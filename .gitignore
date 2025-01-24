@@ -1,0 +1,303 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+#  Usually these files are written by a python script from a template
+#  before PyInstaller builds the exe, so as to inject date/other infos into it.
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+#   For a library or package, you might want to ignore these files since the code is
+#   intended to run in multiple environments; otherwise, check them in:
+.python-version
+
+# pipenv
+#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
+#   However, in case of collaboration, if having platform-specific dependencies or dependencies
+#   having no cross-platform support, pipenv may install dependencies that don't work, or not
+#   install all needed dependencies.
+#Pipfile.lock
+
+# PEP 582; used by e.g. github.com/David-OConnor/pyflow
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+3.8venv/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+#PyCharm
+.idea/
+
+
+# Generic
+__pycache__
+!.elasticbeanstalk/*.cfg.yml
+!.elasticbeanstalk/*.global.yml
+../../../mentor/kupriienko/airtable-notify/.env
+.anvil/*
+.elasticbeanstalk/*
+.env-mysql
+.history
+.mr.developer.cfg
+.pdm.toml
+.prof
+.project
+.pydevproject
+.tox
+.vagrant/
+*.code-workspace
+*.gz
+*.iml
+*.iws
+*.lock
+*.pyc
+*.rar
+*.sqlite
+*.zip
+**/__pycache__/*.pyc
+**/.idea/dataSources.ids
+**/.idea/dataSources.local.xml
+**/.idea/dataSources.xml
+**/.idea/dictionaries
+**/.idea/dynamic.xml
+**/.idea/jsLibraryMappings.xml
+**/.idea/sqlDataSources.xml
+**/.idea/tasks.xml
+**/.idea/uiDesigner.xml
+**/.idea/vcs.xml
+**/.idea/workspace.xml
+**/staticfiles/
+*/__pycache__/
+*/__pycache__/*.pyc
+*/*/__pycache__/
+*/*/*/__pycache__/
+*/staticfiles/
+/bin
+/include
+/lib
+/out/
+/src
+
+atlassian-ide-plugin.xml
+bin
+build
+cmake-build-*/
+com_crashlytics_export_strings.xml
+crashlytics-build.properties
+crashlytics.properties
+develop-eggs
+dist
+eggs
+fabric.properties
+lib
+lib64
+media
+myvenv
+node_modules
+node_modules/
+parts
+pip-wheel-metadata/
+poetry.toml
+projects/static/
+pyrightconfig.json
+pythonenv*
+sdist
+secret_key.txt
+static/build/
+static/local/
+static/media
+static/rev-manifest.json
+staticfiles/
+tdd
+temp/
+Thumbs.db
+tmp/
+uploads/
+var
+venv
+
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+.projectile
+.overcommit.yml
+
+junit*
+
+# Coverage Files
+htmlcov
+.coverage*
+
+# IDEs
+.idea_modules/
+.idea/*
+.idea/*.iml
+.idea/**/contentModel.xml
+.idea/**/dataSources.ids
+.idea/**/dataSources.local.xml
+.idea/**/dataSources/
+.idea/**/dbnavigator.xml
+.idea/**/dictionaries
+.idea/**/dynamic.xml
+.idea/**/gradle.xml
+.idea/**/libraries
+.idea/**/mongoSettings.xml
+.idea/**/shelf
+.idea/**/sqlDataSources.xml
+.idea/**/tasks.xml
+.idea/**/uiDesigner.xml
+.idea/**/usage.statistics.xml
+.idea/**/workspace.xml
+.idea/caches/build_file_checksums.ser
+.idea/dataSources.ids
+.idea/dataSources.local.xml
+.idea/dataSources.xml
+.idea/dictionaries
+.idea/dynamic.xml
+.idea/gradle.xml
+.idea/httpRequests
+.idea/jsLibraryMappings.xml
+.idea/libraries
+.idea/modules
+.idea/modules.xml
+.idea/mongoSettings.xml
+.idea/replstate.xml
+.idea/sqlDataSources.xml
+.idea/tasks.xml
+.idea/uiDesigner.xml
+.idea/vcs.xml
+.idea/workspace.xml
+# VS Code
+.vscode/
+# pycharm
+queue.json
+dev/
+
+# Operating Systems
+.DS_Store
+
+# ruff cache
+.ruff_cache/
+
+
+# pytest cache
+pytestdebug.log

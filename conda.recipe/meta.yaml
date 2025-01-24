@@ -1,0 +1,54 @@
+{% set pyproject = load_file_data('../pyproject.toml', from_recipe_dir=True) %}
+{% set project = pyproject['project'] %}
+
+{% set name = project['name'] %}
+{% set version = project['version'] %}
+
+package:
+  name: {{ name|lower }}
+  version: {{ version }}
+
+source:
+  path: ..
+
+build:
+  number: 0
+  skip: True  # [py<39]
+  script: {{ PYTHON }} -m pip install . --no-deps --no-build-isolation -vv
+
+requirements:
+  host:
+    - python
+    - pip
+    {% for dep in pyproject['build-system']['requires'] %}
+    - {{ dep.lower() }}
+    {% endfor %}
+  run:
+    - python
+    - requests >=2.32.3
+
+test:
+  imports:
+    - mailgun
+    - mailgun.handlers
+  source_files:
+    - tests.py
+  requires:
+    - pip
+    - pytest
+  commands:
+    - pip check
+    # TODO: Add environment variables for tests
+    #- pytest tests.py -vv
+
+about:
+  home: {{ project['urls']['Homepage'] }}
+  dev_url: {{ project['urls']['Repository'] }}
+  doc_url: {{ project['urls']['Documentation'] }}
+  summary: {{ project['description'] }}
+  # TODO: Add the description
+  # description: |
+  #
+  license: {{ project['license']['text'] }}
+  license_family: {{ project['license']['text'] }}
+  license_file: LICENSE

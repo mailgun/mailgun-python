@@ -1,0 +1,15 @@
+---
+name: mailgun
+channels:
+  - defaults
+dependencies:
+  - python >=3.9
+  # build & host deps
+  - pip
+  # runtime deps
+  - requests >=2.32.3
+  # tests
+  - pytest >=7.0.0
+  # other
+  - pre-commit
+  - toml

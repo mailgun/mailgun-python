@@ -1,0 +1,427 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["mailgun", "mailgun.handlers", "mailgun.*", "tests"]
+
+[tool.setuptools.package-data]
+mailgun = ["py.typed", "*.pyi"]
+
+[project]
+# TODO: Replace it with an actual project name
+name = "mailgun"
+version = "1.0.5"
+description = "Python SDK for Mailgun"
+authors = [
+    { name = "diskovod", email = "diskovodik@gmail.com" },
+    # TODO: Replace api@mailgun.com with an actual email
+    { name = "Mailgun", email = "api@mailgun.com" },
+]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.9"
+
+dependencies = ["requests>=2.32.3"]
+
+keywords = [
+        "Python SDK for Mailgun",
+        "Mailgun API Python Wrapper",
+        "wrapper",
+        "email python-wrapper",
+        "transactional-emails",
+        "mailgun",
+        "mailgun-api",
+    ]
+classifiers = [
+        "Development Status :: 2 - Pre-Alpha",
+        "Environment :: Console",
+        "Intended Audience :: Developers",
+        "License :: OSI Approved :: MIT License",
+        "Natural Language :: English",
+        "Operating System :: OS Independent",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Programming Language :: Python :: 3.13",
+        "Programming Language :: Python :: 3 :: Only",
+        "Programming Language :: Python :: Implementation :: CPython",
+        "Topic :: Communications :: Email",
+        "Topic :: Utilities",
+]
+
+[project.urls]
+# TODO: Replace repo name with an actual project name
+"Issue Tracker" = "https://github.com/diskovod/mailgun_beta/issues"
+"Repository" = "https://github.com/diskovod/mailgun_beta"
+
+"Homepage" = "https://www.mailgun.com"
+"Documentation" = "https://documentation.mailgun.com"
+
+[project.optional-dependencies]
+linting = [
+    # dev tools
+    "make",
+    "toml",
+    "autopep8",
+    "bandit",
+    "black>=21.7",
+    "autoflake",
+    "flake8>=3.7.8",  # the modular source code checker: pep8 pyflakes and co
+    "pep8-naming",
+    "isort",  # A Python utility / library to sort Python imports.
+    "yapf",  # A formatter for Python code
+    "pycodestyle",
+    "pydocstyle",
+    "pyupgrade",
+    "refurb",  # refurb doesn't support py39
+    "pre-commit",  # A framework for managing and maintaining multi-language pre-commit hooks.
+    "ruff",  # An extremely fast Python linter and code formatter, written in Rust.
+    "mypy",  # Optional static typing for Python
+    "types-requests",   # mypy requests stub
+    "pandas-stubs",  # mypy pandas stub
+    "types-PyYAML",
+    "monkeytype",  # It can generate type hints based on the observed behavior of your code.
+    "pyright",
+    "pylint",
+    "pytype",  # a static type checker for any type hints you have put in your code
+    "radon",
+    "safety", # Checks installed dependencies for known vulnerabilities and licenses.
+    "vulture",
+    # env variables
+    "python-dotenv>=0.19.2",
+]
+
+docs = [
+    "docconvert",
+    "pyment>=0.3.3",  # for generating docstrings
+]
+
+metrics = [
+    "pystra",  # provides functionalities to enable structural reliability analysis
+    "wily>=1.2.0",  # a tool for reporting code complexity metrics
+]
+
+profilers = ["scalene>=1.3.16", "snakeviz"]
+
+tests = [
+    # tests
+    "pytest>=7.0.0",
+    "pytest-benchmark",
+    "pytest-cov",
+    "coverage>=4.5.4",
+    "codecov",
+]
+
+conda_build = ["conda-build"]
+
+spelling = ["typos"]
+
+other = ["toml"]
+
+
+[tool.black]
+line-length = 88
+target-version = ["py39", "py310", "py311", "py312", "py313"]
+skip-string-normalization = false
+skip-magic-trailing-comma = false
+extend-exclude = '''
+/(
+  | docs
+  | setup.py
+  | venv
+)/
+'''
+
+[tool.autopep8]
+max_line_length = 88
+ignore = ""  # or ["E501", "W6"]
+in-place = true
+recursive = true
+aggressive = 3
+
+[tool.ruff]
+# Exclude a variety of commonly ignored directories.
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".ipynb_checkpoints",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "site-packages",
+    "venv",
+]
+extend-exclude = ["tests", "test"]
+
+# Same as Black.
+line-length = 88
+#indent-width = 4
+
+# Assume Python 3.9.
+target-version = "py39"
+# Enumerate all fixed violations.
+show-fixes = true
+
+[tool.ruff.lint]
+# Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
+# McCabe complexity (`C901`) by default.
+# Enable pycodestyle (`E`) and Pyflakes (`F`) codes by default, ('UP') is pyupgrade.
+# "ERA" - Found commented-out code
+# see https://docs.astral.sh/ruff/rules/#rules
+select = ["ALL"]
+#select = ["A", "ARG", "B", "C4", "DTZ", "E", "EM", "ERA", "EXE", "F", "FA", "FLY", "FURB", "G", "ICN", "INP", "INT", "LOG", "N", "PD", "PERF", "PIE", "PLC", "PLE", "PLW", "PT", "PTH", "PYI", "Q", "RET", "RSE", "RUF", "S", "SIM", "T10", "TID", "TRY", "UP", "W"]
+
+external = ["DOC", "PLR"]
+
+exclude = ["mailgun/examples/*", "tests"]
+
+#extend-select = ["W", "N", "UP", "B", "A", "C4", "PT", "SIM", "PD", "PLE", "RUF"]
+# Never enforce `E501` (line length violations).
+
+ignore = [
+    # TODO: Enable C901, TRY201, TRY003, EM101, PTH118, PLR0917 later
+    "C901", "TRY201", "TRY003", "EM101", "PTH118", "PLR0912", "PLR0917", "TD002", "TD003", "FIX002",
+    "ANN401",  # ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+    "B904",  # Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None`
+    # pycodestyle (E, W)
+    "CPY001",   # Missing copyright notice at top of file
+    "DOC201",  # DOC201 `return` is not documented in docstring
+    # TODO: Enable DOC501 when the upstream issue is fixed, see https://github.com/astral-sh/ruff/issues/12520
+    "DOC501",  # DOC501 Raised exception `ApiError` missing from docstring
+    "E501",
+    "PLR0913",  # PLR0913 Too many arguments in function definition (6 > 5)
+]
+
+# Allow fix for all enabled rules (when `--fix`) is provided.
+fixable = ["ALL"]
+unfixable = ["B"]
+
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.lint.flake8-annotations]
+allow-star-arg-any = false
+ignore-fully-untyped = false
+
+[tool.ruff.lint.flake8-quotes]
+docstring-quotes = "double"
+
+[tool.ruff.format]
+exclude = ["*.pyi"]
+# Like Black, use double quotes for strings.
+quote-style = "double"
+
+# Like Black, indent with spaces, rather than tabs.
+indent-style = "space"
+
+# Like Black, respect magic trailing commas.
+skip-magic-trailing-comma = false
+
+# Like Black, automatically detect the appropriate line ending.
+line-ending = "auto"
+
+# Enable auto-formatting of code examples in docstrings. Markdown,
+# reStructuredText code/literal blocks and doctests are all supported.
+#
+# This is currently disabled by default, but it is planned for this
+# to be opt-out in the future.
+docstring-code-format = true
+
+# Set the line length limit used when formatting code snippets in
+# docstrings.
+#
+# This only has an effect when the `docstring-code-format` setting is
+# enabled.
+docstring-code-line-length = "dynamic"
+
+# Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["E402"]
+#"path/to/file.py" = ["E402"]
+
+[tool.ruff.lint.isort]
+force-single-line = true
+force-sort-within-sections = false
+lines-after-imports = 2
+
+[tool.ruff.lint.mccabe]
+# Unlike Flake8, default to a complexity level of 10.
+max-complexity = 10
+
+[tool.ruff.lint.pycodestyle]
+ignore-overlong-task-comments = true
+
+[tool.ruff.lint.pydocstyle]
+# TODO: Enable the 'sphinx' style when it will be available, see https://github.com/astral-sh/ruff/pull/13286
+convention = "google"
+
+[tool.pydocstyle]
+convention = "google"
+match = ".*.py"
+match_dir = '^examples/'
+
+[tool.flake8]
+exclude = ["mailgun/examples/*", "tests"]
+ignore = ['E501']
+extend-ignore = "W503"
+per-file-ignores = [
+    '__init__.py:F401',
+]
+max-line-length = 88
+count = true
+
+[tool.yapf]
+based_on_style = "facebook"
+SPLIT_BEFORE_BITWISE_OPERATOR = true
+SPLIT_BEFORE_ARITHMETIC_OPERATOR = true
+SPLIT_BEFORE_LOGICAL_OPERATOR = true
+SPLIT_BEFORE_DOT = true
+
+[tool.yapfignore]
+ignore_patterns = [
+]
+
+[tool.mypy]
+strict = true
+# Adapted from this StackOverflow post:
+# https://stackoverflow.com/questions/55944201/python-type-hinting-how-do-i-enforce-that-project-wide
+python_version = "3.9"
+mypy_path = "type_stubs"
+namespace_packages = true
+# This flag enhances the user feedback for error messages
+pretty = true
+# 3rd party import
+ignore_missing_imports = true
+# flag to suppress Name <var> already defined on line
+allow_redefinition = false
+# Disallow dynamic typing
+disallow_any_unimported = false
+disallow_any_expr = false
+disallow_any_decorated = false
+disallow_any_explicit = false
+disallow_any_generics = false
+disallow_subclassing_any = true
+# Disallow untyped definitions and calls
+disallow_untyped_calls = true
+disallow_untyped_defs = true
+check_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_decorators = true
+# None and optional handling
+no_implicit_optional = true
+# Configuring warnings
+warn_return_any = false
+warn_no_return = true
+warn_unreachable = true
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = false
+# Misc
+follow_imports = "silent"
+strict_optional = false
+strict_equality = true
+#exclude = '''(?x)(
+#    (^|/)test[^/]*\.py$    # files named "test*.py"
+#  )'''
+exclude = [
+    "mailgun/examples/*",
+]
+
+# Configuring error messages
+show_error_context = false
+show_column_numbers = false
+show_error_codes = true
+disable_error_code = 'misc'
+
+[tool.pyright]
+include = ["mailgun"]
+exclude = ["mailgun/examples/*", "**/__pycache__"]
+reportAttributeAccessIssue = false
+reportMissingImports = false
+
+
+[tool.bandit]
+# usage: bandit -c pyproject.toml -r .
+exclude_dirs = ["tests", "tests.py"]
+tests = ["B201", "B301"]
+skips = ["B101", "B601"]
+
+[tool.bandit.any_other_function_with_shell_equals_true]
+no_shell = [
+  "os.execl",
+  "os.execle",
+  "os.execlp",
+  "os.execlpe",
+  "os.execv",
+  "os.execve",
+  "os.execvp",
+  "os.execvpe",
+  "os.spawnl",
+  "os.spawnle",
+  "os.spawnlp",
+  "os.spawnlpe",
+  "os.spawnv",
+  "os.spawnve",
+  "os.spawnvp",
+  "os.spawnvpe",
+  "os.startfile"
+]
+shell = [
+  "os.system",
+  "os.popen",
+  "os.popen2",
+  "os.popen3",
+  "os.popen4",
+  "popen2.popen2",
+  "popen2.popen3",
+  "popen2.popen4",
+  "popen2.Popen3",
+  "popen2.Popen4",
+  "commands.getoutput",
+  "commands.getstatusoutput"
+]
+subprocess = [
+  "subprocess.Popen",
+  "subprocess.call",
+  "subprocess.check_call",
+  "subprocess.check_output"
+]
+
+[tool.coverage.run]
+source_pkgs = ["mailgun"]
+branch = true
+parallel = true
+omit = [
+    "mailgun/examples/*",
+]
+
+[tool.coverage.paths]
+tests = ["tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "no cov",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
