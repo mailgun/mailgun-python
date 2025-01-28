@@ -26,8 +26,21 @@ def get_simple_domain() -> None:
     GET /domains/<domain>
     :return:
     """
-    domain_name = "python.test.domain4"
+    domain_name = "python.test.domain5"
     data = client.domains.get(domain_name=domain_name)
+    print(data.json())
+
+def update_simple_domain() -> None:
+    """
+    PUT /domains/<domain>
+    :return:
+    """
+    domain_name = "python.test.domain5"
+    data = {
+        "name": "python.test.domain5",
+        "spam_action": "disabled"
+    }
+    data = client.domains.put(data=data, domain=domain_name)
     print(data.json())
 
 
@@ -208,4 +221,6 @@ def put_web_prefix() -> None:
 
 
 if __name__ == "__main__":
-    put_web_prefix()
+    #add_domain()
+    get_simple_domain()
+    update_simple_domain()
