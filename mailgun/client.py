@@ -80,7 +80,7 @@ class Config:
     API_REF: str = "https://documentation.mailgun.com/en/latest/api_reference.html"
     user_agent: str = "mailgun-api-python/"
 
-    def __init__(self, version: str | None = None, api_url: str | None = None) -> None:
+    def __init__(self, api_url: str | None = None) -> None:
         """Initialize a new Config instance with specified or default API settings.
 
         This initializer sets the API version and base URL. If no version or URL
@@ -96,6 +96,7 @@ class Config:
 
     def __getitem__(self, key: str) -> tuple[Any, dict[str, str]]:
         """Parse incoming split attr name, check it and prepare endpoint url.
+
         Most urls generated here can't be generated dynamically as we are doing this
         in build_url() method under Endpoint class.
         :param key: incoming attr name
@@ -151,7 +152,7 @@ class Config:
             split = key.split("_") if "_" in key else [key]
             final_keys = split
 
-            if any(x in key for x in ["activate", "deactivate"]):
+            if any(x in key for x in ("activate", "deactivate")):
                 action = "activate" if "activate" in key else "deactivate"
                 final_keys = [
                     "domains",
@@ -492,9 +493,8 @@ class Client:
         :param kwargs: kwargs
         """
         self.auth = auth
-        version = kwargs.get("version")
         api_url = kwargs.get("api_url")
-        self.config = Config(version=version, api_url=api_url)
+        self.config = Config(api_url=api_url)
 
     def __getattr__(self, name: str) -> Any:
         """Get named attribute of an object, split it and execute.
