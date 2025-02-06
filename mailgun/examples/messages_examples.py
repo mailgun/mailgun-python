@@ -44,7 +44,6 @@ def post_message() -> None:
         ),
     ]
     
-    print(files)
     req = client.messages.create(data=data, files=files, domain=domain)
     print(req.json())
 
