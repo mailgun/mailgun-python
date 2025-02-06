@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-from typing import Any
 
 from mailgun.client import Client
 
@@ -37,6 +36,7 @@ def add_domain() -> None:
     print(request.json())
     print(request.status_code)
 
+
 # Get domain
 
 
@@ -56,10 +56,7 @@ def update_simple_domain() -> None:
     :return:
     """
     domain_name = "python.test.domain5"
-    data = {
-        "name": "python.test.domain5",
-        "spam_action": "disabled"
-    }
+    data = {"name": "python.test.domain5", "spam_action": "disabled"}
     data = client.domains.put(data=data, domain=domain_name)
     print(data.json())
 
@@ -72,7 +69,6 @@ def verify_domain() -> None:
     domain_name = "python.test.domain5"
     data = client.domains.put(domain=domain_name, verify=True)
     print(data.json())
-
 
 
 def delete_domain() -> None:
@@ -122,11 +118,9 @@ def delete_all_domain_credentials() -> None:
     DELETE /domains/<domain>/credentials
     :return:
     """
-    request = client.domains_credentials.delete(
-        domain=domain
-    )
+    request = client.domains_credentials.delete(domain=domain)
     print(request.json())
-    
+
 
 def delete_credentials() -> None:
     """
@@ -245,7 +239,5 @@ def get_sending_queues() -> None:
     print(request.json())
 
 
-
 if __name__ == "__main__":
     get_domains()
-

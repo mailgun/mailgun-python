@@ -21,9 +21,9 @@ from urllib.parse import urljoin
 import requests  # type: ignore[import-untyped]
 
 from mailgun.handlers.default_handler import handle_default
-from mailgun.handlers.domains_handler import (handle_domainlist,
-                                              handle_sending_queues)
+from mailgun.handlers.domains_handler import handle_domainlist
 from mailgun.handlers.domains_handler import handle_domains
+from mailgun.handlers.domains_handler import handle_sending_queues
 from mailgun.handlers.email_validation_handler import handle_address_validate
 from mailgun.handlers.error_handler import ApiError
 from mailgun.handlers.inbox_placement_handler import handle_inbox
@@ -91,7 +91,6 @@ class Config:
         :param api_url: API base url
         :type api_url: str | None
         """
-
         self.ex_handler: bool = True
         self.api_url = api_url or self.DEFAULT_API_URL
 
@@ -127,13 +126,12 @@ class Config:
             if "ip_pools" in key:
                 return {
                     "base": v5_base,
-                    "keys": ["accounts", "subaccounts", "ip_pools"]
+                    "keys": ["accounts", "subaccounts", "ip_pools"],
                 }, headers
-            elif "ip_pool" in key:
+            if "ip_pool" in key:
                 return {
                     "base": v5_base,
-                    "keys": ["accounts", "subaccounts", "{subaccountId}",
-                             "ip_pool"]
+                    "keys": ["accounts", "subaccounts", "{subaccountId}", "ip_pool"],
                 }, headers
 
         # Handle DKIM management endpoints
@@ -141,13 +139,12 @@ class Config:
             if "rotation" in key:
                 return {
                     "base": v1_base,
-                    "keys": ["dkim_management", "domains", "{name}",
-                             "rotation"]
+                    "keys": ["dkim_management", "domains", "{name}", "rotation"],
                 }, headers
-            elif "rotate" in key:
+            if "rotate" in key:
                 return {
                     "base": v1_base,
-                    "keys": ["dkim_management", "domains", "{name}", "rotate"]
+                    "keys": ["dkim_management", "domains", "{name}", "rotate"],
                 }, headers
 
         if "domains" in key:
@@ -156,8 +153,13 @@ class Config:
 
             if any(x in key for x in ["activate", "deactivate"]):
                 action = "activate" if "activate" in key else "deactivate"
-                final_keys = ["domains", "{authority_name}", "keys",
-                              "{selector}", action]
+                final_keys = [
+                    "domains",
+                    "{authority_name}",
+                    "keys",
+                    "{selector}",
+                    action,
+                ]
                 return {"base": v4_base, "keys": final_keys}, headers
 
             if "dkimauthority" in split:
@@ -170,17 +172,22 @@ class Config:
                 final_keys = ["sending_queues"]
 
             v3_domain_endpoints = {
-                "credentials", "connection", "tracking",
-                "dkimauthority", "dkimselector", "webprefix",
-                "webhooks", "sendingqueues",
+                "credentials",
+                "connection",
+                "tracking",
+                "dkimauthority",
+                "dkimselector",
+                "webprefix",
+                "webhooks",
+                "sendingqueues",
             }
-            base = v3_base if any(
-                x in key for x in v3_domain_endpoints) else v4_base
+            base = v3_base if any(x in key for x in v3_domain_endpoints) else v4_base
             return {"base": f"{base}domains/", "keys": final_keys}, headers
 
         if "addressvalidate" in key:
             return {
-                "base": f"{v4_base}address/validate", "keys": key.split("_")
+                "base": f"{v4_base}address/validate",
+                "keys": key.split("_"),
             }, headers
 
         return {"base": v3_base, "keys": key.split("_")}, headers

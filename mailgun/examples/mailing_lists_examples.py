@@ -1,5 +1,4 @@
 import os
-from pathlib import Path
 
 from mailgun.client import Client
 
@@ -190,7 +189,6 @@ def post_members_json() -> None:
         multiple=True,
     )
     print(req.json())
-
 
 
 def delete_mailing_list_member() -> None:

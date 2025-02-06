@@ -222,9 +222,7 @@ def get_single_complaint() -> None:
 
     :return:
     """
-    req = client.complaints.get(
-        domain=domain, complaint_address="bob@gmail.com"
-    )
+    req = client.complaints.get(domain=domain, complaint_address="bob@gmail.com")
     print(req.json())
 
 
@@ -351,7 +349,6 @@ def delete_all_whitelists() -> None:
     """
     req = client.whitelists.delete(domain=domain)
     print(req.json())
-
 
 
 if __name__ == "__main__":

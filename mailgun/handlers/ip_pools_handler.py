@@ -4,8 +4,10 @@ Doc: https://documentation.mailgun.com/en/latest/api-ip-pools.html
 """
 
 from __future__ import annotations
+
 from os import path
 from typing import Any
+
 
 def handle_ippools(
     url: dict[str, Any],

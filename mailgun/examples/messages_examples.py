@@ -43,7 +43,7 @@ def post_message() -> None:
             ("test2.txt", Path("mailgun/doc_tests/files/test2.txt").read_bytes()),
         ),
     ]
-    
+
     req = client.messages.create(data=data, files=files, domain=domain)
     print(req.json())
 

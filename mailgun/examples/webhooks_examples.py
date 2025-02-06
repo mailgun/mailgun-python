@@ -39,6 +39,7 @@ def get_webhook() -> None:
     req = client.domains_webhooks_clicked.get(domain=domain)
     print(req.json())
 
+
 def put_webhook() -> None:
     """
     PUT /domains/<domain>/webhooks/<webhookname>
