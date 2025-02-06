@@ -1,4 +1,4 @@
-# Mailgun Python SDK (DEMO)
+# Mailgun Python SDK
 
 ## Overview
 

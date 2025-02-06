@@ -1,4 +1,5 @@
-address,tag,created_at
-1@test.com,your_it,"Thu, 13 Oct 2011 18:02:00 GMT"
-2@test.com,your_it,"Thu, 13 Oct 2011 18:02:00 GMT"
-3@test.com,your_it,"Thu, 13 Oct 2011 18:02:00 GMT"
+address,tags,created_at
+foo@example.com,,
+bar@example.org,,
+new@example.net,,
+address@example.com,,

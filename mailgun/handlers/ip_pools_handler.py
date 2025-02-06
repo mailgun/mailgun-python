@@ -4,18 +4,16 @@ Doc: https://documentation.mailgun.com/en/latest/api-ip-pools.html
 """
 
 from __future__ import annotations
-
 from os import path
 from typing import Any
-
 
 def handle_ippools(
     url: dict[str, Any],
     _domain: str | None,
     _method: str | None,
     **kwargs: Any,
-) -> Any:
-    """Handle IP pools.
+) -> str:
+    """Handle IP pools URL construction.
 
     :param url: Incoming URL dictionary
     :type url: dict
@@ -27,9 +25,17 @@ def handle_ippools(
     :return: final url for IP pools endpoint
     """
     final_keys = path.join("/", *url["keys"]) if url["keys"] else ""
-    if "pool_id" in kwargs:
-        url = url["base"][:-1] + final_keys + "/" + kwargs["pool_id"]
-    else:
-        url = url["base"][:-1] + final_keys
+    base_url = url["base"][:-1] + final_keys
 
-    return url
+    if "pool_id" not in kwargs:
+        return base_url
+
+    pool_url = f"{base_url}/{kwargs['pool_id']}"
+
+    if "ips.json" in final_keys:
+        return pool_url
+
+    if "ip" in kwargs:
+        return f"{pool_url}/ips/{kwargs['ip']}"
+
+    return pool_url

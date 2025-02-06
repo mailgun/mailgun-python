@@ -21,7 +21,8 @@ from urllib.parse import urljoin
 import requests  # type: ignore[import-untyped]
 
 from mailgun.handlers.default_handler import handle_default
-from mailgun.handlers.domains_handler import handle_domainlist
+from mailgun.handlers.domains_handler import (handle_domainlist,
+                                              handle_sending_queues)
 from mailgun.handlers.domains_handler import handle_domains
 from mailgun.handlers.email_validation_handler import handle_address_validate
 from mailgun.handlers.error_handler import ApiError
@@ -52,6 +53,7 @@ HANDLERS: dict[str, Callable] = {  # type: ignore[type-arg]
     "dkim_authority": handle_domains,
     "dkim_selector": handle_domains,
     "web_prefix": handle_domains,
+    "sending_queues": handle_sending_queues,
     "ips": handle_ips,
     "ip_pools": handle_ippools,
     "tags": handle_tags,
@@ -76,7 +78,6 @@ class Config:
 
     DEFAULT_API_URL: str = "https://api.mailgun.net/"
     API_REF: str = "https://documentation.mailgun.com/en/latest/api_reference.html"
-    version: str = "v3"
     user_agent: str = "mailgun-api-python/"
 
     def __init__(self, version: str | None = None, api_url: str | None = None) -> None:
@@ -90,85 +91,93 @@ class Config:
         :param api_url: API base url
         :type api_url: str | None
         """
-        if version is not None:
-            self.version = version
 
         self.ex_handler: bool = True
         self.api_url = api_url or self.DEFAULT_API_URL
 
     def __getitem__(self, key: str) -> tuple[Any, dict[str, str]]:
-        """Parse incoming split attr name, check it and prepare endpoint url.
-
-        Most urls generated here can't be generated dynamically as we are doing this
-        in build_url() method under Endpoint class.
-        :param key: incoming attr name
-        :type key: str
-        :return: url, headers
-        """
-        # Append version to URL.
-        # Forward slash is ignored if present in self.version.
-        url = urljoin(self.api_url, self.version + "/")
+        """Parse attribute name and prepare endpoint URL."""
+        key = key.lower()
         headers = {"User-agent": self.user_agent}
-        modified = False
-        # Domains section
-        if key.lower() == "domainlist":
-            url = {  # type: ignore[assignment]
-                "base": urljoin(self.api_url, self.version + "/"),
-                "keys": ["domainlist"],
-            }
-            modified = True
-        if "domains" in key.lower():
-            split = [key.lower()]
-            if "_" in key.lower():
-                split = key.split("_")
+        v1_base = urljoin(self.api_url, "v1/")
+        v3_base = urljoin(self.api_url, "v3/")
+        v4_base = urljoin(self.api_url, "v4/")
+        v5_base = urljoin(self.api_url, "v5/")
+
+        special_cases = {
+            "messages": {"base": v3_base, "keys": ["messages"]},
+            "mimemessage": {"base": v3_base, "keys": ["messages.mime"]},
+            "resendmessage": {"base": v3_base, "keys": ["resendmessage"]},
+            "ippools": {"base": v3_base, "keys": ["ip_pools"]},
+            "dkimkeys": {"base": v1_base, "keys": ["dkim", "keys"]},
+            "domainlist": {"base": v4_base, "keys": ["domainlist"]},
+        }
+
+        if key in special_cases:
+            return special_cases[key], headers
+
+        # Handle DIPP endpoints
+        if "subaccount" in key:
+            if "ip_pools" in key:
+                return {
+                    "base": v5_base,
+                    "keys": ["accounts", "subaccounts", "ip_pools"]
+                }, headers
+            elif "ip_pool" in key:
+                return {
+                    "base": v5_base,
+                    "keys": ["accounts", "subaccounts", "{subaccountId}",
+                             "ip_pool"]
+                }, headers
+
+        # Handle DKIM management endpoints
+        if "dkim_management" in key:
+            if "rotation" in key:
+                return {
+                    "base": v1_base,
+                    "keys": ["dkim_management", "domains", "{name}",
+                             "rotation"]
+                }, headers
+            elif "rotate" in key:
+                return {
+                    "base": v1_base,
+                    "keys": ["dkim_management", "domains", "{name}", "rotate"]
+                }, headers
+
+        if "domains" in key:
+            split = key.split("_") if "_" in key else [key]
             final_keys = split
+
+            if any(x in key for x in ["activate", "deactivate"]):
+                action = "activate" if "activate" in key else "deactivate"
+                final_keys = ["domains", "{authority_name}", "keys",
+                              "{selector}", action]
+                return {"base": v4_base, "keys": final_keys}, headers
+
             if "dkimauthority" in split:
                 final_keys = ["dkim_authority"]
             elif "dkimselector" in split:
                 final_keys = ["dkim_selector"]
             elif "webprefix" in split:
                 final_keys = ["web_prefix"]
+            elif "sendingqueues" in split:
+                final_keys = ["sending_queues"]
 
-            url = {  # type: ignore[assignment]
-                "base": urljoin(self.api_url, self.version + "/domains/"),
-                "keys": final_keys,
+            v3_domain_endpoints = {
+                "credentials", "connection", "tracking",
+                "dkimauthority", "dkimselector", "webprefix",
+                "webhooks", "sendingqueues",
             }
-            modified = True
-        # Messages section
-        if key.lower() == "messages":
-            url = {  # type: ignore[assignment]
-                "base": urljoin(self.api_url, self.version + "/"),
-                "keys": ["messages"],
-            }
-        if key.lower() == "mimemessage":
-            url = {  # type: ignore[assignment]
-                "base": urljoin(self.api_url, self.version + "/"),
-                "keys": ["messages.mime"],
-            }
-            modified = True
-        if key.lower() == "resendmessage":
-            url = {"keys": ["resendmessage"]}  # type: ignore[assignment]
-            modified = True
+            base = v3_base if any(
+                x in key for x in v3_domain_endpoints) else v4_base
+            return {"base": f"{base}domains/", "keys": final_keys}, headers
 
-        # IPpools section
-        if key.lower() == "ippools":
-            url = {  # type: ignore[assignment]
-                "base": urljoin(self.api_url, self.version + "/"),
-                "keys": ["ip_pools"],
-            }
-            modified = True
-        # Email Validation section
-        if "addressvalidate" in key.lower():
-            url = {  # type: ignore[assignment]
-                "base": urljoin(self.api_url, "v4" + "/address/validate"),
-                "keys": key.split("_"),
-            }
-            modified = True
+        if "addressvalidate" in key:
+            return {
+                "base": f"{v4_base}address/validate", "keys": key.split("_")
+            }, headers
 
-        if not modified:
-            url = urljoin(self.api_url, self.version + "/")
-            url = {"base": url, "keys": key.split("_")}  # type: ignore[assignment]
-        return url, headers
+        return {"base": v3_base, "keys": key.split("_")}, headers
 
 
 class Endpoint:

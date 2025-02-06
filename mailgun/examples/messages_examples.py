@@ -43,7 +43,8 @@ def post_message() -> None:
             ("test2.txt", Path("mailgun/doc_tests/files/test2.txt").read_bytes()),
         ),
     ]
-
+    
+    print(files)
     req = client.messages.create(data=data, files=files, domain=domain)
     print(req.json())
 
@@ -132,4 +133,4 @@ def resend_message() -> None:
 
 
 if __name__ == "__main__":
-    resend_message()
+    post_message()

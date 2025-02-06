@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 
 from mailgun.client import Client
@@ -29,6 +31,14 @@ def create_webhook() -> None:
     print(req.json())
 
 
+def get_webhook() -> None:
+    """
+    GET /domains/<domain>/webhooks/<webhookname>
+    :return:
+    """
+    req = client.domains_webhooks_clicked.get(domain=domain)
+    print(req.json())
+
 def put_webhook() -> None:
     """
     PUT /domains/<domain>/webhooks/<webhookname>
@@ -50,4 +60,4 @@ def delete_webhook() -> None:
 
 
 if __name__ == "__main__":
-    delete_webhook()
+    get_webhooks()

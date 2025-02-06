@@ -165,7 +165,7 @@ def import_list_unsubs() -> None:
     # and if it does this value will be set to the number of bytes in the file.
     # Errors may occur if you open the file in text mode.
     files = {
-        "unsubscribe2_csv": Path(
+        "unsubscribe_csv": Path(
             "mailgun/doc_tests/files/mailgun_unsubscribes.csv"
         ).read_bytes()
     }
@@ -213,6 +213,18 @@ def add_complaints() -> None:
     """
     data = {"address": "bob@gmail.com", "tag": "compl_test_tag"}
     req = client.complaints.create(data=data, domain=domain)
+    print(req.json())
+
+
+def get_single_complaint() -> None:
+    """
+    GET /<domain>/complaints/<address>
+
+    :return:
+    """
+    req = client.complaints.get(
+        domain=domain, complaint_address="bob@gmail.com"
+    )
     print(req.json())
 
 
@@ -330,6 +342,16 @@ def delete_single_whitelist() -> None:
     """
     req = client.whitelists.delete(domain=domain, whitelist_address="bob@gmail.com")
     print(req.json())
+
+
+def delete_all_whitelists() -> None:
+    """
+    DELETE /<domain>/whitelists
+    :return:
+    """
+    req = client.whitelists.delete(domain=domain)
+    print(req.json())
+
 
 
 if __name__ == "__main__":

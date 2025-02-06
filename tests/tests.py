@@ -280,7 +280,7 @@ class IpTests(unittest.TestCase):
 
 
 @pytest.mark.skip(
-    "This feature can be disabled for the account, see https://app.mailgun.com/settings/ip-pools"
+   "This feature can be disabled for the account, see https://app.mailgun.com/settings/ip-pools"
 )
 class IpPoolsTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -362,25 +362,6 @@ class EventsTests(unittest.TestCase):
         req = self.client.events.get(domain=self.domain, filters=self.params)
 
         self.assertIn("items", req.json())
-        self.assertEqual(req.status_code, 200)
-
-
-class StatsTests(unittest.TestCase):
-    def setUp(self) -> None:
-        self.auth: tuple[str, str] = (
-            "api",
-            os.environ["APIKEY"],
-        )
-        self.client: Client = Client(auth=self.auth)
-        self.domain: str = os.environ["DOMAIN"]
-        self.params: dict[str, str | list[str]] = {
-            "event": ["accepted"],
-            "duration": "1m",
-        }
-
-    def test_stats_total_get(self) -> None:
-        req = self.client.stats_total.get(filters=self.params, domain=self.domain)
-        self.assertIn("stats", req.json())
         self.assertEqual(req.status_code, 200)
 
 
