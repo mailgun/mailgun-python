@@ -96,7 +96,13 @@ class Config:
         self.api_url = api_url or self.DEFAULT_API_URL
 
     def __getitem__(self, key: str) -> tuple[Any, dict[str, str]]:
-        """Parse attribute name and prepare endpoint URL."""
+        """Parse incoming split attr name, check it and prepare endpoint url.
+        Most urls generated here can't be generated dynamically as we are doing this
+        in build_url() method under Endpoint class.
+        :param key: incoming attr name
+        :type key: str
+        :return: url, headers
+        """
         key = key.lower()
         headers = {"User-agent": self.user_agent}
         v1_base = urljoin(self.api_url, "v1/")
