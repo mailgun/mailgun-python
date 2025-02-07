@@ -17,7 +17,7 @@ authors = [
     # TODO: Replace api@mailgun.com with an actual email
     { name = "Mailgun", email = "api@mailgun.com" },
 ]
-license = {text = "MIT"}
+license = {text = "Apache-2.0"}
 readme = "README.md"
 requires-python = ">=3.9"
 

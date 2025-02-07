@@ -25,14 +25,17 @@ requirements:
     {% endfor %}
   run:
     - python
-    - requests >=2.32.3
+    {% for dep in pyproject['project']['dependencies'] %}
+    - {{ dep.lower() }}
+    {% endfor %}
 
 test:
   imports:
     - mailgun
     - mailgun.handlers
+    - mailgun.examples
   source_files:
-    - tests.py
+    - tests/tests.py
   requires:
     - pip
     - pytest
@@ -50,5 +53,5 @@ about:
   # description: |
   #
   license: {{ project['license']['text'] }}
-  license_family: {{ project['license']['text'] }}
+  license_family: {{ project['license']['text'].split('-')[0] }}
   license_file: LICENSE

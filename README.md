@@ -141,7 +141,7 @@ All of Mailgun's HTTP response codes follow standard HTTP definitions. For some 
 
 ## Request examples
 
-Examples for all endpoints you will find under:
+Examples for available endpoints you will find under:
 
 ```
 mailgun/examples
@@ -608,7 +608,7 @@ If you have suggestions on how to improve the guides, please submit an issue in 
 
 ## License
 
-[MIT](https://choosealicense.com/licenses/mit/)
+[Apache-2.0](https://choosealicense.com/licenses/apache-2.0/)
 
 ## Contributors
 
