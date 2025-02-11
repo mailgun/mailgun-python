@@ -249,6 +249,13 @@ class DomainTests(unittest.TestCase):
         )
         self.assertIn("message", request.json())
 
+    def test_get_sending_queues(self) -> None:
+        self.client.domains.delete(domain=self.test_domain)
+        self.client.domains.create(data=self.post_domain_data)
+        request = self.client.domains_sendingqueues.get(domain=self.post_domain_data['name'])
+        self.assertEqual(request.status_code, 200)
+        self.assertIn("scheduled", request.json())
+
 
 @pytest.mark.skip(
     "Dedicated IPs should be enabled for the domain, see https://app.mailgun.com/settings/dedicated-ips"
