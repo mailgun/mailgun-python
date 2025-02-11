@@ -46,8 +46,8 @@ def get_simple_domain() -> None:
     :return:
     """
     domain_name = "python.test.domain5"
-    data = client.domains.get(domain_name=domain_name)
-    print(data.json())
+    request = client.domains.get(domain_name=domain_name)
+    print(request.json())
 
 
 def update_simple_domain() -> None:
@@ -56,9 +56,9 @@ def update_simple_domain() -> None:
     :return:
     """
     domain_name = "python.test.domain5"
-    data = {"name": "python.test.domain5", "spam_action": "disabled"}
-    data = client.domains.put(data=data, domain=domain_name)
-    print(data.json())
+    data = {"name": domain_name, "spam_action": "disabled"}
+    request = client.domains.put(data=data, domain=domain_name)
+    print(request.json())
 
 
 def verify_domain() -> None:
@@ -67,8 +67,8 @@ def verify_domain() -> None:
     :return:
     """
     domain_name = "python.test.domain5"
-    data = client.domains.put(domain=domain_name, verify=True)
-    print(data.json())
+    request = client.domains.put(domain=domain_name, verify=True)
+    print(request.json())
 
 
 def delete_domain() -> None:

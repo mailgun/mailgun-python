@@ -62,6 +62,9 @@ class DomainTests(unittest.TestCase):
         self.post_domain_data: dict[str, str] = {
             "name": self.test_domain,
         }
+        self.put_domain_data: dict[str, str] = {
+            "spam_action": "disabled",
+        }
         self.post_domain_creds: dict[str, str] = {
             "login": f"alice_bob@{self.domain}",
             "password": "test_new_creds123",
@@ -117,6 +120,14 @@ class DomainTests(unittest.TestCase):
         request = self.client.domains.create(data=self.post_domain_data)
         self.assertEqual(request.status_code, 200)
         self.assertIn("Domain DNS records have been created", request.json()["message"])
+
+    def test_update_simple_domain(self) -> None:
+        self.client.domains.delete(domain=self.test_domain)
+        self.client.domains.create(data=self.post_domain_data)
+        data = {"spam_action": "disabled"}
+        request = self.client.domains.put(data=data, domain=self.post_domain_data['name'])
+        self.assertEqual(request.status_code, 200)
+        self.assertEqual(request.json()["message"], "Domain has been updated")
 
     @pytest.mark.skip("The test can fail because the domain name is a random string")
     def test_get_single_domain(self) -> None:
