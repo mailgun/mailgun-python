@@ -10,24 +10,6 @@ mailing_list_address: str = os.environ["MAILLIST_ADDRESS"]
 client: Client = Client(auth=("api", key))
 
 
-def get_pages() -> None:
-    """
-    GET /lists/pages
-    :return:
-    """
-    req = client.lists_pages.get(domain=domain)
-    print(req.json())
-
-
-def get_lists_address() -> None:
-    """
-    GET /lists/<address>
-    :return:
-    """
-    req = client.lists.get(domain=domain, address="everyone@mailgun.zeefarmer.com")
-    print(req.json())
-
-
 def post_lists() -> None:
     """
     POST /lists
@@ -42,6 +24,15 @@ def post_lists() -> None:
     print(req.json())
 
 
+def get_pages() -> None:
+    """
+    GET /lists/pages
+    :return:
+    """
+    req = client.lists_pages.get(domain=domain)
+    print(req.json())
+
+
 def put_lists() -> None:
     """
     PUT /lists/<address>
@@ -53,6 +44,16 @@ def put_lists() -> None:
     print(req.json())
 
 
+def get_lists() -> None:
+    """
+    GEt /lists
+    :return:
+    """
+    req = client.lists.get(domain=domain, address=f"python_sdk2@{domain}")
+    print(req.json())
+
+
+# Email Validations are only available for paid accounts.
 def post_address_validate() -> None:
     """
     POST /lists/<address>/validate
@@ -64,6 +65,7 @@ def post_address_validate() -> None:
     print(req.json())
 
 
+# Email Validations are only available for paid accounts.
 def get_validate_address() -> None:
     """
     GET /lists/<address>/validate
@@ -75,6 +77,7 @@ def get_validate_address() -> None:
     print(req.json())
 
 
+# Email Validations are only available for paid accounts.
 def delete_validate_job() -> None:
     """
     DELETE /lists/<address>/validate
@@ -83,6 +86,42 @@ def delete_validate_job() -> None:
     req = client.lists.delete(
         domain=domain, address=f"python_sdk2@{domain}", validate=True
     )
+    print(req.json())
+
+
+def post_member_list() -> None:
+    """
+    POST /lists/<address>/members
+    :return:
+    """
+    data = {
+        "subscribed": True,
+        "address": "bar2@example.com",
+        "name": "Bob Bar",
+        "description": "Developer",
+        "vars": '{"age": 26}',
+    }
+    req = client.lists_members.create(
+        domain=domain, address=mailing_list_address, data=data
+    )
+    print(req.json())
+
+
+def get_member_list() -> None:
+    """
+    GET /lists/<address>/members
+    :return:
+    """
+    req = client.lists_members.get(domain=domain, address=mailing_list_address)
+    print(req.json())
+
+
+def get_lists_address() -> None:
+    """
+    GET /lists/<address>
+    :return:
+    """
+    req = client.lists.get(domain=domain, address=f"python_sdk2@{domain}")
     print(req.json())
 
 
@@ -103,27 +142,9 @@ def get_member_from_list() -> None:
     req = client.lists_members.get(
         domain=domain,
         address=mailing_list_address,
-        member_address="everyone@zeefarmer.mailgun.com",
+        member_address="bar2@example.com",
     )
 
-    print(req.json())
-
-
-def post_member_list() -> None:
-    """
-    POST /lists/<address>/members
-    :return:
-    """
-    data = {
-        "subscribed": True,
-        "address": "bar2@example.com",
-        "name": "Bob Bar",
-        "description": "Developer",
-        "vars": '{"age": 26}',
-    }
-    req = client.lists_members.create(
-        domain=domain, address=mailing_list_address, data=data
-    )
     print(req.json())
 
 
@@ -158,7 +179,7 @@ def post_members_json() -> None:
     data = {
         "upsert": True,
         "members": '[{"address": "Alice <alice@example.com>", "vars": {"age": 26}},'
-        '{"name": "Bob", "address": "bob2@example.com", "vars": {"age": 34}}]',
+        '{"name": "Bob1", "address": "bob2@example.com", "vars": {"age": 34}}]',
     }
 
     req = client.lists_members.create(
@@ -188,7 +209,7 @@ def delete_lists_address() -> None:
     DELETE /lists/<address>
     :return:
     """
-    req = client.lists.delete(domain=domain, address=f"python_sdk@{domain}")
+    req = client.lists.delete(domain=domain, address=f"python_sdk2@{domain}")
     print(req.json())
 
 

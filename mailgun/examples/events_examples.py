@@ -20,7 +20,7 @@ def get_domain_events() -> None:
 
 def view_message_with_storage_url() -> None:
     """
-    https://sw.api.mailgun.net/v3/domains/2048.zeefarmer.com/messages/{storage_url}
+    /v3/domains/2048.zeefarmer.com/messages/{storage_url}
     :return:
     """
     params = {"limit": 1}

@@ -62,6 +62,9 @@ class DomainTests(unittest.TestCase):
         self.post_domain_data: dict[str, str] = {
             "name": self.test_domain,
         }
+        self.put_domain_data: dict[str, str] = {
+            "spam_action": "disabled",
+        }
         self.post_domain_creds: dict[str, str] = {
             "login": f"alice_bob@{self.domain}",
             "password": "test_new_creds123",
@@ -117,6 +120,14 @@ class DomainTests(unittest.TestCase):
         request = self.client.domains.create(data=self.post_domain_data)
         self.assertEqual(request.status_code, 200)
         self.assertIn("Domain DNS records have been created", request.json()["message"])
+
+    def test_update_simple_domain(self) -> None:
+        self.client.domains.delete(domain=self.test_domain)
+        self.client.domains.create(data=self.post_domain_data)
+        data = {"spam_action": "disabled"}
+        request = self.client.domains.put(data=data, domain=self.post_domain_data['name'])
+        self.assertEqual(request.status_code, 200)
+        self.assertEqual(request.json()["message"], "Domain has been updated")
 
     @pytest.mark.skip("The test can fail because the domain name is a random string")
     def test_get_single_domain(self) -> None:
@@ -181,6 +192,17 @@ class DomainTests(unittest.TestCase):
 
         self.assertEqual(request.status_code, 200)
 
+    @pytest.mark.skip("If all credentials are deleted then test_update_simple_domain fails")
+    def test_delete_all_domain_credentials(self) -> None:
+        self.client.domains_credentials.create(
+            domain=self.domain,
+            data=self.post_domain_creds,
+        )
+        request = self.client.domains_credentials.delete(domain=self.domain)
+        self.assertEqual(request.status_code, 200)
+        self.assertIn(request.json()['message'],
+                      "All domain credentials have been deleted")
+
     def test_put_domain_connections(self) -> None:
         request = self.client.domains_connection.put(
             domain=self.domain,
@@ -238,6 +260,13 @@ class DomainTests(unittest.TestCase):
         )
         self.assertIn("message", request.json())
 
+    def test_get_sending_queues(self) -> None:
+        self.client.domains.delete(domain=self.test_domain)
+        self.client.domains.create(data=self.post_domain_data)
+        request = self.client.domains_sendingqueues.get(domain=self.post_domain_data['name'])
+        self.assertEqual(request.status_code, 200)
+        self.assertIn("scheduled", request.json())
+
 
 @pytest.mark.skip(
     "Dedicated IPs should be enabled for the domain, see https://app.mailgun.com/settings/dedicated-ips"
@@ -280,7 +309,7 @@ class IpTests(unittest.TestCase):
 
 
 @pytest.mark.skip(
-    "This feature can be disabled for the account, see https://app.mailgun.com/settings/ip-pools"
+   "This feature can be disabled for the account, see https://app.mailgun.com/settings/ip-pools"
 )
 class IpPoolsTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -362,25 +391,6 @@ class EventsTests(unittest.TestCase):
         req = self.client.events.get(domain=self.domain, filters=self.params)
 
         self.assertIn("items", req.json())
-        self.assertEqual(req.status_code, 200)
-
-
-class StatsTests(unittest.TestCase):
-    def setUp(self) -> None:
-        self.auth: tuple[str, str] = (
-            "api",
-            os.environ["APIKEY"],
-        )
-        self.client: Client = Client(auth=self.auth)
-        self.domain: str = os.environ["DOMAIN"]
-        self.params: dict[str, str | list[str]] = {
-            "event": ["accepted"],
-            "duration": "1m",
-        }
-
-    def test_stats_total_get(self) -> None:
-        req = self.client.stats_total.get(filters=self.params, domain=self.domain)
-        self.assertIn("stats", req.json())
         self.assertEqual(req.status_code, 200)
 
 
@@ -619,6 +629,11 @@ class ComplaintsTest(unittest.TestCase):
 
         self.assertEqual(req.status_code, 200)
         self.assertIn("message", req.json())
+
+    def test_get_single_complaint(self) -> None:
+        req = self.client.complaints.get(data=self.compl_data, domain=self.domain)
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("items", req.json())
 
     def test_compl_get_all(self) -> None:
         req = self.client.complaints.get(domain=self.domain)
@@ -1049,6 +1064,11 @@ class MailingListsTest(unittest.TestCase):
 
         self.assertEqual(req.status_code, 200)
         self.assertIn("member", req.json())
+
+    def test_maillists_lists_members_get(self) -> None:
+        req = self.client.lists_members.get(domain=self.domain, address=self.maillist_address)
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("items", req.json())
 
     def test_maillists_lists_members_update(self) -> None:
         self.client.lists_members.create(

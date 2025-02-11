@@ -73,7 +73,9 @@ def handle_domains(
         if "domain_name" in kwargs:
             url = urljoin(url["base"], kwargs["domain_name"])
         elif method == "delete":
-            url = urljoin(url["base"], domain)
+            # TODO: Remove replacing v4 with v3 when the 'Delete a domain API' will be updated to v4, see https://documentation.mailgun.com/docs/mailgun/api-reference/openapi-final/tag/Domains/#tag/Domains/operation/DELETE-v3-domains--name-
+            url = urljoin(url["base"].replace("/v4/", "/v3/"), domain)
+
         else:
             url = url["base"][:-1]
     elif "verify" in kwargs:
@@ -84,3 +86,13 @@ def handle_domains(
         url = urljoin(url["base"], domain)
     # fmt: on
     return url
+
+
+def handle_sending_queues(
+    url: dict[str, Any],
+    domain: str | None,
+    _method: str | None,
+    **kwargs: Any,
+) -> str:
+    """Handle sending queues endpoint URL construction."""
+    return url["base"][:-1] + f"/{domain}/sending_queues"

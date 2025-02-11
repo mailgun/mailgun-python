@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 
 from mailgun.client import Client
@@ -18,29 +20,6 @@ def get_domains() -> None:
     print(data.json())
 
 
-# Get domain
-
-
-def get_simple_domain() -> None:
-    """
-    GET /domains/<domain>
-    :return:
-    """
-    domain_name = "python.test.domain4"
-    data = client.domains.get(domain_name=domain_name)
-    print(data.json())
-
-
-def verify_domain() -> None:
-    """
-    PUT /domains/<domain>/verify
-    :return:
-    """
-    domain_name = "python.test.domain4"
-    data = client.domains.put(domain=domain_name, verify=True)
-    print(data.json())
-
-
 def add_domain() -> None:
     """
     POST /domains
@@ -56,6 +35,40 @@ def add_domain() -> None:
     request = client.domains.create(data=data)
     print(request.json())
     print(request.status_code)
+
+
+# Get domain
+
+
+def get_simple_domain() -> None:
+    """
+    GET /domains/<domain>
+    :return:
+    """
+    domain_name = "python.test.domain5"
+    request = client.domains.get(domain_name=domain_name)
+    print(request.json())
+
+
+def update_simple_domain() -> None:
+    """
+    PUT /domains/<domain>
+    :return:
+    """
+    domain_name = "python.test.domain5"
+    data = {"name": domain_name, "spam_action": "disabled"}
+    request = client.domains.put(data=data, domain=domain_name)
+    print(request.json())
+
+
+def verify_domain() -> None:
+    """
+    PUT /domains/<domain>/verify
+    :return:
+    """
+    domain_name = "python.test.domain5"
+    request = client.domains.put(domain=domain_name, verify=True)
+    print(request.json())
 
 
 def delete_domain() -> None:
@@ -97,6 +110,15 @@ def put_credentials() -> None:
     request = client.domains_credentials.put(
         domain=domain, data=data, login=f"alice_bob@{domain}"
     )
+    print(request.json())
+
+
+def delete_all_domain_credentials() -> None:
+    """
+    DELETE /domains/<domain>/credentials
+    :return:
+    """
+    request = client.domains_credentials.delete(domain=domain)
     print(request.json())
 
 
@@ -193,7 +215,7 @@ def put_dkim_selector() -> None:
     :return:
     """
     data = {"dkim_selector": "s"}
-    request = client.domains_dkimselector.put(domain="python.test.domain4", data=data)
+    request = client.domains_dkimselector.put(domain="python.test.domain5", data=data)
     print(request.json())
 
 
@@ -203,9 +225,19 @@ def put_web_prefix() -> None:
     :return:
     """
     data = {"web_prefix": "python"}
-    request = client.domains_webprefix.put(domain="python.test.domain4", data=data)
+    request = client.domains_webprefix.put(domain="python.test.domain5", data=data)
+    print(request.json())
+
+
+def get_sending_queues() -> None:
+    """
+    GET /domains/<domain>/sending_queues
+    :return:
+    """
+    request = client.domains_sendingqueues.get(domain="python.test.domain5")
+    print(request)
     print(request.json())
 
 
 if __name__ == "__main__":
-    put_web_prefix()
+    get_domains()

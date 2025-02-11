@@ -9,8 +9,7 @@ include = ["mailgun", "mailgun.handlers", "mailgun.*", "tests"]
 mailgun = ["py.typed", "*.pyi"]
 
 [project]
-# TODO: Replace it with an actual project name
-name = "mailgun"
+name = "mailgun-python"
 version = "1.0.5"
 description = "Python SDK for Mailgun"
 authors = [
@@ -18,7 +17,7 @@ authors = [
     # TODO: Replace api@mailgun.com with an actual email
     { name = "Mailgun", email = "api@mailgun.com" },
 ]
-license = {text = "MIT"}
+license = {text = "Apache-2.0"}
 readme = "README.md"
 requires-python = ">=3.9"
 
@@ -53,10 +52,8 @@ classifiers = [
 ]
 
 [project.urls]
-# TODO: Replace repo name with an actual project name
-"Issue Tracker" = "https://github.com/diskovod/mailgun_beta/issues"
-"Repository" = "https://github.com/diskovod/mailgun_beta"
-
+"Issue Tracker" = "https://github.com/mailgun/mailgun-python/issues"
+"Repository" = "https://github.com/mailgun/mailgun-python"
 "Homepage" = "https://www.mailgun.com"
 "Documentation" = "https://documentation.mailgun.com"
 
@@ -203,6 +200,7 @@ ignore = [
     # TODO: Enable C901, TRY201, TRY003, EM101, PTH118, PLR0917 later
     "C901", "TRY201", "TRY003", "EM101", "PTH118", "PLR0912", "PLR0917", "TD002", "TD003", "FIX002",
     "ANN401",  # ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+    "ARG001",  # ARG001 Unused function argument: `kwargs`
     "B904",  # Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None`
     # pycodestyle (E, W)
     "CPY001",   # Missing copyright notice at top of file
@@ -210,6 +208,7 @@ ignore = [
     # TODO: Enable DOC501 when the upstream issue is fixed, see https://github.com/astral-sh/ruff/issues/12520
     "DOC501",  # DOC501 Raised exception `ApiError` missing from docstring
     "E501",
+    "PLR0911",  # PLR0911 Too many return statements (9 > 6)
     "PLR0913",  # PLR0913 Too many arguments in function definition (6 > 5)
 ]
 

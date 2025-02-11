@@ -74,4 +74,4 @@ def unlink_ippool() -> None:
 
 
 if __name__ == "__main__":
-    unlink_ippool()
+    get_ippools()

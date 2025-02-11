@@ -60,14 +60,14 @@ repos:
       - id: gitlint
 
   - repo: https://github.com/codespell-project/codespell
-    rev: v2.3.0
+    rev: v2.4.1
     hooks:
       - id: codespell
         args: [--write]
         exclude: ^tests
 
   - repo: https://github.com/python-jsonschema/check-jsonschema
-    rev: 0.30.0
+    rev: 0.31.1
     hooks:
       - id: check-github-workflows
 
@@ -104,7 +104,7 @@ repos:
         exclude: ^tests
 
   - repo: https://github.com/PyCQA/pylint
-    rev: v3.3.2
+    rev: v3.3.4
     hooks:
       - id: pylint
         args:
@@ -118,7 +118,7 @@ repos:
 
   - repo: https://github.com/charliermarsh/ruff-pre-commit
     # Ruff version.
-    rev: v0.8.4
+    rev: v0.9.6
     hooks:
       # Run the linter.
       - id: ruff
@@ -133,7 +133,7 @@ repos:
           language_version: python3.12
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.14.0
+    rev: v1.15.0
     hooks:
     -   id: mypy
         args:
@@ -143,12 +143,12 @@ repos:
         exclude: ^mailgun/examples/
 
   - repo: https://github.com/RobertCraigie/pyright-python
-    rev: v1.1.391
+    rev: v1.1.393
     hooks:
     - id: pyright
 
   - repo: https://github.com/PyCQA/bandit
-    rev: 1.8.0
+    rev: 1.8.2
     hooks:
       - id: bandit
         args: ["-c", "pyproject.toml", "-r", "."]
@@ -157,12 +157,12 @@ repos:
         additional_dependencies: [".[toml]"]
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1.28.4
+    rev: typos-dict-v0.12.4
     hooks:
       - id: typos
 
   - repo: https://github.com/executablebooks/mdformat
-    rev: 0.7.21
+    rev: 0.7.22
     hooks:
       - id: mdformat
         additional_dependencies:

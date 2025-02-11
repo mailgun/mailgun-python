@@ -132,4 +132,4 @@ def resend_message() -> None:
 
 
 if __name__ == "__main__":
-    resend_message()
+    post_message()
