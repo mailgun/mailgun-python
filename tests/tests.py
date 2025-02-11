@@ -192,6 +192,17 @@ class DomainTests(unittest.TestCase):
 
         self.assertEqual(request.status_code, 200)
 
+    @pytest.mark.skip("If all credentials are deleted then test_update_simple_domain fails")
+    def test_delete_all_domain_credentials(self) -> None:
+        self.client.domains_credentials.create(
+            domain=self.domain,
+            data=self.post_domain_creds,
+        )
+        request = self.client.domains_credentials.delete(domain=self.domain)
+        self.assertEqual(request.status_code, 200)
+        self.assertIn(request.json()['message'],
+                      "All domain credentials have been deleted")
+
     def test_put_domain_connections(self) -> None:
         request = self.client.domains_connection.put(
             domain=self.domain,
