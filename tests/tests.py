@@ -619,6 +619,11 @@ class ComplaintsTest(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("message", req.json())
 
+    def test_get_single_complaint(self) -> None:
+        req = self.client.complaints.get(data=self.compl_data, domain=self.domain)
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("items", req.json())
+
     def test_compl_get_all(self) -> None:
         req = self.client.complaints.get(domain=self.domain)
         self.assertEqual(req.status_code, 200)
@@ -1048,6 +1053,11 @@ class MailingListsTest(unittest.TestCase):
 
         self.assertEqual(req.status_code, 200)
         self.assertIn("member", req.json())
+
+    def test_maillists_lists_members_get(self) -> None:
+        req = self.client.lists_members.get(domain=self.domain, address=self.maillist_address)
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("items", req.json())
 
     def test_maillists_lists_members_update(self) -> None:
         self.client.lists_members.create(
