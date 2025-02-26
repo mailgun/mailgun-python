@@ -10,7 +10,7 @@ mailgun = ["py.typed", "*.pyi"]
 
 [project]
 name = "mailgun-python"
-version = "1.0.5"
+version = "0.1.0"
 description = "Python SDK for Mailgun"
 authors = [
     { name = "diskovod", email = "diskovodik@gmail.com" },
