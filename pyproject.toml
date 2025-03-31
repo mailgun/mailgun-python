@@ -1,6 +1,10 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=61.0", "wheel", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+version_scheme = "post-release"
+write_to = "mailgun/_version.py"
 
 [tool.setuptools.packages.find]
 include = ["mailgun", "mailgun.handlers", "mailgun.*", "tests"]
@@ -10,14 +14,18 @@ mailgun = ["py.typed", "*.pyi"]
 
 [project]
 name = "mailgun-python"
-version = "0.1.0rc1"
+dynamic = ["version"]
 description = "Python SDK for Mailgun"
 authors = [
     { name = "diskovod", email = "diskovodik@gmail.com" },
     # TODO: Replace api@mailgun.com with an actual email
     { name = "Mailgun", email = "api@mailgun.com" },
 ]
-license = {text = "Apache-2.0"}
+maintainers = [
+  {name = "Serhii Kupriienko", email = "kupriienko.serhii@gmail.com"}
+]
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 readme = "README.md"
 requires-python = ">=3.9"
 
@@ -36,7 +44,6 @@ classifiers = [
         "Development Status :: 2 - Pre-Alpha",
         "Environment :: Console",
         "Intended Audience :: Developers",
-        "License :: OSI Approved :: MIT License",
         "Natural Language :: English",
         "Operating System :: OS Independent",
         "Programming Language :: Python :: 3",
