@@ -3,6 +3,8 @@ requires = ["setuptools>=61.0", "wheel", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]
+version_scheme = "no-guess-dev"
+local_scheme = "no-local-version"
 write_to = "mailgun/_version.py"
 
 [tool.setuptools.packages.find]

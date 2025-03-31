@@ -38,7 +38,7 @@ export PRINT_HELP_PYSCRIPT
 
 BROWSER := python -c "$$BROWSER_PYSCRIPT"
 
-clean: clean-cov clean-build clean-env clean-pyc clean-test clean-temp clean-other ## remove all build, test, coverage and Python artifacts
+clean: clean-cov clean-build clean-pyc clean-test clean-temp clean-other ## remove all build, test, coverage and Python artifacts
 
 clean-cov:
 	rm -rf .coverage
