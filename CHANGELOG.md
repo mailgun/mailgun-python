@@ -8,16 +8,16 @@ We [keep a changelog.](http://keepachangelog.com/)
 
 ### Added
 
-* CHANGELOG.md
+- CHANGELOG.md
 
 ### Technical (internal)
 
-* Initial version
+- Initial version
 
 ### Tickets closed
 
-* [DE-1453](https://mailgun.atlassian.net/browse/DE-1453) - Define MVP - Support all of the major functionality and Mailgun APIs
+- [DE-1453](https://mailgun.atlassian.net/browse/DE-1453) - Define MVP - Support all of the major functionality and Mailgun APIs
 
 ### Pull Requests Merged
 
-* [PR_2](https://github.com/mailgun/mailgun-python/pull/2) - JIRA-727: Done ticket title
+- [PR_2](https://github.com/mailgun/mailgun-python/pull/2) - JIRA-727: Done ticket title
