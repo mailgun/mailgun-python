@@ -1,6 +1,12 @@
 name: Build and Publish Python distributions to TestPyPI and PyPI
 
 on:
+  workflow_run:
+    workflows: [ "CI" ]
+    types:
+      - completed
+    branches:
+      - main
   push:
     tags:
       - 'v*'
@@ -8,6 +14,11 @@ on:
 
 jobs:
   build-and-publish:
+    # Only run if the dependent workflow succeeded or this was triggered by tags/manual
+    if: |
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -34,11 +45,11 @@ jobs:
         run: python -m build
 
       - name: Publish to TestPyPI
-        if: github.event_name == 'workflow_dispatch'
+        # Run on both manual triggers AND tag pushes
+        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
-          user: __token__
           password: ${{ secrets.TEST_PYPI_API_TOKEN }}
 
 #      - name: Publish to PyPI
