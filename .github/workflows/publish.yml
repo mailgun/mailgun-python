@@ -50,7 +50,7 @@ jobs:
         with:
           repository-url: https://test.pypi.org/legacy/
           password: ${{ secrets.TEST_PYPI_API_TOKEN }}
-          # TODO: Disable trusted publishing. Fix it later
+          # TODO: Disable trusted publishing. Fix it later.
           verify-metadata: false
           verbose: true
           skip-existing: true
