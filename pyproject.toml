@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0", "wheel", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]
-version_scheme = "no-guess-dev"
+version_scheme = "lambda v: v.format_with('{tag}.dev{distance}') if v.distance else v.format_with('{tag}')"
 local_scheme = "no-local-version"
 git_describe_command = "git describe --dirty --tags --long --match v*"
 write_to = "mailgun/_version.py"
