@@ -5,7 +5,6 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools_scm]
 version_scheme = "no-guess-dev"  # Don't try to guess next version
 local_scheme = "no-local-version"
-git_describe_command = "git describe --dirty --tags --long --match v*"
 write_to = "mailgun/_version.py"
 write_to_template = '__version__ = "{version}"'
 #fallback_version = "X.Y.ZrcN.postN.devN"  # Explicit fallback

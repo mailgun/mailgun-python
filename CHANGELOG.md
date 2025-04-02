@@ -4,7 +4,7 @@ We [keep a changelog.](http://keepachangelog.com/)
 
 ## Next release
 
-## Version 0.1.0 (2025-XX-XX) - Public Release
+## Version 0.1.0 (2025-04-02) - Public Release
 
 ### Added
 
