@@ -29,9 +29,10 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
-          user: __token__
-          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
-          skip-existing: true
+          # TODO: Remove it.
+#          user: __token__
+#          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+#          skip-existing: true
 
 #      - name: Publish to PyPI (tags only)
 #        if: startsWith(github.ref, 'refs/tags/')
