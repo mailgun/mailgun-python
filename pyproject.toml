@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0", "wheel", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]
-version_scheme = "no-guess-dev"
+version_scheme = "release-branch-semver"
 local_scheme = "no-local-version"
 git_describe_command = "git describe --dirty --tags --long --match v*"
 write_to = "mailgun/_version.py"
@@ -31,8 +31,9 @@ authors = [
 maintainers = [
   {name = "Serhii Kupriienko", email = "kupriienko.serhii@gmail.com"}
 ]
-license = "Apache-2.0"
-license-files = ["LICENSE"]
+license = {text = "Apache-2.0"}
+# TODO: Enable license-files when setuptools >=77.0.0 will be available
+#license-files = ["LICENSE"]
 readme = "README.md"
 requires-python = ">=3.9"
 
