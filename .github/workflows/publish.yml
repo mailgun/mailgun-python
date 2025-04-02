@@ -24,6 +24,11 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Debug Git tags
+        run: |
+          git tag -l
+          git describe --tags
+
       - name: Build package
         run: |
           pip install build setuptools wheel setuptools-scm
