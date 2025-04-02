@@ -3,8 +3,10 @@ requires = ["setuptools>=61.0", "wheel", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools_scm]
-version_scheme = "no-guess-dev"  # Don't try to guess next version
+version_scheme = "guess-next-dev"
 local_scheme = "no-local-version"
+# Ignore uncommitted changes
+git_describe_command = "git describe --tags --match 'v[0-9]*.[0-9]*.[0-9]*'"
 write_to = "mailgun/_version.py"
 write_to_template = '__version__ = "{version}"'
 #fallback_version = "X.Y.ZrcN.postN.devN"  # Explicit fallback
