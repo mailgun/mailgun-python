@@ -27,7 +27,6 @@ dynamic = ["version"]
 description = "Python SDK for Mailgun"
 authors = [
     { name = "diskovod", email = "diskovodik@gmail.com" },
-    # TODO: Replace api@mailgun.com with an actual email
     { name = "Mailgun", email = "api@mailgun.com" },
 ]
 maintainers = [
