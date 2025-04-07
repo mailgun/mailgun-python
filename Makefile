@@ -90,7 +90,6 @@ environment:    ## handles environment creation
 environment-dev:       ## Handles environment creation
 	conda env create -n $(CONDA_ENV_NAME)-dev -y --file environment-dev.yml
 	conda run --name $(CONDA_ENV_NAME)-dev pip install -e .
-	$(CONDA_ACTIVATE) $(CONDA_ENV_NAME)-dev
 
 install: clean	## install the package to the active Python's site-packages
 	pip install .

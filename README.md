@@ -2,71 +2,146 @@
 
 ## Overview
 
-Welcome to the official Python SDK for [Mailgun]!
+Welcome to the official Python SDK for [Mailgun](http://www.mailgun.com/)!
 
-Check out all the resources and Python code examples in the official [Mailgun Documentation][doc].
+Check out all the resources and Python code examples in the official [Mailgun Documentation](https://documentation.mailgun.com/docs/mailgun/).
 
 ## Table of contents
 
-- [Compatibility](#compatibility)
-- [Installation](#installation)
-- [Authentication](#authentication)
-- [Make your first call](#make-your-first-call)
-- [Overview](#overview)
-  - [Base URL](#base-url)
-  - [Authentication](#authentication)
-  - [API Response Codes](#api-response-codes)
-- [Request examples](#request-examples)
-  - [Messages](#messages)
-    - [Send an email](#send-an-email)
-  - [Domains](#domains)
-    - [Get domains](#get-domains)
-    - [Create a domain](#create-a-domain)
-    - [Domain connections](#domain-connections)
-    - [Domain keys](#domain-keys)
-      - [Update DKIM authority](#update-dkim-authority)
-    - [Domain Tracking](#domain-tracking)
-      - [Get tracking settings](#get-tracking-settings)
-  - [Webhooks](#webhooks)
-    - [Get all webhooks](#get-all-webhooks)
-    - [Create a webhook](#create-a-webhook)
-  - [Events](#events)
-    - [Retrieves a paginated list of events](#retrieves-a-paginated-list-of-events)
-  - [Reporting](#reporting)
-    - [Stats](#stats)
-      - [Totals for entire account](#totals-for-entire-account)
-  - [Suppressions](#suppressions)
-    - [Unsubscribe](#unsubscribe)
-      - [View all unsubscribes](#view-all-unsubscribes)
-      - [Import list of unsubscribes](#import-list-of-unsubscribes)
-    - [Complaints](#complaints)
-      - [Import list of complaints](#import-list-of-complaints)
-  - [Routes](#routes)
-    - [Create a routes](#create-a-route)
-  - [Mailing Lists](#mailing-lists)
-    - [Create a mailing list](#create-a-mailing-list)
-  - [Templates](#templates)
-    - [Get templates](#get-templates)
-  - [IP Pools](#ip-pools)
-    - [Edit DIPP](#edit-dipp)
-  - [IPs](#ips)
-    - [List account IPs](#list-account-ips)
-- [Contribute](#contribute)
-- [License](#license)
-- [Authors](#authors)
+- [Mailgun Python SDK](#mailgun-python-sdk)
+  - [Overview](#overview)
+  - [Table of contents](#table-of-contents)
+  - [Compatibility](#compatibility)
+  - [Requirements](#requirements)
+    - [Build backend dependencies](#build-backend-dependencies)
+    - [Runtime dependencies](#runtime-dependencies)
+    - [Test dependencies](#test-dependencies)
+  - [Installation](#installation)
+    - [pip install](#pip-install)
+      - [git clone and pip install locally](git-clone-and-pip-install-locally)
+      - [conda and make](conda-and-make)
+    - [For development](#for-development)
+      - [Using conda](using-conda)
+  - [Overview](#overview-1)
+    - [Base URL](#base-url)
+    - [Authentication](#authentication)
+    - [API Response Codes](#api-response-codes)
+  - [Request examples](#request-examples)
+    - [Messages](#messages)
+      - [Send an email](#send-an-email)
+    - [Domains](#domains)
+      - [Get domains](#get-domains)
+      - [Create a domain](#create-a-domain)
+      - [Domain connections](#domain-connections)
+      - [Domain keys](#domain-keys)
+        - [Update DKIM authority](#update-dkim-authority)
+      - [Domain Tracking](#domain-tracking)
+        - [Get tracking settings](#get-tracking-settings)
+    - [Webhooks](#webhooks)
+      - [Get all webhooks](#get-all-webhooks)
+      - [Create a webhook](#create-a-webhook)
+    - [Events](#events)
+      - [Retrieves a paginated list of events](#retrieves-a-paginated-list-of-events)
+    - [Reporting](#reporting)
+      - [Stats](#stats)
+        - [Totals for entire account](#totals-for-entire-account)
+    - [Suppressions](#suppressions)
+      - [Unsubscribe](#unsubscribe)
+        - [View all unsubscribes](#view-all-unsubscribes)
+        - [Import list of unsubscribes](#import-list-of-unsubscribes)
+      - [Complaints](#complaints)
+        - [Import list of complaints](#import-list-of-complaints)
+    - [Routes](#routes)
+      - [Create a route](#create-a-route)
+    - [Mailing Lists](#mailing-lists)
+      - [Create a mailing list](#create-a-mailing-list)
+    - [Templates](#templates)
+      - [Get templates](#get-templates)
+    - [IP Pools](#ip-pools)
+      - [Edit DIPP](#edit-dipp)
+    - [IPs](#ips)
+      - [List account IPs](#list-account-ips)
+  - [Contribute](#contribute)
+  - [License](#license)
+  - [Contributors](#contributors)
 
 ## Compatibility
 
-This library officially supports the following Python versions:
+This library `mailgun-python` officially supports the following Python versions:
 
-- v3.9+
+- python >=3.9,\<3.13
+
+It's tested up to 3.13 (including).
+
+## Requirements
+
+### Build backend dependencies
+
+To build the `mailgun-python` package from the sources you need `setuptools` (as a build backend), `wheel`, and `setuptools-scm`.
+
+### Runtime dependencies
+
+At runtime the package requires only `requests >=2.32.3`.
+
+### Test dependencies
+
+For running test you need `pytest >=7.0.0` at least.
+Make sure to provide the environment variables from [Authentication](#authentication).
 
 ## Installation
+
+### pip install
 
 Use the below code to install the Mailgun SDK for Python:
 
 ```bash
 pip install mailgun
+```
+
+#### git clone and pip install locally
+
+Use the below code to install it locally by cloning this repository:
+
+```bash
+git clone https://github.com/mailgun/mailgun-python
+cd mailgun-python
+```
+
+```bash
+pip install .
+```
+
+#### conda and make
+
+Use the below code to install it locally by `conda` and `make` on Unix platforms:
+
+```bash
+make install
+```
+
+### For development
+
+#### Using conda
+
+on Linux or macOS:
+
+```bash
+git clone https://github.com/mailgun/mailgun-python
+cd mailgun-python
+```
+
+- A basic environment with a minimum number of dependencies:
+
+```bash
+make dev
+conda activate mailgun
+```
+
+- A full dev environment:
+
+```bash
+make dev-full
+conda activate mailgun-dev
 ```
 
 ## Overview
@@ -81,25 +156,25 @@ It is also important to note that Mailgun uses URI versioning for our API endpoi
 
 For domains created in our US region the base URL is:
 
-```
+```sh
 https://api.mailgun.net/
 ```
 
 For domains created in our EU region the base URL is:
 
-```
+```sh
 https://api.eu.mailgun.net/
 ```
 
 Your Mailgun account may contain multiple sending domains. To avoid passing the domain name as a query parameter, most API URLs must include the name of the domain you are interested in:
 
-```
+```sh
 https://api.mailgun.net/v3/mydomain.com
 ```
 
 ### Authentication
 
-The Mailgun Send API uses your API key for authentication. [Grab][api_credential] and save your Mailgun API credentials.
+The Mailgun Send API uses your API key for authentication. [Grab](https://app.mailgun.com/settings/api_security) and save your Mailgun API credentials.
 
 To run tests and examples please use virtualenv or conda environment with next environment variables:
 
@@ -115,7 +190,7 @@ export VALIDATION_ADDRESS_1="test1@i.ua"
 export VALIDATION_ADDRESS_2="test2@gmail.com"
 ```
 
-Initialize your [Mailgun] client:
+Initialize your [Mailgun](http://www.mailgun.com/) client:
 
 ```python
 from mailgun.client import Client
@@ -143,7 +218,7 @@ All of Mailgun's HTTP response codes follow standard HTTP definitions. For some 
 
 Examples for available endpoints you will find under:
 
-```
+```sh
 mailgun/examples
 ```
 
@@ -614,7 +689,3 @@ If you have suggestions on how to improve the guides, please submit an issue in 
 
 - [@diskovod](https://github.com/diskovod)
 - [@skupriienko](https://github.com/skupriienko)
-
-[api_credential]: https://app.mailgun.com/settings/api_security
-[doc]: https://documentation.mailgun.com/docs/mailgun/
-[mailgun]: http://www.mailgun.com/
