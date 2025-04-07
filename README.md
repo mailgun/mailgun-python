@@ -18,10 +18,10 @@ Check out all the resources and Python code examples in the official [Mailgun Do
     - [Test dependencies](#test-dependencies)
   - [Installation](#installation)
     - [pip install](#pip-install)
-      - [git clone and pip install locally](git-clone-and-pip-install-locally)
-      - [conda and make](conda-and-make)
+      - [git clone & pip install locally](#git-clone-&-pip-install-locally)
+      - [conda & make](#conda-&-make)
     - [For development](#for-development)
-      - [Using conda](using-conda)
+      - [Using conda](#using-conda)
   - [Overview](#overview-1)
     - [Base URL](#base-url)
     - [Authentication](#authentication)
@@ -98,7 +98,7 @@ Use the below code to install the Mailgun SDK for Python:
 pip install mailgun
 ```
 
-#### git clone and pip install locally
+#### git clone & pip install locally
 
 Use the below code to install it locally by cloning this repository:
 
@@ -111,7 +111,7 @@ cd mailgun-python
 pip install .
 ```
 
-#### conda and make
+#### conda & make
 
 Use the below code to install it locally by `conda` and `make` on Unix platforms:
 
