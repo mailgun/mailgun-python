@@ -231,21 +231,10 @@ Pass the components of the messages such as To, From, Subject, HTML and text par
 ```python
 import os
 from pathlib import Path
-
 from mailgun.client import Client
-
 
 key: str = os.environ["APIKEY"]
 domain: str = os.environ["DOMAIN"]
-html: str = """<body style="margin: 0; padding: 0;">
- <table border="1" cellpadding="0" cellspacing="0" width="100%">
-  <tr>
-   <td>
-    Hello!
-   </td>
-  </tr>
- </table>
-</body>"""
 client: Client = Client(auth=("api", key))
 
 
@@ -253,13 +242,40 @@ def post_message() -> None:
     # Messages
     # POST /<domain>/messages
     data = {
-        "from": os.environ["MESSAGES_FROM"],
-        "to": os.environ["MESSAGES_TO"],
-        "cc": os.environ["MESSAGES_CC"],
-        "subject": "Hello Vasyl Bodaj",
-        "html": html,
+        "from": os.getenv("MESSAGES_FROM", "test@test.com"),
+        "to": os.getenv("MESSAGES_TO", "recipient@example.com"),
+        "subject": "Hello from python!",
+        "text": "Hello world!",
         "o:tag": "Python test",
     }
+
+    req = client.messages.create(data=data, domain=domain)
+    print(req.json())
+```
+
+#### Send an email with attachments
+
+```python
+import os
+from pathlib import Path
+from mailgun.client import Client
+
+key: str = os.environ["APIKEY"]
+domain: str = os.environ["DOMAIN"]
+client: Client = Client(auth=("api", key))
+
+
+def post_message() -> None:
+    # Messages
+    # POST /<domain>/messages
+    data = {
+        "from": os.getenv("MESSAGES_FROM", "test@test.com"),
+        "to": os.getenv("MESSAGES_TO", "recipient@example.com"),
+        "subject": "Hello from python!",
+        "text": "Hello world!",
+        "o:tag": "Python test",
+    }
+
     # It is strongly recommended that you open files in binary mode.
     # Because the Content-Length header may be provided for you,
     # and if it does this value will be set to the number of bytes in the file.
@@ -267,12 +283,8 @@ def post_message() -> None:
     files = [
         (
             "attachment",
-            ("test1.txt", Path("mailgun/doc_tests/files/test1.txt").read_bytes()),
-        ),
-        (
-            "attachment",
-            ("test2.txt", Path("mailgun/doc_tests/files/test2.txt").read_bytes()),
-        ),
+            ("test1.txt", Path("test1.txt").read_bytes()),
+        )
     ]
 
     req = client.messages.create(data=data, files=files, domain=domain)
@@ -285,13 +297,10 @@ def post_message() -> None:
 
 ```python
 import os
-
 from mailgun.client import Client
-
 
 key: str = os.environ["APIKEY"]
 domain: str = os.environ["DOMAIN"]
-
 client: Client = Client(auth=("api", key))
 
 
@@ -304,7 +313,7 @@ def get_domains() -> None:
     print(data.json())
 ```
 
-#### Create a domain
+#### Get domains details
 
 ```python
 def get_simple_domain() -> None:
