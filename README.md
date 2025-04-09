@@ -162,6 +162,7 @@ key: str = os.environ["APIKEY"]
 domain: str = os.environ["DOMAIN"]
 client: Client = Client(auth=("api", key))
 
+
 def post_message() -> None:
     # Messages
     # POST /<domain>/messages
@@ -187,6 +188,7 @@ from mailgun.client import Client
 key: str = os.environ["APIKEY"]
 domain: str = os.environ["DOMAIN"]
 client: Client = Client(auth=("api", key))
+
 
 def post_message() -> None:
     # Messages
@@ -225,6 +227,7 @@ from mailgun.client import Client
 key: str = os.environ["APIKEY"]
 domain: str = os.environ["DOMAIN"]
 client: Client = Client(auth=("api", key))
+
 
 def get_domains() -> None:
     """
