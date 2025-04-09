@@ -95,7 +95,7 @@ Make sure to provide the environment variables from [Authentication](#authentica
 Use the below code to install the Mailgun SDK for Python:
 
 ```bash
-pip install mailgun
+pip install mailgun-python
 ```
 
 #### git clone & pip install locally
