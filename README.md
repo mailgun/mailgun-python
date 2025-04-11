@@ -347,7 +347,20 @@ def get_domains() -> None:
     GET /domains
     :return:
     """
-    data = client.domainlist.get(domain=domain)
+    data = client.domainlist.get()
+    print(data.json())
+```
+
+#### Get domains with filters
+
+```python
+def get_domains_with_filters() -> None:
+    """
+    GET /domains
+    :return:
+    """
+    params = {"skip": 0, "limit": 1}
+    data = client.domainlist.get(filters=params)
     print(data.json())
 ```
 

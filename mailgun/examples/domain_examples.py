@@ -16,7 +16,7 @@ def get_domains() -> None:
     GET /domains
     :return:
     """
-    data = client.domainlist.get(domain=domain)
+    data = client.domainlist.get()
     print(data.json())
 
 
