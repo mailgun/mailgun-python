@@ -216,11 +216,9 @@ All of Mailgun's HTTP response codes follow standard HTTP definitions. For some 
 
 ## Request examples
 
-Examples for available endpoints you will find under:
+### Full list of supported endpoints
 
-```sh
-mailgun/examples
-```
+This is a full list of supported endpoints this SDK provides [mailgun/examples](mailgun/examples)
 
 ### Messages
 
