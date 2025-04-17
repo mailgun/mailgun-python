@@ -24,7 +24,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install build tools
-        run: pip install build setuptools wheel setuptools-scm twine
+        run: pip install --upgrade build setuptools wheel setuptools-scm twine
 
       - name: Extract version
         id: get_version
@@ -56,6 +56,10 @@ jobs:
           # Force clean version
           export SETUPTOOLS_SCM_PRETEND_VERSION=$VERSION
           python -m build
+
+      - name: Check dist
+        run: |
+          ls -alh
           twine check dist/*
 
       # Always publish to TestPyPI for all tags and releases
@@ -69,7 +73,8 @@ jobs:
 
       # Only publish to PyPI for stable GitHub releases (no RC/alpha/beta)
       - name: Publish to PyPI
-        if: github.event_name == 'release' && env.IS_STABLE == 'true'
+        # TODO: Enable '&& env.IS_STABLE == 'true' only for stable releases
+        if: github.event_name == 'release' #&& env.IS_STABLE == 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           user: __token__

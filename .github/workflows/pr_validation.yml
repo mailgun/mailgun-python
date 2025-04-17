@@ -19,7 +19,7 @@ jobs:
 
       - name: Build package
         run: |
-          pip install build setuptools wheel setuptools-scm
+          pip install --upgrade build setuptools wheel setuptools-scm
           python -m build
 
       - name: Test installation
