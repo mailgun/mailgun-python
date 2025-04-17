@@ -22,7 +22,7 @@ mailgun = ["py.typed", "*.pyi"]
 
 
 [project]
-name = "mailgun-python"
+name = "mailgun"
 dynamic = ["version"]
 description = "Python SDK for Mailgun"
 authors = [
