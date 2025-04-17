@@ -17,11 +17,6 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Clear pip cache
-        run: |
-          pip cache purge
-          rm -rf ~/.cache/pip
-
       - name: Build package
         run: |
           pip install build setuptools wheel setuptools-scm
@@ -30,4 +25,4 @@ jobs:
       - name: Test installation
         run: |
           pip install dist/*.whl
-          python -c "from importlib.metadata import version; print(version('mailgun-python'))"
+          python -c "from importlib.metadata import version; print(version('mailgun'))"
