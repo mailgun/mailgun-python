@@ -17,6 +17,11 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Clear pip cache
+        run: |
+          pip cache purge
+          rm -rf ~/.cache/pip
+
       - name: Build package
         run: |
           pip install build setuptools wheel setuptools-scm
