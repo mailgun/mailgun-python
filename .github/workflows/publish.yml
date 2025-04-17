@@ -71,9 +71,9 @@ jobs:
           skip-existing: true
           verbose: true
 
-      # Only publish to PyPI for stable GitHub releases (no RC/alpha/beta)
+      #
       - name: Publish to PyPI
-        # TODO: Enable '&& env.IS_STABLE == 'true' only for stable releases
+        # TODO: Enable '&& env.IS_STABLE == 'true' only publish to PyPI for stable GitHub releases (no RC/alpha/beta)
         if: github.event_name == 'release' #&& env.IS_STABLE == 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
