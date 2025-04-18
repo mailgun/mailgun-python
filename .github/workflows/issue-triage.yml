@@ -44,27 +44,4 @@ jobs:
                 repo: context.repo.repo,
                 labels: ['needs-review']
               });
-              // Add comment for feature requests
-              github.rest.issues.createComment({
-                issue_number: issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: 'Thank you for your feature request! Our team will review it in our next planning meeting.'
-              });
-            }
-            // Add comment for first-time contributors
-            const creator = issue.user.login;
-            const { data: contributions } = await github.rest.issues.listForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              creator: creator,
-              state: 'all'
-            });
-            if (contributions.length === 1) { // This is their first issue
-              github.rest.issues.createComment({
-                issue_number: issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: `Welcome @${creator}! Thank you for your first contribution to this project! 🎉`
-              });
             }

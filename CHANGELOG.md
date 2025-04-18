@@ -2,22 +2,18 @@
 
 We [keep a changelog.](http://keepachangelog.com/)
 
-## Next release
+## [Unreleased]
 
-## Version 0.1.0 (2025-04-02) - Public Release
+## 1.0.0 - 2025-04-XX
 
-### Added
+### Changed
 
-- CHANGELOG.md
-
-### Technical (internal)
-
-- Initial version
-
-### Tickets closed
-
-- [DE-1453](https://mailgun.atlassian.net/browse/DE-1453) - Define MVP - Support all of the major functionality and Mailgun APIs
+- Breaking changes! It's a new Python SKD for [Mailgun](http://www.mailgun.com/)
 
 ### Pull Requests Merged
 
-- [PR_2](https://github.com/mailgun/mailgun-python/pull/2) - JIRA-727: Done ticket title
+- [PR_2](https://github.com/mailgun/mailgun-python/pull/2) - Improve and update API versioning
+- [PR_4](https://github.com/mailgun/mailgun-python/pull/4) - Update README.md
+- [PR_6](https://github.com/mailgun/mailgun-python/pull/6) - Release 1.0.0
+- [PR_7](https://github.com/mailgun/mailgun-python/pull/7) - Add issue templates
+-
