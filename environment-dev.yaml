@@ -6,6 +6,9 @@ dependencies:
   - python >=3.9
   # build & host deps
   - pip
+  - setuptools-scm
+  # PyPi only
+  - python-build
   # runtime deps
   - requests >=2.32.3
   # tests
@@ -54,3 +57,5 @@ dependencies:
       - snakeviz
       - typos
       - vulture
+      # PyPI
+      - twine

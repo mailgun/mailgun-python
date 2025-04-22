@@ -109,13 +109,11 @@ class DomainTests(unittest.TestCase):
         self.client.domains.delete(domain=self.test_domain)
 
     def test_get_domain_list(self) -> None:
-        req = self.client.domainlist.get(domain=self.domain)
+        req = self.client.domainlist.get()
         self.assertEqual(req.status_code, 200)
         self.assertIn("items", req.json())
 
     def test_post_domain(self) -> None:
-        #  ### Problem with smtp_password!!!!
-        #
         self.client.domains.delete(domain=self.test_domain)
         request = self.client.domains.create(data=self.post_domain_data)
         self.assertEqual(request.status_code, 200)

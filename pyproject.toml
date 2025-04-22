@@ -1,6 +1,18 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=61.0", "wheel", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+version_scheme = "no-guess-dev"  # Don't try to guess next version
+local_scheme = "no-local-version"
+# Ignore uncommitted changes
+git_describe_command = "git describe --tags --match 'v[0-9]*.[0-9]*.[0-9]*'"
+write_to = "mailgun/_version.py"
+write_to_template = '__version__ = "{version}"'
+#fallback_version = "X.Y.ZrcN.postN.devN"  # Explicit fallback
+
+[tool.setuptools]
+py-modules = ["mailgun._version"]
 
 [tool.setuptools.packages.find]
 include = ["mailgun", "mailgun.handlers", "mailgun.*", "tests"]
@@ -8,16 +20,21 @@ include = ["mailgun", "mailgun.handlers", "mailgun.*", "tests"]
 [tool.setuptools.package-data]
 mailgun = ["py.typed", "*.pyi"]
 
+
 [project]
-name = "mailgun-python"
-version = "1.0.5"
+name = "mailgun"
+dynamic = ["version"]
 description = "Python SDK for Mailgun"
 authors = [
     { name = "diskovod", email = "diskovodik@gmail.com" },
-    # TODO: Replace api@mailgun.com with an actual email
     { name = "Mailgun", email = "api@mailgun.com" },
 ]
+maintainers = [
+  {name = "Serhii Kupriienko", email = "kupriienko.serhii@gmail.com"}
+]
 license = {text = "Apache-2.0"}
+# TODO: Enable license-files when setuptools >=77.0.0 will be available
+#license-files = ["LICENSE"]
 readme = "README.md"
 requires-python = ">=3.9"
 
@@ -33,10 +50,9 @@ keywords = [
         "mailgun-api",
     ]
 classifiers = [
-        "Development Status :: 2 - Pre-Alpha",
+        "Development Status :: 3 - Alpha",
         "Environment :: Console",
         "Intended Audience :: Developers",
-        "License :: OSI Approved :: MIT License",
         "Natural Language :: English",
         "Operating System :: OS Independent",
         "Programming Language :: Python :: 3",

@@ -13,6 +13,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'  # Specify a Python version explicitly
       - uses: pre-commit/action@v3.0.1
 
   test:
@@ -25,14 +27,15 @@ jobs:
       fail-fast: false
       matrix:
         os: ["ubuntu-latest", "macos-latest", "windows-latest"]
-        # TODO": Enable py313 support when all packages will be available on the conda 'main' channel
-        python-version: ["3.9", "3.10", "3.11", "3.12"]
-    #environment: mailgun
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
     env:
       APIKEY: ${{ secrets.APIKEY }}
       DOMAIN: ${{ secrets.DOMAIN }}
     steps:
-      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Required for setuptools-scm
+
       - uses: conda-incubator/setup-miniconda@v3
         with:
           python-version: ${{ matrix.python-version }}
@@ -44,5 +47,6 @@ jobs:
         run: |
           pip install .
           conda info
+
       - name: Test package imports
         run: python -c "import mailgun"

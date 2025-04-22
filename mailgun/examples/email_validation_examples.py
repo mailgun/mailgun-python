@@ -25,7 +25,7 @@ def post_single_validate() -> None:
     POST /v4/address/validate
     :return:
     """
-    data = {"address": "diskovodik@gmail.com"}
+    data = {"address": "test2@gmail.com"}
     params = {"provider_lookup": "false"}
     req = client.addressvalidate.create(domain=domain, data=data, filters=params)
     print(req.json())
