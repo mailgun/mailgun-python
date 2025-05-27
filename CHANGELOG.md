@@ -4,6 +4,16 @@ We [keep a changelog.](http://keepachangelog.com/)
 
 ## [Unreleased]
 
+## [1.0.1] - 2025-05-27
+
+### Changed
+
+- docs: Fixed package name in README.md
+
+### Pull Requests Merged
+
+- [PR_11](https://github.com/mailgun/mailgun-python/pull/11) - Fix package name
+
 ## [1.0.0] - 2025-04-22
 
 ### Added
@@ -22,4 +32,5 @@ We [keep a changelog.](http://keepachangelog.com/)
 - [PR_7](https://github.com/mailgun/mailgun-python/pull/7) - Add issue templates
 
 [1.0.0]: https://github.com/mailgun/mailgun-python/releases/tag/v1.0.0
-[unreleased]: https://github.com/mailgun/mailgun-python/releases/tag/v1.0.0...HEAD
+[1.0.1]: https://github.com/mailgun/mailgun-python/releases/tag/v1.0.1
+[unreleased]: https://github.com/mailgun/mailgun-python/releases/tag/v1.0.1...HEAD

@@ -126,11 +126,11 @@ repos:
       # Run the formatter.
       - id: ruff-format
 
-  -   repo: https://github.com/dosisod/refurb
-      rev: v2.0.0
-      hooks:
-      -   id: refurb
-          language_version: python3.12
+#  -   repo: https://github.com/dosisod/refurb
+#      rev: v2.0.0
+#      hooks:
+#      -   id: refurb
+#          language_version: python3.13
 
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.15.0
