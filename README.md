@@ -88,9 +88,9 @@ Check out all the resources and Python code examples in the official [Mailgun Do
 
 ## Compatibility
 
-This library `mailgun-python` officially supports the following Python versions:
+This library `mailgun` officially supports the following Python versions:
 
-- python >=3.9,\<3.13
+- python >=3.9,\<3.14
 
 It's tested up to 3.13 (including).
 
@@ -98,7 +98,7 @@ It's tested up to 3.13 (including).
 
 ### Build backend dependencies
 
-To build the `mailgun-python` package from the sources you need `setuptools` (as a build backend), `wheel`, and `setuptools-scm`.
+To build the `mailgun` package from the sources you need `setuptools` (as a build backend), `wheel`, and `setuptools-scm`.
 
 ### Runtime dependencies
 
@@ -116,7 +116,7 @@ Make sure to provide the environment variables from [Authentication](#authentica
 Use the below code to install the Mailgun SDK for Python:
 
 ```bash
-pip install mailgun-python
+pip install mailgun
 ```
 
 #### git clone & pip install locally
