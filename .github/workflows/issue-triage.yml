@@ -4,6 +4,9 @@ on:
   issues:
     types: [opened, labeled, unlabeled, reopened]
 
+permissions:
+  contents: read
+
 jobs:
   triage:
     runs-on: ubuntu-latest

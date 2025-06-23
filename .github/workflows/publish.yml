@@ -7,6 +7,9 @@ on:
     types: [published]  # Triggers when a GitHub release is published
   workflow_dispatch:  # Manual trigger
 
+permissions:
+  contents: read
+
 jobs:
   publish:
     runs-on: ubuntu-latest
