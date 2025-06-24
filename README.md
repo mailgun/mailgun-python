@@ -250,7 +250,6 @@ Pass the components of the messages such as To, From, Subject, HTML and text par
 
 ```python
 import os
-from pathlib import Path
 from mailgun.client import Client
 
 key: str = os.environ["APIKEY"]

@@ -4,6 +4,24 @@ We [keep a changelog.](http://keepachangelog.com/)
 
 ## [Unreleased]
 
+## [1.0.2] - 2025-06-24
+
+### Changed
+
+- docs: Minor clean up in README.md
+- ci: Update pre-commit hooks to the latest versions
+
+### Security
+
+- docs: Add the Security Policy file SECURITY.md
+- ci: Use permissions: contents: read in all CI workflow files explicitly
+- ci: Use commit hashes to ensure reproducible builds
+- build: Update dependency pinning: requests>=2.32.4
+
+### Pull Requests Merged
+
+- [PR_13](https://github.com/mailgun/mailgun-python/pull/13) - Release v1.0.2: Improve CI workflows & packaging
+
 ## [1.0.1] - 2025-05-27
 
 ### Changed
@@ -33,4 +51,5 @@ We [keep a changelog.](http://keepachangelog.com/)
 
 [1.0.0]: https://github.com/mailgun/mailgun-python/releases/tag/v1.0.0
 [1.0.1]: https://github.com/mailgun/mailgun-python/releases/tag/v1.0.1
-[unreleased]: https://github.com/mailgun/mailgun-python/releases/tag/v1.0.1...HEAD
+[1.0.2]: https://github.com/mailgun/mailgun-python/releases/tag/v1.0.2
+[unreleased]: https://github.com/mailgun/mailgun-python/releases/tag/v1.0.2...HEAD
