@@ -17,7 +17,7 @@ We [keep a changelog.](http://keepachangelog.com/)
 
 ### Pull Requests Merged
 
-- [PR_11](https://github.com/mailgun/mailgun-python/pull/11) - Fix package name
+- [PR_13](https://github.com/mailgun/mailgun-python/pull/13) - Improve CI workflows & packaging
 
 ## [1.0.1] - 2025-05-27
 
@@ -48,4 +48,5 @@ We [keep a changelog.](http://keepachangelog.com/)
 
 [1.0.0]: https://github.com/mailgun/mailgun-python/releases/tag/v1.0.0
 [1.0.1]: https://github.com/mailgun/mailgun-python/releases/tag/v1.0.1
-[unreleased]: https://github.com/mailgun/mailgun-python/releases/tag/v1.0.1...HEAD
+[1.0.2]: https://github.com/mailgun/mailgun-python/releases/tag/v1.0.2
+[unreleased]: https://github.com/mailgun/mailgun-python/releases/tag/v1.0.2...HEAD
