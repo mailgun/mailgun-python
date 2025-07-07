@@ -24,7 +24,7 @@ def handle_metrics(
     :param _method: Incoming request method (it's not being used for this handler)
     :type _method: str
     :param kwargs: kwargs
-    :return: final url for IPs endpoint
+    :return: final url for Metrics endpoint
     """
     final_keys = path.join("/", *url["keys"]) if url["keys"] else ""
     if "usage" in kwargs:
