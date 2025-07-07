@@ -15,10 +15,9 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 from typing import Any
-from typing import Callable
 from urllib.parse import urljoin
 
-import requests  # type: ignore[import-untyped]
+import requests
 
 from mailgun.handlers.default_handler import handle_default
 from mailgun.handlers.domains_handler import handle_domainlist
@@ -31,6 +30,7 @@ from mailgun.handlers.ip_pools_handler import handle_ippools
 from mailgun.handlers.ips_handler import handle_ips
 from mailgun.handlers.mailinglists_handler import handle_lists
 from mailgun.handlers.messages_handler import handle_resend_message
+from mailgun.handlers.metrics_handler import handle_metrics
 from mailgun.handlers.routes_handler import handle_routes
 from mailgun.handlers.suppressions_handler import handle_bounces
 from mailgun.handlers.suppressions_handler import handle_complaints
@@ -41,9 +41,10 @@ from mailgun.handlers.templates_handler import handle_templates
 
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from collections.abc import Mapping
 
-    from requests.models import Response  # type: ignore[import-untyped]
+    from requests.models import Response
 
 
 HANDLERS: dict[str, Callable] = {  # type: ignore[type-arg]
@@ -69,7 +70,7 @@ HANDLERS: dict[str, Callable] = {  # type: ignore[type-arg]
     "messages": handle_default,
     "messages.mime": handle_default,
     "events": handle_default,
-    "stats": handle_default,
+    "analytics": handle_metrics,
 }
 
 
@@ -117,10 +118,19 @@ class Config:
             "ippools": {"base": v3_base, "keys": ["ip_pools"]},
             "dkimkeys": {"base": v1_base, "keys": ["dkim", "keys"]},
             "domainlist": {"base": v4_base, "keys": ["domainlist"]},
+            # /v1/analytics/metrics
+            "analytics": {"base": v1_base, "keys": ["analytics", "usage", "metrics"]},
         }
 
         if key in special_cases:
             return special_cases[key], headers
+
+        if "analytics" in key:
+            headers |= {"Content-Type": "application/json"}
+            return {
+                "base": v1_base,
+                "keys": key.split("_"),
+            }, headers
 
         # Handle DIPP endpoints
         if "subaccount" in key:
@@ -345,7 +355,7 @@ class Endpoint:
         :param domain: incoming domain
         :type domain: str
         :param headers: incoming headers
-        :type headers: str | None
+        :type headers: dict[str, str]
         :param files: incoming files
         :type files: dict[str, Any] | None
         :param kwargs: kwargs
@@ -353,15 +363,15 @@ class Endpoint:
         :return: api_call POST request
         :rtype: requests.models.Response
         """
-        if "Content-type" in self.headers:
-            if self.headers["Content-type"] == "application/json":
+        if "Content-Type" in self.headers:
+            if self.headers["Content-Type"] == "application/json":
                 data = json.dumps(data)
         elif headers:
             if headers == "application/json":
                 data = json.dumps(data)
-                self.headers["Content-type"] = "application/json"
+                self.headers["Content-Type"] = "application/json"
             elif headers == "multipart/form-data":
-                self.headers["Content-type"] = "multipart/form-data"
+                self.headers["Content-Type"] = "multipart/form-data"
 
         return self.api_call(
             self._auth,
