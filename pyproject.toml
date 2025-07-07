@@ -33,7 +33,7 @@ maintainers = [
   {name = "Serhii Kupriienko", email = "kupriienko.serhii@gmail.com"}
 ]
 license = {text = "Apache-2.0"}
-license-files = ["LICENSE"]
+#license-files = ["LICENSE"]
 readme = "README.md"
 requires-python = ">=3.10"
 
