@@ -51,8 +51,7 @@ dependencies:
       - pyment >=0.3.3
       - pytype
       - pyupgrade
-      # refurb doesn't support py39
-      #- refurb
+      - refurb
       - scalene >=1.3.16
       - snakeviz
       - typos
