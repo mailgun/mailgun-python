@@ -105,7 +105,7 @@ To build the `mailgun` package from the sources you need `setuptools` (as a buil
 
 ### Runtime dependencies
 
-At runtime the package requires only `requests >=2.32.3`.
+At runtime the package requires only `requests >=2.32.4`.
 
 ### Test dependencies
 
