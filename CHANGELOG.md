@@ -35,7 +35,7 @@ We [keep a changelog.](http://keepachangelog.com/)
 ### Pull Requests Merged
 
 - [PR_14](https://github.com/mailgun/mailgun-python/pull/14) - Add support for Metrics endpoint
-- [PR_15](https://github.com/mailgun/mailgun-python/pull/15) - Release v1.1.0
+- [PR_16](https://github.com/mailgun/mailgun-python/pull/16) - Release v1.1.0
 
 ## [1.0.2] - 2025-06-24
 
