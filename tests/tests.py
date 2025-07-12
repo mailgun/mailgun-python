@@ -307,7 +307,7 @@ class IpTests(unittest.TestCase):
 
 
 @pytest.mark.skip(
-   "This feature can be disabled for the account, see https://app.mailgun.com/settings/ip-pools"
+    "This feature can be disabled for an account, see https://app.mailgun.com/settings/ip-pools"
 )
 class IpPoolsTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -1419,6 +1419,217 @@ class InboxPlacementTest(unittest.TestCase):
 
         self.assertEqual(req.status_code, 200)
         self.assertIn("checks", req.json())
+
+
+class MetricsTest(unittest.TestCase):
+    # "https://api.mailgun.net/v1/analytics/metrics"
+
+    def setUp(self) -> None:
+        self.auth: tuple[str, str] = (
+            "api",
+            os.environ["APIKEY"],
+        )
+        self.client: Client = Client(auth=self.auth)
+        self.domain: str = os.environ["DOMAIN"]
+
+        self.invalid_account_metrics_data = {
+            "start": "Sun, 08 Jun 2025 00:00:00 +0000",
+            "end": "Tue, 08 Jul 2025 00:00:00 +0000",
+            "resolution": "century",
+            "duration": "1c",
+            "dimensions": ["time"],
+            "metrics": [
+                "accepted_count",
+                "delivered_count",
+                "clicked_rate",
+                "opened_rate",
+            ],
+            "filter": {
+                "AND": [
+                    {
+                        "attribute": "domain",
+                        "comparator": "=",
+                        "values": [{"label": self.domain, "value": self.domain}],
+                    }
+                ]
+            },
+            "include_subaccounts": True,
+            "include_aggregates": True,
+        }
+        self.account_metrics_data = {
+            "start": "Sun, 08 Jun 2025 00:00:00 +0000",
+            "end": "Tue, 08 Jul 2025 00:00:00 +0000",
+            "resolution": "day",
+            "duration": "1m",
+            "dimensions": ["time"],
+            "metrics": [
+                "accepted_count",
+                "delivered_count",
+                "clicked_rate",
+                "opened_rate",
+            ],
+            "filter": {
+                "AND": [
+                    {
+                        "attribute": "domain",
+                        "comparator": "=",
+                        "values": [{"label": self.domain, "value": self.domain}],
+                    }
+                ]
+            },
+            "include_subaccounts": True,
+            "include_aggregates": True,
+        }
+
+        self.invalid_account_usage_metrics_data = {
+            "start": "Sun, 08 Jun 2025 00:00:00 +0000",
+            "end": "Tue, 08 Jul 2025 00:00:00 +0000",
+            "resolution": "century",
+            "duration": "1c",
+            "dimensions": ["time"],
+            "metrics": [
+                "accessibility_count",
+                "accessibility_failed_count",
+                "domain_blocklist_monitoring_count",
+            ],
+            "include_subaccounts": True,
+            "include_aggregates": True,
+        }
+
+        self.account_usage_metrics_data = {
+            "start": "Sun, 08 Jun 2025 00:00:00 +0000",
+            "end": "Tue, 08 Jul 2025 00:00:00 +0000",
+            "resolution": "day",
+            "duration": "1m",
+            "dimensions": ["time"],
+            "metrics": [
+                "accessibility_count",
+                "accessibility_failed_count",
+                "domain_blocklist_monitoring_count",
+                "email_preview_count",
+                "email_preview_failed_count",
+                "email_validation_bulk_count",
+                "email_validation_count",
+                "email_validation_list_count",
+                "email_validation_mailgun_count",
+                "email_validation_mailjet_count",
+                "email_validation_public_count",
+                "email_validation_single_count",
+                "email_validation_valid_count",
+                "image_validation_count",
+                "image_validation_failed_count",
+                "ip_blocklist_monitoring_count",
+                "link_validation_count",
+                "link_validation_failed_count",
+                "processed_count",
+                "seed_test_count",
+            ],
+            "include_subaccounts": True,
+            "include_aggregates": True,
+        }
+
+    def test_post_query_get_account_metrics(self) -> None:
+        """Happy Path with valid data."""
+        req = self.client.analytics_metrics.create(
+            data=self.account_metrics_data,
+        )
+        expected_keys = [
+            "start",
+            "end",
+            "resolution",
+            "duration",
+            "dimensions",
+            "pagination",
+            "items",
+            "aggregates",
+        ]
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 200)
+        [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
+        self.assertIn("metrics", req.json()["items"][0])
+        self.assertIn("dimensions", req.json()["items"][0])
+        self.assertIn("delivered_count", req.json()["items"][0]["metrics"])
+
+    def test_post_query_get_account_metrics_invalid_data(self) -> None:
+        """Expected failure with invalid data."""
+        req = self.client.analytics_metrics.create(
+            data=self.invalid_account_metrics_data,
+        )
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 400)
+        self.assertNotIn("items", req.json())
+        self.assertIn("'resolution' attribute is invalid", req.json()["message"])
+
+    def test_post_query_get_account_metrics_invalid_url(self) -> None:
+        """Expected failure with an invalid URL https://api.mailgun.net/v1/analytics_metric (without 's' at the end)"""
+        req = self.client.analytics_metric.create(
+            data=self.account_metrics_data,
+        )
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 404)
+
+    def test_post_query_get_account_metrics_invalid_url_without_underscore(
+        self,
+    ) -> None:
+        """Expected failure with an invalid URL https://api.mailgun.net/v1/analyticsmetric (without '_' in the middle)"""
+        with self.assertRaises(KeyError) as cm:
+            self.client.analyticsmetric.create(
+                data=self.account_metrics_data,
+            )
+        self.assertEqual(str(cm.exception), "'analyticsmetric'")
+
+    def test_post_query_get_account_usage_metrics(self) -> None:
+        req = self.client.analytics_usage_metrics.create(
+            data=self.account_usage_metrics_data,
+        )
+        expected_keys = [
+            "start",
+            "end",
+            "resolution",
+            "duration",
+            "dimensions",
+            "pagination",
+            "items",
+            "aggregates",
+        ]
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 200)
+        [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
+        self.assertIn("metrics", req.json()["items"][0])
+        self.assertIn("dimensions", req.json()["items"][0])
+        self.assertIn("email_validation_count", req.json()["items"][0]["metrics"])
+
+    def test_post_query_get_account_usage_metrics_invalid_data(self) -> None:
+        """Expected failure with invalid data."""
+        req = self.client.analytics_usage_metrics.create(
+            data=self.invalid_account_usage_metrics_data,
+        )
+        from pprint import pprint
+
+        pprint(req.json())
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 400)
+        self.assertNotIn("items", req.json())
+        self.assertIn("'resolution' attribute is invalid", req.json()["message"])
+
+    def test_post_query_get_account_usage_metrics_invalid_url(self) -> None:
+        """Expected failure with an invalid URL https://api.mailgun.net/v1/analytics_usage_metric (without 's' at the end)"""
+        req = self.client.analytics_usage_metric.create(
+            data=self.invalid_account_usage_metrics_data,
+        )
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 404)
+
+    def test_post_query_get_account_usage_metrics_invalid_url_without_underscore(
+        self,
+    ) -> None:
+        """Expected failure with an invalid URL https://api.mailgun.net/v1/analyticsusagemetrics (without '_' in the middle)"""
+        with self.assertRaises(KeyError) as cm:
+            self.client.analyticsusagemetrics.create(
+                data=json.dumps(self.invalid_account_usage_metrics_data),
+            )
+        self.assertEqual(str(cm.exception), "'analyticsusagemetrics'")
 
 
 if __name__ == "__main__":

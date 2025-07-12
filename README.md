@@ -46,6 +46,9 @@ Check out all the resources and Python code examples in the official [Mailgun Do
     - [Events](#events)
       - [Retrieves a paginated list of events](#retrieves-a-paginated-list-of-events)
       - [Get events by recipient](#get-events-by-recipient)
+    - [Metrics](#metrics)
+      - [Get account metrics](#get-account-metrics)
+      - [Get account usage metrics](#get-account-usage-metrics)
     - [Suppressions](#suppressions)
       - [Bounces](#bounces)
         - [Create bounces](#create-bounces)
@@ -90,7 +93,7 @@ Check out all the resources and Python code examples in the official [Mailgun Do
 
 This library `mailgun` officially supports the following Python versions:
 
-- python >=3.9,\<3.14
+- python >=3.10,\<3.14
 
 It's tested up to 3.13 (including).
 
@@ -102,7 +105,7 @@ To build the `mailgun` package from the sources you need `setuptools` (as a buil
 
 ### Runtime dependencies
 
-At runtime the package requires only `requests >=2.32.3`.
+At runtime the package requires only `requests >=2.32.4`.
 
 ### Test dependencies
 
@@ -544,6 +547,92 @@ def events_by_recipient() -> None:
         "recipient": os.environ["VALIDATION_ADDRESS_1"],
     }
     req = client.events.get(domain=domain, filters=params)
+    print(req.json())
+```
+
+### Metrics
+
+Mailgun collects many different events and generates event metrics which are available in your Control Panel.
+This data is also available via our analytics metrics [API endpoint](https://documentation.mailgun.com/docs/mailgun/api-reference/openapi-final/tag/Metrics/#tag/Metrics).
+
+#### Get account metrics
+
+Get filtered metrics for an account
+
+```python
+def post_analytics_metrics() -> None:
+    """
+    # Metrics
+    # POST /analytics/metrics
+    :return:
+    """
+
+    data = {
+        "start": "Sun, 08 Jun 2025 00:00:00 +0000",
+        "end": "Tue, 08 Jul 2025 00:00:00 +0000",
+        "resolution": "day",
+        "duration": "1m",
+        "dimensions": ["time"],
+        "metrics": ["accepted_count", "delivered_count", "clicked_rate", "opened_rate"],
+        "filter": {
+            "AND": [
+                {
+                    "attribute": "domain",
+                    "comparator": "=",
+                    "values": [{"label": domain, "value": domain}],
+                }
+            ]
+        },
+        "include_subaccounts": True,
+        "include_aggregates": True,
+    }
+
+    req = client.analytics_metrics.create(data=data)
+    print(req.json())
+```
+
+#### Get account usage metrics
+
+```python
+def post_analytics_usage_metrics() -> None:
+    """
+    # Usage Metrics
+    # POST /analytics/usage/metrics
+    :return:
+    """
+    data = {
+        "start": "Sun, 08 Jun 2025 00:00:00 +0000",
+        "end": "Tue, 08 Jul 2025 00:00:00 +0000",
+        "resolution": "day",
+        "duration": "1m",
+        "dimensions": ["time"],
+        "metrics": [
+            "accessibility_count",
+            "accessibility_failed_count",
+            "domain_blocklist_monitoring_count",
+            "email_preview_count",
+            "email_preview_failed_count",
+            "email_validation_bulk_count",
+            "email_validation_count",
+            "email_validation_list_count",
+            "email_validation_mailgun_count",
+            "email_validation_mailjet_count",
+            "email_validation_public_count",
+            "email_validation_single_count",
+            "email_validation_valid_count",
+            "image_validation_count",
+            "image_validation_failed_count",
+            "ip_blocklist_monitoring_count",
+            "link_validation_count",
+            "link_validation_failed_count",
+            "processed_count",
+            "seed_test_count",
+        ],
+        "include_subaccounts": True,
+        "include_aggregates": True,
+    }
+
+    req = client.analytics_usage_metrics.create(data=data)
     print(req.json())
 ```
 

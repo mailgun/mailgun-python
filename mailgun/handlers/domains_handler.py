@@ -93,6 +93,6 @@ def handle_sending_queues(
     domain: str | None,
     _method: str | None,
     **kwargs: Any,
-) -> str:
+) -> str | Any:
     """Handle sending queues endpoint URL construction."""
     return url["base"][:-1] + f"/{domain}/sending_queues"

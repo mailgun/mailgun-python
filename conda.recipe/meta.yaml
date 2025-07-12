@@ -2,18 +2,10 @@
 {% set project = pyproject['project'] %}
 
 {% set name = project['name'] %}
-
-{% set version_file_path = '../' + name + '/_version.py' %}
-
-# Check if file exists before trying to read it
-{% set version = '' %}
-{% if os.path.exists(version_file_path) %}
-    {% set version_file_content = open(version_file_path, 'r').read() %}
-    {% set version = version_file_content.split('=')[1].strip().strip('"\'') %}
-{% else %}
-    # Fallback to git-based version
-    {% set version = environ.get('GIT_DESCRIBE_TAG', '0.0.0') %}
-{% endif %}
+{% set version_match = load_file_regex(
+  load_file=name.replace('-', '_') + "/_version.py",
+  regex_pattern='__version__ = "(.+)"') %}
+{% set version = version_match[1] %}
 
 package:
   name: {{ name|lower }}
@@ -24,7 +16,7 @@ source:
 
 build:
   number: 0
-  skip: True  # [py<39]
+  skip: True  # [py<310]
   script: {{ PYTHON }} -m pip install . --no-deps --no-build-isolation -vv
 
 requirements:
@@ -52,17 +44,16 @@ test:
     - pytest
   commands:
     - pip check
-    # TODO: Add environment variables for tests
-    #- pytest tests.py -vv
+    # Important: export required environment variables for integration tests.
+    # Skip test_update_simple_domain because it can fail.
+    - pytest tests/tests.py -v -k "not test_update_simple_domain"
 
 about:
   home: {{ project['urls']['Homepage'] }}
   dev_url: {{ project['urls']['Repository'] }}
   doc_url: {{ project['urls']['Documentation'] }}
   summary: {{ project['description'] }}
-  # TODO: Add the description
-  # description: |
-  #
-  license: {{ project['license']['text'] }}
-  license_family: {{ project['license']['text'].split('-')[0] }}
+  description: {{ project['description'] }}
+  license: {{ project['license'] }}
+  license_family: {{ project['license'].split('-')[0] }}
   license_file: LICENSE
