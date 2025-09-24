@@ -46,6 +46,8 @@ Check out all the resources and Python code examples in the official [Mailgun Do
     - [Events](#events)
       - [Retrieves a paginated list of events](#retrieves-a-paginated-list-of-events)
       - [Get events by recipient](#get-events-by-recipient)
+    - [Logs](#logs)
+      - [List logs](#list-logs)
     - [Metrics](#metrics)
       - [Get account metrics](#get-account-metrics)
       - [Get account usage metrics](#get-account-usage-metrics)
@@ -549,6 +551,17 @@ def events_by_recipient() -> None:
     req = client.events.get(domain=domain, filters=params)
     print(req.json())
 ```
+
+### Logs
+
+Mailgun keeps track of every inbound and outbound message event and stores this log data.
+This data can be queried and filtered to provide insights into the health of your email infrastructure [API endpoint](https://documentation.mailgun.com/docs/mailgun/api-reference/send/mailgun/logs/post-v1-analytics-logs).
+
+#### List Logs
+
+Gets customer event logs for an account.
+
+TODO: add an example.
 
 ### Metrics
 
