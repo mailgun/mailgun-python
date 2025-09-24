@@ -80,6 +80,7 @@ repos:
     rev: v3.0.0
     hooks:
       - id: darker
+        additional_dependencies: [black]
 
   - repo: https://github.com/PyCQA/autoflake
     rev: v2.3.1

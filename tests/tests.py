@@ -1632,5 +1632,125 @@ class MetricsTest(unittest.TestCase):
         self.assertEqual(str(cm.exception), "'analyticsusagemetrics'")
 
 
+class LogsTest(unittest.TestCase):
+    # "https://api.mailgun.net/v1/analytics/logs"
+
+    def setUp(self) -> None:
+        self.auth: tuple[str, str] = (
+            "api",
+            os.environ["APIKEY"],
+        )
+        self.client: Client = Client(auth=self.auth)
+        self.domain: str = os.environ["DOMAIN"]
+
+        self.invalid_account_logs_data = {
+            "start": "Wed, 24 Sep 2025 00:00:00 +0000",
+            "end": "Thu, 25 Sep 2025 00:00:00 +0000",
+            "filter": {
+                "AND": [
+                    {
+                        "attribute": "test",
+                        "comparator": "=",
+                        "values": [{"label": "", "value": ""}],
+                    }
+                ]
+            },
+            "include_subaccounts": True,
+            "pagination": {
+                "sort": "timestamp:asc",
+                "limit": 0,
+            },
+        }
+        self.account_logs_data = {
+            "start": "Wed, 24 Sep 2025 00:00:00 +0000",
+            "end": "Thu, 25 Sep 2025 00:00:00 +0000",
+            "filter": {
+                "AND": [
+                    {
+                        "attribute": "domain",
+                        "comparator": "=",
+                        "values": [{"label": self.domain, "value": self.domain}],
+                    }
+                ]
+            },
+            "include_subaccounts": True,
+            "pagination": {
+                "sort": "timestamp:asc",
+                "limit": 50,
+            },
+        }
+
+    def test_post_query_get_account_logs(self) -> None:
+        """Happy Path with valid data."""
+        req = self.client.analytics_logs.create(
+            data=self.account_logs_data,
+        )
+
+        expected_keys = [
+            "start",
+            "end",
+            "pagination",
+            "items",
+            "aggregates",
+        ]
+        expected_items_keys = [
+            "@timestamp",
+            "account",
+            "api-key-id",
+            "domain",
+            "envelope",
+            "event",
+            "flags",
+            "id",
+            "log-level",
+            "message",
+            "method",
+            "originating-ip",
+            "recipient",
+            "recipient-domain",
+            "storage",
+            "tags",
+            "user-variables",
+        ]
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 200)
+        [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
+        self.assertIn("event", req.json()["items"][0])
+        self.assertIn("account", req.json()["items"][0])
+        [self.assertIn(key, expected_items_keys) for key in req.json()["items"][0]]  # type: ignore[func-returns-value]
+
+    def test_post_query_get_account_logs_invalid_data(self) -> None:
+        """Expected failure with invalid data."""
+        req = self.client.analytics_logs.create(
+            data=self.invalid_account_logs_data,
+        )
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 400)
+        self.assertNotIn("items", req.json())
+        self.assertIn(
+            "'test' is not a valid filter predicate attribute", req.json()["message"]
+        )
+
+    def test_post_query_get_account_logs_invalid_url(self) -> None:
+        """Expected failure with an invalid URL https://api.mailgun.net/v1/analytics_log (without 's' at the end)"""
+        req = self.client.analytics_log.create(
+            data=self.account_logs_data,
+        )
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 404)
+
+    def test_post_query_get_account_logs_invalid_url_without_underscore(
+        self,
+    ) -> None:
+        """Expected failure with an invalid URL https://api.mailgun.net/v1/analyticslogs (without '_' in the middle)"""
+        with self.assertRaises(KeyError) as cm:
+            self.client.analyticslogs.create(
+                data=self.account_logs_data,
+            )
+        self.assertEqual(str(cm.exception), "'analyticslogs'")
+
+
 if __name__ == "__main__":
     unittest.main()
