@@ -4,6 +4,27 @@ We [keep a changelog.](http://keepachangelog.com/)
 
 ## [Unreleased]
 
+## [1.2.0] - 2025-09-XX
+
+### Added
+
+- Add the Logs endpoint:
+  - Add `logs` to the `analytics` key of special cases
+  - Add `mailgun/examples/logs_examples.py` with `post_analytics_logs()`
+  - Add class `LogsTest` to tests/tests.py
+  - Add `Get account logs` sections with an example to `README.md`
+  - Add class `LogsTest` to tests/tests.py
+- Add `black` to `darker`'s additional_dependencies in `.pre-commit-config.yaml`
+
+### Changed
+
+- Update pre-commit hooks to the latest versions
+- Fix indentation of the `post_bounces()` example in `README.md`
+
+### Pull Requests Merged
+
+- [PR_18](https://github.com/mailgun/mailgun-python/pull/18) - Add support for the Logs API endpoint
+
 ## [1.1.0] - 2025-07-12
 
 ### Added
