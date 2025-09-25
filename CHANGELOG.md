@@ -86,4 +86,4 @@ We [keep a changelog.](http://keepachangelog.com/)
 [1.0.1]: https://github.com/mailgun/mailgun-python/releases/tag/v1.0.1
 [1.0.2]: https://github.com/mailgun/mailgun-python/releases/tag/v1.0.2
 [1.1.0]: https://github.com/mailgun/mailgun-python/releases/tag/v1.1.0
-[unreleased]: https://github.com/mailgun/mailgun-python/releases/tag/v1.1.0...HEAD
+[unreleased]: https://github.com/mailgun/mailgun-python/compare/v1.1.0...HEAD

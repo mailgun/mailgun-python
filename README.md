@@ -595,7 +595,7 @@ def post_analytics_logs() -> None:
 ### Metrics
 
 Mailgun collects many different events and generates event metrics which are available in your Control Panel.
-This data is also available via our analytics metrics [API endpoint](https://documentation.mailgun.com/docs/mailgun/api-reference/openapi-final/tag/Metrics/#tag/Metrics).
+This data is also available via our analytics metrics [API endpoint](https://documentation.mailgun.com/docs/mailgun/api-reference/send/mailgun/metrics).
 
 #### Get account metrics
 
