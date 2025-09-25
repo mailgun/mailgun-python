@@ -21,6 +21,10 @@ We [keep a changelog.](http://keepachangelog.com/)
 - Update pre-commit hooks to the latest versions
 - Fix indentation of the `post_bounces()` example in `README.md`
 
+## Removed
+
+- Remove `*/_version.py` from `.gitignore`
+
 ### Pull Requests Merged
 
 - [PR_18](https://github.com/mailgun/mailgun-python/pull/18) - Add support for the Logs API endpoint

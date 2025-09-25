@@ -300,5 +300,3 @@ dev/
 
 # pytest cache
 pytestdebug.log
-
-*/_version.py
