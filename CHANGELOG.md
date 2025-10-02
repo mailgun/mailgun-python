@@ -22,6 +22,7 @@ We [keep a changelog.](http://keepachangelog.com/)
 - Update pre-commit hooks to the latest versions
 - Fix indentation of the `post_bounces()` example in `README.md`
 - Fix some pylint warnings related to docstrings
+- Update CI workflows
 
 ## Removed
 
