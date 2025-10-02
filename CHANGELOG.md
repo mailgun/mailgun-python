@@ -27,6 +27,7 @@ We [keep a changelog.](http://keepachangelog.com/)
 ### Pull Requests Merged
 
 - [PR_18](https://github.com/mailgun/mailgun-python/pull/18) - Add support for the Logs API endpoint
+- [PR_19](https://github.com/mailgun/mailgun-python/pull/19) - Release v1.2.0
 
 ## [1.1.0] - 2025-07-12
 
