@@ -4,7 +4,7 @@ We [keep a changelog.](http://keepachangelog.com/)
 
 ## [Unreleased]
 
-## [1.2.0] - 2025-09-XX
+## [1.2.0] - 2025-10-02
 
 ### Added
 
@@ -15,11 +15,13 @@ We [keep a changelog.](http://keepachangelog.com/)
   - Add `Get account logs` sections with an example to `README.md`
   - Add class `LogsTest` to tests/tests.py
 - Add `black` to `darker`'s additional_dependencies in `.pre-commit-config.yaml`
+- Add docstrings to the test classes.
 
 ### Changed
 
 - Update pre-commit hooks to the latest versions
 - Fix indentation of the `post_bounces()` example in `README.md`
+- Fix some pylint warnings related to docstrings
 
 ## Removed
 
