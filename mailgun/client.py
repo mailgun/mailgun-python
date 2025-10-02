@@ -119,7 +119,11 @@ class Config:
             "dkimkeys": {"base": v1_base, "keys": ["dkim", "keys"]},
             "domainlist": {"base": v4_base, "keys": ["domainlist"]},
             # /v1/analytics/metrics
-            "analytics": {"base": v1_base, "keys": ["analytics", "usage", "metrics"]},
+            # /v1/analytics/logs
+            "analytics": {
+                "base": v1_base,
+                "keys": ["analytics", "usage", "metrics", "logs"],
+            },
         }
 
         if key in special_cases:

@@ -46,6 +46,8 @@ Check out all the resources and Python code examples in the official [Mailgun Do
     - [Events](#events)
       - [Retrieves a paginated list of events](#retrieves-a-paginated-list-of-events)
       - [Get events by recipient](#get-events-by-recipient)
+    - [Logs](#logs)
+      - [List logs](#list-logs)
     - [Metrics](#metrics)
       - [Get account metrics](#get-account-metrics)
       - [Get account usage metrics](#get-account-usage-metrics)
@@ -550,10 +552,50 @@ def events_by_recipient() -> None:
     print(req.json())
 ```
 
+### Logs
+
+Mailgun keeps track of every inbound and outbound message event and stores this log data.
+This data can be queried and filtered to provide insights into the health of your email infrastructure [API endpoint](https://documentation.mailgun.com/docs/mailgun/api-reference/send/mailgun/logs/post-v1-analytics-logs).
+
+#### List Logs
+
+Gets customer event logs for an account.
+
+```python
+def post_analytics_logs() -> None:
+    """
+    # Metrics
+    # POST /analytics/logs
+    :return:
+    """
+
+    data = {
+        "start": "Wed, 24 Sep 2025 00:00:00 +0000",
+        "end": "Thu, 25 Sep 2025 00:00:00 +0000",
+        "filter": {
+            "AND": [
+                {
+                    "attribute": "domain",
+                    "comparator": "=",
+                    "values": [{"label": domain, "value": domain}],
+                }
+            ]
+        },
+        "include_subaccounts": True,
+        "pagination": {
+            "sort": "timestamp:asc",
+            "limit": 50,
+        },
+    }
+
+    req = client.analytics_logs.create(data=data)
+    print(req.json())
+```
+
 ### Metrics
 
 Mailgun collects many different events and generates event metrics which are available in your Control Panel.
-This data is also available via our analytics metrics [API endpoint](https://documentation.mailgun.com/docs/mailgun/api-reference/openapi-final/tag/Metrics/#tag/Metrics).
+This data is also available via our analytics metrics [API endpoint](https://documentation.mailgun.com/docs/mailgun/api-reference/send/mailgun/metrics).
 
 #### Get account metrics
 
@@ -652,14 +694,15 @@ domain: str = os.environ["DOMAIN"]
 
 client: Client = Client(auth=("api", key))
 
+
 def post_bounces() -> None:
-"""
-POST /<domain>/bounces
-:return:
-"""
-data = {"address": "test120@gmail.com", "code": 550, "error": "Test error"}
-req = client.bounces.create(data=data, domain=domain)
-print(req.json())
+    """
+    POST /<domain>/bounces
+    :return:
+    """
+    data = {"address": "test120@gmail.com", "code": 550, "error": "Test error"}
+    req = client.bounces.create(data=data, domain=domain)
+    print(req.json())
 ```
 
 #### Unsubscribe

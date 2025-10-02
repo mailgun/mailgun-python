@@ -15,6 +15,14 @@ from mailgun.client import Client
 
 
 class MessagesTests(unittest.TestCase):
+    """Tests for Mailgun Messages API.
+
+    This class provides setup and teardown functionality for tests involving the
+    messages functionality, with authentication and client initialization handled
+    in `setUp`. Each test in this suite operates with the configured Mailgun client
+    instance to simulate API interactions.
+
+    """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
             "api",
@@ -25,7 +33,9 @@ class MessagesTests(unittest.TestCase):
         self.data: dict[str, str] = {
             "from": os.environ["MESSAGES_FROM"],
             "to": os.environ["MESSAGES_TO"],
-            # TODO: Check 'Domain $DOMAIN is not allowed to send: Free accounts are for test purposes only. Please upgrade or add the address to authorized recipients in Account Settings.'
+            # TODO: Check it:
+            # Domain $DOMAIN is not allowed to send: Free accounts are for test purposes only.
+            # Please upgrade or add the address to authorized recipients in Account Settings.
             # "cc": os.environ["MESSAGES_CC"],
             "subject": "Hello Vasyl Bodaj",
             "text": "Congratulations!, you just sent an email with Mailgun! You are truly awesome!",
@@ -42,10 +52,18 @@ class MessagesTests(unittest.TestCase):
 
 
 class DomainTests(unittest.TestCase):
-    """All the tests of this part will work only on fresh setup, or if you change self.test_domain variable every time you're running this again.
+    """Tests for Mailgun Domain API.
+
+    This class provides setup and teardown functionality for tests involving the
+    messages functionality, with authentication and client initialization handled
+    in `setUp`. Each test in this suite operates with the configured Mailgun client
+    instance to simulate API interactions.
+
+    All the tests of this part will work only on fresh setup, or if you change self.test_domain variable every time you're running this again.
 
     It's happening because domain name is not deleting permanently after API call, so every new create will cause an error,
     as that domain is still exists. To avoid the problems we use a random domain name generator.
+
     """
 
     def setUp(self) -> None:
@@ -270,6 +288,14 @@ class DomainTests(unittest.TestCase):
     "Dedicated IPs should be enabled for the domain, see https://app.mailgun.com/settings/dedicated-ips"
 )
 class IpTests(unittest.TestCase):
+    """Tests for Mailgun IP API.
+
+    This class provides setup and teardown functionality for tests involving the
+    messages functionality, with authentication and client initialization handled
+    in `setUp`. Each test in this suite operates with the configured Mailgun client
+    instance to simulate API interactions.
+
+    """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
             "api",
@@ -310,6 +336,14 @@ class IpTests(unittest.TestCase):
     "This feature can be disabled for an account, see https://app.mailgun.com/settings/ip-pools"
 )
 class IpPoolsTests(unittest.TestCase):
+    """Tests for Mailgun IP POOLS API.
+
+    This class provides setup and teardown functionality for tests involving the
+    messages functionality, with authentication and client initialization handled
+    in `setUp`. Each test in this suite operates with the configured Mailgun client
+    instance to simulate API interactions.
+
+    """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
             "api",
@@ -369,6 +403,14 @@ class IpPoolsTests(unittest.TestCase):
 
 
 class EventsTests(unittest.TestCase):
+    """Tests for Mailgun Events API.
+
+    This class provides setup and teardown functionality for tests involving the
+    messages functionality, with authentication and client initialization handled
+    in `setUp`. Each test in this suite operates with the configured Mailgun client
+    instance to simulate API interactions.
+
+    """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
             "api",
@@ -393,6 +435,14 @@ class EventsTests(unittest.TestCase):
 
 
 class TagsTests(unittest.TestCase):
+    """Tests for Mailgun Tags API.
+
+    This class provides setup and teardown functionality for tests involving the
+    messages functionality, with authentication and client initialization handled
+    in `setUp`. Each test in this suite operates with the configured Mailgun client
+    instance to simulate API interactions.
+
+    """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
             "api",
@@ -459,6 +509,14 @@ class TagsTests(unittest.TestCase):
 
 
 class BouncesTests(unittest.TestCase):
+    """Tests for Mailgun Bounces API.
+
+    This class provides setup and teardown functionality for tests involving the
+    messages functionality, with authentication and client initialization handled
+    in `setUp`. Each test in this suite operates with the configured Mailgun client
+    instance to simulate API interactions.
+
+    """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
             "api",
@@ -529,6 +587,14 @@ class BouncesTests(unittest.TestCase):
 
 
 class UnsubscribesTest(unittest.TestCase):
+    """Tests for Mailgun Unsubscribes API.
+
+    This class provides setup and teardown functionality for tests involving the
+    messages functionality, with authentication and client initialization handled
+    in `setUp`. Each test in this suite operates with the configured Mailgun client
+    instance to simulate API interactions.
+
+    """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
             "api",
@@ -602,6 +668,14 @@ class UnsubscribesTest(unittest.TestCase):
 
 
 class ComplaintsTest(unittest.TestCase):
+    """Tests for Mailgun Complaints API.
+
+    This class provides setup and teardown functionality for tests involving the
+    messages functionality, with authentication and client initialization handled
+    in `setUp`. Each test in this suite operates with the configured Mailgun client
+    instance to simulate API interactions.
+
+    """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
             "api",
@@ -680,6 +754,14 @@ class ComplaintsTest(unittest.TestCase):
 
 
 class WhiteListTest(unittest.TestCase):
+    """Tests for Mailgun WhiteList API.
+
+    This class provides setup and teardown functionality for tests involving the
+    messages functionality, with authentication and client initialization handled
+    in `setUp`. Each test in this suite operates with the configured Mailgun client
+    instance to simulate API interactions.
+
+    """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
             "api",
@@ -731,6 +813,14 @@ class WhiteListTest(unittest.TestCase):
 
 
 class RoutesTest(unittest.TestCase):
+    """Tests for Mailgun Routes API.
+
+    This class provides setup and teardown functionality for tests involving the
+    messages functionality, with authentication and client initialization handled
+    in `setUp`. Each test in this suite operates with the configured Mailgun client
+    instance to simulate API interactions.
+
+    """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
             "api",
@@ -869,6 +959,14 @@ class RoutesTest(unittest.TestCase):
 
 
 class WebhooksTest(unittest.TestCase):
+    """Tests for Mailgun Webhooks API.
+
+    This class provides setup and teardown functionality for tests involving the
+    messages functionality, with authentication and client initialization handled
+    in `setUp`. Each test in this suite operates with the configured Mailgun client
+    instance to simulate API interactions.
+
+    """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
             "api",
@@ -925,6 +1023,14 @@ class WebhooksTest(unittest.TestCase):
 
 
 class MailingListsTest(unittest.TestCase):
+    """Tests for Mailgun Mailing Lists API.
+
+    This class provides setup and teardown functionality for tests involving the
+    messages functionality, with authentication and client initialization handled
+    in `setUp`. Each test in this suite operates with the configured Mailgun client
+    instance to simulate API interactions.
+
+    """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
             "api",
@@ -1112,6 +1218,14 @@ class MailingListsTest(unittest.TestCase):
 
 
 class TemplatesTest(unittest.TestCase):
+    """Tests for Mailgun Templates API.
+
+    This class provides setup and teardown functionality for tests involving the
+    messages functionality, with authentication and client initialization handled
+    in `setUp`. Each test in this suite operates with the configured Mailgun client
+    instance to simulate API interactions.
+
+    """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
             "api",
@@ -1281,6 +1395,14 @@ class TemplatesTest(unittest.TestCase):
     "Email Validation is only available through Mailgun paid plans, see https://www.mailgun.com/pricing/"
 )
 class EmailValidationTest(unittest.TestCase):
+    """Tests for Mailgun Email Validation API.
+
+    This class provides setup and teardown functionality for tests involving the
+    messages functionality, with authentication and client initialization handled
+    in `setUp`. Each test in this suite operates with the configured Mailgun client
+    instance to simulate API interactions.
+
+    """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
             "api",
@@ -1333,6 +1455,14 @@ class EmailValidationTest(unittest.TestCase):
     "Inbox Placement is only available through Mailgun Optimize plans, see https://help.mailgun.com/hc/en-us/articles/360034702773-Inbox-Placement"
 )
 class InboxPlacementTest(unittest.TestCase):
+    """Tests for Mailgun Inbox Placement API.
+
+    This class provides setup and teardown functionality for tests involving the
+    messages functionality, with authentication and client initialization handled
+    in `setUp`. Each test in this suite operates with the configured Mailgun client
+    instance to simulate API interactions.
+
+    """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
             "api",
@@ -1422,6 +1552,14 @@ class InboxPlacementTest(unittest.TestCase):
 
 
 class MetricsTest(unittest.TestCase):
+    """Tests for Mailgun Inbox Placement API, https://api.mailgun.net/v1/analytics/metrics.
+
+    This class provides setup and teardown functionality for tests involving the
+    messages functionality, with authentication and client initialization handled
+    in `setUp`. Each test in this suite operates with the configured Mailgun client
+    instance to simulate API interactions.
+
+    """
     # "https://api.mailgun.net/v1/analytics/metrics"
 
     def setUp(self) -> None:
@@ -1630,6 +1768,132 @@ class MetricsTest(unittest.TestCase):
                 data=json.dumps(self.invalid_account_usage_metrics_data),
             )
         self.assertEqual(str(cm.exception), "'analyticsusagemetrics'")
+
+
+class LogsTest(unittest.TestCase):
+    """Tests for Mailgun Inbox Placement API, https://api.mailgun.net/v1/analytics/logs.
+
+    This class provides setup and teardown functionality for tests involving the
+    messages functionality, with authentication and client initialization handled
+    in `setUp`. Each test in this suite operates with the configured Mailgun client
+    instance to simulate API interactions.
+
+    """
+    def setUp(self) -> None:
+        self.auth: tuple[str, str] = (
+            "api",
+            os.environ["APIKEY"],
+        )
+        self.client: Client = Client(auth=self.auth)
+        self.domain: str = os.environ["DOMAIN"]
+
+        self.invalid_account_logs_data = {
+            "start": "Wed, 24 Sep 2025 00:00:00 +0000",
+            "end": "Thu, 25 Sep 2025 00:00:00 +0000",
+            "filter": {
+                "AND": [
+                    {
+                        "attribute": "test",
+                        "comparator": "=",
+                        "values": [{"label": "", "value": ""}],
+                    }
+                ]
+            },
+            "include_subaccounts": True,
+            "pagination": {
+                "sort": "timestamp:asc",
+                "limit": 0,
+            },
+        }
+        self.account_logs_data = {
+            "start": "Wed, 24 Sep 2025 00:00:00 +0000",
+            "end": "Thu, 25 Sep 2025 00:00:00 +0000",
+            "filter": {
+                "AND": [
+                    {
+                        "attribute": "domain",
+                        "comparator": "=",
+                        "values": [{"label": self.domain, "value": self.domain}],
+                    }
+                ]
+            },
+            "include_subaccounts": True,
+            "pagination": {
+                "sort": "timestamp:asc",
+                "limit": 50,
+            },
+        }
+
+    def test_post_query_get_account_logs(self) -> None:
+        """Happy Path with valid data."""
+        req = self.client.analytics_logs.create(
+            data=self.account_logs_data,
+        )
+
+        expected_keys = [
+            "start",
+            "end",
+            "pagination",
+            "items",
+            "aggregates",
+        ]
+        expected_items_keys = [
+            "@timestamp",
+            "account",
+            "api-key-id",
+            "domain",
+            "envelope",
+            "event",
+            "flags",
+            "id",
+            "log-level",
+            "message",
+            "method",
+            "originating-ip",
+            "recipient",
+            "recipient-domain",
+            "storage",
+            "tags",
+            "user-variables",
+        ]
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 200)
+        [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
+        self.assertIn("event", req.json()["items"][0])
+        self.assertIn("account", req.json()["items"][0])
+        [self.assertIn(key, expected_items_keys) for key in req.json()["items"][0]]  # type: ignore[func-returns-value]
+
+    def test_post_query_get_account_logs_invalid_data(self) -> None:
+        """Expected failure with invalid data."""
+        req = self.client.analytics_logs.create(
+            data=self.invalid_account_logs_data,
+        )
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 400)
+        self.assertNotIn("items", req.json())
+        self.assertIn(
+            "'test' is not a valid filter predicate attribute", req.json()["message"]
+        )
+
+    def test_post_query_get_account_logs_invalid_url(self) -> None:
+        """Expected failure with an invalid URL https://api.mailgun.net/v1/analytics_log (without 's' at the end)"""
+        req = self.client.analytics_log.create(
+            data=self.account_logs_data,
+        )
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 404)
+
+    def test_post_query_get_account_logs_invalid_url_without_underscore(
+        self,
+    ) -> None:
+        """Expected failure with an invalid URL https://api.mailgun.net/v1/analyticslogs (without '_' in the middle)"""
+        with self.assertRaises(KeyError) as cm:
+            self.client.analyticslogs.create(
+                data=self.account_logs_data,
+            )
+        self.assertEqual(str(cm.exception), "'analyticslogs'")
 
 
 if __name__ == "__main__":

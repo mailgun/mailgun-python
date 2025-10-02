@@ -4,6 +4,34 @@ We [keep a changelog.](http://keepachangelog.com/)
 
 ## [Unreleased]
 
+## [1.2.0] - 2025-10-02
+
+### Added
+
+- Add the Logs endpoint:
+  - Add `logs` to the `analytics` key of special cases
+  - Add `mailgun/examples/logs_examples.py` with `post_analytics_logs()`
+  - Add class `LogsTest` to tests/tests.py
+  - Add `Get account logs` sections with an example to `README.md`
+  - Add class `LogsTest` to tests/tests.py
+- Add `black` to `darker`'s additional_dependencies in `.pre-commit-config.yaml`
+- Add docstrings to the test classes.
+
+### Changed
+
+- Update pre-commit hooks to the latest versions
+- Fix indentation of the `post_bounces()` example in `README.md`
+- Fix some pylint warnings related to docstrings
+- Update CI workflows
+
+## Removed
+
+- Remove `*/_version.py` from `.gitignore`
+
+### Pull Requests Merged
+
+- [PR_18](https://github.com/mailgun/mailgun-python/pull/18) - Add support for the Logs API endpoint
+
 ## [1.1.0] - 2025-07-12
 
 ### Added
@@ -86,4 +114,4 @@ We [keep a changelog.](http://keepachangelog.com/)
 [1.0.1]: https://github.com/mailgun/mailgun-python/releases/tag/v1.0.1
 [1.0.2]: https://github.com/mailgun/mailgun-python/releases/tag/v1.0.2
 [1.1.0]: https://github.com/mailgun/mailgun-python/releases/tag/v1.1.0
-[unreleased]: https://github.com/mailgun/mailgun-python/releases/tag/v1.1.0...HEAD
+[unreleased]: https://github.com/mailgun/mailgun-python/compare/v1.1.0...HEAD
