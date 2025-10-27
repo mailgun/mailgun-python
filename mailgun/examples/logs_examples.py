@@ -11,7 +11,7 @@ client: Client = Client(auth=("api", key))
 def post_analytics_logs() -> None:
     """
     # Metrics
-    # POST /analytics/logs
+    # POST /v1/analytics/logs
     :return:
     """
 

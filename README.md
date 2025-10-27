@@ -48,6 +48,11 @@ Check out all the resources and Python code examples in the official [Mailgun Do
       - [Get events by recipient](#get-events-by-recipient)
     - [Logs](#logs)
       - [List logs](#list-logs)
+    - [Tags New](#tags-new)
+      - [Update account tag](#update-account-tag)
+      - [Post query to list account tags or search for single tag](#post-query-to-list-account-tags-or-search-for-single-tag)
+      - [Delete account tag](#delete-account-tag)
+      - [Get account tag limit information](#get-account-tag-limit-information)
     - [Metrics](#metrics)
       - [Get account metrics](#get-account-metrics)
       - [Get account usage metrics](#get-account-usage-metrics)
@@ -591,6 +596,34 @@ def post_analytics_logs() -> None:
     req = client.analytics_logs.create(data=data)
     print(req.json())
 ```
+
+### Tags New
+
+Mailgun allows you to tag your email with unique identifiers. Tags are visible via our analytics tags [API endpoint](https://documentation.mailgun.com/docs/inboxready/api-reference/optimize/mailgun/tags-new).
+
+#### Update account tag
+
+Updates the tag description for an account.
+
+TODO: add an example.
+
+#### Post query to list account tags or search for single tag
+
+Gets the list of all tags, or filtered by tag prefix, for an account.
+
+TODO: add an example.
+
+#### Delete account tag
+
+Deletes the tag for an account.
+
+TODO: add an example.
+
+#### Get account tag limit information
+
+Gets the tag limit and current number of unique tags for an account.
+
+TODO: add an example.
 
 ### Metrics
 

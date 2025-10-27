@@ -119,10 +119,13 @@ class Config:
             "dkimkeys": {"base": v1_base, "keys": ["dkim", "keys"]},
             "domainlist": {"base": v4_base, "keys": ["domainlist"]},
             # /v1/analytics/metrics
+            # /v1/analytics/usage/metrics
             # /v1/analytics/logs
+            # /v1/analytics/tags
+            # /v1/analytics/tags/limits
             "analytics": {
                 "base": v1_base,
-                "keys": ["analytics", "usage", "metrics", "logs"],
+                "keys": ["analytics", "usage", "metrics", "logs", "tags", "limits"],
             },
         }
 
@@ -403,7 +406,7 @@ class Endpoint:
         :type filters: dict
         :param kwargs: kwargs
         :type kwargs: Any
-        :return: api_call POST request
+        :return: api_call PUT request
         :rtype: requests.models.Response
         """
         return self.api_call(
