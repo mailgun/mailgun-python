@@ -1097,6 +1097,9 @@ def delete_domain_ip() -> None:
 
 ### Tags
 
+> [!WARNING]
+> This API is deprecated in favor of our new [Tags API](https://documentation.mailgun.com/docs/inboxready/api-reference/optimize/mailgun/tags-new).
+
 #### Get tags
 
 ```python
