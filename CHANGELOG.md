@@ -98,7 +98,8 @@ We [keep a changelog.](http://keepachangelog.com/)
 
 ### Changed
 
-- Breaking changes! It's a new Python SKD for [Mailgun](http://www.mailgun.com/); an obsolete v0.1.1 on [PyPI](https://pypi.org/project/mailgun/0.1.1/) is deprecated.
+- Breaking changes! It's a new Python SKD for [Mailgun](http://www.mailgun.com/); an obsolete v0.1.1 on
+  [PyPI](https://pypi.org/project/mailgun/0.1.1/) is deprecated.
 
 ### Pull Requests Merged
 

@@ -2,7 +2,8 @@
 
 Welcome to the official Python SDK for [Mailgun](http://www.mailgun.com/)!
 
-Check out all the resources and Python code examples in the official [Mailgun Documentation](https://documentation.mailgun.com/docs/mailgun/).
+Check out all the resources and Python code examples in the official
+[Mailgun Documentation](https://documentation.mailgun.com/docs/mailgun/).
 
 ## Table of contents
 
@@ -108,7 +109,8 @@ It's tested up to 3.13 (including).
 
 ### Build backend dependencies
 
-To build the `mailgun` package from the sources you need `setuptools` (as a build backend), `wheel`, and `setuptools-scm`.
+To build the `mailgun` package from the sources you need `setuptools` (as a build backend), `wheel`, and
+`setuptools-scm`.
 
 ### Runtime dependencies
 
@@ -116,8 +118,8 @@ At runtime the package requires only `requests >=2.32.4`.
 
 ### Test dependencies
 
-For running test you need `pytest >=7.0.0` at least.
-Make sure to provide the environment variables from [Authentication](#authentication).
+For running test you need `pytest >=7.0.0` at least. Make sure to provide the environment variables from
+[Authentication](#authentication).
 
 ## Installation
 
@@ -181,9 +183,12 @@ The Mailgun API is part of the Sinch family and enables you to send, track, and 
 
 ### Base URL
 
-All API calls referenced in our documentation start with a base URL. Mailgun allows the ability to send and receive email in both US and EU regions. Be sure to use the appropriate base URL based on which region you have created for your domain.
+All API calls referenced in our documentation start with a base URL. Mailgun allows the ability to send and receive
+email in both US and EU regions. Be sure to use the appropriate base URL based on which region you have created for your
+domain.
 
-It is also important to note that Mailgun uses URI versioning for our API endpoints, and some endpoints may have different versions than others. Please reference the version stated in the URL for each endpoint.
+It is also important to note that Mailgun uses URI versioning for our API endpoints, and some endpoints may have
+different versions than others. Please reference the version stated in the URL for each endpoint.
 
 For domains created in our US region the base URL is:
 
@@ -197,7 +202,8 @@ For domains created in our EU region the base URL is:
 https://api.eu.mailgun.net/
 ```
 
-Your Mailgun account may contain multiple sending domains. To avoid passing the domain name as a query parameter, most API URLs must include the name of the domain you are interested in:
+Your Mailgun account may contain multiple sending domains. To avoid passing the domain name as a query parameter, most
+API URLs must include the name of the domain you are interested in:
 
 ```sh
 https://api.mailgun.net/v3/mydomain.com
@@ -205,12 +211,13 @@ https://api.mailgun.net/v3/mydomain.com
 
 ### Authentication
 
-The Mailgun Send API uses your API key for authentication. [Grab](https://app.mailgun.com/settings/api_security) and save your Mailgun API credentials.
+The Mailgun Send API uses your API key for authentication. [Grab](https://app.mailgun.com/settings/api_security) and
+save your Mailgun API credentials.
 
 To run tests and examples please use virtualenv or conda environment with next environment variables:
 
 ```bash
-export APIKEY="API_KEY"
+export APIKEY="API_KEY"  # pragma: allowlist secret
 export DOMAIN="DOMAIN_NAME"
 export MESSAGES_FROM="Name Surname <mailgun@domain_name>"
 export MESSAGES_TO="Name Surname <username@gmail.com>"
@@ -233,17 +240,24 @@ client = Client(auth=auth)
 
 ### API Response Codes
 
-All of Mailgun's HTTP response codes follow standard HTTP definitions. For some additional information and troubleshooting steps, please see below.
+All of Mailgun's HTTP response codes follow standard HTTP definitions. For some additional information and
+troubleshooting steps, please see below.
 
-**400** - Will typically contain a JSON response with a "message" key which contains a human readable message / action to interpret.
+**400** - Will typically contain a JSON response with a "message" key which contains a human readable message / action
+to interpret.
 
-**403** - Auth error or access denied. Please ensure your API key is correct and that you are part of a group that has access to the desired resource.
+**403** - Auth error or access denied. Please ensure your API key is correct and that you are part of a group that has
+access to the desired resource.
 
-**404** - Resource not found. NOTE: this one can be temporal as our system is an eventually-consistent system but requires diligence. If a JSON response is missing for a 404 - that's usually a sign that there was a mistake in the API request, such as a non-existing endpoint.
+**404** - Resource not found. NOTE: this one can be temporal as our system is an eventually-consistent system but
+requires diligence. If a JSON response is missing for a 404 - that's usually a sign that there was a mistake in the API
+request, such as a non-existing endpoint.
 
-**429** - Mailgun does have rate limits in place to protect our system. Please retry these requests as defined in the response. In the unlikely case you encounter them and need them raised, please reach out to our support team.
+**429** - Mailgun does have rate limits in place to protect our system. Please retry these requests as defined in the
+response. In the unlikely case you encounter them and need them raised, please reach out to our support team.
 
-**500** - Internal Error on the Mailgun side. Retries are recommended with exponential or logarithmic retry intervals. If the issue persists, please reach out to our support team.
+**500** - Internal Error on the Mailgun side. Retries are recommended with exponential or logarithmic retry intervals.
+If the issue persists, please reach out to our support team.
 
 ## Request examples
 
@@ -256,7 +270,9 @@ All of Mailgun's HTTP response codes follow standard HTTP definitions. For some 
 
 #### Send an email
 
-Pass the components of the messages such as To, From, Subject, HTML and text parts, attachments, etc. Mailgun will build a MIME representation of the message and send it. Note: In order to send you must provide one of the following parameters: 'text', 'html', 'amp-html' or 'template'
+Pass the components of the messages such as To, From, Subject, HTML and text parts, attachments, etc. Mailgun will build
+a MIME representation of the message and send it. Note: In order to send you must provide one of the following
+parameters: 'text', 'html', 'amp-html' or 'template'
 
 ```python
 import os
@@ -397,7 +413,7 @@ def add_domain() -> None:
     # Post domain
     data = {
         "name": "python.test.domain5",
-        # "smtp_password": "random123456"
+        # "smtp_password": ""
     }
 
     request = client.domains.create(data=data)
@@ -559,8 +575,9 @@ def events_by_recipient() -> None:
 
 ### Logs
 
-Mailgun keeps track of every inbound and outbound message event and stores this log data.
-This data can be queried and filtered to provide insights into the health of your email infrastructure [API endpoint](https://documentation.mailgun.com/docs/mailgun/api-reference/send/mailgun/logs/post-v1-analytics-logs).
+Mailgun keeps track of every inbound and outbound message event and stores this log data. This data can be queried and
+filtered to provide insights into the health of your email infrastructure
+[API endpoint](https://documentation.mailgun.com/docs/mailgun/api-reference/send/mailgun/logs/post-v1-analytics-logs).
 
 #### List Logs
 
@@ -599,7 +616,8 @@ def post_analytics_logs() -> None:
 
 ### Tags New
 
-Mailgun allows you to tag your email with unique identifiers. Tags are visible via our analytics tags [API endpoint](https://documentation.mailgun.com/docs/inboxready/api-reference/optimize/mailgun/tags-new).
+Mailgun allows you to tag your email with unique identifiers. Tags are visible via our analytics tags
+[API endpoint](https://documentation.mailgun.com/docs/inboxready/api-reference/optimize/mailgun/tags-new).
 
 #### Update account tag
 
@@ -627,8 +645,9 @@ TODO: add an example.
 
 ### Metrics
 
-Mailgun collects many different events and generates event metrics which are available in your Control Panel.
-This data is also available via our analytics metrics [API endpoint](https://documentation.mailgun.com/docs/mailgun/api-reference/send/mailgun/metrics).
+Mailgun collects many different events and generates event metrics which are available in your Control Panel. This data
+is also available via our analytics metrics
+[API endpoint](https://documentation.mailgun.com/docs/mailgun/api-reference/send/mailgun/metrics).
 
 #### Get account metrics
 
@@ -754,11 +773,9 @@ def get_unsubs() -> None:
 
 ##### Import list of unsubscribes
 
-> [!IMPORTANT]
-> It is strongly recommended that you open files in binary mode.
-> Because the Content-Length header may be provided for you,
-> and if it does this value will be set to the number of bytes in the file.
-> Errors may occur if you open the file in text mode.
+> [!IMPORTANT] It is strongly recommended that you open files in binary mode. Because the Content-Length header may be
+> provided for you, and if it does this value will be set to the number of bytes in the file. Errors may occur if you
+> open the file in text mode.
 
 ```python
 def import_list_unsubs() -> None:
@@ -792,11 +809,9 @@ def add_complaints() -> None:
 
 ##### Import list of complaints
 
-> [!IMPORTANT]
-> It is strongly recommended that you open files in binary mode.
-> Because the Content-Length header may be provided for you,
-> and if it does this value will be set to the number of bytes in the file.
-> Errors may occur if you open the file in text mode.
+> [!IMPORTANT] It is strongly recommended that you open files in binary mode. Because the Content-Length header may be
+> provided for you, and if it does this value will be set to the number of bytes in the file. Errors may occur if you
+> open the file in text mode.
 
 ```python
 def import_complaint_list() -> None:
@@ -1156,7 +1171,8 @@ Feel free to ask anything, and contribute:
 - Add documentation to it.
 - Commit, push, open a pull request and voila.
 
-If you have suggestions on how to improve the guides, please submit an issue in our [Official API Documentation](https://documentation.mailgun.com).
+If you have suggestions on how to improve the guides, please submit an issue in our
+[Official API Documentation](https://documentation.mailgun.com).
 
 ## Contributors
 
