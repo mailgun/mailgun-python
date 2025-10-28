@@ -134,9 +134,9 @@ coverage: ## check code coverage quickly with the default Python
 	$(BROWSER) htmlcov/index.html
 
 lint-black:
-	black --line-length=80 $(SRC_DIR) $(TEST_DIR)
+	black --line-length=100 $(SRC_DIR) $(TEST_DIR)
 lint-isort:
-	isort --profile black --line-length=80 $(SRC_DIR) $(TEST_DIR)
+	isort --profile black --line-length=100 $(SRC_DIR) $(TEST_DIR)
 lint-flake8:
 	@flake8 $(SRC_DIR) $(TEST_DIR)
 lint-pylint:
@@ -145,7 +145,7 @@ lint-refurb:
 	@refurb $(SRC_DIR)
 
 format-black:
-	@black --line-length=88 $(SRC_DIR) $(TEST_DIR) $(SCRIPTS_DIR)
+	@black --line-length=100 $(SRC_DIR) $(TEST_DIR) $(SCRIPTS_DIR)
 format-isort:
 	@isort --profile black --line-length=88 $(SRC_DIR) $(TEST_DIR) $(SCRIPTS_DIR)
 format: format-black format-isort

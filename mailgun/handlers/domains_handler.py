@@ -73,7 +73,8 @@ def handle_domains(
         if "domain_name" in kwargs:
             url = urljoin(url["base"], kwargs["domain_name"])
         elif method == "delete":
-            # TODO: Remove replacing v4 with v3 when the 'Delete a domain API' will be updated to v4, see https://documentation.mailgun.com/docs/mailgun/api-reference/openapi-final/tag/Domains/#tag/Domains/operation/DELETE-v3-domains--name-
+            # TODO: Remove replacing v4 with v3 when the 'Delete a domain API' swill be updated to v4,
+            # see https://documentation.mailgun.com/docs/mailgun/api-reference/openapi-final/tag/Domains/#tag/Domains/operation/DELETE-v3-domains--name-
             url = urljoin(url["base"].replace("/v4/", "/v3/"), domain)
 
         else:
