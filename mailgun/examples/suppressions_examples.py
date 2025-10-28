@@ -73,11 +73,7 @@ def import_bounce_list() -> None:
     # Because the Content-Length header may be provided for you,
     # and if it does this value will be set to the number of bytes in the file.
     # Errors may occur if you open the file in text mode.
-    files = {
-        "bounce_csv": Path(
-            "mailgun/doc_tests/files/mailgun_bounces_test.csv"
-        ).read_bytes()
-    }
+    files = {"bounce_csv": Path("mailgun/doc_tests/files/mailgun_bounces_test.csv").read_bytes()}
     req = client.bounces_import.create(domain=domain, files=files)
     print(req.json())
 
@@ -165,9 +161,7 @@ def import_list_unsubs() -> None:
     # and if it does this value will be set to the number of bytes in the file.
     # Errors may occur if you open the file in text mode.
     files = {
-        "unsubscribe_csv": Path(
-            "mailgun/doc_tests/files/mailgun_unsubscribes.csv"
-        ).read_bytes()
+        "unsubscribe_csv": Path("mailgun/doc_tests/files/mailgun_unsubscribes.csv").read_bytes()
     }
     req = client.unsubscribes_import.create(domain=domain, files=files)
     print(req.json())
@@ -178,9 +172,7 @@ def delete_single_unsub() -> None:
     DELETE /<domain>/unsubscribes/<address>
     :return:
     """
-    req = client.unsubscribes.delete(
-        domain=domain, unsubscribe_address="alice@example.com"
-    )
+    req = client.unsubscribes.delete(domain=domain, unsubscribe_address="alice@example.com")
     print(req.json())
 
 
@@ -254,11 +246,7 @@ def import_complaint_list() -> None:
     # Because the Content-Length header may be provided for you,
     # and if it does this value will be set to the number of bytes in the file.
     # Errors may occur if you open the file in text mode.
-    files = {
-        "complaints_csv": Path(
-            "mailgun/doc_tests/files/mailgun_complaints.csv"
-        ).read_bytes()
-    }
+    files = {"complaints_csv": Path("mailgun/doc_tests/files/mailgun_complaints.csv").read_bytes()}
     req = client.complaints_import.create(domain=domain, files=files)
     print(req.json())
 
@@ -268,9 +256,7 @@ def delete_single_complaint() -> None:
     DELETE /<domain>/complaints/<address>
     :return:
     """
-    req = client.complaints.delete(
-        domain=domain, complaint_address="carol1@example.com"
-    )
+    req = client.complaints.delete(domain=domain, complaint_address="carol1@example.com")
     print(req.json())
 
 
@@ -324,11 +310,7 @@ def import_list_whitelists() -> None:
     # Because the Content-Length header may be provided for you,
     # and if it does this value will be set to the number of bytes in the file.
     # Errors may occur if you open the file in text mode.
-    files = {
-        "whitelist_csv": Path(
-            "mailgun/doc_tests/files/mailgun_whitelists.csv"
-        ).read_bytes()
-    }
+    files = {"whitelist_csv": Path("mailgun/doc_tests/files/mailgun_whitelists.csv").read_bytes()}
     req = client.whitelists_import.create(domain=domain, files=files)
     print(req.json())
 

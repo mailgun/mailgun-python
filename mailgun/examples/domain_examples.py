@@ -28,7 +28,6 @@ def add_domain() -> None:
     # Post domain
     data = {
         "name": "python.test.domain5",
-        # "smtp_password": "cisco123456"
     }
     # Problem with smtp_password!!!!
 
@@ -96,7 +95,10 @@ def post_credentials() -> None:
     POST /domains/<domain>/credentials
     :return:
     """
-    data = {"login": f"alice_bob@{domain}", "password": "test_new_creds123"}
+    data = {
+        "login": f"alice_bob@{domain}",
+        "password": "test_new_creds123",  # pragma: allowlist secret
+    }
     request = client.domains_credentials.create(domain=domain, data=data)
     print(request.json())
 
@@ -106,10 +108,8 @@ def put_credentials() -> None:
     PUT /domains/<domain>/credentials/<login>
     :return:
     """
-    data = {"password": "test_new_creds12356"}
-    request = client.domains_credentials.put(
-        domain=domain, data=data, login=f"alice_bob@{domain}"
-    )
+    data = {"password": "test_new_creds12356"}  # pragma: allowlist secret
+    request = client.domains_credentials.put(domain=domain, data=data, login=f"alice_bob@{domain}")
     print(request.json())
 
 
@@ -127,9 +127,7 @@ def delete_credentials() -> None:
     DELETE /domains/<domain>/credentials/<login>
     :return:
     """
-    request = client.domains_credentials.delete(
-        domain=domain, login=f"alice_bob@{domain}"
-    )
+    request = client.domains_credentials.delete(domain=domain, login=f"alice_bob@{domain}")
     print(request.json())
 
 

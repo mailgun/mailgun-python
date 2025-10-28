@@ -32,9 +32,7 @@ def get_template() -> None:
     :return:
     """
     params = {"active": "yes"}
-    req = client.templates.get(
-        domain=domain, filters=params, template_name="template.name1"
-    )
+    req = client.templates.get(domain=domain, filters=params, template_name="template.name1")
     print(req.json())
 
 
@@ -139,9 +137,7 @@ def get_all_versions() -> None:
     GET /<domain>/templates/<template>/versions
     :return:
     """
-    req = client.templates.get(
-        domain=domain, template_name="template.name1", versions=True
-    )
+    req = client.templates.get(domain=domain, template_name="template.name1", versions=True)
     print(req.json())
 
 

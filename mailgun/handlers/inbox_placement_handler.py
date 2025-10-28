@@ -33,13 +33,7 @@ def handle_inbox(
     if "test_id" in kwargs:
         if "counters" in kwargs:
             if kwargs["counters"]:
-                url = (
-                    url["base"][:-1]
-                    + final_keys
-                    + "/"
-                    + kwargs["test_id"]
-                    + "/counters"
-                )
+                url = url["base"][:-1] + final_keys + "/" + kwargs["test_id"] + "/counters"
             else:
                 raise ApiError("Counters option should be True or absent")
         elif "checks" in kwargs:
@@ -54,13 +48,7 @@ def handle_inbox(
                         + kwargs["address"]
                     )
                 else:
-                    url = (
-                        url["base"][:-1]
-                        + final_keys
-                        + "/"
-                        + kwargs["test_id"]
-                        + "/checks"
-                    )
+                    url = url["base"][:-1] + final_keys + "/" + kwargs["test_id"] + "/checks"
             else:
                 raise ApiError("Checks option should be True or absent")
         else:

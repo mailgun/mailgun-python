@@ -59,9 +59,7 @@ def post_address_validate() -> None:
     POST /lists/<address>/validate
     :return:
     """
-    req = client.lists.create(
-        domain=domain, address=f"python_sdk2@{domain}", validate=True
-    )
+    req = client.lists.create(domain=domain, address=f"python_sdk2@{domain}", validate=True)
     print(req.json())
 
 
@@ -71,9 +69,7 @@ def get_validate_address() -> None:
     GET /lists/<address>/validate
     :return:
     """
-    req = client.lists.get(
-        domain=domain, address=f"python_sdk2@{domain}", validate=True
-    )
+    req = client.lists.get(domain=domain, address=f"python_sdk2@{domain}", validate=True)
     print(req.json())
 
 
@@ -83,9 +79,7 @@ def delete_validate_job() -> None:
     DELETE /lists/<address>/validate
     :return:
     """
-    req = client.lists.delete(
-        domain=domain, address=f"python_sdk2@{domain}", validate=True
-    )
+    req = client.lists.delete(domain=domain, address=f"python_sdk2@{domain}", validate=True)
     print(req.json())
 
 
@@ -101,9 +95,7 @@ def post_member_list() -> None:
         "description": "Developer",
         "vars": '{"age": 26}',
     }
-    req = client.lists_members.create(
-        domain=domain, address=mailing_list_address, data=data
-    )
+    req = client.lists_members.create(domain=domain, address=mailing_list_address, data=data)
     print(req.json())
 
 
