@@ -623,25 +623,77 @@ Mailgun allows you to tag your email with unique identifiers. Tags are visible v
 
 Updates the tag description for an account.
 
-TODO: add an example.
+```python
+def update_analytics_tags() -> None:
+    """
+    # Metrics
+    # PUT /v1/analytics/tags
+    :return:
+    """
+
+    data = {
+        "tag": "name-of-tag-to-update",
+        "description": "updated tag description",
+    }
+
+    req = client.analytics_tags.update(data=data)
+    print(req.json())
+```
 
 #### Post query to list account tags or search for single tag
 
 Gets the list of all tags, or filtered by tag prefix, for an account.
 
-TODO: add an example.
+```python
+def post_analytics_tags() -> None:
+    """
+    # Metrics
+    # POST /v1/analytics/tags
+    :return:
+    """
+
+    data = {
+        "pagination": {"sort": "lastseen:desc", "limit": 10},
+        "include_subaccounts": True,
+    }
+
+    req = client.analytics_tags.create(data=data)
+    print(req.json())
+```
 
 #### Delete account tag
 
 Deletes the tag for an account.
 
-TODO: add an example.
+```python
+def delete_analytics_tags() -> None:
+    """
+    # Metrics
+    # DELETE /v1/analytics/tags
+    :return:
+    """
+
+    data = {"tag": "name-of-tag-to-delete"}
+
+    req = client.analytics_tags.delete(data=data)
+    print(req.json())
+```
 
 #### Get account tag limit information
 
 Gets the tag limit and current number of unique tags for an account.
 
-TODO: add an example.
+```python
+def get_account_analytics_tag_limit_information() -> None:
+    """
+    # Metrics
+    # GET /v1/analytics/tags/limits
+    :return:
+    """
+
+    req = client.analytics_tags_limits.get()
+    print(req.json())
+```
 
 ### Metrics
 

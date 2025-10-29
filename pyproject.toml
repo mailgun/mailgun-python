@@ -121,6 +121,7 @@ tests = [
     # tests
     "pytest>=7.0.0",
     "pytest-benchmark",
+    "pytest-order",
     "pytest-cov",
     "coverage>=4.5.4",
     "codecov",
