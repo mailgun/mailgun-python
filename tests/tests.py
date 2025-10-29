@@ -1965,7 +1965,7 @@ class TagsNewTests(unittest.TestCase):
 
     @pytest.mark.order(2)
     def test_update_account_invalid_tag(self) -> None:
-        """Test to update account tag: Unhappy Path with invalid data."""
+        """Test to update account nonexistent tag: Unhappy Path with invalid data."""
 
         req = self.client.analytics_tags.put(
             data=self.account_tag_invalid_info,
@@ -1999,7 +1999,7 @@ class TagsNewTests(unittest.TestCase):
 
     @pytest.mark.order(1)
     def test_post_query_get_account_tags_with_incorrect_url(self) -> None:
-        """Test to post query to list account tags or search for single tag: Wrong Path with invalid url."""
+        """Test to post query to list account tags or search for single tag: Wrong Path with an invalid URL."""
         req = self.client.analytics_tag.create(
             data=self.account_tags_data,
         )
@@ -2038,7 +2038,7 @@ class TagsNewTests(unittest.TestCase):
 
     @pytest.mark.order(4)
     def test_delete_account_tag_with_invalid_url(self) -> None:
-        """Test to delete account tag: Wrong Path with invalid data."""
+        """Test to delete account tag: Wrong Path with invalid URL."""
 
         req = self.client.analytics_tag.delete(
             data=self.account_tag_invalid_info,
@@ -2062,7 +2062,7 @@ class TagsNewTests(unittest.TestCase):
 
     @pytest.mark.order(3)
     def test_get_account_tag_incorrect_url_without_limits_part(self) -> None:
-        """Test to get account tag limit information without the limits URL part: Wrong Path with invalid URL."""
+        """Test to get account tag limit information without the limits URL part: Wrong Path with an invalid URL."""
         req = self.client.analytics_tags.get()
 
         self.assertIsInstance(req.json(), dict)
