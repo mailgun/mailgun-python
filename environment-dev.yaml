@@ -49,6 +49,7 @@ dependencies:
       - bandit
       - docconvert
       - pyment >=0.3.3
+      - pytest-order
       - pytype
       - pyupgrade
       - refurb

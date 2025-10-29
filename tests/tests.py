@@ -8,6 +8,7 @@ import string
 import unittest
 import random
 from typing import Any
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -42,10 +43,12 @@ class MessagesTests(unittest.TestCase):
             "o:tag": "Python test",
         }
 
+    @pytest.mark.order(1)
     def test_post_right_message(self) -> None:
         req = self.client.messages.create(data=self.data, domain=self.domain)
         self.assertEqual(req.status_code, 200)
 
+    @pytest.mark.order(1)
     def test_post_wrong_message(self) -> None:
         req = self.client.messages.create(data={"from": "sdsdsd"}, domain=self.domain)
         self.assertEqual(req.status_code, 400)
@@ -85,11 +88,11 @@ class DomainTests(unittest.TestCase):
         }
         self.post_domain_creds: dict[str, str] = {
             "login": f"alice_bob@{self.domain}",
-            "password": "test_new_creds123",
+            "password": "test_new_creds123",  # pragma: allowlist secret
         }
 
         self.put_domain_creds: dict[str, str] = {
-            "password": "test_new_creds",
+            "password": "test_new_creds",  # pragma: allowlist secret
         }
 
         self.put_domain_connections_data: dict[str, str] = {
@@ -126,54 +129,14 @@ class DomainTests(unittest.TestCase):
         # otherwise, test_delete_domain and test_verify_domain will fail with a new run of tests
         self.client.domains.delete(domain=self.test_domain)
 
-    def test_get_domain_list(self) -> None:
-        req = self.client.domainlist.get()
-        self.assertEqual(req.status_code, 200)
-        self.assertIn("items", req.json())
-
+    @pytest.mark.order(1)
     def test_post_domain(self) -> None:
         self.client.domains.delete(domain=self.test_domain)
         request = self.client.domains.create(data=self.post_domain_data)
         self.assertEqual(request.status_code, 200)
         self.assertIn("Domain DNS records have been created", request.json()["message"])
 
-    def test_update_simple_domain(self) -> None:
-        self.client.domains.delete(domain=self.test_domain)
-        self.client.domains.create(data=self.post_domain_data)
-        data = {"spam_action": "disabled"}
-        request = self.client.domains.put(data=data, domain=self.post_domain_data['name'])
-        self.assertEqual(request.status_code, 200)
-        self.assertEqual(request.json()["message"], "Domain has been updated")
-
-    @pytest.mark.skip("The test can fail because the domain name is a random string")
-    def test_get_single_domain(self) -> None:
-        self.client.domains.create(data=self.post_domain_data)
-        req = self.client.domains.get(domain_name=self.post_domain_data["name"])
-
-        self.assertEqual(req.status_code, 200)
-        self.assertIn("domain", req.json())
-
-    @pytest.mark.skip("The test can fail because the domain name is a random string")
-    def test_verify_domain(self) -> None:
-        self.client.domains.create(data=self.post_domain_data)
-        req = self.client.domains.put(domain=self.post_domain_data["name"], verify=True)
-        self.assertEqual(req.status_code, 200)
-        self.assertIn("domain", req.json())
-
-    def test_delete_domain(self) -> None:
-        self.client.domains.create(data=self.post_domain_data)
-        request = self.client.domains.delete(domain=self.test_domain)
-        self.assertEqual(
-            request.json()["message"],
-            "Domain will be deleted in the background",
-        )
-        self.assertEqual(request.status_code, 200)
-
-    def test_get_smtp_creds(self) -> None:
-        request = self.client.domains_credentials.get(domain=self.domain)
-        self.assertEqual(request.status_code, 200)
-        self.assertIn("items", request.json())
-
+    @pytest.mark.order(1)
     def test_post_domain_creds(self) -> None:
         request = self.client.domains_credentials.create(
             domain=self.domain,
@@ -182,6 +145,16 @@ class DomainTests(unittest.TestCase):
         self.assertEqual(request.status_code, 200)
         self.assertIn("message", request.json())
 
+    @pytest.mark.order(2)
+    def test_update_simple_domain(self) -> None:
+        self.client.domains.delete(domain=self.test_domain)
+        self.client.domains.create(data=self.post_domain_data)
+        data = {"spam_action": "disabled"}
+        request = self.client.domains.put(data=data, domain=self.post_domain_data['name'])
+        self.assertEqual(request.status_code, 200)
+        self.assertEqual(request.json()["message"], "Domain has been updated")
+
+    @pytest.mark.order(2)
     def test_put_domain_creds(self) -> None:
         self.client.domains_credentials.create(
             domain=self.domain,
@@ -196,6 +169,108 @@ class DomainTests(unittest.TestCase):
         self.assertEqual(request.status_code, 200)
         self.assertIn("message", request.json())
 
+    @pytest.mark.order(3)
+    def test_get_domain_list(self) -> None:
+        req = self.client.domainlist.get()
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("items", req.json())
+
+    @pytest.mark.order(3)
+    def test_get_smtp_creds(self) -> None:
+        request = self.client.domains_credentials.get(domain=self.domain)
+        self.assertEqual(request.status_code, 200)
+        self.assertIn("items", request.json())
+
+    @pytest.mark.order(3)
+    def test_get_sending_queues(self) -> None:
+        self.client.domains.delete(domain=self.test_domain)
+        self.client.domains.create(data=self.post_domain_data)
+        request = self.client.domains_sendingqueues.get(domain=self.post_domain_data["name"])
+        self.assertEqual(request.status_code, 200)
+        self.assertIn("scheduled", request.json())
+
+    @pytest.mark.order(4)
+    @pytest.mark.skip("The test can fail because the domain name is a random string")
+    def test_get_single_domain(self) -> None:
+        self.client.domains.create(data=self.post_domain_data)
+        req = self.client.domains.get(domain_name=self.post_domain_data["name"])
+
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("domain", req.json())
+
+    @pytest.mark.order(5)
+    @pytest.mark.skip("The test can fail because the domain name is a random string")
+    def test_verify_domain(self) -> None:
+        self.client.domains.create(data=self.post_domain_data)
+        req = self.client.domains.put(domain=self.post_domain_data["name"], verify=True)
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("domain", req.json())
+
+    @pytest.mark.order(6)
+    def test_put_domain_connections(self) -> None:
+        request = self.client.domains_connection.put(
+            domain=self.domain,
+            data=self.put_domain_connections_data,
+        )
+
+        self.assertEqual(request.status_code, 200)
+        self.assertIn("message", request.json())
+
+    @pytest.mark.order(6)
+    def test_put_domain_tracking_open(self) -> None:
+        request = self.client.domains_tracking_open.put(
+            domain=self.domain,
+            data=self.put_domain_tracking_data,
+        )
+        self.assertEqual(request.status_code, 200)
+        self.assertIn("message", request.json())
+
+    @pytest.mark.order(6)
+    def test_put_domain_tracking_click(self) -> None:
+        request = self.client.domains_tracking_click.put(
+            domain=self.domain,
+            data=self.put_domain_tracking_data,
+        )
+        self.assertEqual(request.status_code, 200)
+        self.assertIn("message", request.json())
+
+    @pytest.mark.order(6)
+    def test_put_domain_unsubscribe(self) -> None:
+        request = self.client.domains_tracking_unsubscribe.put(
+            domain=self.domain,
+            data=self.put_domain_unsubscribe_data,
+        )
+        self.assertEqual(request.status_code, 200)
+        self.assertIn("message", request.json())
+
+    @pytest.mark.order(6)
+    def test_put_dkim_authority(self) -> None:
+        self.client.domains.create(data=self.post_domain_data)
+        request = self.client.domains_dkimauthority.put(
+            domain=self.test_domain,
+            data=self.put_domain_dkim_authority_data,
+        )
+        self.assertIn("message", request.json())
+
+    @pytest.mark.order(6)
+    def test_put_webprefix(self) -> None:
+        self.client.domains.create(data=self.post_domain_data)
+        request = self.client.domains_webprefix.put(
+            domain=self.test_domain,
+            data=self.put_domain_webprefix_data,
+        )
+        self.assertIn("message", request.json())
+
+    @pytest.mark.order(6)
+    def test_put_dkim_selector(self) -> None:
+        self.client.domains.create(data=self.post_domain_data)
+        request = self.client.domains_dkimselector.put(
+            domain=self.domain,
+            data=self.put_dkim_selector_data,
+        )
+        self.assertIn("message", request.json())
+
+    @pytest.mark.order(7)
     def test_delete_domain_creds(self) -> None:
         self.client.domains_credentials.create(
             domain=self.domain,
@@ -208,7 +283,8 @@ class DomainTests(unittest.TestCase):
 
         self.assertEqual(request.status_code, 200)
 
-    @pytest.mark.skip("If all credentials are deleted then test_update_simple_domain fails")
+    # @pytest.mark.skip("If all credentials are deleted then test_update_simple_domain fails")
+    @pytest.mark.order(7)
     def test_delete_all_domain_credentials(self) -> None:
         self.client.domains_credentials.create(
             domain=self.domain,
@@ -219,69 +295,15 @@ class DomainTests(unittest.TestCase):
         self.assertIn(request.json()['message'],
                       "All domain credentials have been deleted")
 
-    def test_put_domain_connections(self) -> None:
-        request = self.client.domains_connection.put(
-            domain=self.domain,
-            data=self.put_domain_connections_data,
-        )
-
-        self.assertEqual(request.status_code, 200)
-        self.assertIn("message", request.json())
-
-    def test_put_domain_tracking_open(self) -> None:
-        request = self.client.domains_tracking_open.put(
-            domain=self.domain,
-            data=self.put_domain_tracking_data,
-        )
-        self.assertEqual(request.status_code, 200)
-        self.assertIn("message", request.json())
-
-    def test_put_domain_tracking_click(self) -> None:
-        request = self.client.domains_tracking_click.put(
-            domain=self.domain,
-            data=self.put_domain_tracking_data,
-        )
-        self.assertEqual(request.status_code, 200)
-        self.assertIn("message", request.json())
-
-    def test_put_domain_unsubscribe(self) -> None:
-        request = self.client.domains_tracking_unsubscribe.put(
-            domain=self.domain,
-            data=self.put_domain_unsubscribe_data,
-        )
-        self.assertEqual(request.status_code, 200)
-        self.assertIn("message", request.json())
-
-    def test_put_dkim_authority(self) -> None:
+    @pytest.mark.order(8)
+    def test_delete_domain(self) -> None:
         self.client.domains.create(data=self.post_domain_data)
-        request = self.client.domains_dkimauthority.put(
-            domain=self.test_domain,
-            data=self.put_domain_dkim_authority_data,
+        request = self.client.domains.delete(domain=self.test_domain)
+        self.assertEqual(
+            request.json()["message"],
+            "Domain will be deleted in the background",
         )
-        self.assertIn("message", request.json())
-
-    def test_put_webprefix(self) -> None:
-        self.client.domains.create(data=self.post_domain_data)
-        request = self.client.domains_webprefix.put(
-            domain=self.test_domain,
-            data=self.put_domain_webprefix_data,
-        )
-        self.assertIn("message", request.json())
-
-    def test_put_dkim_selector(self) -> None:
-        self.client.domains.create(data=self.post_domain_data)
-        request = self.client.domains_dkimselector.put(
-            domain=self.domain,
-            data=self.put_dkim_selector_data,
-        )
-        self.assertIn("message", request.json())
-
-    def test_get_sending_queues(self) -> None:
-        self.client.domains.delete(domain=self.test_domain)
-        self.client.domains.create(data=self.post_domain_data)
-        request = self.client.domains_sendingqueues.get(domain=self.post_domain_data['name'])
         self.assertEqual(request.status_code, 200)
-        self.assertIn("scheduled", request.json())
 
 
 @pytest.mark.skip(
@@ -586,7 +608,7 @@ class BouncesTests(unittest.TestCase):
         self.assertIn("message", req.json())
 
 
-class UnsubscribesTest(unittest.TestCase):
+class UnsubscribesTests(unittest.TestCase):
     """Tests for Mailgun Unsubscribes API.
 
     This class provides setup and teardown functionality for tests involving the
@@ -667,7 +689,7 @@ class UnsubscribesTest(unittest.TestCase):
         self.assertIn("message", req.json())
 
 
-class ComplaintsTest(unittest.TestCase):
+class ComplaintsTests(unittest.TestCase):
     """Tests for Mailgun Complaints API.
 
     This class provides setup and teardown functionality for tests involving the
@@ -753,7 +775,7 @@ class ComplaintsTest(unittest.TestCase):
         self.assertIn("message", req.json())
 
 
-class WhiteListTest(unittest.TestCase):
+class WhiteListTests(unittest.TestCase):
     """Tests for Mailgun WhiteList API.
 
     This class provides setup and teardown functionality for tests involving the
@@ -812,7 +834,7 @@ class WhiteListTest(unittest.TestCase):
         self.assertIn("message", req.json())
 
 
-class RoutesTest(unittest.TestCase):
+class RoutesTests(unittest.TestCase):
     """Tests for Mailgun Routes API.
 
     This class provides setup and teardown functionality for tests involving the
@@ -958,7 +980,7 @@ class RoutesTest(unittest.TestCase):
         self.assertIn("message", req.json())
 
 
-class WebhooksTest(unittest.TestCase):
+class WebhooksTests(unittest.TestCase):
     """Tests for Mailgun Webhooks API.
 
     This class provides setup and teardown functionality for tests involving the
@@ -1022,7 +1044,7 @@ class WebhooksTest(unittest.TestCase):
         self.assertIn("message", req.json())
 
 
-class MailingListsTest(unittest.TestCase):
+class MailingListsTests(unittest.TestCase):
     """Tests for Mailgun Mailing Lists API.
 
     This class provides setup and teardown functionality for tests involving the
@@ -1217,7 +1239,7 @@ class MailingListsTest(unittest.TestCase):
         self.assertIn("message", req.json())
 
 
-class TemplatesTest(unittest.TestCase):
+class TemplatesTests(unittest.TestCase):
     """Tests for Mailgun Templates API.
 
     This class provides setup and teardown functionality for tests involving the
@@ -1394,7 +1416,7 @@ class TemplatesTest(unittest.TestCase):
 @pytest.mark.skip(
     "Email Validation is only available through Mailgun paid plans, see https://www.mailgun.com/pricing/"
 )
-class EmailValidationTest(unittest.TestCase):
+class EmailValidationTests(unittest.TestCase):
     """Tests for Mailgun Email Validation API.
 
     This class provides setup and teardown functionality for tests involving the
@@ -1454,7 +1476,7 @@ class EmailValidationTest(unittest.TestCase):
 @pytest.mark.skip(
     "Inbox Placement is only available through Mailgun Optimize plans, see https://help.mailgun.com/hc/en-us/articles/360034702773-Inbox-Placement"
 )
-class InboxPlacementTest(unittest.TestCase):
+class InboxPlacementTests(unittest.TestCase):
     """Tests for Mailgun Inbox Placement API.
 
     This class provides setup and teardown functionality for tests involving the
@@ -1770,7 +1792,7 @@ class MetricsTest(unittest.TestCase):
         self.assertEqual(str(cm.exception), "'analyticsusagemetrics'")
 
 
-class LogsTest(unittest.TestCase):
+class LogsTests(unittest.TestCase):
     """Tests for Mailgun Inbox Placement API, https://api.mailgun.net/v1/analytics/logs.
 
     This class provides setup and teardown functionality for tests involving the
@@ -1787,9 +1809,14 @@ class LogsTest(unittest.TestCase):
         self.client: Client = Client(auth=self.auth)
         self.domain: str = os.environ["DOMAIN"]
 
+        now = datetime.now()
+        now_formatted = now.strftime("%a, %d %b %Y %H:%M:%S +0000")
+        yesterday = now - timedelta(days=1)
+        yesterday_formatted = yesterday.strftime("%a, %d %b %Y %H:%M:%S +0000")  # noqa: FURB184
+
         self.invalid_account_logs_data = {
-            "start": "Wed, 24 Sep 2025 00:00:00 +0000",
-            "end": "Thu, 25 Sep 2025 00:00:00 +0000",
+            "start": yesterday_formatted,
+            "end": now_formatted,
             "filter": {
                 "AND": [
                     {
@@ -1805,9 +1832,10 @@ class LogsTest(unittest.TestCase):
                 "limit": 0,
             },
         }
+
         self.account_logs_data = {
-            "start": "Wed, 24 Sep 2025 00:00:00 +0000",
-            "end": "Thu, 25 Sep 2025 00:00:00 +0000",
+            "start": yesterday_formatted,
+            "end": now_formatted,
             "filter": {
                 "AND": [
                     {
@@ -1894,6 +1922,172 @@ class LogsTest(unittest.TestCase):
                 data=self.account_logs_data,
             )
         self.assertEqual(str(cm.exception), "'analyticslogs'")
+
+
+class TagsNewTests(unittest.TestCase):
+    """Tests for Mailgun new Tags API, https://api.mailgun.net/v1/analytics/tags.
+
+    This class provides setup and teardown functionality for tests involving the
+    messages functionality, with authentication and client initialization handled
+    in `setUp`. Each test in this suite operates with the configured Mailgun client
+    instance to simulate API interactions.
+
+    """
+
+    def setUp(self) -> None:
+        self.auth: tuple[str, str] = (
+            "api",
+            os.environ["APIKEY"],
+        )
+        self.client: Client = Client(auth=self.auth)
+        self.domain: str = os.environ["DOMAIN"]
+
+        self.account_tags_data = {
+            "pagination": {"sort": "lastseen:desc", "limit": 10},
+            "include_subaccounts": True,
+        }
+
+        self.account_tag_info = '{"tag": "Python test", "description": "updated tag description"}'
+        self.account_tag_invalid_info = '{"tag": "test", "description": "updated tag description"}'
+
+    @pytest.mark.order(2)
+    def test_update_account_tag(self) -> None:
+        """Test to update account tag: Happy Path with valid data."""
+
+        req = self.client.analytics_tags.put(
+            data=self.account_tag_info,
+        )
+
+        print(req.json())
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("message", req.json())
+        self.assertIn("Tag updated", req.json()["message"])
+
+    @pytest.mark.order(2)
+    def test_update_account_invalid_tag(self) -> None:
+        """Test to update account tag: Unhappy Path with invalid data."""
+
+        req = self.client.analytics_tags.put(
+            data=self.account_tag_invalid_info,
+        )
+
+        print(req.json())
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 404)
+        self.assertIn("message", req.json())
+        self.assertIn("Tag not found", req.json()["message"])
+
+    @pytest.mark.order(1)
+    def test_post_query_get_account_tags(self) -> None:
+        """Test to post query to list account tags or search for single tag: Happy Path with valid data."""
+        req = self.client.analytics_tags.create(
+            data=self.account_tags_data,
+        )
+
+        expected_keys = [
+            "pagination",
+            "items",
+        ]
+        expected_pagination_keys = [
+            "sort",
+            "limit",
+        ]
+
+        print(req.json().keys())
+        print(req.json()["pagination"])
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 200)
+        [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
+        [self.assertIn(key, expected_pagination_keys) for key in req.json()["pagination"]]  # type: ignore[func-returns-value]
+
+    @pytest.mark.order(1)
+    def test_post_query_get_account_tags_with_incorrect_url(self) -> None:
+        """Test to post query to list account tags or search for single tag: Wrong Path with invalid url."""
+        req = self.client.analytics_tag.create(
+            data=self.account_tags_data,
+        )
+
+        expected_keys = ["error"]
+
+        print(req.json().keys())
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 404)
+        [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
+
+    @pytest.mark.order(4)
+    def test_delete_account_tag(self) -> None:
+        """Test to delete account tag: Happy Path with valid data."""
+
+        req = self.client.analytics_tags.delete(
+            data=self.account_tag_info,
+        )
+
+        print(req.json())
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("message", req.json())
+        self.assertIn("Tag deleted", req.json()["message"])
+
+    @pytest.mark.order(4)
+    def test_delete_account_nonexistent_tag(self) -> None:
+        """Test to delete account nonexistent tag: Unhappy Path with invalid data."""
+
+        req = self.client.analytics_tags.delete(
+            data=self.account_tag_invalid_info,
+        )
+
+        print(req.json())
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 404)
+        self.assertIn("message", req.json())
+        self.assertIn("Tag not found", req.json()["message"])
+
+    @pytest.mark.order(4)
+    def test_delete_account_tag_with_invalid_url(self) -> None:
+        """Test to delete account tag: Wrong Path with invalid data."""
+
+        req = self.client.analytics_tag.delete(
+            data=self.account_tag_invalid_info,
+        )
+
+        print(req.json())
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 404)
+        self.assertIn("error", req.json())
+        self.assertIn("not found", req.json()["error"])
+
+    @pytest.mark.order(3)
+    def test_get_account_tag_limit_information(self) -> None:
+        """Test to get account tag limit information: Happy Path with valid data."""
+        req = self.client.analytics_tags_limits.get()
+
+        expected_keys = ["limit", "count", "limit_reached"]
+
+        print(req.json())
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 200)
+        [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
+
+    @pytest.mark.order(3)
+    def test_get_account_tag_incorrect_url_without_limits_part(self) -> None:
+        """Test to get account tag limit information without the limits URL part: Wrong Path with invalid URL."""
+        req = self.client.analytics_tags.get()
+
+        print(req.json())
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 404)
+        self.assertIn("error", req.json())
+        self.assertIn("not found", req.json()["error"])
 
 
 if __name__ == "__main__":
