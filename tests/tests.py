@@ -1958,8 +1958,6 @@ class TagsNewTests(unittest.TestCase):
             data=self.account_tag_info,
         )
 
-        print(req.json())
-
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 200)
         self.assertIn("message", req.json())
@@ -1972,8 +1970,6 @@ class TagsNewTests(unittest.TestCase):
         req = self.client.analytics_tags.put(
             data=self.account_tag_invalid_info,
         )
-
-        print(req.json())
 
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 404)
@@ -1996,9 +1992,6 @@ class TagsNewTests(unittest.TestCase):
             "limit",
         ]
 
-        print(req.json().keys())
-        print(req.json()["pagination"])
-
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 200)
         [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
@@ -2013,8 +2006,6 @@ class TagsNewTests(unittest.TestCase):
 
         expected_keys = ["error"]
 
-        print(req.json().keys())
-
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 404)
         [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
@@ -2026,8 +2017,6 @@ class TagsNewTests(unittest.TestCase):
         req = self.client.analytics_tags.delete(
             data=self.account_tag_info,
         )
-
-        print(req.json())
 
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 200)
@@ -2042,8 +2031,6 @@ class TagsNewTests(unittest.TestCase):
             data=self.account_tag_invalid_info,
         )
 
-        print(req.json())
-
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 404)
         self.assertIn("message", req.json())
@@ -2057,8 +2044,6 @@ class TagsNewTests(unittest.TestCase):
             data=self.account_tag_invalid_info,
         )
 
-        print(req.json())
-
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 404)
         self.assertIn("error", req.json())
@@ -2071,8 +2056,6 @@ class TagsNewTests(unittest.TestCase):
 
         expected_keys = ["limit", "count", "limit_reached"]
 
-        print(req.json())
-
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 200)
         [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
@@ -2081,8 +2064,6 @@ class TagsNewTests(unittest.TestCase):
     def test_get_account_tag_incorrect_url_without_limits_part(self) -> None:
         """Test to get account tag limit information without the limits URL part: Wrong Path with invalid URL."""
         req = self.client.analytics_tags.get()
-
-        print(req.json())
 
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 404)
