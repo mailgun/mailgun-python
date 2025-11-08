@@ -38,8 +38,8 @@ dependencies:
   - types-requests
   - yapf
   # other
-  - conda  # [not py==314]
-  - conda-build  # [not py==314]
+  - conda
+  - conda-build
   - jsonschema
   - pre-commit
   - python-dotenv >=0.19.2
