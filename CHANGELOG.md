@@ -33,6 +33,7 @@ We [keep a changelog.](http://keepachangelog.com/)
 ### Pull Requests Merged
 
 - [PR_20](https://github.com/mailgun/mailgun-python/pull/20) - Add support for the Tags New API endpoint
+- [PR_21](https://github.com/mailgun/mailgun-python/pull/21) - Release v1.3.0
 
 ## [1.2.0] - 2025-10-02
 
