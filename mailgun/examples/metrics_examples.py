@@ -11,7 +11,7 @@ client: Client = Client(auth=("api", key))
 def post_analytics_metrics() -> None:
     """
     # Metrics
-    # POST /analytics/metrics
+    # POST /v1/analytics/metrics
     :return:
     """
 
@@ -42,7 +42,7 @@ def post_analytics_metrics() -> None:
 def post_analytics_usage_metrics() -> None:
     """
     # Usage Metrics
-    # POST /analytics/usage/metrics
+    # POST /v1/analytics/usage/metrics
     :return:
     """
     data = {

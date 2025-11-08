@@ -15,7 +15,7 @@ def handle_metrics(
     _method: str | None,
     **kwargs: Any,
 ) -> Any:
-    """Handle Metrics.
+    """Handle Metrics and Tags New.
 
     :param url: Incoming URL dictionary
     :type url: dict
@@ -24,11 +24,13 @@ def handle_metrics(
     :param _method: Incoming request method (it's not being used for this handler)
     :type _method: str
     :param kwargs: kwargs
-    :return: final url for Metrics endpoint
+    :return: final url for Metrics and Tags New endpoints
     """
     final_keys = path.join("/", *url["keys"]) if url["keys"] else ""
     if "usage" in kwargs:
         url = url["base"][:-1] + "/" + kwargs["usage"] + final_keys
+    elif "limits" in kwargs and "tags" in kwargs:
+        url = url["base"][:-1] + "/" + final_keys + kwargs["limits"]
     else:
         url = url["base"][:-1] + final_keys
 

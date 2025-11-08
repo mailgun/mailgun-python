@@ -4,6 +4,36 @@ We [keep a changelog.](http://keepachangelog.com/)
 
 ## [Unreleased]
 
+## [1.3.0] - 2025-11-08
+
+### Added
+
+- Add the `Tags New` endpoint:
+  - Add `tags` to the `analytics` key of special cases in the class `Endpoint`.
+  - Add `mailgun/examples/tags_new_examples.py` with `post_analytics_tags()`, `update_analytics_tags()`, `delete_analytics_tags()`, `get_account_analytics_tag_limit_information()`.
+  - Add `Tags New` sections with examples to `README.md`.
+  - Add class `TagsNewTests` to tests/tests.py.
+- Add `# pragma: allowlist secret` for pseudo-passwords.
+- Add the `pytest-order` package to `pyproject.toml`'s test dependencies and to `environment-dev.yaml` for ordering some `DomainTests`, `Messages` and `TagsNewTests`.
+- Add docstrings to the test classes.
+- Add Python 3.14 support.
+
+### Changed
+
+- Update `metrics_handler.py` to parse Tags New API.
+- Mark deprecated `Tags API` in `README.md` with a warning.
+- Fix `Metrics` & `Logs` docstrings.
+- Format `README.md`.
+- Use ordering for some tests by adding `@pytest.mark.order(N)` to run specific tests sequentionally. It allows to remove some unnecessary `@pytest.mark.skip()`
+- Rename some test classes, e.i., `ComplaintsTest` -> `ComplaintsTests` for consistency.
+- Use `datetime` for `LogsTests` data instead of static date strings.
+- Update CI workflows: update `pre-commit` hooks to the latest versions; add py314 support (limited).
+- Set `line-length` to `100` across the linters in `pyproject.toml`.
+
+### Pull Requests Merged
+
+- [PR_20](https://github.com/mailgun/mailgun-python/pull/20) - Add support for the Tags New API endpoint
+
 ## [1.2.0] - 2025-10-02
 
 ### Added
@@ -98,7 +128,8 @@ We [keep a changelog.](http://keepachangelog.com/)
 
 ### Changed
 
-- Breaking changes! It's a new Python SKD for [Mailgun](http://www.mailgun.com/); an obsolete v0.1.1 on [PyPI](https://pypi.org/project/mailgun/0.1.1/) is deprecated.
+- Breaking changes! It's a new Python SKD for [Mailgun](http://www.mailgun.com/); an obsolete v0.1.1 on
+  [PyPI](https://pypi.org/project/mailgun/0.1.1/) is deprecated.
 
 ### Pull Requests Merged
 

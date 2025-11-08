@@ -37,9 +37,7 @@ def update_ippool() -> None:
         "name": "test_pool3",
         "description": "Test3",
     }
-    req = client.ippools.patch(
-        domain=domain, data=data, pool_id="60140bc1fee3e84dec5abeeb"
-    )
+    req = client.ippools.patch(domain=domain, data=data, pool_id="60140bc1fee3e84dec5abeeb")
     print(req.json())
 
 

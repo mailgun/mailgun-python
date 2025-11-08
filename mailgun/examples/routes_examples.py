@@ -54,9 +54,7 @@ def put_route() -> None:
         "expression": f"match_recipient('.*@{domain}')",
         "action": ["forward('http://myhost.com/messages/')", "stop()"],
     }
-    req = client.routes.put(
-        domain=domain, data=data, route_id="60142b357c90c3c9f228e0a6"
-    )
+    req = client.routes.put(domain=domain, data=data, route_id="60142b357c90c3c9f228e0a6")
     print(req.json())
 
 

@@ -25,9 +25,9 @@ def view_message_with_storage_url() -> None:
     """
     params = {"limit": 1}
 
-    storage_url = client.events.get(domain=domain, filters=params).json()["items"][0][
-        "storage"
-    ]["url"]
+    storage_url = client.events.get(domain=domain, filters=params).json()["items"][0]["storage"][
+        "url"
+    ]
     req = client.domains_messages.get(domain=domain, api_storage_url=storage_url)
     print(req.json())
 
