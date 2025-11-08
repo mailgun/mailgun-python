@@ -101,9 +101,9 @@ Check out all the resources and Python code examples in the official
 
 This library `mailgun` officially supports the following Python versions:
 
-- python >=3.10,\<3.14
+- python >=3.10,\<3.15
 
-It's tested up to 3.13 (including).
+It's tested up to 3.14 (including).
 
 ## Requirements
 
