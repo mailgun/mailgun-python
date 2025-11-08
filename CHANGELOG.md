@@ -12,11 +12,11 @@ We [keep a changelog.](http://keepachangelog.com/)
   - Add `tags` to the `analytics` key of special cases in the class `Endpoint`.
   - Add `mailgun/examples/tags_new_examples.py` with `post_analytics_tags()`, `update_analytics_tags()`, `delete_analytics_tags()`, `get_account_analytics_tag_limit_information()`.
   - Add `Tags New` sections with examples to `README.md`.
-  - Add docstrings to the test classes.
   - Add class `TagsNewTests` to tests/tests.py.
-  - Add `# pragma: allowlist secret` for pseudo-passwords.
-  - Add the `pytest-order` package to `pyproject.toml`'s test dependencies and to `environment-dev.yaml` for ordering some `DomainTests`, `Messages` and `TagsNewTests`.
-  - Add Python 3.14 support.
+- Add `# pragma: allowlist secret` for pseudo-passwords.
+- Add the `pytest-order` package to `pyproject.toml`'s test dependencies and to `environment-dev.yaml` for ordering some `DomainTests`, `Messages` and `TagsNewTests`.
+- Add docstrings to the test classes.
+- Add Python 3.14 support.
 
 ### Changed
 
