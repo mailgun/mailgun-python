@@ -29,7 +29,7 @@ def handle_metrics(
     final_keys = path.join("/", *url["keys"]) if url["keys"] else ""
     if "usage" in kwargs:
         url = url["base"][:-1] + "/" + kwargs["usage"] + final_keys
-    elif "limits" and "tags" in kwargs:
+    elif "limits" in kwargs and "tags" in kwargs:
         url = url["base"][:-1] + "/" + final_keys + kwargs["limits"]
     else:
         url = url["base"][:-1] + final_keys
