@@ -1950,6 +1950,7 @@ class TagsNewTests(unittest.TestCase):
         self.account_tag_info = '{"tag": "Python test", "description": "updated tag description"}'
         self.account_tag_invalid_info = '{"tag": "test", "description": "updated tag description"}'
 
+    # Make sure that the message has been created in MessagesTests before running this test.
     @pytest.mark.order(2)
     def test_update_account_tag(self) -> None:
         """Test to update account tag: Happy Path with valid data."""
@@ -2010,6 +2011,7 @@ class TagsNewTests(unittest.TestCase):
         self.assertEqual(req.status_code, 404)
         [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
 
+    # Make sure that the message has been created in MessagesTests before running this test.
     @pytest.mark.order(4)
     def test_delete_account_tag(self) -> None:
         """Test to delete account tag: Happy Path with valid data."""
