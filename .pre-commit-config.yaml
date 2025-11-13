@@ -121,7 +121,7 @@ repos:
     rev: v0.14.2
     hooks:
       # Run the linter.
-      - id: ruff
+      - id: ruff-check
         args: [--fix, --preview, --exit-non-zero-on-fix]
       # Run the formatter.
       - id: ruff-format
