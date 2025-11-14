@@ -2182,7 +2182,7 @@ class BounceClassificationTests(unittest.TestCase):
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 400)
         [self.assertIn(key, "message") for key in req.json().keys()]  # type: ignore[func-returns-value]
-        self.assertIn("sort should be either one of metrics or dimensions", req.json()["message"])  # type: ignore[func-returns-value]
+        self.assertIn("sort should be either one of metrics or dimensions", req.json()["message"])
 
     def test_post_list_statistic_with_old_dates(self) -> None:
         """Test to post query to list statistic: Wrong Path with invalid data."""
@@ -2191,7 +2191,7 @@ class BounceClassificationTests(unittest.TestCase):
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 400)
         [self.assertIn(key, "message") for key in req.json().keys()]  # type: ignore[func-returns-value]
-        self.assertIn("is out of permitted log retention", req.json()["message"])  # type: ignore[func-returns-value]
+        self.assertIn("is out of permitted log retention", req.json()["message"])
 
     def test_post_list_statistic_with_empty_payload(self) -> None:
         """Test to post query to list statistic: Wrong Path with invalid data."""
@@ -2200,7 +2200,7 @@ class BounceClassificationTests(unittest.TestCase):
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 400)
         [self.assertIn(key, "message") for key in req.json().keys()]  # type: ignore[func-returns-value]
-        self.assertIn("is out of permitted log retention", req.json()["message"])  # type: ignore[func-returns-value]
+        self.assertIn("is out of permitted log retention", req.json()["message"])
 
 
 if __name__ == "__main__":
