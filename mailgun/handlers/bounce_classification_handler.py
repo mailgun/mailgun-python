@@ -1,6 +1,6 @@
 """BOUNCE CLASSIFICATION HANDLER.
 
-Doc: https://documentation.mailgun.com/docs/mailgun/api-reference/openapi-final/tag/Metrics/
+Doc: https://documentation.mailgun.com/docs/mailgun/api-reference/send/mailgun/bounce-classification
 """
 
 from __future__ import annotations
