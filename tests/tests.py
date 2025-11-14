@@ -1576,8 +1576,8 @@ class InboxPlacementTests(unittest.TestCase):
 class MetricsTest(unittest.TestCase):
     """Tests for Mailgun Inbox Placement API, https://api.mailgun.net/v1/analytics/metrics.
 
-    This class provides setup and teardown functionality for tests involving the
-    messages functionality, with authentication and client initialization handled
+    This class provides setup functionality for tests
+    with authentication and client initialization handled
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
 
@@ -1795,8 +1795,8 @@ class MetricsTest(unittest.TestCase):
 class LogsTests(unittest.TestCase):
     """Tests for Mailgun Inbox Placement API, https://api.mailgun.net/v1/analytics/logs.
 
-    This class provides setup and teardown functionality for tests involving the
-    messages functionality, with authentication and client initialization handled
+    This class provides setup and teardown functionality for tests
+    with authentication and client initialization handled
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
 
@@ -1927,8 +1927,8 @@ class LogsTests(unittest.TestCase):
 class TagsNewTests(unittest.TestCase):
     """Tests for Mailgun new Tags API, https://api.mailgun.net/v1/analytics/tags.
 
-    This class provides setup and teardown functionality for tests involving the
-    messages functionality, with authentication and client initialization handled
+    This class provides setup functionality for tests involving
+    with authentication and client initialization handled
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
 
@@ -2071,6 +2071,136 @@ class TagsNewTests(unittest.TestCase):
         self.assertEqual(req.status_code, 404)
         self.assertIn("error", req.json())
         self.assertIn("not found", req.json()["error"])
+
+
+class BounceClassificationTests(unittest.TestCase):
+    """Tests for Mailgun Bounce Classification API, https://api.mailgun.net/v2/bounce-classification/metrics.
+
+    This class provides setup functionality for tests involving the
+    functionality with authentication and client initialization handled
+    in `setUp`. Each test in this suite operates with the configured Mailgun client
+    instance to simulate API interactions.
+
+    """
+
+    def setUp(self) -> None:
+        self.auth: tuple[str, str] = (
+            "api",
+            os.environ["APIKEY"],
+        )
+        self.client: Client = Client(auth=self.auth)
+        self.domain: str = os.environ["DOMAIN"]
+
+        now = datetime.now()
+        now_formatted = now.strftime("%a, %d %b %Y %H:%M:%S +0000")
+        yesterday = now - timedelta(days=1)
+        yesterday_formatted = yesterday.strftime("%a, %d %b %Y %H:%M:%S +0000")  # noqa: FURB184
+
+        self.payload = {
+            "start": yesterday_formatted,
+            "end": now_formatted,
+            "resolution": "day",
+            "duration": "24h0m0s",
+            "dimensions": ["entity-name", "domain.name"],
+            "metrics": [
+                "critical_bounce_count",
+                "non_critical_bounce_count",
+                "critical_delay_count",
+                "non_critical_delay_count",
+                "delivered_smtp_count",
+                "classified_failures_count",
+                "critical_bounce_rate",
+                "non_critical_bounce_rate",
+                "critical_delay_rate",
+                "non_critical_delay_rate",
+            ],
+            "filter": {
+                "AND": [
+                    {
+                        "attribute": "domain.name",
+                        "comparator": "=",
+                        "values": [{"value": self.domain}],
+                    }
+                ]
+            },
+            "include_subaccounts": True,
+            "pagination": {"sort": "entity-name:asc", "limit": 10},
+        }
+        self.payload_without_dimensions = {
+            "start": yesterday_formatted,
+            "end": now_formatted,
+            "metrics": [
+                "critical_bounce_count",
+            ],
+            "pagination": {"sort": "entity-name:asc", "limit": 10},
+        }
+        self.payload_with_old_dates = {
+            "start": "Wed, 12 Nov 2000 23:00:00 UTC",
+            "end": "Thu, 13 Nov 2000 23:00:00 UTC",
+            "dimensions": ["entity-name", "domain.name"],
+            "metrics": [
+                "critical_bounce_count",
+            ],
+            "pagination": {"sort": "entity-name:asc", "limit": 10},
+        }
+        self.empty_payload: dict[str, str] = {}
+
+    def test_post_list_statistic(self) -> None:
+        """Test to post query to list statistic: Happy Path with valid data."""
+        req = self.client.bounceclassification_metrics.create(data=self.payload)
+
+        expected_keys: list[str] = [
+            "start",
+            "end",
+            "resolution",
+            "duration",
+            "dimensions",
+            "pagination",
+            "items",
+        ]
+        expected_dimensions_elements: list[str] = [
+            "entity-name",
+            "domain.name",
+        ]
+        expected_pagination_keys: list[str] = [
+            "sort",
+            "skip",
+            "limit",
+            "total",
+        ]
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 200)
+        [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
+        [self.assertIn(key, expected_dimensions_elements) for key in req.json()["dimensions"]]  # type: ignore[func-returns-value]
+        [self.assertIn(key, expected_pagination_keys) for key in req.json()["pagination"]]  # type: ignore[func-returns-value]
+
+    def test_post_list_statistic_without_dimensions(self) -> None:
+        """Test to post query to list statistic: Wrong Path with invalid data."""
+        req = self.client.bounceclassification_metrics.create(data=self.payload_without_dimensions)
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 400)
+        [self.assertIn(key, "message") for key in req.json().keys()]  # type: ignore[func-returns-value]
+        self.assertIn("sort should be either one of metrics or dimensions", req.json()["message"])  # type: ignore[func-returns-value]
+
+    def test_post_list_statistic_with_old_dates(self) -> None:
+        """Test to post query to list statistic: Wrong Path with invalid data."""
+        req = self.client.bounceclassification_metrics.create(data=self.payload_with_old_dates)
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 400)
+        [self.assertIn(key, "message") for key in req.json().keys()]  # type: ignore[func-returns-value]
+        self.assertIn("is out of permitted log retention", req.json()["message"])  # type: ignore[func-returns-value]
+
+    def test_post_list_statistic_with_empty_payload(self) -> None:
+        """Test to post query to list statistic: Wrong Path with invalid data."""
+        req = self.client.bounceclassification_metrics.create(data=self.empty_payload)
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 400)
+        [self.assertIn(key, "message") for key in req.json().keys()]  # type: ignore[func-returns-value]
+        self.assertIn("is out of permitted log retention", req.json()["message"])  # type: ignore[func-returns-value]
 
 
 if __name__ == "__main__":
