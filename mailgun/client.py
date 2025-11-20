@@ -19,6 +19,7 @@ from urllib.parse import urljoin
 
 import requests
 
+from mailgun.handlers.bounce_classification_handler import handle_bounce_classification
 from mailgun.handlers.default_handler import handle_default
 from mailgun.handlers.domains_handler import handle_domainlist
 from mailgun.handlers.domains_handler import handle_domains
@@ -71,6 +72,7 @@ HANDLERS: dict[str, Callable] = {  # type: ignore[type-arg]
     "messages.mime": handle_default,
     "events": handle_default,
     "analytics": handle_metrics,
+    "bounce-classification": handle_bounce_classification,
 }
 
 
@@ -107,6 +109,7 @@ class Config:
         key = key.lower()
         headers = {"User-agent": self.user_agent}
         v1_base = urljoin(self.api_url, "v1/")
+        v2_base = urljoin(self.api_url, "v2/")
         v3_base = urljoin(self.api_url, "v3/")
         v4_base = urljoin(self.api_url, "v4/")
         v5_base = urljoin(self.api_url, "v5/")
@@ -127,6 +130,11 @@ class Config:
                 "base": v1_base,
                 "keys": ["analytics", "usage", "metrics", "logs", "tags", "limits"],
             },
+            # /v2/bounce-classification/metrics
+            "bounceclassification": {
+                "base": v2_base,
+                "keys": ["bounce-classification", "metrics"],
+            },
         }
 
         if key in special_cases:
@@ -137,6 +145,15 @@ class Config:
             return {
                 "base": v1_base,
                 "keys": key.split("_"),
+            }, headers
+
+        if "bounceclassification" in key:
+            headers |= {"Content-Type": "application/json"}
+            part1 = key[:6]
+            part2 = key[6:]
+            return {
+                "base": v2_base,
+                "keys": f"{part1}-{part2}".split("_"),
             }, headers
 
         # Handle DIPP endpoints

@@ -4,6 +4,28 @@ We [keep a changelog.](http://keepachangelog.com/)
 
 ## [Unreleased]
 
+## [1.4.0] - 2025-11-XX
+
+### Added
+
+- Add the `Bounce Classification` endpoint:
+  - Add `bounce-classification`, `metrics` to the `bounceclassification` key of special cases in the class `Config`.
+  - Add `bounce_classification_handler.py` to parse Bounce Classification API.
+  - Add `mailgun/examples/bounce_classification_examples.py` with `post_list_statistic_v2()`.
+  - Add `Bounce Classification` sections with an example to `README.md`.
+  - Add class `BounceClassificationTests ` to `tests/tests.py`.
+  - Add docstrings to the test class `BounceClassificationTests` and its methods.
+
+### Changed
+
+- Fix `Metrics`, `Tags New` & `Logs` docstrings in tests.
+- Update CI workflows: update `pre-commit` hooks to the latest versions.
+- Apply linters: remove redundant `type: ignore`.
+
+### Pull Requests Merged
+
+- [PR_22](https://github.com/mailgun/mailgun-python/pull/22) - Add support for the Bounce Classification v2 API
+
 ## [1.3.0] - 2025-11-08
 
 ### Added
@@ -143,4 +165,6 @@ We [keep a changelog.](http://keepachangelog.com/)
 [1.0.1]: https://github.com/mailgun/mailgun-python/releases/tag/v1.0.1
 [1.0.2]: https://github.com/mailgun/mailgun-python/releases/tag/v1.0.2
 [1.1.0]: https://github.com/mailgun/mailgun-python/releases/tag/v1.1.0
-[unreleased]: https://github.com/mailgun/mailgun-python/compare/v1.1.0...HEAD
+[1.2.0]: https://github.com/mailgun/mailgun-python/releases/tag/v1.2.0
+[1.3.0]: https://github.com/mailgun/mailgun-python/releases/tag/v1.3.0
+[unreleased]: https://github.com/mailgun/mailgun-python/compare/v1.3.0...HEAD
