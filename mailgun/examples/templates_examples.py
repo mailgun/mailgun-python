@@ -141,5 +141,27 @@ def get_all_versions() -> None:
     print(req.json())
 
 
+def update_template_version_copy() -> None:
+    """
+    PUT /v3/{domain_name}/templates/{template_name}/versions/{version_name}/copy/{new_version_name}
+    :return:
+    """
+    data = {"comment": "An updated version comment"}
+
+    req = client.templates.put(
+        domain=domain,
+        filters=data,
+        template_name="template.name1",
+        versions=True,
+        tag="v2",
+        copy=True,
+        new_tag="v3",
+    )
+    print(req.json())
+
+
 if __name__ == "__main__":
-    get_all_versions()
+    # get_all_versions()
+    post_template()
+    create_new_template_version()
+    update_template_version_copy()
