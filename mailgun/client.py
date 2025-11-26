@@ -15,13 +15,16 @@ Classes:
 
 from __future__ import annotations
 
+import io
 import json
+from collections import defaultdict
 from typing import TYPE_CHECKING
 from typing import Any
 from urllib.parse import urljoin
 
 import httpx
 import requests
+from typing_extensions import Self
 
 from mailgun.handlers.bounce_classification_handler import handle_bounce_classification
 from mailgun.handlers.default_handler import handle_default
@@ -46,6 +49,7 @@ from mailgun.handlers.templates_handler import handle_templates
 
 
 if TYPE_CHECKING:
+    import types
     from collections.abc import Callable
     from collections.abc import Mapping
 
@@ -561,7 +565,7 @@ class AsyncEndpoint(BaseEndpoint):
         url: dict[str, Any],
         headers: dict[str, str],
         auth: tuple[str, str] | None,
-        client: httpx.AsyncClient | None = None,
+        client: httpx.AsyncClient,
     ) -> None:
         """Initialize a new AsyncEndpoint instance.
 
@@ -581,66 +585,67 @@ class AsyncEndpoint(BaseEndpoint):
         self._client = client
 
     @staticmethod
-    def _prepare_files(files: dict[str, str] | None) -> dict[str, str]:
+    def _prepare_files(files: Any) -> dict[str, Any] | None:
         """Convert files to httpx format: {"field": (filename, file_obj, content_type)}."""
+        min_length = 2
         httpx_files = None
-        if files:
-            import io
-            from collections import defaultdict
+        if not files:
+            return httpx_files
 
-            if isinstance(files, dict):
-                # Convert dict[str, bytes] to httpx format
-                # httpx expects: {"field": (filename, file_obj, content_type)}
-                httpx_files = {}
-                for key, value in files.items():
-                    if isinstance(value, bytes):
-                        httpx_files[key] = (key, io.BytesIO(value), "application/octet-stream")
-                    elif isinstance(value, tuple) and len(value) >= 2:
-                        # Already in tuple format: (filename, content, ...)
-                        filename = value[0]
-                        content = value[1]
-                        content_type = value[2] if len(value) > 2 else "application/octet-stream"
-                        if isinstance(content, bytes):
-                            httpx_files[key] = (filename, io.BytesIO(content), content_type)
-                        else:
-                            httpx_files[key] = value
+        if isinstance(files, dict):
+            # Convert dict[str, bytes] to httpx format
+            # httpx expects: {"field": (filename, file_obj, content_type)}
+            httpx_files = {}
+            for key, value in files.items():
+                if isinstance(value, bytes):
+                    httpx_files[key] = (key, io.BytesIO(value), "application/octet-stream")
+                elif isinstance(value, tuple) and len(value) >= min_length:
+                    # Already in tuple format: (filename, content, ...)
+                    filename = value[0]
+                    content = value[1]
+                    content_type = (
+                        value[2] if len(value) > min_length else "application/octet-stream"
+                    )
+                    if isinstance(content, bytes):
+                        httpx_files[key] = (filename, io.BytesIO(content), content_type)
                     else:
                         httpx_files[key] = value
-            elif isinstance(files, list):
-                # Convert list of tuples to httpx dict format
-                # Input: [("field", (filename, bytes)), ...] or [("field", ("filename", bytes)), ...]
-                # Output: {"field": [(filename, file_obj, content_type), ...]} for multiple files
-                #         or {"field": (filename, file_obj, content_type)} for single file
-                files_dict: dict[str, list[tuple[str, Any, str]]] = defaultdict(list)
-                for item in files:
-                    if isinstance(item, tuple) and len(item) >= 2:
-                        field_name = item[0]
-                        file_data = item[1]
-                        if isinstance(file_data, tuple) and len(file_data) >= 2:
-                            filename = file_data[0]
-                            content = file_data[1]
-                            content_type = (
-                                file_data[2] if len(file_data) > 2 else "application/octet-stream"
-                            )
-                            if isinstance(content, bytes):
-                                files_dict[field_name].append(
-                                    (filename, io.BytesIO(content), content_type),
-                                )
-                            else:
-                                files_dict[field_name].append(file_data)
-                        elif isinstance(file_data, bytes):
+                else:
+                    httpx_files[key] = value
+        elif isinstance(files, list):
+            # Convert list of tuples to httpx dict format
+            files_dict: dict[str, list[tuple[str, Any, str]]] = defaultdict(list)
+            for item in files:
+                if isinstance(item, tuple) and len(item) >= min_length:
+                    field_name = item[0]
+                    file_data = item[1]
+                    if isinstance(file_data, tuple) and len(file_data) >= min_length:
+                        filename = file_data[0]
+                        content = file_data[1]
+                        content_type = (
+                            file_data[2]
+                            if len(file_data) > min_length
+                            else "application/octet-stream"
+                        )
+                        if isinstance(content, bytes):
                             files_dict[field_name].append(
-                                (field_name, io.BytesIO(file_data), "application/octet-stream"),
+                                (filename, io.BytesIO(content), content_type),
                             )
                         else:
                             files_dict[field_name].append(file_data)
+                    elif isinstance(file_data, bytes):
+                        files_dict[field_name].append(
+                            (field_name, io.BytesIO(file_data), "application/octet-stream"),
+                        )
+                    else:
+                        files_dict[field_name].append(file_data)
 
-                httpx_files = {
-                    field: file_list[0] if len(file_list) == 1 else file_list
-                    for field, file_list in files_dict.items()
-                }
-            else:
-                httpx_files = files
+            httpx_files = {
+                field: file_list[0] if len(file_list) == 1 else file_list
+                for field, file_list in files_dict.items()
+            }
+        else:
+            httpx_files = files
         return httpx_files
 
     async def api_call(
@@ -851,10 +856,7 @@ class AsyncEndpoint(BaseEndpoint):
         :return: api_call PUT request
         :rtype: httpx.Response
         """
-        if (
-            self.headers.get("Content-type") == "application/json"
-            or self.headers.get("Content-Type") == "application/json"
-        ):
+        if self.headers.get("Content-type") == "application/json":
             data = json.dumps(data)
         return await self.api_call(
             self._auth,
@@ -891,12 +893,12 @@ class AsyncClient(Client):
 
     endpoint_cls = AsyncEndpoint
 
-    def __init__(self, **kwargs: Any):
+    def __init__(self, **kwargs: Any) -> None:
         """Initialize a new AsyncClient instance for API interaction."""
         super().__init__(**kwargs)
         # Save client kwargs for client reinitialization
-        self._client_kwargs = {k: v for k, v in kwargs.items() if k not in ("api_url",)}
-        self._httpx_client = None
+        self._client_kwargs = {k: v for k, v in kwargs.items() if k != "api_url"}
+        self._httpx_client: httpx.AsyncClient = None
 
     def __getattr__(self, name: str) -> Any:
         """Get named attribute of an object, split it and execute.
@@ -930,10 +932,15 @@ class AsyncClient(Client):
         if self._httpx_client:
             await self._httpx_client.aclose()
 
-    async def __aenter__(self) -> AsyncClient:
+    async def __aenter__(self) -> Self:
         """Async context manager entry."""
         return self
 
-    async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
+    ) -> None:
         """Async context manager exit."""
         await self.aclose()
