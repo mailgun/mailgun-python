@@ -47,6 +47,8 @@ Check out all the resources and Python code examples in the official
     - [Events](#events)
       - [Retrieves a paginated list of events](#retrieves-a-paginated-list-of-events)
       - [Get events by recipient](#get-events-by-recipient)
+    - [Bounce Classification](#bounce-classification)
+      - [List statistic v2](#list-statistic-v2)
     - [Logs](#logs)
       - [List logs](#list-logs)
     - [Tags New](#tags-new)
@@ -614,6 +616,59 @@ def events_by_recipient() -> None:
         "recipient": os.environ["VALIDATION_ADDRESS_1"],
     }
     req = client.events.get(domain=domain, filters=params)
+    print(req.json())
+```
+
+### Bounce Classification
+
+[API endpoint](https://documentation.mailgun.com/docs/mailgun/api-reference/send/mailgun/bounce-classification).
+
+#### List statistic v2
+
+Items that have no bounces and no delays(classified_failures_count==0) are not returned.
+
+```python
+def post_list_statistic_v2() -> None:
+    """
+    # Bounce Classification
+    # POST /v2/bounce-classification/metrics
+    :return:
+    """
+
+    payload = {
+        "start": "Wed, 12 Nov 2025 23:00:00 UTC",
+        "end": "Thu, 13 Nov 2025 23:00:00 UTC",
+        "resolution": "day",
+        "duration": "24h0m0s",
+        "dimensions": ["entity-name", "domain.name"],
+        "metrics": [
+            "critical_bounce_count",
+            "non_critical_bounce_count",
+            "critical_delay_count",
+            "non_critical_delay_count",
+            "delivered_smtp_count",
+            "classified_failures_count",
+            "critical_bounce_rate",
+            "non_critical_bounce_rate",
+            "critical_delay_rate",
+            "non_critical_delay_rate",
+        ],
+        "filter": {
+            "AND": [
+                {
+                    "attribute": "domain.name",
+                    "comparator": "=",
+                    "values": [{"value": domain}],
+                }
+            ]
+        },
+        "include_subaccounts": True,
+        "pagination": {"sort": "entity-name:asc", "limit": 10},
+    }
+
+    headers = {"Content-Type": "application/json"}
+
+    req = client.bounceclassification_metrics.create(data=payload, headers=headers)
     print(req.json())
 ```
 

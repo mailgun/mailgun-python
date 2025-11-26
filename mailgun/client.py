@@ -20,9 +20,10 @@ from typing import TYPE_CHECKING
 from typing import Any
 from urllib.parse import urljoin
 
-import requests
 import httpx
+import requests
 
+from mailgun.handlers.bounce_classification_handler import handle_bounce_classification
 from mailgun.handlers.default_handler import handle_default
 from mailgun.handlers.domains_handler import handle_domainlist
 from mailgun.handlers.domains_handler import handle_domains
@@ -76,6 +77,7 @@ HANDLERS: dict[str, Callable] = {  # type: ignore[type-arg]
     "messages.mime": handle_default,
     "events": handle_default,
     "analytics": handle_metrics,
+    "bounce-classification": handle_bounce_classification,
 }
 
 
@@ -112,6 +114,7 @@ class Config:
         key = key.lower()
         headers = {"User-agent": self.user_agent}
         v1_base = urljoin(self.api_url, "v1/")
+        v2_base = urljoin(self.api_url, "v2/")
         v3_base = urljoin(self.api_url, "v3/")
         v4_base = urljoin(self.api_url, "v4/")
         v5_base = urljoin(self.api_url, "v5/")
@@ -132,6 +135,11 @@ class Config:
                 "base": v1_base,
                 "keys": ["analytics", "usage", "metrics", "logs", "tags", "limits"],
             },
+            # /v2/bounce-classification/metrics
+            "bounceclassification": {
+                "base": v2_base,
+                "keys": ["bounce-classification", "metrics"],
+            },
         }
 
         if key in special_cases:
@@ -142,6 +150,15 @@ class Config:
             return {
                 "base": v1_base,
                 "keys": key.split("_"),
+            }, headers
+
+        if "bounceclassification" in key:
+            headers |= {"Content-Type": "application/json"}
+            part1 = key[:6]
+            part2 = key[6:]
+            return {
+                "base": v2_base,
+                "keys": f"{part1}-{part2}".split("_"),
             }, headers
 
         # Handle DIPP endpoints
@@ -217,6 +234,8 @@ class Config:
 
 
 class BaseEndpoint:
+    """Base class for endpoints. Contains methods common for Endpoint and AsyncEndpoint."""
+
     def __init__(
         self,
         url: dict[str, Any],
@@ -537,8 +556,13 @@ class Client:
 class AsyncEndpoint(BaseEndpoint):
     """Generate async request and return response using httpx."""
 
-    def __init__(self, url: dict[str, Any], headers: dict[str, str], auth: tuple[str, str] | None,
-                 client: httpx.AsyncClient | None = None) -> None:
+    def __init__(
+        self,
+        url: dict[str, Any],
+        headers: dict[str, str],
+        auth: tuple[str, str] | None,
+        client: httpx.AsyncClient | None = None,
+    ) -> None:
         """Initialize a new AsyncEndpoint instance.
 
         :param url: URL dict with pairs {"base": "keys"}
@@ -550,7 +574,6 @@ class AsyncEndpoint(BaseEndpoint):
         :param client: Optional httpx.AsyncClient instance to reuse
         :type client: httpx.AsyncClient | None
         """
-
         super().__init__(url, headers, auth)
         self._url = url
         self.headers = headers
@@ -559,7 +582,7 @@ class AsyncEndpoint(BaseEndpoint):
 
     @staticmethod
     def _prepare_files(files: dict[str, str] | None) -> dict[str, str]:
-        """Converts files to httpx format: {"field": (filename, file_obj, content_type)}"""
+        """Convert files to httpx format: {"field": (filename, file_obj, content_type)}."""
         httpx_files = None
         if files:
             import io
@@ -596,14 +619,19 @@ class AsyncEndpoint(BaseEndpoint):
                         if isinstance(file_data, tuple) and len(file_data) >= 2:
                             filename = file_data[0]
                             content = file_data[1]
-                            content_type = file_data[2] if len(file_data) > 2 else "application/octet-stream"
+                            content_type = (
+                                file_data[2] if len(file_data) > 2 else "application/octet-stream"
+                            )
                             if isinstance(content, bytes):
-                                files_dict[field_name].append((filename, io.BytesIO(content), content_type))
+                                files_dict[field_name].append(
+                                    (filename, io.BytesIO(content), content_type),
+                                )
                             else:
                                 files_dict[field_name].append(file_data)
                         elif isinstance(file_data, bytes):
                             files_dict[field_name].append(
-                                (field_name, io.BytesIO(file_data), "application/octet-stream"))
+                                (field_name, io.BytesIO(file_data), "application/octet-stream"),
+                            )
                         else:
                             files_dict[field_name].append(file_data)
 
@@ -823,7 +851,10 @@ class AsyncEndpoint(BaseEndpoint):
         :return: api_call PUT request
         :rtype: httpx.Response
         """
-        if self.headers.get("Content-type") == "application/json" or self.headers.get("Content-Type") == "application/json":
+        if (
+            self.headers.get("Content-type") == "application/json"
+            or self.headers.get("Content-Type") == "application/json"
+        ):
             data = json.dumps(data)
         return await self.api_call(
             self._auth,
@@ -861,11 +892,10 @@ class AsyncClient(Client):
     endpoint_cls = AsyncEndpoint
 
     def __init__(self, **kwargs: Any):
+        """Initialize a new AsyncClient instance for API interaction."""
         super().__init__(**kwargs)
         # Save client kwargs for client reinitialization
-        self._client_kwargs = {
-            k: v for k, v in kwargs.items() if k not in ("api_url",)
-        }
+        self._client_kwargs = {k: v for k, v in kwargs.items() if k not in ("api_url",)}
         self._httpx_client = None
 
     def __getattr__(self, name: str) -> Any:
@@ -879,7 +909,12 @@ class AsyncClient(Client):
         # identify the resource
         fname = split[0]
         url, headers = self.config[name]
-        return type(fname, (AsyncEndpoint,), {})(url=url, headers=headers, auth=self.auth, client=self._client)
+        return type(fname, (AsyncEndpoint,), {})(
+            url=url,
+            headers=headers,
+            auth=self.auth,
+            client=self._client,
+        )
 
     @property
     def _client(self) -> AsyncClient:
