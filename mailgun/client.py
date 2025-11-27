@@ -23,6 +23,8 @@ from mailgun.handlers.bounce_classification_handler import handle_bounce_classif
 from mailgun.handlers.default_handler import handle_default
 from mailgun.handlers.domains_handler import handle_domainlist
 from mailgun.handlers.domains_handler import handle_domains
+from mailgun.handlers.domains_handler import handle_envelopes
+from mailgun.handlers.domains_handler import handle_mailboxes_credentials
 from mailgun.handlers.domains_handler import handle_sending_queues
 from mailgun.handlers.email_validation_handler import handle_address_validate
 from mailgun.handlers.error_handler import ApiError
@@ -56,6 +58,8 @@ HANDLERS: dict[str, Callable] = {  # type: ignore[type-arg]
     "dkim_selector": handle_domains,
     "web_prefix": handle_domains,
     "sending_queues": handle_sending_queues,
+    "envelopes": handle_envelopes,
+    "mailboxes": handle_mailboxes_credentials,
     "ips": handle_ips,
     "ip_pools": handle_ippools,
     "tags": handle_tags,
@@ -154,6 +158,14 @@ class Config:
             return {
                 "base": v2_base,
                 "keys": f"{part1}-{part2}".split("_"),
+            }, headers
+
+        # TODO: verify if it works!
+        if "enevelopes" in key:
+            headers |= {"Content-Type": "application/json"}
+            return {
+                "base": v3_base,
+                "keys": key,
             }, headers
 
         # Handle DIPP endpoints

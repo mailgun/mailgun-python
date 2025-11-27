@@ -38,7 +38,7 @@ export PRINT_HELP_PYSCRIPT
 
 BROWSER := python -c "$$BROWSER_PYSCRIPT"
 
-clean: clean-cov clean-build clean-pyc clean-test clean-temp clean-other ## remove all build, test, coverage and Python artifacts
+clean:	clean-cov clean-build clean-pyc clean-test clean-temp clean-other ## remove all build, test, coverage and Python artifacts
 
 clean-cov:
 	rm -rf .coverage
@@ -47,7 +47,7 @@ clean-cov:
 	rm -rf pytest.xml
 	rm -rf pytest-coverage.txt
 
-clean-build: ## remove build artifacts
+clean-build:	## remove build artifacts
 	rm -fr build/
 	rm -fr dist/
 	rm -fr .eggs/
@@ -57,19 +57,19 @@ clean-build: ## remove build artifacts
 clean-env:					## remove conda environment
 	conda remove -y -n $(CONDA_ENV_NAME) --all ; conda info
 
-clean-pyc: ## remove Python file artifacts
+clean-pyc:	## remove Python file artifacts
 	find . -name '*.pyc' -exec rm -f {} +
 	find . -name '*.pyo' -exec rm -f {} +
 	find . -name '*~' -exec rm -f {} +
 	find . -name '__pycache__' -exec rm -fr {} +
 
-clean-test: ## remove test and coverage artifacts
+clean-test:	## remove test and coverage artifacts
 	rm -fr .tox/
 	rm -f .coverage
 	rm -fr htmlcov/
 	rm -fr .pytest_cache
 
-clean-temp: ## remove temp artifacts
+clean-temp:	## remove temp artifacts
 	rm -fr temp/tmp.txt
 	rm -fr tmp.txt
 
@@ -83,21 +83,21 @@ clean-other:
 help:
 	$(PYTHON3) -c "$$PRINT_HELP_PYSCRIPT" < $(MAKEFILE_LIST)
 
-environment:    ## handles environment creation
+environment:	## handles environment creation
 	conda env create -f environment.yaml --name $(CONDA_ENV_NAME) --yes
 	conda run --name $(CONDA_ENV_NAME) pip install .
 
-environment-dev:       ## Handles environment creation
+environment-dev:	## Handles environment creation
 	conda env create -n $(CONDA_ENV_NAME)-dev -y --file environment-dev.yml
 	conda run --name $(CONDA_ENV_NAME)-dev pip install -e .
 
 install: clean	## install the package to the active Python's site-packages
 	pip install .
 
-release: dist ## package and upload a release
+release: dist	## package and upload a release
 	twine upload dist/*
 
-dist: clean ## builds source and wheel package
+dist: clean	## builds source and wheel package
 	python -m build
 	ls -l dist
 
@@ -111,14 +111,14 @@ dev-full: clean		## install the package's development version to a fresh environ
 	$(CONDA_ACTIVATE) $(CONDA_ENV_NAME)-dev && pre-commit install
 
 
-pre-commit:     ## runs pre-commit against files. NOTE: older files are disabled in the pre-commit config.
+pre-commit:		## runs pre-commit against files. NOTE: older files are disabled in the pre-commit config.
 	pre-commit run --all-files
 
-test:			## runs test cases
-	$(PYTHON3) -m pytest -n auto --capture=no $(TEST_DIR) test.py
+test:		## runs test cases
+	$(PYTHON3) -m pytest -v --capture=no $(TEST_DIR)/tests.py
 
 test-debug:		## runs test cases with debugging info enabled
-	$(PYTHON3) -m pytest -n auto -vv --capture=no $(TEST_DIR) test.py
+	$(PYTHON3) -m pytest -n auto -vv --capture=no $(TEST_DIR)/tests.py
 
 test-cov:		## checks test coverage requirements
 	$(PYTHON3) -m pytest -n auto --cov-config=.coveragerc --cov=$(SRC_DIR) \
@@ -127,7 +127,7 @@ test-cov:		## checks test coverage requirements
 tests-cov-fail:
 	@pytest --cov=$(SRC_DIR) --cov-report term-missing --cov-report=html --cov-fail-under=80
 
-coverage: ## check code coverage quickly with the default Python
+coverage:	## check code coverage quickly with the default Python
 	coverage run --source $(SRC_DIR) -m pytest
 	coverage report -m
 	coverage html

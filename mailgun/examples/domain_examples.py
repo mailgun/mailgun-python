@@ -81,56 +81,6 @@ def delete_domain() -> None:
     print(request.status_code)
 
 
-def get_credentials() -> None:
-    """
-    GET /domains/<domain>/credentials
-    :return:
-    """
-    request = client.domains_credentials.get(domain=domain)
-    print(request.json())
-
-
-def post_credentials() -> None:
-    """
-    POST /domains/<domain>/credentials
-    :return:
-    """
-    data = {
-        "login": f"alice_bob@{domain}",
-        "password": "test_new_creds123",  # pragma: allowlist secret
-    }
-    request = client.domains_credentials.create(domain=domain, data=data)
-    print(request.json())
-
-
-def put_credentials() -> None:
-    """
-    PUT /domains/<domain>/credentials/<login>
-    :return:
-    """
-    data = {"password": "test_new_creds12356"}  # pragma: allowlist secret
-    request = client.domains_credentials.put(domain=domain, data=data, login=f"alice_bob@{domain}")
-    print(request.json())
-
-
-def delete_all_domain_credentials() -> None:
-    """
-    DELETE /domains/<domain>/credentials
-    :return:
-    """
-    request = client.domains_credentials.delete(domain=domain)
-    print(request.json())
-
-
-def delete_credentials() -> None:
-    """
-    DELETE /domains/<domain>/credentials/<login>
-    :return:
-    """
-    request = client.domains_credentials.delete(domain=domain, login=f"alice_bob@{domain}")
-    print(request.json())
-
-
 def get_connections() -> None:
     """
     GET /domains/<domain>/connection
@@ -237,5 +187,22 @@ def get_sending_queues() -> None:
     print(request.json())
 
 
+# TODO: Verify if it works
+def delete_envelopes() -> None:
+    """
+    Messages
+    GET DELETE /v3/<domain>/envelopes
+    :return:
+    """
+    req = client.envelopes.delete(domain=domain)
+    print(req)
+    print(req.json())
+
+
 if __name__ == "__main__":
-    get_domains()
+    # add_domain()
+    # get_domains()
+
+    # delete_envelopes()
+
+    put_mailboxes_credentials()

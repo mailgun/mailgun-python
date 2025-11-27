@@ -97,3 +97,38 @@ def handle_sending_queues(
 ) -> str | Any:
     """Handle sending queues endpoint URL construction."""
     return url["base"][:-1] + f"/{domain}/sending_queues"
+
+
+# TODO: Verify if it works!
+def handle_envelopes(
+    url: dict[str, Any],
+    domain: str | None,
+    _method: str | None,
+    **kwargs: Any,
+) -> str | Any:
+    """Handle envelopes endpoint URL construction."""
+    return url["base"][:-1] + f"/{domain}/envelopes"
+
+
+def handle_mailboxes_credentials(
+    url: dict[str, Any],
+    domain: str | None,
+    _method: str | None,
+    **kwargs: Any,
+) -> Any:
+    """Handle Mailboxes credentials.
+
+    :param url: Incoming URL dictionary
+    :type url: dict
+    :param domain: Incoming domain
+    :type domain: str
+    :param _method: Incoming request method (it's not being used for this handler)
+    :type _method: str
+    :param kwargs: kwargs
+    :return: final url for Mailboxes credentials endpoint
+    """
+    final_keys = path.join("/", *url["keys"]) if url["keys"] else ""
+    if "login" in kwargs:
+        url = url["base"] + domain + final_keys + "/" + kwargs["login"]
+
+    return url
