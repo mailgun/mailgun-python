@@ -2123,7 +2123,7 @@ class AsyncDomainTests(unittest.IsolatedAsyncioTestCase):
         random_domain_name = "".join(
             random.choice(string.ascii_lowercase + string.digits) for _ in range(10)
         )
-        self.test_domain: str = f"mailgun.wrapper.async.{random_domain_name}"
+        self.test_domain: str = f"mailgun.wrapper.{random_domain_name}"
         self.post_domain_data: dict[str, str] = {
             "name": self.test_domain,
         }
