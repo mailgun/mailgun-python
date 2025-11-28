@@ -12,62 +12,93 @@ domain: str = os.environ["DOMAIN"]
 client: AsyncClient = AsyncClient(auth=("api", key))
 
 
-async def get_credentials() -> None:
+async def get_domains() -> None:
     """
-    GET /domains/<domain>/credentials
+    GET /domains
     :return:
     """
-    request = await client.domains_credentials.get(domain=domain)
-    print(request.json())
+    data = await client.domainlist.get()
+    print(data.json())
 
 
-async def get_single_validate() -> None:
+async def events_rejected_or_failed() -> None:
     """
-    GET /v4/address/validate
+    GET /<domain>/events
     :return:
     """
-    params = {"address": "test@gmail.com", "provider_lookup": "false"}
-    req = await client.addressvalidate.get(domain=domain, filters=params)
+    params = {"event": "rejected OR failed"}
+    req = await client.events.get(domain=domain, filters=params)
     print(req.json())
 
 
 # context manager approach examples:
-async def view_message_with_storage_url() -> None:
+async def post_template() -> None:
     """
-    /v3/domains/2048.zeefarmer.com/messages/{storage_url}
-    :return:
-    """
-    params = {"limit": 1}
-
-    storage_url = client.events.get(domain=domain, filters=params).json()["items"][0]["storage"][
-        "url"
-    ]
-    async with AsyncClient(auth=("api", key)) as _client:
-        req = await _client.domains_messages.get(domain=domain, api_storage_url=storage_url)
-    print(req.json())
-
-
-async def post_inbox() -> None:
-    """
-    POST /v3/inbox/tests
+    POST /<domain>/templates
     :return:
     """
     data = {
-        "domain": "domain.com",
-        "from": "user@sending_domain.com",
-        "subject": "testSubject",
-        "html": "<html>HTML version of the body</html>",
+        "name": "template.name1",
+        "description": "template description",
+        "template": "{{fname}} {{lname}}",
+        "engine": "handlebars",
+        "comment": "version comment",
     }
+
     async with AsyncClient(auth=("api", key)) as _client:
-        req = client.inbox_tests.create(domain=domain, data=data)
+        req = await _client.templates.create(data=data, domain=domain)
     print(req.json())
 
 
+async def post_analytics_logs() -> None:
+    """
+    # Metrics
+    # POST /v1/analytics/logs
+    :return:
+    """
+
+    data = {
+        "start": "Wed, 24 Sep 2025 00:00:00 +0000",
+        "end": "Thu, 25 Sep 2025 00:00:00 +0000",
+        "filter": {
+            "AND": [
+                {
+                    "attribute": "domain",
+                    "comparator": "=",
+                    "values": [{"label": domain, "value": domain}],
+                }
+            ]
+        },
+        "include_subaccounts": True,
+        "pagination": {
+            "sort": "timestamp:asc",
+            "limit": 50,
+        },
+    }
+
+    async with AsyncClient(auth=("api", key)) as _client:
+        req = await _client.analytics_logs.create(data=data)
+    print(req.json())
+
+
+async def main():
+    """Main coroutine that orchestrates the execution of other coroutines."""
+    print("=== Starting async operations ===\n")
+
+    # Example 1: Running coroutines sequentially
+    print("Example 1: Sequential execution")
+    await get_domains()
+    await events_rejected_or_failed()
+
+    # Example 2: Running coroutines concurrently with gather
+    print("Example 2: Concurrent execution with gather()")
+    await asyncio.gather(
+        post_template(),
+        post_analytics_logs(),
+    )
+
+    print("\n=== All async operations completed ===")
+
+
 if __name__ == "__main__":
-    coroutines = [
-        get_single_validate(),
-        get_credentials(),
-        view_message_with_storage_url(),
-        post_inbox(),
-    ]
-    asyncio.gather(*coroutines)
+    asyncio.run(main())
