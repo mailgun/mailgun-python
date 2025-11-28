@@ -191,7 +191,7 @@ def get_sending_queues() -> None:
 def delete_envelopes() -> None:
     """
     Messages
-    GET DELETE /v3/<domain>/envelopes
+    DELETE /v3/<domain>/envelopes
     :return:
     """
     req = client.envelopes.delete(domain=domain)
@@ -203,6 +203,4 @@ if __name__ == "__main__":
     # add_domain()
     # get_domains()
 
-    # delete_envelopes()
-
-    put_mailboxes_credentials()
+    delete_envelopes()

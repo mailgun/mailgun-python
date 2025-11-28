@@ -41,6 +41,7 @@ from mailgun.handlers.suppressions_handler import handle_unsubscribes
 from mailgun.handlers.suppressions_handler import handle_whitelists
 from mailgun.handlers.tags_handler import handle_tags
 from mailgun.handlers.templates_handler import handle_templates
+from mailgun.handlers.users_handler import handle_users
 
 
 if TYPE_CHECKING:
@@ -77,6 +78,7 @@ HANDLERS: dict[str, Callable] = {  # type: ignore[type-arg]
     "events": handle_default,
     "analytics": handle_metrics,
     "bounce-classification": handle_bounce_classification,
+    "users": handle_users,
 }
 
 
@@ -139,6 +141,10 @@ class Config:
                 "base": v2_base,
                 "keys": ["bounce-classification", "metrics"],
             },
+            "users": {
+                "base": v5_base,
+                "keys": ["users", "me", "org"],
+            },
         }
 
         if key in special_cases:
@@ -166,6 +172,12 @@ class Config:
             return {
                 "base": v3_base,
                 "keys": key,
+            }, headers
+
+        if "users" in key:
+            return {
+                "base": v5_base,
+                "keys": key.split("_"),
             }, headers
 
         # Handle DIPP endpoints

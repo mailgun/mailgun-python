@@ -70,3 +70,7 @@ def delete_credentials() -> None:
     """
     request = client.domains_credentials.delete(domain=domain, login=f"alice_bob@{domain}")
     print(request.json())
+
+
+if __name__ == "__main__":
+    put_mailboxes_credentials()
