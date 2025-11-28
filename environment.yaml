@@ -8,6 +8,7 @@ dependencies:
   - pip
   # runtime deps
   - requests >=2.32.5
+  - httpx >=0.24.0
   # tests
   - pytest >=7.0.0
   # other
