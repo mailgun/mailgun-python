@@ -240,6 +240,50 @@ auth = ("api", os.environ["APIKEY"])
 client = Client(auth=auth)
 ```
 
+### AsyncClient
+
+SDK provides also async version of the client to use in asynchronous applications. The AsyncClient offers the same functionality as the sync client but with non-blocking I/O, making it ideal for concurrent operations and integration with asyncio-based applications.
+
+```python
+from mailgun.client import AsyncClient
+import os
+
+auth = ("api", os.environ["APIKEY"])
+client = AsyncClient(auth=auth)
+```
+
+The `AsyncClient` provides async equivalents for all methods available in the sync `Client`. The method signatures and parameters are identical - simply add `await` when calling methods:
+
+```python
+# Sync version
+client = Client(auth=auth)
+result = client.domainlist.get()
+
+# Async version
+client = AsyncClient(auth=auth)
+result = await client.domainlist.get()
+```
+
+Additionally `AsyncClient` can be used as async context manager to automatically close connection when execution is finished:
+
+```python
+import asyncio
+import os
+from mailgun.client import AsyncClient
+
+
+async def main():
+    auth = ("api", os.environ["APIKEY"])
+    async with AsyncClient(auth=auth) as client:
+        result = await client.domainlist.get()
+        print(result)
+
+
+asyncio.run(main())
+```
+
+For detailed examples of all available methods, parameters, and use cases, refer to the [mailgun/examples](mailgun/examples) section. All examples can be adapted to async by using `AsyncClient` and adding `await` to method calls.
+
 ### API Response Codes
 
 All of Mailgun's HTTP response codes follow standard HTTP definitions. For some additional information and
@@ -1288,3 +1332,4 @@ If you have suggestions on how to improve the guides, please submit an issue in 
 
 - [@diskovod](https://github.com/diskovod)
 - [@skupriienko](https://github.com/skupriienko)
+- [@erz9engel](https://github.com/erz9engel)

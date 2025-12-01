@@ -7,17 +7,24 @@ Classes:
     - Config: Manages configuration settings for the Mailgun API.
     - Endpoint: Represents specific API endpoints and provides methods for
       common HTTP operations like GET, POST, PUT, and DELETE.
+    - AsyncEndpoint: Async version of Endpoint using httpx for async HTTP operations.
+    - BaseClient: Base class for API clients that holds common logic.
     - Client: The main API client for authenticating and making requests.
+    - AsyncClient: Async version of Client using httpx for async API requests.
 """
 
 from __future__ import annotations
 
+import io
 import json
+from collections import defaultdict
 from typing import TYPE_CHECKING
 from typing import Any
 from urllib.parse import urljoin
 
+import httpx
 import requests
+from typing_extensions import Self
 
 from mailgun.handlers.bounce_classification_handler import handle_bounce_classification
 from mailgun.handlers.default_handler import handle_default
@@ -42,9 +49,11 @@ from mailgun.handlers.templates_handler import handle_templates
 
 
 if TYPE_CHECKING:
+    import types
     from collections.abc import Callable
     from collections.abc import Mapping
 
+    from httpx import Response as HttpxResponse
     from requests.models import Response
 
 
@@ -228,8 +237,8 @@ class Config:
         return {"base": v3_base, "keys": key.split("_")}, headers
 
 
-class Endpoint:
-    """Generate request and return response."""
+class BaseEndpoint:
+    """Base class for endpoints. Contains methods common for Endpoint and AsyncEndpoint."""
 
     def __init__(
         self,
@@ -249,6 +258,32 @@ class Endpoint:
         self._url = url
         self.headers = headers
         self._auth = auth
+
+    @staticmethod
+    def build_url(
+        url: dict[str, Any],
+        domain: str | None = None,
+        method: str | None = None,
+        **kwargs: Any,
+    ) -> Any:
+        """Build final request url using predefined handlers.
+
+        Note: Some urls are being built in Config class, as they can't be generated dynamically.
+        :param url: incoming url (base+keys)
+        :type url: dict[str, Any]
+        :param domain: incoming domain
+        :type domain: str
+        :param method: requested method
+        :type method: str
+        :param kwargs: kwargs
+        :type kwargs: Any
+        :return: built URL
+        """
+        return HANDLERS[url["keys"][0]](url, domain, method, **kwargs)
+
+
+class Endpoint(BaseEndpoint):
+    """Generate request and return response."""
 
     def api_call(
         self,
@@ -311,28 +346,6 @@ class Endpoint:
             raise ApiError(e)
         except Exception as e:
             raise e
-
-    @staticmethod
-    def build_url(
-        url: dict[str, Any],
-        domain: str | None = None,
-        method: str | None = None,
-        **kwargs: Any,
-    ) -> Any:
-        """Build final request url using predefined handlers.
-
-        Note: Some urls are being built in Config class, as they can't be generated dynamically.
-        :param url: incoming url (base+keys)
-        :type url: dict[str, Any]
-        :param domain: incoming domain
-        :type domain: str
-        :param method: requested method
-        :type method: str
-        :param kwargs: kwargs
-        :type kwargs: Any
-        :return: built URL
-        """
-        return HANDLERS[url["keys"][0]](url, domain, method, **kwargs)
 
     def get(
         self,
@@ -542,3 +555,392 @@ class Client:
         fname = split[0]
         url, headers = self.config[name]
         return type(fname, (Endpoint,), {})(url=url, headers=headers, auth=self.auth)
+
+
+class AsyncEndpoint(BaseEndpoint):
+    """Generate async request and return response using httpx."""
+
+    def __init__(
+        self,
+        url: dict[str, Any],
+        headers: dict[str, str],
+        auth: tuple[str, str] | None,
+        client: httpx.AsyncClient,
+    ) -> None:
+        """Initialize a new AsyncEndpoint instance.
+
+        :param url: URL dict with pairs {"base": "keys"}
+        :type url: dict[str, Any]
+        :param headers: Headers dict
+        :type headers: dict[str, str]
+        :param auth: httpx auth tuple
+        :type auth: tuple[str, str] | None
+        :param client: Optional httpx.AsyncClient instance to reuse
+        :type client: httpx.AsyncClient | None
+        """
+        super().__init__(url, headers, auth)
+        self._url = url
+        self.headers = headers
+        self._auth = auth
+        self._client = client
+
+    @staticmethod
+    def _prepare_files(files: Any) -> dict[str, Any] | None:
+        """Convert files to httpx format: {"field": (filename, file_obj, content_type)}."""
+        min_length = 2
+        httpx_files = None
+        if not files:
+            return httpx_files
+
+        if isinstance(files, dict):
+            # Convert dict[str, bytes] to httpx format
+            # httpx expects: {"field": (filename, file_obj, content_type)}
+            httpx_files = {}
+            for key, value in files.items():
+                if isinstance(value, bytes):
+                    httpx_files[key] = (key, io.BytesIO(value), "application/octet-stream")
+                elif isinstance(value, tuple) and len(value) >= min_length:
+                    # Already in tuple format: (filename, content, ...)
+                    filename = value[0]
+                    content = value[1]
+                    content_type = (
+                        value[2] if len(value) > min_length else "application/octet-stream"
+                    )
+                    if isinstance(content, bytes):
+                        httpx_files[key] = (filename, io.BytesIO(content), content_type)
+                    else:
+                        httpx_files[key] = value
+                else:
+                    httpx_files[key] = value
+        elif isinstance(files, list):
+            # Convert list of tuples to httpx dict format
+            files_dict: dict[str, list[tuple[str, Any, str]]] = defaultdict(list)
+            for item in files:
+                if isinstance(item, tuple) and len(item) >= min_length:
+                    field_name = item[0]
+                    file_data = item[1]
+                    if isinstance(file_data, tuple) and len(file_data) >= min_length:
+                        filename = file_data[0]
+                        content = file_data[1]
+                        content_type = (
+                            file_data[2]
+                            if len(file_data) > min_length
+                            else "application/octet-stream"
+                        )
+                        if isinstance(content, bytes):
+                            files_dict[field_name].append(
+                                (filename, io.BytesIO(content), content_type),
+                            )
+                        else:
+                            files_dict[field_name].append(file_data)
+                    elif isinstance(file_data, bytes):
+                        files_dict[field_name].append(
+                            (field_name, io.BytesIO(file_data), "application/octet-stream"),
+                        )
+                    else:
+                        files_dict[field_name].append(file_data)
+
+            httpx_files = {
+                field: file_list[0] if len(file_list) == 1 else file_list
+                for field, file_list in files_dict.items()
+            }
+        else:
+            httpx_files = files
+        return httpx_files
+
+    async def api_call(
+        self,
+        auth: tuple[str, str] | None,
+        method: str,
+        url: dict[str, Any],
+        headers: dict[str, str],
+        data: Any | None = None,
+        filters: Mapping[str, str | Any] | None = None,
+        timeout: int = 60,
+        files: dict[str, bytes] | None = None,
+        domain: str | None = None,
+        **kwargs: Any,
+    ) -> HttpxResponse:
+        """Build URL and make an async request.
+
+        :param auth: auth data
+        :type auth: tuple[str, str] | None
+        :param method: request method
+        :type method: str
+        :param url: incoming url (base+keys)
+        :type url: dict[str, Any]
+        :param headers: incoming headers
+        :type headers: dict[str, str]
+        :param data: incoming post/put data
+        :type data: Any | None
+        :param filters: incoming params
+        :type filters: dict | None
+        :param timeout: requested timeout (60-default)
+        :type timeout: int
+        :param files: incoming files
+        :type files: dict[str, Any] | None
+        :param domain: incoming domain
+        :type domain: str | None
+        :param kwargs: kwargs
+        :type kwargs: Any
+        :return: server response from API
+        :rtype: httpx.Response
+        :raises: TimeoutError, ApiError
+        """
+        url = self.build_url(url, domain=domain, method=method, **kwargs)
+
+        request_kwargs: dict[str, Any] = {
+            "method": method.upper(),
+            "url": url,
+            "params": filters,
+            "data": data,
+            "files": self._prepare_files(files),
+            "headers": headers,
+            "auth": auth,
+            "timeout": timeout,
+        }
+
+        try:
+            return await self._client.request(**request_kwargs)
+
+        except httpx.TimeoutException:
+            raise TimeoutError
+        except httpx.RequestError as e:
+            raise ApiError(e)
+        except Exception as e:
+            raise e
+
+    async def get(
+        self,
+        filters: Mapping[str, str | Any] | None = None,
+        domain: str | None = None,
+        **kwargs: Any,
+    ) -> HttpxResponse:
+        """GET method for async API calls.
+
+        :param filters: incoming params
+        :type filters: Mapping[str, str | Any] | None
+        :param domain: incoming domain
+        :type domain: str | None
+        :param kwargs: kwargs
+        :type kwargs: Any
+        :return: api_call GET request
+        :rtype: httpx.Response
+        """
+        return await self.api_call(
+            self._auth,
+            "get",
+            self._url,
+            domain=domain,
+            headers=self.headers,
+            filters=filters,
+            **kwargs,
+        )
+
+    async def create(
+        self,
+        data: Any | None = None,
+        filters: Mapping[str, str | Any] | None = None,
+        domain: str | None = None,
+        headers: str | None = None,
+        files: dict[str, bytes] | None = None,
+        **kwargs: Any,
+    ) -> httpx.Response:
+        """POST method for async API calls.
+
+        :param data: incoming post data
+        :type data: Any | None
+        :param filters: incoming params
+        :type filters: dict
+        :param domain: incoming domain
+        :type domain: str
+        :param headers: incoming headers
+        :type headers: dict[str, str]
+        :param files: incoming files
+        :type files: dict[str, Any] | None
+        :param kwargs: kwargs
+        :type kwargs: Any
+        :return: api_call POST request
+        :rtype: httpx.Response
+        """
+        if "Content-Type" in self.headers:
+            if self.headers["Content-Type"] == "application/json":
+                data = json.dumps(data)
+        elif headers:
+            if headers == "application/json":
+                data = json.dumps(data)
+                self.headers["Content-Type"] = "application/json"
+            elif headers == "multipart/form-data":
+                self.headers["Content-Type"] = "multipart/form-data"
+
+        return await self.api_call(
+            self._auth,
+            "post",
+            self._url,
+            files=files,
+            domain=domain,
+            headers=self.headers,
+            data=data,
+            filters=filters,
+            **kwargs,
+        )
+
+    async def put(
+        self,
+        data: Any | None = None,
+        filters: Mapping[str, str | Any] | None = None,
+        **kwargs: Any,
+    ) -> httpx.Response:
+        """PUT method for async API calls.
+
+        :param data: incoming data
+        :type data: Any | None
+        :param filters: incoming params
+        :type filters: dict
+        :param kwargs: kwargs
+        :type kwargs: Any
+        :return: api_call PUT request
+        :rtype: httpx.Response
+        """
+        return await self.api_call(
+            self._auth,
+            "put",
+            self._url,
+            headers=self.headers,
+            data=data,
+            filters=filters,
+            **kwargs,
+        )
+
+    async def patch(
+        self,
+        data: Any | None = None,
+        filters: Mapping[str, str | Any] | None = None,
+        **kwargs: Any,
+    ) -> httpx.Response:
+        """PATCH method for async API calls.
+
+        :param data: incoming data
+        :type data: Any | None
+        :param filters: incoming params
+        :type filters: dict
+        :param kwargs: kwargs
+        :type kwargs: Any
+        :return: api_call PATCH request
+        :rtype: httpx.Response
+        """
+        return await self.api_call(
+            self._auth,
+            "patch",
+            self._url,
+            headers=self.headers,
+            data=data,
+            filters=filters,
+            **kwargs,
+        )
+
+    async def update(
+        self,
+        data: Any | None,
+        filters: Mapping[str, str | Any] | None = None,
+        **kwargs: Any,
+    ) -> httpx.Response:
+        """PUT method for async API calls.
+
+        :param data: incoming data
+        :type data: dict[str, Any] | None
+        :param filters: incoming params
+        :type filters: dict
+        :param kwargs: kwargs
+        :type kwargs: Any
+        :return: api_call PUT request
+        :rtype: httpx.Response
+        """
+        if self.headers.get("Content-type") == "application/json":
+            data = json.dumps(data)
+        return await self.api_call(
+            self._auth,
+            "put",
+            self._url,
+            headers=self.headers,
+            data=data,
+            filters=filters,
+            **kwargs,
+        )
+
+    async def delete(self, domain: str | None = None, **kwargs: Any) -> httpx.Response:
+        """DELETE method for async API calls.
+
+        :param domain: incoming domain
+        :type domain: str
+        :param kwargs: kwargs
+        :type kwargs: Any
+        :return: api_call DELETE request
+        :rtype: httpx.Response
+        """
+        return await self.api_call(
+            self._auth,
+            "delete",
+            self._url,
+            headers=self.headers,
+            domain=domain,
+            **kwargs,
+        )
+
+
+class AsyncClient(Client):
+    """Async client class using httpx."""
+
+    endpoint_cls = AsyncEndpoint
+
+    def __init__(self, **kwargs: Any) -> None:
+        """Initialize a new AsyncClient instance for API interaction."""
+        super().__init__(**kwargs)
+        # Save client kwargs for client reinitialization
+        self._client_kwargs = {k: v for k, v in kwargs.items() if k != "api_url"}
+        self._httpx_client: httpx.AsyncClient = None
+
+    def __getattr__(self, name: str) -> Any:
+        """Get named attribute of an object, split it and execute.
+
+        :param name: attribute name (Example: client.domains_ips. names: ["domains", "ips"])
+        :type name: str
+        :return: type object (executes existing handler)
+        """
+        split = name.split("_")
+        # identify the resource
+        fname = split[0]
+        url, headers = self.config[name]
+        return type(fname, (AsyncEndpoint,), {})(
+            url=url,
+            headers=headers,
+            auth=self.auth,
+            client=self._client,
+        )
+
+    @property
+    def _client(self) -> AsyncClient:
+        if not self._httpx_client or self._httpx_client.is_closed:
+            self._httpx_client = httpx.AsyncClient(**self._client_kwargs)
+        return self._httpx_client
+
+    async def aclose(self) -> None:
+        """Close the underlying httpx.AsyncClient.
+
+        Call this when done with the client to properly clean up resources.
+        """
+        if self._httpx_client:
+            await self._httpx_client.aclose()
+
+    async def __aenter__(self) -> Self:
+        """Async context manager entry."""
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
+    ) -> None:
+        """Async context manager exit."""
+        await self.aclose()
