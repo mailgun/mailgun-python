@@ -1428,6 +1428,44 @@ class TemplatesTests(unittest.TestCase):
 
         self.assertEqual(req.status_code, 200)
 
+    def test_update_template_version_copy(self) -> None:
+        """Test to copy an existing version into a new version with the provided name: Happy Path with valid data."""
+        data = {"comment": "An updated version comment"}
+
+        req = self.client.templates.put(
+            domain=self.domain,
+            filters=data,
+            template_name="template.name1",
+            versions=True,
+            tag="v2",
+            copy=True,
+            new_tag="v3",
+        )
+
+        expected_keys = [
+            "message",
+            "version",
+            "template",
+        ]
+        expected_template_keys = [
+            "tag",
+            "template",
+            "engine",
+            "mjml",
+            "createdAt",
+            "comment",
+            "active",
+            "id",
+            "headers",
+        ]
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 200)
+        [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
+        self.assertIn("tag", req.json()["version"])
+        self.assertIn("version has been copied", req.json()["message"])
+        [self.assertIn(key, expected_template_keys) for key in req.json()["template"]]  # type: ignore[func-returns-value]
+
 
 @pytest.mark.skip(
     "Email Validation is only available through Mailgun paid plans, see https://www.mailgun.com/pricing/"
@@ -3445,6 +3483,53 @@ class AsyncTemplatesTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(req.status_code, 200)
+
+    async def test_update_template_version_copy(self) -> None:
+        """Test to copy an existing version into a new version with the provided name: Happy Path with valid data."""
+        await self.client.templates.create(data=self.post_template_data, domain=self.domain)
+
+        await self.client.templates.create(
+            data=self.post_template_version_data,
+            domain=self.domain,
+            template_name=self.post_template_data["name"],
+            versions=True,
+        )
+
+        data = {"comment": "An updated version comment"}
+
+        req = await self.client.templates.put(
+            domain=self.domain,
+            filters=data,
+            template_name="template.name1",
+            versions=True,
+            tag="v2",
+            copy=True,
+            new_tag="v3",
+        )
+
+        expected_keys = [
+            "message",
+            "version",
+            "template",
+        ]
+        expected_template_keys = [
+            "tag",
+            "template",
+            "engine",
+            "mjml",
+            "createdAt",
+            "comment",
+            "active",
+            "id",
+            "headers",
+        ]
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 200)
+        [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
+        self.assertIn("tag", req.json()["version"])
+        self.assertIn("version has been copied", req.json()["message"])
+        [self.assertIn(key, expected_template_keys) for key in req.json()["template"]]  # type: ignore[func-returns-value]
 
 
 @pytest.mark.skip(
