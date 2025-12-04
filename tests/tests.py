@@ -850,6 +850,7 @@ class RoutesTests(unittest.TestCase):
         )
         self.client: Client = Client(auth=self.auth)
         self.domain: str = os.environ["DOMAIN"]
+        self.sender: str = os.environ["MESSAGES_FROM"]
         self.routes_data: dict[str, int | str | list[str]] = {
             "priority": 0,
             "description": "Sample route",
@@ -864,7 +865,7 @@ class RoutesTests(unittest.TestCase):
             "priority": 2,
         }
 
-    # 'Routes quota (1) is exceeded for a free plan
+    # 'Routes quota (1) is exceeded for a free plan'
     def test_routes_create(self) -> None:
         params = {"skip": 0, "limit": 1}
         req1 = self.client.routes.get(domain=self.domain, filters=params)
@@ -978,6 +979,21 @@ class RoutesTests(unittest.TestCase):
 
         self.assertEqual(req.status_code, 200)
         self.assertIn("message", req.json())
+
+    def test_get_routes_match(self) -> None:
+        """Test to match address to route: Happy Path with valid data."""
+
+        query = {"address": self.sender}
+        req = self.client.routes_match.get(domain=self.domain, filters=query)
+
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("route", req.json())
+
+        expected_keys = ["actions", "created_at", "description", "expression", "id", "priority"]
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 200)
+        [self.assertIn(key, expected_keys) for key in req.json()["route"].keys()]  # type: ignore[func-returns-value]
 
 
 class WebhooksTests(unittest.TestCase):
@@ -2861,6 +2877,7 @@ class AsyncRoutesTests(unittest.IsolatedAsyncioTestCase):
         )
         self.client: AsyncClient = AsyncClient(auth=self.auth)
         self.domain: str = os.environ["DOMAIN"]
+        self.sender: str = os.environ["MESSAGES_FROM"]
         self.routes_data: dict[str, int | str | list[str]] = {
             "priority": 0,
             "description": "Sample route",
@@ -2978,6 +2995,33 @@ class AsyncRoutesTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(req.status_code, 200)
         self.assertIn("message", req.json())
+
+    async def test_get_routes_match(self) -> None:
+        """Test to match address to route: Happy Path with valid data."""
+        params = {"skip": 0, "limit": 1}
+        query = {"address": self.sender}
+        req1 = await self.client.routes.get(domain=self.domain, filters=params)
+        print('len(req1.json()["items"]): ', len(req1.json()["items"]))
+        if len(req1.json()["items"]) > 0:
+            await self.client.routes.delete(
+                domain=self.domain,
+                route_id=req1.json()["items"][0]["id"],
+            )
+
+            await self.client.routes.create(domain=self.domain, data=self.routes_data)
+            req = await self.client.routes_match.get(domain=self.domain, filters=query)
+        else:
+            await self.client.routes.create(domain=self.domain, data=self.routes_data)
+            req = await self.client.routes_match.get(domain=self.domain, filters=query)
+
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("route", req.json())
+
+        expected_keys = ["actions", "created_at", "description", "expression", "id", "priority"]
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 200)
+        [self.assertIn(key, expected_keys) for key in req.json()["route"].keys()]  # type: ignore[func-returns-value]
 
 
 class AsyncWebhooksTests(unittest.IsolatedAsyncioTestCase):
