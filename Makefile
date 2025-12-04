@@ -15,6 +15,7 @@ CONDA_ENV_NAME ?= mailgun
 SRC_DIR = mailgun
 TEST_DIR = tests
 SCRIPTS_DIR = scripts/
+REQUIRED_VARS := APIKEY DOMAIN
 
 define BROWSER_PYSCRIPT
 import os, webbrowser, sys
@@ -114,15 +115,28 @@ dev-full: clean		## install the package's development version to a fresh environ
 pre-commit:		## runs pre-commit against files. NOTE: older files are disabled in the pre-commit config.
 	pre-commit run --all-files
 
-test:		## runs test cases
+check-env:
+	@missing=0; \
+	for v in $(REQUIRED_VARS); do \
+	  if [ -z "$${!v}" ]; then \
+	    echo "Missing required env var: $$v"; \
+	    missing=1; \
+	  fi; \
+	done; \
+	if [ $$missing -ne 0 ]; then \
+	  echo "Aborting tests due to missing env vars."; \
+	  exit 1; \
+	fi
+
+test: check-env		## runs test cases
 	$(PYTHON3) -m pytest -v --capture=no $(TEST_DIR)/tests.py
 
-test-debug:		## runs test cases with debugging info enabled
-	$(PYTHON3) -m pytest -n auto -vv --capture=no $(TEST_DIR)/tests.py
+test-debug: check-env		## runs test cases with debugging info enabled
+	$(PYTHON3) -m pytest -vv --capture=no $(TEST_DIR)/tests.py
 
-test-cov:		## checks test coverage requirements
-	$(PYTHON3) -m pytest -n auto --cov-config=.coveragerc --cov=$(SRC_DIR) \
-		$(TEST_DIR) --cov-fail-under=80 --cov-report term-missing
+test-cov: check-env		## checks test coverage requirements
+	$(PYTHON3) -m pytest --cov-config=.coveragerc --cov=$(SRC_DIR) \
+		$(TEST_DIR)/tests.py --cov-fail-under=80 --cov-report term-missing
 
 tests-cov-fail:
 	@pytest --cov=$(SRC_DIR) --cov-report term-missing --cov-report=html --cov-fail-under=80
