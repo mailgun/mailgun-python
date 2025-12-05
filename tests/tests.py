@@ -169,6 +169,30 @@ class DomainTests(unittest.TestCase):
         self.assertEqual(request.status_code, 200)
         self.assertIn("message", request.json())
 
+    @pytest.mark.order(2)
+    def test_put_mailboxes_credentials(self) -> None:
+        self.client.domains_credentials.create(
+            domain=self.domain,
+            data=self.post_domain_creds,
+        )
+        name = "alice_bob"
+        req = self.client.mailboxes.put(domain=self.domain, login=f"{name}@{self.domain}")
+
+        expected_keys = [
+            "message",
+            "note",
+            "credentials",
+        ]
+        expected_credentials_keys = [
+            f"{name}@{self.domain}",
+        ]
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 200)
+        [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
+        self.assertIn("Password changed", req.json()["message"])
+        [self.assertIn(key, expected_credentials_keys) for key in req.json()["credentials"]]  # type: ignore[func-returns-value]
+
     @pytest.mark.order(3)
     def test_get_domain_list(self) -> None:
         req = self.client.domainlist.get()
@@ -2265,6 +2289,32 @@ class AsyncDomainTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(request.status_code, 200)
         self.assertIn("message", request.json())
+
+    @pytest.mark.order(2)
+    async def test_put_mailboxes_credentials(self) -> None:
+        await self.client.domains_credentials.create(
+            domain=self.domain,
+            data=self.post_domain_creds,
+        )
+        name = "alice_bob"
+        req = await self.client.mailboxes.put(domain=self.domain, login=f"{name}@{self.domain}")
+        print(req)
+        print(req.json())
+
+        expected_keys = [
+            "message",
+            "note",
+            "credentials",
+        ]
+        expected_credentials_keys = [
+            f"{name}@{self.domain}",
+        ]
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 200)
+        [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
+        self.assertIn("Password changed", req.json()["message"])
+        [self.assertIn(key, expected_credentials_keys) for key in req.json()["credentials"]]  # type: ignore[func-returns-value]
 
     @pytest.mark.order(3)
     async def test_get_domain_list(self) -> None:
