@@ -99,17 +99,6 @@ def handle_sending_queues(
     return url["base"][:-1] + f"/{domain}/sending_queues"
 
 
-# TODO: Verify if it works!
-def handle_envelopes(
-    url: dict[str, Any],
-    domain: str | None,
-    _method: str | None,
-    **kwargs: Any,
-) -> str | Any:
-    """Handle envelopes endpoint URL construction."""
-    return url["base"][:-1] + f"/{domain}/envelopes"
-
-
 def handle_mailboxes_credentials(
     url: dict[str, Any],
     domain: str | None,

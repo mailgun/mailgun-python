@@ -27,19 +27,7 @@ def handle_users(
     :return: final url for Users endpoint
     """
     final_keys = path.join("/", *url["keys"]) if url["keys"] else ""
-    if "org_id" in kwargs:
-        url = (
-            url["base"][:-1]
-            + "/"
-            + "users"
-            + "/"
-            + kwargs["user_id"]
-            + "/"
-            + "org"
-            + "/"
-            + kwargs["org_id"]
-        )
-    elif "user_id" in kwargs and kwargs["user_id"] != "me":
+    if "user_id" in kwargs and kwargs["user_id"] != "me":
         url = url["base"][:-1] + "/" + "users" + "/" + kwargs["user_id"]
     elif "user_id" in kwargs and kwargs["user_id"] == "me":
         url = url["base"][:-1] + final_keys

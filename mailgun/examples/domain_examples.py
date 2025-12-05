@@ -187,20 +187,6 @@ def get_sending_queues() -> None:
     print(request.json())
 
 
-# TODO: Verify if it works
-def delete_envelopes() -> None:
-    """
-    Messages
-    DELETE /v3/<domain>/envelopes
-    :return:
-    """
-    req = client.envelopes.delete(domain=domain)
-    print(req)
-    print(req.json())
-
-
 if __name__ == "__main__":
-    # add_domain()
-    # get_domains()
-
-    delete_envelopes()
+    add_domain()
+    get_domains()
