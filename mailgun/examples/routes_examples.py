@@ -5,6 +5,7 @@ from mailgun.client import Client
 
 key: str = os.environ["APIKEY"]
 domain: str = os.environ["DOMAIN"]
+sender: str = os.environ["MESSAGES_FROM"]
 
 client: Client = Client(auth=("api", key))
 
@@ -67,5 +68,15 @@ def delete_route() -> None:
     print(req.json())
 
 
+def get_routes_match() -> None:
+    """
+    GET /routes/match
+    :return:
+    """
+    query = {"address": sender}
+    req = client.routes_match.get(domain=domain, filters=query)
+    print(req.json())
+
+
 if __name__ == "__main__":
-    delete_route()
+    get_routes_match()

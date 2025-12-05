@@ -33,7 +33,7 @@ def handle_templates(
     if "template_name" in kwargs:
         if "versions" in kwargs:
             if kwargs["versions"]:
-                if "tag" in kwargs:
+                if "tag" in kwargs and "copy" not in kwargs:
                     url = (
                         url["base"]
                         + domain
@@ -42,6 +42,18 @@ def handle_templates(
                         + kwargs["template_name"]
                         + "/versions/"
                         + kwargs["tag"]
+                    )
+                elif "tag" in kwargs and "copy" in kwargs and "new_tag" in kwargs:
+                    url = (
+                        url["base"]
+                        + domain
+                        + final_keys
+                        + "/"
+                        + kwargs["template_name"]
+                        + "/versions/"
+                        + kwargs["tag"]
+                        + "/copy/"
+                        + kwargs["new_tag"]
                     )
                 else:
                     url = (
@@ -58,5 +70,4 @@ def handle_templates(
             url = url["base"] + domain + final_keys + "/" + kwargs["template_name"]
     else:
         url = url["base"] + domain + final_keys
-
     return url
