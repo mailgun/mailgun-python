@@ -2151,6 +2151,100 @@ class TagsNewTests(unittest.TestCase):
         self.assertIn("not found", req.json()["error"])
 
 
+class UsersTests(unittest.TestCase):
+    """Tests for Mailgun Users API, https://api.mailgun.net/v5/users.
+
+    This class provides setup functionality for tests involving
+    with authentication and client initialization handled
+    in `setUp`. Each test in this suite operates with the configured Mailgun client
+    instance to simulate API interactions.
+
+    """
+
+    def setUp(self) -> None:
+        self.auth: tuple[str, str] = (
+            "api",
+            os.environ["APIKEY"],
+        )
+        self.client: Client = Client(auth=self.auth)
+        self.domain: str = os.environ["DOMAIN"]
+        self.mailgun_email = os.environ["MAILGUN_EMAIL"]
+
+    def test_get_users(self) -> None:
+        query = {"role": "admin", "limit": "0", "skip": "0"}
+        req = self.client.users.get(filters=query)
+
+        expected_keys = [
+            "total",
+            "users",
+        ]
+
+        expected_users_keys = [
+            "account_id",
+            "activated",
+            "auth",
+            "email",
+            "email_details",
+            "github_user_id",
+            "id",
+            "is_disabled",
+            "is_master",
+            "metadata",
+            "migration_status",
+            "name",
+            "opened_ip",
+            "password_updated_at",
+            "preferences",
+            "role",
+            "salesforce_user_id",
+            "tfa_active",
+            "tfa_created_at",
+            "tfa_enabled",
+        ]
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 200)
+        [self.assertIn(key, expected_keys) for key in req.json()]  # type: ignore[func-returns-value]
+        [self.assertIn(key, expected_users_keys) for key in req.json()["users"][0]]  # type: ignore[func-returns-value]
+
+    def test_get_user_details(self) -> None:
+        query = {"role": "admin", "limit": "0", "skip": "0"}
+        req1 = self.client.users.get(filters=query)
+        users = req1.json()["users"]
+
+        for user in users:
+            if self.mailgun_email == user["email"]:
+                req2 = self.client.users.get(user_id=user["id"])
+
+                expected_users_keys = [
+                    "account_id",
+                    "activated",
+                    "auth",
+                    "email",
+                    "email_details",
+                    "github_user_id",
+                    "id",
+                    "is_disabled",
+                    "is_master",
+                    "metadata",
+                    "migration_status",
+                    "name",
+                    "opened_ip",
+                    "password_updated_at",
+                    "preferences",
+                    "role",
+                    "salesforce_user_id",
+                    "tfa_active",
+                    "tfa_created_at",
+                    "tfa_enabled",
+                ]
+
+                self.assertIsInstance(req2.json(), dict)
+                self.assertEqual(req2.status_code, 200)
+                [self.assertIn(key, expected_users_keys) for key in req2.json()]  # type: ignore[func-returns-value]
+            break
+
+
 # ============================================================================
 # Async Test Classes (using AsyncClient and AsyncEndpoint)
 # ============================================================================
@@ -4218,6 +4312,100 @@ class AsyncTagsNewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(req.status_code, 404)
         self.assertIn("error", req.json())
         self.assertIn("not found", req.json()["error"])
+
+
+class AsyncUsersTests(unittest.IsolatedAsyncioTestCase):
+    """Async tests for Mailgun Users API using AsyncClient."""
+
+    async def asyncSetUp(self) -> None:
+        self.auth: tuple[str, str] = (
+            "api",
+            os.environ["APIKEY"],
+        )
+        self.client: AsyncClient = AsyncClient(auth=self.auth)
+        self.domain: str = os.environ["DOMAIN"]
+        self.mailgun_email = os.environ["MAILGUN_EMAIL"]
+
+    async def asyncTearDown(self) -> None:
+        await self.client.aclose()
+
+    async def test_get_users(self) -> None:
+        query = {"role": "admin", "limit": "0", "skip": "0"}
+        req = await self.client.users.get(filters=query)
+
+        expected_keys = [
+            "total",
+            "users",
+        ]
+
+        expected_users_keys = [
+            "account_id",
+            "activated",
+            "auth",
+            "email",
+            "email_details",
+            "github_user_id",
+            "id",
+            "is_disabled",
+            "is_master",
+            "metadata",
+            "migration_status",
+            "name",
+            "opened_ip",
+            "password_updated_at",
+            "preferences",
+            "role",
+            "salesforce_user_id",
+            "tfa_active",
+            "tfa_created_at",
+            "tfa_enabled",
+        ]
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 200)
+        [self.assertIn(key, expected_keys) for key in req.json()]  # type: ignore[func-returns-value]
+        [self.assertIn(key, expected_users_keys) for key in req.json()["users"][0]]  # type: ignore[func-returns-value]
+
+    async def test_get_user_details(self) -> None:
+        """
+        GET /v5/users/{user_id}
+        :return:
+        """
+        query = {"role": "admin", "limit": "0", "skip": "0"}
+        req1 = await self.client.users.get(filters=query)
+        users = req1.json()["users"]
+
+        for user in users:
+            if self.mailgun_email == user["email"]:
+                req2 = await self.client.users.get(user_id=user["id"])
+
+                expected_users_keys = [
+                    "account_id",
+                    "activated",
+                    "auth",
+                    "email",
+                    "email_details",
+                    "github_user_id",
+                    "id",
+                    "is_disabled",
+                    "is_master",
+                    "metadata",
+                    "migration_status",
+                    "name",
+                    "opened_ip",
+                    "password_updated_at",
+                    "preferences",
+                    "role",
+                    "salesforce_user_id",
+                    "tfa_active",
+                    "tfa_created_at",
+                    "tfa_enabled",
+                ]
+
+                self.assertIsInstance(req2.json(), dict)
+                self.assertEqual(req2.status_code, 200)
+                [self.assertIn(key, expected_users_keys) for key in req2.json()]  # type: ignore[func-returns-value]
+            break
 
 
 class BounceClassificationTests(unittest.TestCase):
