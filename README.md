@@ -95,6 +95,12 @@ Check out all the resources and Python code examples in the official
       - [Create a single validation](#create-a-single-validation)
     - [Inbox placement](#inbox-placement)
       - [Get all inbox](#get-all-inbox)
+    - [Credentials](#credentials)
+      - [List Mailgun SMTP credential metadata for a given domain](#list-mailgun-smtp-credential-metadata-for-a-given-domain)
+      - [Create Mailgun SMTP credentials for a given domain](#create-mailgun-smtp-credentials-for-a-given-domain)
+    - [Users](#users)
+      - [Get users on an account](#get-users-on-an-account)
+      - [Get a user's details](#)
   - [License](#license)
   - [Contribute](#contribute)
   - [Contributors](#contributors)
@@ -1305,6 +1311,72 @@ def get_all_inbox() -> None:
     """
     req = client.inbox_tests.get(domain=domain)
     print(req.json())
+```
+
+### Credentials
+
+#### List Mailgun SMTP credential metadata for a given domain
+
+```python
+def get_credentials() -> None:
+    """
+    GET /domains/<domain>/credentials
+    :return:
+    """
+    request = client.domains_credentials.get(domain=domain)
+    print(request.json())
+```
+
+#### Create Mailgun SMTP credentials for a given domain
+
+```python
+def post_credentials() -> None:
+    """
+    POST /domains/<domain>/credentials
+    :return:
+    """
+    data = {
+        "login": f"alice_bob@{domain}",
+        "password": "test_new_creds123",  # pragma: allowlist secret
+    }
+    request = client.domains_credentials.create(domain=domain, data=data)
+    print(request.json())
+```
+
+### Users
+
+#### Get users on an account
+
+```python
+def get_users() -> None:
+    """
+    GET /v5/users
+    :return:
+    """
+    query = {"role": "admin", "limit": "0", "skip": "0"}
+    req = client.users.get(filters=query)
+    print(req)
+    print(req.json())
+```
+
+#### Get a user's details
+
+```python
+def get_user_details() -> None:
+    """
+    GET /v5/users/{user_id}
+    :return:
+    """
+    mailgun_email = os.environ["MAILGUN_EMAIL"]
+    query = {"role": "admin", "limit": "0", "skip": "0"}
+    req1 = client.users.get(filters=query)
+    users = req1.json()["users"]
+
+    for user in users:
+        if mailgun_email == user["email"]:
+            req2 = client.users.get(user_id=user["id"])
+            print(req2)
+            print(req2.json())
 ```
 
 ## License
