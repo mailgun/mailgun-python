@@ -36,7 +36,11 @@ We [keep a changelog.](http://keepachangelog.com/)
 ### Changed
 
 - Update `handle_templates()` in `mailgun/handlers/templates_handler.py` to handle `new_tag`
+
 - Update CI workflows: update `pre-commit` hooks to the latest versions.
+
+- Modify `mypy`'s additional_dependencies in `.pre-commit-config.yaml` to suppress `error: Untyped decorator makes function` by adding `pytest-order`
+
 - Replace spaces with tabs in `Makefile`
 
 ### Pull Requests Merged
