@@ -104,21 +104,21 @@ repos:
         exclude: ^tests
 
   - repo: https://github.com/PyCQA/pylint
-    rev: v4.0.3
+    rev: v4.0.4
     hooks:
       - id: pylint
         args:
           - --exit-zero
 
   - repo: https://github.com/asottile/pyupgrade
-    rev: v3.21.1
+    rev: v3.21.2
     hooks:
       - id: pyupgrade
         args: [--py310-plus, --keep-runtime-typing]
 
   - repo: https://github.com/charliermarsh/ruff-pre-commit
     # Ruff version.
-    rev: v0.14.5
+    rev: v0.14.8
     hooks:
       # Run the linter.
       - id: ruff-check
@@ -139,7 +139,7 @@ repos:
       -   id: refurb
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.18.2
+    rev: v1.19.0
     hooks:
     -   id: mypy
         args: [--config-file=./pyproject.toml]
@@ -153,7 +153,7 @@ repos:
     - id: pyright
 
   - repo: https://github.com/PyCQA/bandit
-    rev: 1.8.6
+    rev: 1.9.2
     hooks:
       - id: bandit
         args: ["-c", "pyproject.toml", "-r", "."]
