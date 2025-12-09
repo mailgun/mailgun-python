@@ -2176,6 +2176,7 @@ class UsersTests(unittest.TestCase):
         self.mailgun_email = os.environ["MAILGUN_EMAIL"]
 
     def test_get_users(self) -> None:
+        """Test to get account's users details: Happy Path with valid data."""
         query = {"role": "admin", "limit": "0", "skip": "0"}
         req = self.client.users.get(filters=query)
 
@@ -2212,6 +2213,13 @@ class UsersTests(unittest.TestCase):
         [self.assertIn(key, expected_keys) for key in req.json()]  # type: ignore[func-returns-value]
         [self.assertIn(key, expected_users_keys) for key in req.json()["users"][0]]  # type: ignore[func-returns-value]
 
+    def test_get_user_invalid_url(self) -> None:
+        """Test to get account's users details: expected failure with invalid URL."""
+        query = {"role": "admin", "limit": "0", "skip": "0"}
+
+        with self.assertRaises(KeyError) as cm:
+            self.client.user.get(filters=query)
+
     @pytest.mark.xfail
     def test_own_user_details(self) -> None:
         req = self.client_with_secret_key.users.get(user_id="me")
@@ -2244,6 +2252,7 @@ class UsersTests(unittest.TestCase):
         [self.assertIn(key, expected_users_keys) for key in req.json()]  # type: ignore[func-returns-value]
 
     def test_get_user_details(self) -> None:
+        """Test to get account's users details: happy path."""
         query = {"role": "admin", "limit": "0", "skip": "0"}
         req1 = self.client.users.get(filters=query)
         users = req1.json()["users"]
@@ -2280,6 +2289,18 @@ class UsersTests(unittest.TestCase):
                 [self.assertIn(key, expected_users_keys) for key in req2.json()]  # type: ignore[func-returns-value]
             break
 
+    def test_get_invalid_user_details(self) -> None:
+        """Test to get user details: expected failure with invalid user_id."""
+        query = {"role": "admin", "limit": "0", "skip": "0"}
+        req1 = self.client.users.get(filters=query)
+        users = req1.json()["users"]
+
+        for user in users:
+            if self.mailgun_email == user["email"]:
+                req2 = self.client.users.get(user_id="xxxxxxx")
+
+                self.assertIsInstance(req2.json(), dict)
+                self.assertEqual(req2.status_code, 404)
 
 # ============================================================================
 # Async Test Classes (using AsyncClient and AsyncEndpoint)
@@ -4371,6 +4392,7 @@ class AsyncUsersTests(unittest.IsolatedAsyncioTestCase):
         await self.client.aclose()
 
     async def test_get_users(self) -> None:
+        """Test to get account's users: happy path."""
         query = {"role": "admin", "limit": "0", "skip": "0"}
         req = await self.client.users.get(filters=query)
 
@@ -4407,6 +4429,13 @@ class AsyncUsersTests(unittest.IsolatedAsyncioTestCase):
         [self.assertIn(key, expected_keys) for key in req.json()]  # type: ignore[func-returns-value]
         [self.assertIn(key, expected_users_keys) for key in req.json()["users"][0]]  # type: ignore[func-returns-value]
 
+    async def test_get_user_invalid_url(self) -> None:
+        """Test to get account's users details: expected failure with invalid URL."""
+        query = {"role": "admin", "limit": "0", "skip": "0"}
+
+        with self.assertRaises(KeyError) as cm:
+            await self.client.user.get(filters=query)
+
     @pytest.mark.xfail
     async def test_own_user_details(self) -> None:
         req = await self.client_with_secret_key.users.get(user_id="me")
@@ -4439,6 +4468,7 @@ class AsyncUsersTests(unittest.IsolatedAsyncioTestCase):
         [self.assertIn(key, expected_users_keys) for key in req.json()]  # type: ignore[func-returns-value]
 
     async def test_get_user_details(self) -> None:
+        """Test to get user details: happy path."""
         """
         GET /v5/users/{user_id}
         :return:
@@ -4478,6 +4508,19 @@ class AsyncUsersTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(req2.status_code, 200)
                 [self.assertIn(key, expected_users_keys) for key in req2.json()]  # type: ignore[func-returns-value]
             break
+
+    async def test_get_invalid_user_details(self) -> None:
+        """Test to get user details: expected failure with invalid user_id."""
+        query = {"role": "admin", "limit": "0", "skip": "0"}
+        req1 = await self.client.users.get(filters=query)
+        users = req1.json()["users"]
+
+        for user in users:
+            if self.mailgun_email == user["email"]:
+                req2 = await self.client.users.get(user_id="xxxxxxx")
+
+                self.assertIsInstance(req2.json(), dict)
+                self.assertEqual(req2.status_code, 404)
 
 
 class BounceClassificationTests(unittest.TestCase):
