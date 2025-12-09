@@ -4,6 +4,45 @@ We [keep a changelog.](http://keepachangelog.com/)
 
 ## [Unreleased]
 
+## [1.5.0] - 2025-12-XX
+
+### Addedq
+
+- Add missing endpoints:
+
+  - Add "users", "me" to the `users` key of special cases in the class `Config`.
+  - Add `handle_users` to `mailgun.handlers.users_handler` for parsing [Users API](https://documentation.mailgun.com/docs/mailgun/api-reference/send/mailgun/users).
+  - Add `handle_mailboxes_credentials()` to `mailgun.handlers.domains_handler` for parsing `Update Mailgun SMTP credentials` in [Credentials API](https://documentation.mailgun.com/docs/mailgun/api-reference/send/mailgun/credentials).
+
+- Examples:
+
+  - Move credentials examples from `mailgun/examples/domain_examples.py` to `mailgun/examples/credentials_examples.py` and add a new example `put_mailboxes_credentials()`.
+  - Add the `get_routes_match()` example to `mailgun/examples/routes_examples.py`
+  - Add the `update_template_version_copy()` example to `mailgun/examples/templates_examples.py`
+  - Add `mailgun/examples/users_examples.py`
+
+- Docs:
+
+  - Add `Credentials` and `Users` sections with examples to `README.md`.
+  - Add docstrings to the test class `UsersTests` & `AsyncUsersTests` and theirs methods.
+
+- Tests:
+
+  - Add `test_put_mailboxes_credentials` to `DomainTests` and `AsyncDomainTests`
+  - Add `test_get_routes_match` to `RoutesTests` and `AsyncRoutesTests`
+  - Add `test_update_template_version_copy` to `TemplatesTests ` and `AsyncTemplatesTests `
+  - Add classes `UsersTests` and `AsyncUsersTests` to `tests/tests.py`.
+
+### Changed
+
+- Update `handle_templates()` in `mailgun/handlers/templates_handler.py` to handle `new_tag`
+- Update CI workflows: update `pre-commit` hooks to the latest versions.
+- Replace spaces with tabs in `Makefile`
+
+### Pull Requests Merged
+
+- [PR_25](https://github.com/mailgun/mailgun-python/pull/25) - Add missing endpoints
+
 ## [1.4.0] - 2025-11-20
 
 ### Added
