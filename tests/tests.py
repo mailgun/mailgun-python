@@ -171,6 +171,7 @@ class DomainTests(unittest.TestCase):
 
     @pytest.mark.order(2)
     def test_put_mailboxes_credentials(self) -> None:
+        """Test to update Mailgun SMTP credentials: Happy Path with valid data."""
         self.client.domains_credentials.create(
             domain=self.domain,
             data=self.post_domain_creds,
@@ -2443,6 +2444,7 @@ class AsyncDomainTests(unittest.IsolatedAsyncioTestCase):
 
     @pytest.mark.order(2)
     async def test_put_mailboxes_credentials(self) -> None:
+        """Test to update Mailgun SMTP credentials: Happy Path with valid data."""
         await self.client.domains_credentials.create(
             domain=self.domain,
             data=self.post_domain_creds,
