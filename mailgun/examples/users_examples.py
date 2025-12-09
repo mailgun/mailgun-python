@@ -23,6 +23,43 @@ def get_users() -> None:
     print(req.json())
 
 
+def get_own_user_details() -> None:
+    """
+    GET /v5/users/me
+
+    Please note, for the command("Get one's own user details") to be successful, you must use a Web type API key for the call. Private type API keys will Not work.
+    This below Call will generate a Web API key tied to the account user associated with the data inputted for the USER_EMAIL field and USER_ID  values. This is returned by the API in the "secret":"API_KEY" key/value pair. This key will authenticate the call(Get one's own user details) made to the /v5/users/me endpoint, and will return the user's data associated with the USER_EMAIL and USER_ID values.
+
+    Generate Web API Key:
+        curl -i -X POST \
+             -u api:API_KEY \
+        https://api.mailgun.net/v1/keys \
+             -F email=USER_EMAIL \
+             -F kind=web \
+             -F expiration=SECONDS (Lifetime of the key in seconds) \
+             -F role=ROLE \
+             -F user_id=USER_ID \
+             -F description=DESCRIPTION
+
+    see https://documentation.mailgun.com/docs/mailgun/api-reference/send/mailgun/keys/api.(*keysapi).createkey-fm-7
+
+    Important Notes:
+    API_KEY - Private API Key
+    USER_EMAIL - The user login email address of the user that is trying to make the call to the /v5/users/me endpoint.
+    SECONDS - How many seconds you want the key to be active before it expires.
+    ROLE - The role of the API Key. This dictates what permissions the key has (https://help.mailgun.com/hc/en-us/articles/26016288026907-API-Key-Roles)
+    USER_ID - The internal User ID of the user that is trying to call the /v5/users/me endpoint. This is present in the URL in the address bar when viewing the User details in the GUI or in Admin. Both will show /users/USER_ID in the address.
+    DESCRIPTION - Description of the key.
+
+    :return:
+    """
+    secret: str = os.environ["SECRET"]
+    client_with_secret_key: Client = Client(auth=("api", secret))
+    req = client_with_secret_key.users.get(user_id="me")
+    print(req)
+    print(req.json())
+
+
 def get_user_details() -> None:
     """
     GET /v5/users/{user_id}
@@ -41,4 +78,5 @@ def get_user_details() -> None:
 
 if __name__ == "__main__":
     get_users()
+    get_own_user_details()
     get_user_details()
