@@ -50,7 +50,6 @@ def put_mailboxes_credentials() -> None:
     """
 
     req = client.mailboxes.put(domain=domain, login=f"alice_bob@{domain}")
-    print(req)
     print(req.json())
 
 

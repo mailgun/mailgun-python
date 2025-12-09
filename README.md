@@ -1355,7 +1355,6 @@ def get_users() -> None:
     """
     query = {"role": "admin", "limit": "0", "skip": "0"}
     req = client.users.get(filters=query)
-    print(req)
     print(req.json())
 ```
 
@@ -1375,7 +1374,6 @@ def get_user_details() -> None:
     for user in users:
         if mailgun_email == user["email"]:
             req2 = client.users.get(user_id=user["id"])
-            print(req2)
             print(req2.json())
 ```
 
