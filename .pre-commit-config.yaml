@@ -145,6 +145,7 @@ repos:
         args: [--config-file=./pyproject.toml]
         additional_dependencies:
           - types-requests
+          - pytest-order
         exclude: ^mailgun/examples/
 
   - repo: https://github.com/RobertCraigie/pyright-python
