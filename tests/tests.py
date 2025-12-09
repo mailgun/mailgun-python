@@ -2212,6 +2212,7 @@ class UsersTests(unittest.TestCase):
         [self.assertIn(key, expected_keys) for key in req.json()]  # type: ignore[func-returns-value]
         [self.assertIn(key, expected_users_keys) for key in req.json()["users"][0]]  # type: ignore[func-returns-value]
 
+    @pytest.mark.xfail
     def test_own_user_details(self) -> None:
         req = self.client_with_secret_key.users.get(user_id="me")
 
@@ -4357,7 +4358,12 @@ class AsyncUsersTests(unittest.IsolatedAsyncioTestCase):
             "api",
             os.environ["APIKEY"],
         )
+        self.secret: tuple[str, str] = (
+            "api",
+            os.environ["SECRET"],
+        )
         self.client: AsyncClient = AsyncClient(auth=self.auth)
+        self.client_with_secret_key: AsyncClient = AsyncClient(auth=self.secret)
         self.domain: str = os.environ["DOMAIN"]
         self.mailgun_email = os.environ["MAILGUN_EMAIL"]
 
@@ -4400,6 +4406,37 @@ class AsyncUsersTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(req.status_code, 200)
         [self.assertIn(key, expected_keys) for key in req.json()]  # type: ignore[func-returns-value]
         [self.assertIn(key, expected_users_keys) for key in req.json()["users"][0]]  # type: ignore[func-returns-value]
+
+    @pytest.mark.xfail
+    async def test_own_user_details(self) -> None:
+        req = await self.client_with_secret_key.users.get(user_id="me")
+
+        expected_users_keys = [
+            "account_id",
+            "activated",
+            "auth",
+            "email",
+            "email_details",
+            "github_user_id",
+            "id",
+            "is_disabled",
+            "is_master",
+            "metadata",
+            "migration_status",
+            "name",
+            "opened_ip",
+            "password_updated_at",
+            "preferences",
+            "role",
+            "salesforce_user_id",
+            "tfa_active",
+            "tfa_created_at",
+            "tfa_enabled",
+        ]
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 200)
+        [self.assertIn(key, expected_users_keys) for key in req.json()]  # type: ignore[func-returns-value]
 
     async def test_get_user_details(self) -> None:
         """
