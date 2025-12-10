@@ -4,8 +4,6 @@ We [keep a changelog.](http://keepachangelog.com/)
 
 ## [Unreleased]
 
-## [1.5.0] - 2025-12-XX
-
 ### Added
 
 - Add missing endpoints:
