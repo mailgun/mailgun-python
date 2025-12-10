@@ -30,6 +30,7 @@ from mailgun.handlers.bounce_classification_handler import handle_bounce_classif
 from mailgun.handlers.default_handler import handle_default
 from mailgun.handlers.domains_handler import handle_domainlist
 from mailgun.handlers.domains_handler import handle_domains
+from mailgun.handlers.domains_handler import handle_mailboxes_credentials
 from mailgun.handlers.domains_handler import handle_sending_queues
 from mailgun.handlers.email_validation_handler import handle_address_validate
 from mailgun.handlers.error_handler import ApiError
@@ -46,6 +47,7 @@ from mailgun.handlers.suppressions_handler import handle_unsubscribes
 from mailgun.handlers.suppressions_handler import handle_whitelists
 from mailgun.handlers.tags_handler import handle_tags
 from mailgun.handlers.templates_handler import handle_templates
+from mailgun.handlers.users_handler import handle_users
 
 
 if TYPE_CHECKING:
@@ -65,6 +67,7 @@ HANDLERS: dict[str, Callable] = {  # type: ignore[type-arg]
     "dkim_selector": handle_domains,
     "web_prefix": handle_domains,
     "sending_queues": handle_sending_queues,
+    "mailboxes": handle_mailboxes_credentials,
     "ips": handle_ips,
     "ip_pools": handle_ippools,
     "tags": handle_tags,
@@ -82,6 +85,7 @@ HANDLERS: dict[str, Callable] = {  # type: ignore[type-arg]
     "events": handle_default,
     "analytics": handle_metrics,
     "bounce-classification": handle_bounce_classification,
+    "users": handle_users,
 }
 
 
@@ -144,6 +148,10 @@ class Config:
                 "base": v2_base,
                 "keys": ["bounce-classification", "metrics"],
             },
+            "users": {
+                "base": v5_base,
+                "keys": ["users", "me"],
+            },
         }
 
         if key in special_cases:
@@ -163,6 +171,12 @@ class Config:
             return {
                 "base": v2_base,
                 "keys": f"{part1}-{part2}".split("_"),
+            }, headers
+
+        if "users" in key:
+            return {
+                "base": v5_base,
+                "keys": key.split("_"),
             }, headers
 
         # Handle DIPP endpoints

@@ -30,33 +30,24 @@ def handle_templates(
     :raises: ApiError
     """
     final_keys = path.join("/", *url["keys"]) if url["keys"] else ""
-    if "template_name" in kwargs:
-        if "versions" in kwargs:
-            if kwargs["versions"]:
-                if "tag" in kwargs:
-                    url = (
-                        url["base"]
-                        + domain
-                        + final_keys
-                        + "/"
-                        + kwargs["template_name"]
-                        + "/versions/"
-                        + kwargs["tag"]
-                    )
-                else:
-                    url = (
-                        url["base"]
-                        + domain
-                        + final_keys
-                        + "/"
-                        + kwargs["template_name"]
-                        + "/versions"
-                    )
-            else:
-                raise ApiError("Versions should be True or absent")
-        else:
-            url = url["base"] + domain + final_keys + "/" + kwargs["template_name"]
-    else:
-        url = url["base"] + domain + final_keys
+    domain_url = f"{url['base']}{domain}{final_keys}"
 
-    return url
+    if "template_name" not in kwargs:
+        return domain_url
+
+    template_url = domain_url + f"/{kwargs['template_name']}"
+
+    if "versions" not in kwargs:
+        return template_url
+
+    if not kwargs["versions"]:
+        raise ApiError("Versions should be True or absent")
+
+    versions_url = template_url + "/versions"
+
+    if "tag" in kwargs and "copy" not in kwargs:
+        return versions_url + f"/{kwargs['tag']}"
+    if "tag" in kwargs and "copy" in kwargs and "new_tag" in kwargs:
+        return versions_url + f"/{kwargs['tag']}/copy/{kwargs['new_tag']}"
+
+    return versions_url

@@ -169,6 +169,31 @@ class DomainTests(unittest.TestCase):
         self.assertEqual(request.status_code, 200)
         self.assertIn("message", request.json())
 
+    @pytest.mark.order(2)
+    def test_put_mailboxes_credentials(self) -> None:
+        """Test to update Mailgun SMTP credentials: Happy Path with valid data."""
+        self.client.domains_credentials.create(
+            domain=self.domain,
+            data=self.post_domain_creds,
+        )
+        name = "alice_bob"
+        req = self.client.mailboxes.put(domain=self.domain, login=f"{name}@{self.domain}")
+
+        expected_keys = [
+            "message",
+            "note",
+            "credentials",
+        ]
+        expected_credentials_keys = [
+            f"{name}@{self.domain}",
+        ]
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 200)
+        [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
+        self.assertIn("Password changed", req.json()["message"])
+        [self.assertIn(key, expected_credentials_keys) for key in req.json()["credentials"]]  # type: ignore[func-returns-value]
+
     @pytest.mark.order(3)
     def test_get_domain_list(self) -> None:
         req = self.client.domainlist.get()
@@ -850,6 +875,7 @@ class RoutesTests(unittest.TestCase):
         )
         self.client: Client = Client(auth=self.auth)
         self.domain: str = os.environ["DOMAIN"]
+        self.sender: str = os.environ["MESSAGES_FROM"]
         self.routes_data: dict[str, int | str | list[str]] = {
             "priority": 0,
             "description": "Sample route",
@@ -864,7 +890,7 @@ class RoutesTests(unittest.TestCase):
             "priority": 2,
         }
 
-    # 'Routes quota (1) is exceeded for a free plan
+    # 'Routes quota (1) is exceeded for a free plan'
     def test_routes_create(self) -> None:
         params = {"skip": 0, "limit": 1}
         req1 = self.client.routes.get(domain=self.domain, filters=params)
@@ -978,6 +1004,21 @@ class RoutesTests(unittest.TestCase):
 
         self.assertEqual(req.status_code, 200)
         self.assertIn("message", req.json())
+
+    def test_get_routes_match(self) -> None:
+        """Test to match address to route: Happy Path with valid data."""
+
+        query = {"address": self.sender}
+        req = self.client.routes_match.get(domain=self.domain, filters=query)
+
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("route", req.json())
+
+        expected_keys = ["actions", "created_at", "description", "expression", "id", "priority"]
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 200)
+        [self.assertIn(key, expected_keys) for key in req.json()["route"].keys()]  # type: ignore[func-returns-value]
 
 
 class WebhooksTests(unittest.TestCase):
@@ -1411,6 +1452,44 @@ class TemplatesTests(unittest.TestCase):
         )
 
         self.assertEqual(req.status_code, 200)
+
+    def test_update_template_version_copy(self) -> None:
+        """Test to copy an existing version into a new version with the provided name: Happy Path with valid data."""
+        data = {"comment": "An updated version comment"}
+
+        req = self.client.templates.put(
+            domain=self.domain,
+            filters=data,
+            template_name="template.name1",
+            versions=True,
+            tag="v2",
+            copy=True,
+            new_tag="v3",
+        )
+
+        expected_keys = [
+            "message",
+            "version",
+            "template",
+        ]
+        expected_template_keys = [
+            "tag",
+            "template",
+            "engine",
+            "mjml",
+            "createdAt",
+            "comment",
+            "active",
+            "id",
+            "headers",
+        ]
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 200)
+        [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
+        self.assertIn("tag", req.json()["version"])
+        self.assertIn("version has been copied", req.json()["message"])
+        [self.assertIn(key, expected_template_keys) for key in req.json()["template"]]  # type: ignore[func-returns-value]
 
 
 @pytest.mark.skip(
@@ -2073,6 +2152,157 @@ class TagsNewTests(unittest.TestCase):
         self.assertIn("not found", req.json()["error"])
 
 
+class UsersTests(unittest.TestCase):
+    """Tests for Mailgun Users API, https://api.mailgun.net/v5/users.
+
+    This class provides setup functionality for tests involving
+    with authentication and client initialization handled
+    in `setUp`. Each test in this suite operates with the configured Mailgun client
+    instance to simulate API interactions.
+
+    """
+
+    def setUp(self) -> None:
+        self.auth: tuple[str, str] = (
+            "api",
+            os.environ["APIKEY"],
+        )
+        self.secret: tuple[str, str] = (
+            "api",
+            os.environ["SECRET"],
+        )
+        self.client: Client = Client(auth=self.auth)
+        self.client_with_secret_key = Client(auth=self.secret)
+        self.domain: str = os.environ["DOMAIN"]
+        self.mailgun_email = os.environ["MAILGUN_EMAIL"]
+
+    def test_get_users(self) -> None:
+        """Test to get account's users details: Happy Path with valid data."""
+        query = {"role": "admin", "limit": "0", "skip": "0"}
+        req = self.client.users.get(filters=query)
+
+        expected_keys = [
+            "total",
+            "users",
+        ]
+
+        expected_users_keys = [
+            "account_id",
+            "activated",
+            "auth",
+            "email",
+            "email_details",
+            "github_user_id",
+            "id",
+            "is_disabled",
+            "is_master",
+            "metadata",
+            "migration_status",
+            "name",
+            "opened_ip",
+            "password_updated_at",
+            "preferences",
+            "role",
+            "salesforce_user_id",
+            "tfa_active",
+            "tfa_created_at",
+            "tfa_enabled",
+        ]
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 200)
+        [self.assertIn(key, expected_keys) for key in req.json()]  # type: ignore[func-returns-value]
+        [self.assertIn(key, expected_users_keys) for key in req.json()["users"][0]]  # type: ignore[func-returns-value]
+
+    def test_get_user_invalid_url(self) -> None:
+        """Test to get account's users details: expected failure with invalid URL."""
+        query = {"role": "admin", "limit": "0", "skip": "0"}
+
+        with self.assertRaises(KeyError) as cm:
+            self.client.user.get(filters=query)
+
+    @pytest.mark.xfail
+    def test_own_user_details(self) -> None:
+        req = self.client_with_secret_key.users.get(user_id="me")
+
+        expected_users_keys = [
+            "account_id",
+            "activated",
+            "auth",
+            "email",
+            "email_details",
+            "github_user_id",
+            "id",
+            "is_disabled",
+            "is_master",
+            "metadata",
+            "migration_status",
+            "name",
+            "opened_ip",
+            "password_updated_at",
+            "preferences",
+            "role",
+            "salesforce_user_id",
+            "tfa_active",
+            "tfa_created_at",
+            "tfa_enabled",
+        ]
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 200)
+        [self.assertIn(key, expected_users_keys) for key in req.json()]  # type: ignore[func-returns-value]
+
+    def test_get_user_details(self) -> None:
+        """Test to get account's users details: happy path."""
+        query = {"role": "admin", "limit": "0", "skip": "0"}
+        req1 = self.client.users.get(filters=query)
+        users = req1.json()["users"]
+
+        for user in users:
+            if self.mailgun_email == user["email"]:
+                req2 = self.client.users.get(user_id=user["id"])
+
+                expected_users_keys = [
+                    "account_id",
+                    "activated",
+                    "auth",
+                    "email",
+                    "email_details",
+                    "github_user_id",
+                    "id",
+                    "is_disabled",
+                    "is_master",
+                    "metadata",
+                    "migration_status",
+                    "name",
+                    "opened_ip",
+                    "password_updated_at",
+                    "preferences",
+                    "role",
+                    "salesforce_user_id",
+                    "tfa_active",
+                    "tfa_created_at",
+                    "tfa_enabled",
+                ]
+
+                self.assertIsInstance(req2.json(), dict)
+                self.assertEqual(req2.status_code, 200)
+                [self.assertIn(key, expected_users_keys) for key in req2.json()]  # type: ignore[func-returns-value]
+            break
+
+    def test_get_invalid_user_details(self) -> None:
+        """Test to get user details: expected failure with invalid user_id."""
+        query = {"role": "admin", "limit": "0", "skip": "0"}
+        req1 = self.client.users.get(filters=query)
+        users = req1.json()["users"]
+
+        for user in users:
+            if self.mailgun_email == user["email"]:
+                req2 = self.client.users.get(user_id="xxxxxxx")
+
+                self.assertIsInstance(req2.json(), dict)
+                self.assertEqual(req2.status_code, 404)
+
 # ============================================================================
 # Async Test Classes (using AsyncClient and AsyncEndpoint)
 # ============================================================================
@@ -2211,6 +2441,33 @@ class AsyncDomainTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(request.status_code, 200)
         self.assertIn("message", request.json())
+
+    @pytest.mark.order(2)
+    async def test_put_mailboxes_credentials(self) -> None:
+        """Test to update Mailgun SMTP credentials: Happy Path with valid data."""
+        await self.client.domains_credentials.create(
+            domain=self.domain,
+            data=self.post_domain_creds,
+        )
+        name = "alice_bob"
+        req = await self.client.mailboxes.put(domain=self.domain, login=f"{name}@{self.domain}")
+        print(req)
+        print(req.json())
+
+        expected_keys = [
+            "message",
+            "note",
+            "credentials",
+        ]
+        expected_credentials_keys = [
+            f"{name}@{self.domain}",
+        ]
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 200)
+        [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
+        self.assertIn("Password changed", req.json()["message"])
+        [self.assertIn(key, expected_credentials_keys) for key in req.json()["credentials"]]  # type: ignore[func-returns-value]
 
     @pytest.mark.order(3)
     async def test_get_domain_list(self) -> None:
@@ -2861,6 +3118,7 @@ class AsyncRoutesTests(unittest.IsolatedAsyncioTestCase):
         )
         self.client: AsyncClient = AsyncClient(auth=self.auth)
         self.domain: str = os.environ["DOMAIN"]
+        self.sender: str = os.environ["MESSAGES_FROM"]
         self.routes_data: dict[str, int | str | list[str]] = {
             "priority": 0,
             "description": "Sample route",
@@ -2978,6 +3236,33 @@ class AsyncRoutesTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(req.status_code, 200)
         self.assertIn("message", req.json())
+
+    async def test_get_routes_match(self) -> None:
+        """Test to match address to route: Happy Path with valid data."""
+        params = {"skip": 0, "limit": 1}
+        query = {"address": self.sender}
+        req1 = await self.client.routes.get(domain=self.domain, filters=params)
+        print('len(req1.json()["items"]): ', len(req1.json()["items"]))
+        if len(req1.json()["items"]) > 0:
+            await self.client.routes.delete(
+                domain=self.domain,
+                route_id=req1.json()["items"][0]["id"],
+            )
+
+            await self.client.routes.create(domain=self.domain, data=self.routes_data)
+            req = await self.client.routes_match.get(domain=self.domain, filters=query)
+        else:
+            await self.client.routes.create(domain=self.domain, data=self.routes_data)
+            req = await self.client.routes_match.get(domain=self.domain, filters=query)
+
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("route", req.json())
+
+        expected_keys = ["actions", "created_at", "description", "expression", "id", "priority"]
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 200)
+        [self.assertIn(key, expected_keys) for key in req.json()["route"].keys()]  # type: ignore[func-returns-value]
 
 
 class AsyncWebhooksTests(unittest.IsolatedAsyncioTestCase):
@@ -3401,6 +3686,53 @@ class AsyncTemplatesTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(req.status_code, 200)
+
+    async def test_update_template_version_copy(self) -> None:
+        """Test to copy an existing version into a new version with the provided name: Happy Path with valid data."""
+        await self.client.templates.create(data=self.post_template_data, domain=self.domain)
+
+        await self.client.templates.create(
+            data=self.post_template_version_data,
+            domain=self.domain,
+            template_name=self.post_template_data["name"],
+            versions=True,
+        )
+
+        data = {"comment": "An updated version comment"}
+
+        req = await self.client.templates.put(
+            domain=self.domain,
+            filters=data,
+            template_name="template.name1",
+            versions=True,
+            tag="v2",
+            copy=True,
+            new_tag="v3",
+        )
+
+        expected_keys = [
+            "message",
+            "version",
+            "template",
+        ]
+        expected_template_keys = [
+            "tag",
+            "template",
+            "engine",
+            "mjml",
+            "createdAt",
+            "comment",
+            "active",
+            "id",
+            "headers",
+        ]
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 200)
+        [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
+        self.assertIn("tag", req.json()["version"])
+        self.assertIn("version has been copied", req.json()["message"])
+        [self.assertIn(key, expected_template_keys) for key in req.json()["template"]]  # type: ignore[func-returns-value]
 
 
 @pytest.mark.skip(
@@ -4039,6 +4371,158 @@ class AsyncTagsNewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(req.status_code, 404)
         self.assertIn("error", req.json())
         self.assertIn("not found", req.json()["error"])
+
+
+class AsyncUsersTests(unittest.IsolatedAsyncioTestCase):
+    """Async tests for Mailgun Users API using AsyncClient."""
+
+    async def asyncSetUp(self) -> None:
+        self.auth: tuple[str, str] = (
+            "api",
+            os.environ["APIKEY"],
+        )
+        self.secret: tuple[str, str] = (
+            "api",
+            os.environ["SECRET"],
+        )
+        self.client: AsyncClient = AsyncClient(auth=self.auth)
+        self.client_with_secret_key: AsyncClient = AsyncClient(auth=self.secret)
+        self.domain: str = os.environ["DOMAIN"]
+        self.mailgun_email = os.environ["MAILGUN_EMAIL"]
+
+    async def asyncTearDown(self) -> None:
+        await self.client.aclose()
+
+    async def test_get_users(self) -> None:
+        """Test to get account's users: happy path."""
+        query = {"role": "admin", "limit": "0", "skip": "0"}
+        req = await self.client.users.get(filters=query)
+
+        expected_keys = [
+            "total",
+            "users",
+        ]
+
+        expected_users_keys = [
+            "account_id",
+            "activated",
+            "auth",
+            "email",
+            "email_details",
+            "github_user_id",
+            "id",
+            "is_disabled",
+            "is_master",
+            "metadata",
+            "migration_status",
+            "name",
+            "opened_ip",
+            "password_updated_at",
+            "preferences",
+            "role",
+            "salesforce_user_id",
+            "tfa_active",
+            "tfa_created_at",
+            "tfa_enabled",
+        ]
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 200)
+        [self.assertIn(key, expected_keys) for key in req.json()]  # type: ignore[func-returns-value]
+        [self.assertIn(key, expected_users_keys) for key in req.json()["users"][0]]  # type: ignore[func-returns-value]
+
+    async def test_get_user_invalid_url(self) -> None:
+        """Test to get account's users details: expected failure with invalid URL."""
+        query = {"role": "admin", "limit": "0", "skip": "0"}
+
+        with self.assertRaises(KeyError) as cm:
+            await self.client.user.get(filters=query)
+
+    @pytest.mark.xfail
+    async def test_own_user_details(self) -> None:
+        req = await self.client_with_secret_key.users.get(user_id="me")
+
+        expected_users_keys = [
+            "account_id",
+            "activated",
+            "auth",
+            "email",
+            "email_details",
+            "github_user_id",
+            "id",
+            "is_disabled",
+            "is_master",
+            "metadata",
+            "migration_status",
+            "name",
+            "opened_ip",
+            "password_updated_at",
+            "preferences",
+            "role",
+            "salesforce_user_id",
+            "tfa_active",
+            "tfa_created_at",
+            "tfa_enabled",
+        ]
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 200)
+        [self.assertIn(key, expected_users_keys) for key in req.json()]  # type: ignore[func-returns-value]
+
+    async def test_get_user_details(self) -> None:
+        """Test to get user details: happy path."""
+        """
+        GET /v5/users/{user_id}
+        :return:
+        """
+        query = {"role": "admin", "limit": "0", "skip": "0"}
+        req1 = await self.client.users.get(filters=query)
+        users = req1.json()["users"]
+
+        for user in users:
+            if self.mailgun_email == user["email"]:
+                req2 = await self.client.users.get(user_id=user["id"])
+
+                expected_users_keys = [
+                    "account_id",
+                    "activated",
+                    "auth",
+                    "email",
+                    "email_details",
+                    "github_user_id",
+                    "id",
+                    "is_disabled",
+                    "is_master",
+                    "metadata",
+                    "migration_status",
+                    "name",
+                    "opened_ip",
+                    "password_updated_at",
+                    "preferences",
+                    "role",
+                    "salesforce_user_id",
+                    "tfa_active",
+                    "tfa_created_at",
+                    "tfa_enabled",
+                ]
+
+                self.assertIsInstance(req2.json(), dict)
+                self.assertEqual(req2.status_code, 200)
+                [self.assertIn(key, expected_users_keys) for key in req2.json()]  # type: ignore[func-returns-value]
+            break
+
+    async def test_get_invalid_user_details(self) -> None:
+        """Test to get user details: expected failure with invalid user_id."""
+        query = {"role": "admin", "limit": "0", "skip": "0"}
+        req1 = await self.client.users.get(filters=query)
+        users = req1.json()["users"]
+
+        for user in users:
+            if self.mailgun_email == user["email"]:
+                req2 = await self.client.users.get(user_id="xxxxxxx")
+
+                self.assertIsInstance(req2.json(), dict)
+                self.assertEqual(req2.status_code, 404)
 
 
 class BounceClassificationTests(unittest.TestCase):
