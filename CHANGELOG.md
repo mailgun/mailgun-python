@@ -6,7 +6,7 @@ We [keep a changelog.](http://keepachangelog.com/)
 
 ## [1.5.0] - 2025-12-XX
 
-### Addedq
+### Added
 
 - Add missing endpoints:
 
