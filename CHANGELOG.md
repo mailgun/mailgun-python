@@ -4,46 +4,56 @@ We [keep a changelog.](http://keepachangelog.com/)
 
 ## [Unreleased]
 
+## [1.5.0] - 2025-12-11
+
 ### Added
+
+- Add `AsyncClient` and `AsyncEndpoint` that work based on asynchronous approach. Signatures and usage is basically the same but `AsyncClient`
+  supports async context manager mode.
+
+- Add `httpx >=0.24.0` as an additional runtime dependency in order to support async/await and also `typing_extensions >=4.7.1` to `environment.yaml`, `environment-dev.yaml`, and `pyproject.toml`.
 
 - Add missing endpoints:
 
-  - Add "users", "me" to the `users` key of special cases in the class `Config`.
+  - Add `"users"`, `"me"` to the `users` key of special cases in the class `Config`.
   - Add `handle_users` to `mailgun.handlers.users_handler` for parsing [Users API](https://documentation.mailgun.com/docs/mailgun/api-reference/send/mailgun/users).
   - Add `handle_mailboxes_credentials()` to `mailgun.handlers.domains_handler` for parsing `Update Mailgun SMTP credentials` in [Credentials API](https://documentation.mailgun.com/docs/mailgun/api-reference/send/mailgun/credentials).
 
 - Examples:
 
+  - Add async examples to `async_client_examples.py`.
   - Move credentials examples from `mailgun/examples/domain_examples.py` to `mailgun/examples/credentials_examples.py` and add a new example `put_mailboxes_credentials()`.
-  - Add the `get_routes_match()` example to `mailgun/examples/routes_examples.py`
-  - Add the `update_template_version_copy()` example to `mailgun/examples/templates_examples.py`
-  - Add `mailgun/examples/users_examples.py`
+  - Add the `get_routes_match()` example to `mailgun/examples/routes_examples.py`.
+  - Add the `update_template_version_copy()` example to `mailgun/examples/templates_examples.py`.
+  - Add `mailgun/examples/users_examples.py`.
 
 - Docs:
 
+  - Add the `AsyncClient` section to `README.md`.
   - Add `Credentials` and `Users` sections with examples to `README.md`.
   - Add docstrings to the test class `UsersTests` & `AsyncUsersTests` and theirs methods.
 
 - Tests:
 
-  - Add `test_put_mailboxes_credentials` to `DomainTests` and `AsyncDomainTests`
-  - Add `test_get_routes_match` to `RoutesTests` and `AsyncRoutesTests`
-  - Add `test_update_template_version_copy` to `TemplatesTests ` and `AsyncTemplatesTests `
+  - Add same tests for `AsyncClient` as exist for `Client`.
+  - Add `test_put_mailboxes_credentials` to `DomainTests` and `AsyncDomainTests`.
+  - Add `test_get_routes_match` to `RoutesTests` and `AsyncRoutesTests`.
+  - Add `test_update_template_version_copy` to `TemplatesTests ` and `AsyncTemplatesTests`.
   - Add classes `UsersTests` and `AsyncUsersTests` to `tests/tests.py`.
 
 ### Changed
 
-- Update `handle_templates()` in `mailgun/handlers/templates_handler.py` to handle `new_tag`
-
+- Update `handle_templates()` in `mailgun/handlers/templates_handler.py` to handle `new_tag`.
 - Update CI workflows: update `pre-commit` hooks to the latest versions.
-
-- Modify `mypy`'s additional_dependencies in `.pre-commit-config.yaml` to suppress `error: Untyped decorator makes function` by adding `pytest-order`
-
-- Replace spaces with tabs in `Makefile`
+- Modify `mypy`'s additional_dependencies in `.pre-commit-config.yaml` to suppress `error: Untyped decorator makes function` by adding `pytest-order`.
+- Replace spaces with tabs in `Makefile`.
+- Update `Makefile`: add `make check-env` and improve `make test`.
 
 ### Pull Requests Merged
 
+- [PR_24](https://github.com/mailgun/mailgun-python/pull/24) - Async client support
 - [PR_25](https://github.com/mailgun/mailgun-python/pull/25) - Add missing endpoints
+- [PR_26](https://github.com/mailgun/mailgun-python/pull/26) - Release v1.5.0
 
 ## [1.4.0] - 2025-11-20
 
@@ -210,4 +220,5 @@ We [keep a changelog.](http://keepachangelog.com/)
 [1.2.0]: https://github.com/mailgun/mailgun-python/releases/tag/v1.2.0
 [1.3.0]: https://github.com/mailgun/mailgun-python/releases/tag/v1.3.0
 [1.4.0]: https://github.com/mailgun/mailgun-python/releases/tag/v1.4.0
-[unreleased]: https://github.com/mailgun/mailgun-python/compare/v1.4.0...HEAD
+[1.5.0]: https://github.com/mailgun/mailgun-python/releases/tag/v1.5.0
+[unreleased]: https://github.com/mailgun/mailgun-python/compare/v1.5.0...HEAD
