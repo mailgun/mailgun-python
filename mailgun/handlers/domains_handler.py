@@ -121,3 +121,27 @@ def handle_mailboxes_credentials(
         url = url["base"] + domain + final_keys + "/" + kwargs["login"]
 
     return url
+
+
+def handle_dkimkeys(
+    url: dict[str, Any],
+    _domain: str | None,
+    _method: str | None,
+    **kwargs: Any,
+) -> Any:
+    """Handle Mailboxes credentials.
+
+    :param url: Incoming URL dictionary
+    :type url: dict
+    :param domain: Incoming domain
+    :type domain: str
+    :param _method: Incoming request method (it's not being used for this handler)
+    :type _method: str
+    :param kwargs: kwargs
+    :return: final url for Mailboxes credentials endpoint
+    """
+    final_keys = path.join(*url["keys"]) if url["keys"] else ""
+    if "keys" in final_keys:
+        url = url["base"] + final_keys
+
+    return url

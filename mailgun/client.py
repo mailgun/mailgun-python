@@ -28,6 +28,7 @@ from typing_extensions import Self
 
 from mailgun.handlers.bounce_classification_handler import handle_bounce_classification
 from mailgun.handlers.default_handler import handle_default
+from mailgun.handlers.domains_handler import handle_dkimkeys
 from mailgun.handlers.domains_handler import handle_domainlist
 from mailgun.handlers.domains_handler import handle_domains
 from mailgun.handlers.domains_handler import handle_mailboxes_credentials
@@ -63,6 +64,7 @@ HANDLERS: dict[str, Callable] = {  # type: ignore[type-arg]
     "resendmessage": handle_resend_message,
     "domains": handle_domains,
     "domainlist": handle_domainlist,
+    "dkim": handle_dkimkeys,
     "dkim_authority": handle_domains,
     "dkim_selector": handle_domains,
     "web_prefix": handle_domains,
@@ -132,7 +134,8 @@ class Config:
             "mimemessage": {"base": v3_base, "keys": ["messages.mime"]},
             "resendmessage": {"base": v3_base, "keys": ["resendmessage"]},
             "ippools": {"base": v3_base, "keys": ["ip_pools"]},
-            "dkimkeys": {"base": v1_base, "keys": ["dkim", "keys"]},
+            # /v1/dkim/keys
+            "dkim": {"base": v1_base, "keys": ["dkim", "keys"]},
             "domainlist": {"base": v4_base, "keys": ["domainlist"]},
             # /v1/analytics/metrics
             # /v1/analytics/usage/metrics
@@ -148,6 +151,7 @@ class Config:
                 "base": v2_base,
                 "keys": ["bounce-classification", "metrics"],
             },
+            # /v5/users
             "users": {
                 "base": v5_base,
                 "keys": ["users", "me"],
@@ -156,6 +160,12 @@ class Config:
 
         if key in special_cases:
             return special_cases[key], headers
+
+        if "dkim" in key:
+            return {
+                "base": v1_base,
+                "keys": key.split("_"),
+            }, headers
 
         if "analytics" in key:
             headers |= {"Content-Type": "application/json"}

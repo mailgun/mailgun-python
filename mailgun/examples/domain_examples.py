@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import subprocess
+from pathlib import Path
 
 from mailgun.client import Client
 
@@ -183,10 +185,85 @@ def get_sending_queues() -> None:
     :return:
     """
     request = client.domains_sendingqueues.get(domain="python.test.domain5")
-    print(request)
+    print(request.json())
+
+
+def get_dkim_keys() -> None:
+    """
+    GET /v1/dkim/keys
+    :return:
+    """
+    data = {
+        "page": "string",
+        "limit": "0",
+        "signing_domain": "python.test.domain5",
+        "selector": "smtp",
+    }
+
+    request = client.dkim_keys.get(data=data)
+    print(request.json())
+
+
+def post_dkim_keys() -> None:
+    """
+    POST /v1/dkim/keys
+    :return:
+    """
+
+    # Private key PEM file must be generated in PKCS1 format. You need 'openssl' on your machine
+    # example:
+    # openssl genrsa -traditional -out .server.key 2048
+    subprocess.run(["openssl", "genrsa", "-traditional", "-out", ".server.key", "2048"])
+
+    files = [
+        (
+            "pem",
+            ("server.key", Path(".server.key").read_bytes()),
+        )
+    ]
+
+    data = {
+        "signing_domain": "python.test.domain5",
+        "selector": "smtp",
+        "bits": "2048",
+        "pem": files,
+    }
+
+    headers = {"Content-Type": "multipart/form-data"}
+
+    request = client.dkim_keys.create(data=data, headers=headers, files=files)
+    # TODO: Create test cases for these failures:
+    # <Response [400]>
+    # {'message': 'failed to import domain key: failed to parse PEM'}
+
+    # You must remove a domain key on WEB UI https://app.mailgun.com/mg/sending/domains selecting your "signing_domain"
+    # <Response [400]>
+    # {'message': 'failed to create domain key: duplicate key'}
+
+    # If you provide a string instead of a file
+    # <Response [400]>
+    # {'message': 'failed to import domain key: failed to parse PEM'}
+
+    # <Response [400]>
+    # {'message': 'failed to import domain key: failed to parse private key: key must be PKCS1 format'}
+    print(request.json())
+
+
+def delete_dkim_keys() -> None:
+    """
+    GET /v1/dkim/keys
+    :return:
+    """
+    query = {"signing_domain": "python.test.domain5", "selector": "smtp"}
+
+    request = client.dkim_keys.delete(filters=query)
     print(request.json())
 
 
 if __name__ == "__main__":
     add_domain()
     get_domains()
+
+    post_dkim_keys()
+    get_dkim_keys()
+    delete_dkim_keys()
