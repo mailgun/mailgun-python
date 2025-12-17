@@ -134,6 +134,8 @@ spelling = ["typos"]
 
 other = ["toml"]
 
+[tool.typos.default.extend-words]
+requestor = "requestor"
 
 [tool.black]
 line-length = 100

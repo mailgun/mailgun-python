@@ -63,12 +63,12 @@ repos:
     hooks:
       - id: detect-secrets  # Detect accidentally committed secrets
 
-  - repo: https://github.com/codespell-project/codespell
-    rev: v2.4.1
-    hooks:
-      - id: codespell
-        args: [--write]
-        exclude: ^tests
+#  - repo: https://github.com/codespell-project/codespell
+#    rev: v2.4.1
+#    hooks:
+#      - id: codespell
+#        args: [--write]
+#        exclude: ^tests
 
   - repo: https://github.com/python-jsonschema/check-jsonschema
     rev: 0.35.0

@@ -8,6 +8,8 @@ from mailgun.client import Client
 key: str = os.environ["APIKEY"]
 domain: str = os.environ["DOMAIN"]
 mailgun_email = os.environ["MAILGUN_EMAIL"]
+role = os.environ["ROLE"]
+
 
 client: Client = Client(auth=("api", key))
 
@@ -17,7 +19,7 @@ def get_users() -> None:
     GET /v5/users
     :return:
     """
-    query = {"role": "admin", "limit": "0", "skip": "0"}
+    query = {"role": role, "limit": "0", "skip": "0"}
     req = client.users.get(filters=query)
     print(req.json())
 

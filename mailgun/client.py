@@ -38,6 +38,7 @@ from mailgun.handlers.error_handler import ApiError
 from mailgun.handlers.inbox_placement_handler import handle_inbox
 from mailgun.handlers.ip_pools_handler import handle_ippools
 from mailgun.handlers.ips_handler import handle_ips
+from mailgun.handlers.keys_handler import handle_keys
 from mailgun.handlers.mailinglists_handler import handle_lists
 from mailgun.handlers.messages_handler import handle_resend_message
 from mailgun.handlers.metrics_handler import handle_metrics
@@ -88,6 +89,7 @@ HANDLERS: dict[str, Callable] = {  # type: ignore[type-arg]
     "analytics": handle_metrics,
     "bounce-classification": handle_bounce_classification,
     "users": handle_users,
+    "keys": handle_keys,
 }
 
 
@@ -186,6 +188,12 @@ class Config:
         if "users" in key:
             return {
                 "base": v5_base,
+                "keys": key.split("_"),
+            }, headers
+
+        if "keys" in key:
+            return {
+                "base": v1_base,
                 "keys": key.split("_"),
             }, headers
 
