@@ -17,6 +17,7 @@ dependencies:
   - conda-forge::pyfakefs
   - coverage >=4.5.4
   - pytest
+  - pytest-asyncio
   - pytest-benchmark
   - pytest-cov
   - pytest-xdist

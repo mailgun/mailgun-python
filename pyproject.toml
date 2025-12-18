@@ -121,6 +121,7 @@ profilers = ["scalene>=1.3.16", "snakeviz"]
 tests = [
     # tests
     "pytest>=7.0.0",
+    "pytest-asyncio",
     "pytest-benchmark",
     "pytest-order",
     "pytest-cov",

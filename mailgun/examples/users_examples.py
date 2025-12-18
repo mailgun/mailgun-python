@@ -9,6 +9,8 @@ key: str = os.environ["APIKEY"]
 domain: str = os.environ["DOMAIN"]
 mailgun_email = os.environ["MAILGUN_EMAIL"]
 role = os.environ["ROLE"]
+user_id = os.environ["USER_ID"]
+user_name = os.environ["USER_NAME"]
 
 
 client: Client = Client(auth=("api", key))
@@ -29,18 +31,9 @@ def get_own_user_details() -> None:
     GET /v5/users/me
 
     Please note, for the command("Get one's own user details") to be successful, you must use a Web type API key for the call. Private type API keys will Not work.
-    This below Call will generate a Web API key tied to the account user associated with the data inputted for the USER_EMAIL field and USER_ID  values. This is returned by the API in the "secret":"API_KEY" key/value pair. This key will authenticate the call(Get one's own user details) made to the /v5/users/me endpoint, and will return the user's data associated with the USER_EMAIL and USER_ID values.
-
-    Generate Web API Key:
-        curl -i -X POST \
-             -u api:API_KEY \
-        https://api.mailgun.net/v1/keys \
-             -F email=USER_EMAIL \
-             -F kind=web \
-             -F expiration=SECONDS (Lifetime of the key in seconds) \
-             -F role=ROLE \
-             -F user_id=USER_ID \
-             -F description=DESCRIPTION
+    The below Call will generate a Web API key tied to the account user associated with the data inputted for the USER_EMAIL field and USER_ID  values.
+    This is returned by the API in the "secret":"API_KEY" key/value pair.  # pragma: allowlist secret
+    This key will authenticate the call(Get one's own user details) made to the /v5/users/me endpoint, and will return the user's data associated with the USER_EMAIL and USER_ID values.
 
     see https://documentation.mailgun.com/docs/mailgun/api-reference/send/mailgun/keys/api.(*keysapi).createkey-fm-7
 
@@ -54,10 +47,27 @@ def get_own_user_details() -> None:
 
     :return:
     """
-    secret: str = os.environ["SECRET"]
+
+    data = {
+        "email": mailgun_email,
+        "domain_name": "python.test.domain5",
+        "kind": "web",
+        "expiration": "3600",
+        "role": role,
+        "user_id": user_id,
+        "user_name": user_name,
+        "description": "a new key",
+    }
+
+    headers = {"Content-Type": "multipart/form-data"}
+
+    req1 = client.keys.create(data=data, headers=headers)
+    print(req1.json())
+    secret = req1.json()["key"]["secret"]
+
     client_with_secret_key: Client = Client(auth=("api", secret))
-    req = client_with_secret_key.users.get(user_id="me")
-    print(req.json())
+    req2 = client_with_secret_key.users.get(user_id="me")
+    print(req2.json())
 
 
 def get_user_details() -> None:
