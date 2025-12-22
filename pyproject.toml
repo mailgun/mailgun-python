@@ -127,6 +127,8 @@ tests = [
     "pytest-cov",
     "coverage>=4.5.4",
     "codecov",
+    # For a Private key PEM file generated in PKCS1 format.
+    "openssl",
 ]
 
 conda_build = ["conda-build"]

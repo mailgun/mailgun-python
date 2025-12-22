@@ -154,7 +154,7 @@ def put_dkim_authority() -> None:
     PUT /domains/<domain>/dkim_authority
     :return:
     """
-    data = {"self": "false"}
+    data = {"self": "true"}
     request = client.domains_dkimauthority.put(domain=domain, data=data)
     print(request.json())
 
@@ -232,20 +232,6 @@ def post_dkim_keys() -> None:
     headers = {"Content-Type": "multipart/form-data"}
 
     request = client.dkim_keys.create(data=data, headers=headers, files=files)
-    # TODO: Create test cases for these failures:
-    # <Response [400]>
-    # {'message': 'failed to import domain key: failed to parse PEM'}
-
-    # You must remove a domain key on WEB UI https://app.mailgun.com/mg/sending/domains selecting your "signing_domain"
-    # <Response [400]>
-    # {'message': 'failed to create domain key: duplicate key'}
-
-    # If you provide a string instead of a file
-    # <Response [400]>
-    # {'message': 'failed to import domain key: failed to parse PEM'}
-
-    # <Response [400]>
-    # {'message': 'failed to import domain key: failed to parse private key: key must be PKCS1 format'}
     print(request.json())
 
 
@@ -266,4 +252,6 @@ if __name__ == "__main__":
 
     post_dkim_keys()
     get_dkim_keys()
+    get_sending_queues()
+    put_dkim_authority()
     delete_dkim_keys()

@@ -163,12 +163,6 @@ class Config:
         if key in special_cases:
             return special_cases[key], headers
 
-        if "dkim" in key:
-            return {
-                "base": v1_base,
-                "keys": key.split("_"),
-            }, headers
-
         if "analytics" in key:
             headers |= {"Content-Type": "application/json"}
             return {
@@ -259,6 +253,14 @@ class Config:
             }
             base = v3_base if any(x in key for x in v3_domain_endpoints) else v4_base
             return {"base": f"{base}domains/", "keys": final_keys}, headers
+
+        # "dkim" must follow after "dkim_management", "dkimauthority", "dkimselector",
+        # otherwise a wrong base url will be chosen.
+        if "dkim" in key:
+            return {
+                "base": v1_base,
+                "keys": key.split("_"),
+            }, headers
 
         if "addressvalidate" in key:
             return {
