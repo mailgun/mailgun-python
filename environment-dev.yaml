@@ -16,6 +16,7 @@ dependencies:
   # tests
   - conda-forge::pyfakefs
   - coverage >=4.5.4
+  - openssl
   - pytest
   - pytest-asyncio
   - pytest-benchmark
