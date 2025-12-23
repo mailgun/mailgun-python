@@ -302,3 +302,6 @@ dev/
 pytestdebug.log
 
 */_version.py
+
+# local temp files
+.server.key

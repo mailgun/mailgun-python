@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import subprocess
+from pathlib import Path
 
 from mailgun.client import Client
 
@@ -152,7 +154,7 @@ def put_dkim_authority() -> None:
     PUT /domains/<domain>/dkim_authority
     :return:
     """
-    data = {"self": "false"}
+    data = {"self": "true"}
     request = client.domains_dkimauthority.put(domain=domain, data=data)
     print(request.json())
 
@@ -183,10 +185,73 @@ def get_sending_queues() -> None:
     :return:
     """
     request = client.domains_sendingqueues.get(domain="python.test.domain5")
-    print(request)
+    print(request.json())
+
+
+def get_dkim_keys() -> None:
+    """
+    GET /v1/dkim/keys
+    :return:
+    """
+    data = {
+        "page": "string",
+        "limit": "0",
+        "signing_domain": "python.test.domain5",
+        "selector": "smtp",
+    }
+
+    request = client.dkim_keys.get(data=data)
+    print(request.json())
+
+
+def post_dkim_keys() -> None:
+    """
+    POST /v1/dkim/keys
+    :return:
+    """
+
+    # Private key PEM file must be generated in PKCS1 format. You need 'openssl' on your machine
+    # example:
+    # openssl genrsa -traditional -out .server.key 2048
+    subprocess.run(["openssl", "genrsa", "-traditional", "-out", ".server.key", "2048"])
+
+    files = [
+        (
+            "pem",
+            ("server.key", Path(".server.key").read_bytes()),
+        )
+    ]
+
+    data = {
+        "signing_domain": "python.test.domain5",
+        "selector": "smtp",
+        "bits": "2048",
+        "pem": files,
+    }
+
+    headers = {"Content-Type": "multipart/form-data"}
+
+    request = client.dkim_keys.create(data=data, headers=headers, files=files)
+    print(request.json())
+
+
+def delete_dkim_keys() -> None:
+    """
+    GET /v1/dkim/keys
+    :return:
+    """
+    query = {"signing_domain": "python.test.domain5", "selector": "smtp"}
+
+    request = client.dkim_keys.delete(filters=query)
     print(request.json())
 
 
 if __name__ == "__main__":
     add_domain()
     get_domains()
+
+    post_dkim_keys()
+    get_dkim_keys()
+    get_sending_queues()
+    put_dkim_authority()
+    delete_dkim_keys()

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import io
 import json
+import sys
 from collections import defaultdict
 from typing import TYPE_CHECKING
 from typing import Any
@@ -24,10 +25,10 @@ from urllib.parse import urljoin
 
 import httpx
 import requests
-from typing_extensions import Self
 
 from mailgun.handlers.bounce_classification_handler import handle_bounce_classification
 from mailgun.handlers.default_handler import handle_default
+from mailgun.handlers.domains_handler import handle_dkimkeys
 from mailgun.handlers.domains_handler import handle_domainlist
 from mailgun.handlers.domains_handler import handle_domains
 from mailgun.handlers.domains_handler import handle_mailboxes_credentials
@@ -37,6 +38,7 @@ from mailgun.handlers.error_handler import ApiError
 from mailgun.handlers.inbox_placement_handler import handle_inbox
 from mailgun.handlers.ip_pools_handler import handle_ippools
 from mailgun.handlers.ips_handler import handle_ips
+from mailgun.handlers.keys_handler import handle_keys
 from mailgun.handlers.mailinglists_handler import handle_lists
 from mailgun.handlers.messages_handler import handle_resend_message
 from mailgun.handlers.metrics_handler import handle_metrics
@@ -48,6 +50,12 @@ from mailgun.handlers.suppressions_handler import handle_whitelists
 from mailgun.handlers.tags_handler import handle_tags
 from mailgun.handlers.templates_handler import handle_templates
 from mailgun.handlers.users_handler import handle_users
+
+
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
 
 
 if TYPE_CHECKING:
@@ -63,6 +71,7 @@ HANDLERS: dict[str, Callable] = {  # type: ignore[type-arg]
     "resendmessage": handle_resend_message,
     "domains": handle_domains,
     "domainlist": handle_domainlist,
+    "dkim": handle_dkimkeys,
     "dkim_authority": handle_domains,
     "dkim_selector": handle_domains,
     "web_prefix": handle_domains,
@@ -86,6 +95,7 @@ HANDLERS: dict[str, Callable] = {  # type: ignore[type-arg]
     "analytics": handle_metrics,
     "bounce-classification": handle_bounce_classification,
     "users": handle_users,
+    "keys": handle_keys,
 }
 
 
@@ -132,7 +142,8 @@ class Config:
             "mimemessage": {"base": v3_base, "keys": ["messages.mime"]},
             "resendmessage": {"base": v3_base, "keys": ["resendmessage"]},
             "ippools": {"base": v3_base, "keys": ["ip_pools"]},
-            "dkimkeys": {"base": v1_base, "keys": ["dkim", "keys"]},
+            # /v1/dkim/keys
+            "dkim": {"base": v1_base, "keys": ["dkim", "keys"]},
             "domainlist": {"base": v4_base, "keys": ["domainlist"]},
             # /v1/analytics/metrics
             # /v1/analytics/usage/metrics
@@ -148,6 +159,7 @@ class Config:
                 "base": v2_base,
                 "keys": ["bounce-classification", "metrics"],
             },
+            # /v5/users
             "users": {
                 "base": v5_base,
                 "keys": ["users", "me"],
@@ -176,6 +188,12 @@ class Config:
         if "users" in key:
             return {
                 "base": v5_base,
+                "keys": key.split("_"),
+            }, headers
+
+        if "keys" in key:
+            return {
+                "base": v1_base,
                 "keys": key.split("_"),
             }, headers
 
@@ -241,6 +259,14 @@ class Config:
             }
             base = v3_base if any(x in key for x in v3_domain_endpoints) else v4_base
             return {"base": f"{base}domains/", "keys": final_keys}, headers
+
+        # "dkim" must follow after "dkim_management", "dkimauthority", "dkimselector",
+        # otherwise a wrong base url will be chosen.
+        if "dkim" in key:
+            return {
+                "base": v1_base,
+                "keys": key.split("_"),
+            }, headers
 
         if "addressvalidate" in key:
             return {
