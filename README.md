@@ -1529,20 +1529,11 @@ def get_user_details() -> None:
 
 ## Contribute
 
-Mailgun loves developers. You can be part of this project!
+See for details [CONTRIBUTING.md](CONTRIBUTING.md)
 
-This Python SDK is a great introduction to the open source world, check out the code!
+## Security
 
-Feel free to ask anything, and contribute:
-
-- Fork the project.
-- Create a new branch.
-- Implement your feature or bug fix.
-- Add documentation to it.
-- Commit, push, open a pull request and voila.
-
-If you have suggestions on how to improve the guides, please submit an issue in our
-[Official API Documentation](https://documentation.mailgun.com).
+See for details [SECURITY.md](SECURITY.md)
 
 ## Contributors
 
