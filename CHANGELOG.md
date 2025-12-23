@@ -21,6 +21,7 @@ We [keep a changelog.](http://keepachangelog.com/)
 
   - Add `Keys` and `Domain Keys` sections with examples to `README.md`.
   - Add docstrings to the test class `KeysTests` & `AsyncKeysTests` and their methods.
+  - Add `CONTRIBUTING.md`.
 
 - Tests:
 
