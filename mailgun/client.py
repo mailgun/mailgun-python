@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import io
 import json
+import sys
 from collections import defaultdict
 from typing import TYPE_CHECKING
 from typing import Any
@@ -24,7 +25,6 @@ from urllib.parse import urljoin
 
 import httpx
 import requests
-from typing_extensions import Self
 
 from mailgun.handlers.bounce_classification_handler import handle_bounce_classification
 from mailgun.handlers.default_handler import handle_default
@@ -50,6 +50,12 @@ from mailgun.handlers.suppressions_handler import handle_whitelists
 from mailgun.handlers.tags_handler import handle_tags
 from mailgun.handlers.templates_handler import handle_templates
 from mailgun.handlers.users_handler import handle_users
+
+
+if sys.version_info >= (3, 11):
+    from typing import Self
+else:
+    from typing_extensions import Self
 
 
 if TYPE_CHECKING:

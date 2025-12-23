@@ -379,7 +379,7 @@ class DomainTests(unittest.TestCase):
 
         self.assertIsInstance(req2.json(), dict)
         self.assertEqual(req2.status_code, 200)
-        self.assertIn("success", req2.json()["message"])  # type: ignore[func-returns-value]
+        self.assertIn("success", req2.json()["message"])
 
         server_key_path.unlink(missing_ok=True)
         print(f"File {server_key_path} has been removed.")
@@ -399,7 +399,7 @@ class DomainTests(unittest.TestCase):
 
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 400)
-        self.assertIn("failed to import domain key: failed to parse PEM", req.json()["message"])  # type: ignore[func-returns-value]
+        self.assertIn("failed to import domain key: failed to parse PEM", req.json()["message"])
 
     @pytest.mark.order(6)
     def test_post_dkim_keys_if_duplicate_key_exists(self) -> None:
@@ -448,7 +448,7 @@ class DomainTests(unittest.TestCase):
 
         self.assertIsInstance(req2.json(), dict)
         self.assertEqual(req2.status_code, 400)
-        self.assertIn("failed to create domain key: duplicate key", req2.json()["message"])  # type: ignore[func-returns-value]
+        self.assertIn("failed to create domain key: duplicate key", req2.json()["message"])
 
     @pytest.mark.order(6)
     def test_post_dkim_keys_key_must_be_pkcs1_format(self) -> None:
@@ -476,7 +476,9 @@ class DomainTests(unittest.TestCase):
 
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 400)
-        self.assertIn("failed to parse private key: key must be PKCS1 format", req.json()["message"])  # type: ignore[func-returns-value]
+        self.assertIn(
+            "failed to parse private key: key must be PKCS1 format", req.json()["message"]
+        )
 
     @pytest.mark.order(7)
     def test_delete_dkim_keys(self) -> None:
@@ -487,7 +489,7 @@ class DomainTests(unittest.TestCase):
 
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 200)
-        self.assertIn("success", req.json()["message"])  # type: ignore[func-returns-value]
+        self.assertIn("success", req.json()["message"])
 
     @pytest.mark.order(7)
     def test_delete_non_existing_dkim_keys(self) -> None:
@@ -517,13 +519,13 @@ class DomainTests(unittest.TestCase):
         req1 = self.client.dkim_keys.delete(filters=query)
         self.assertIsInstance(req1.json(), dict)
         self.assertEqual(req1.status_code, 200)
-        self.assertIn("success", req1.json()["message"])  # type: ignore[func-returns-value]
+        self.assertIn("success", req1.json()["message"])
 
         req2 = self.client.dkim_keys.delete(filters=query)
 
         self.assertIsInstance(req2.json(), dict)
         self.assertEqual(req2.status_code, 404)
-        self.assertIn("domain key not found", req2.json()["message"])  # type: ignore[func-returns-value]
+        self.assertIn("domain key not found", req2.json()["message"])
 
     @pytest.mark.order(7)
     def test_delete_domain_creds(self) -> None:
@@ -2577,7 +2579,7 @@ class UsersTests(unittest.TestCase):
         """Test to get account's users details: expected failure with invalid URL."""
         query = {"role": "admin", "limit": "0", "skip": "0"}
 
-        with self.assertRaises(KeyError) as cm:
+        with self.assertRaises(KeyError):
             self.client.user.get(filters=query)
 
     @pytest.mark.xfail
@@ -3085,7 +3087,7 @@ class AsyncDomainTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 400)
-        self.assertIn("failed to import domain key: failed to parse PEM", req.json()["message"])  # type: ignore[func-returns-value]
+        self.assertIn("failed to import domain key: failed to parse PEM", req.json()["message"])
 
     @pytest.mark.order(7)
     @pytest.mark.xfail(reason="The test can fail because the domain name is a random string")
