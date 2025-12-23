@@ -4,6 +4,48 @@ We [keep a changelog.](http://keepachangelog.com/)
 
 ## [Unreleased]
 
+### Added
+
+- Add Keys and Domain Keys API endpoints:
+
+  - Add `handle_keys` to `mailgun.handlers.keys_handler`.
+  - Add `handle_dkimkeys` to `mailgun.handlers.domains_handler`.
+  - Add "dkim" key to special cases in the class `Config`.
+
+- Examples:
+
+  - Add the `get_dkim_keys()`, `post_dkim_keys()`, `delete_dkim_keys()` examples to `mailgun/examples/domain_examples.py`.
+  - Add the `get_keys()`, `post_keys()`, `delete_key()`, `regenerate_key()` examples to `mailgun/examples/keys_examples.py`.
+
+- Docs:
+
+  - Add `Keys` and `Domain Keys` sections with examples to `README.md`.
+  - Add docstrings to the test class `KeysTests` & `AsyncKeysTests` and their methods.
+
+- Tests:
+
+  - Add dkim keys tests to `DomainTests` and only `test_get_dkim_keys`, `test_post_dkim_keys_invalid_pem_string` to `AsyncDomainTests`.
+  - Add classes `KeysTests` and `AsyncKeysTests` to `tests/tests.py`.
+  - Add keys tests to `KeysTests` and `AsyncKeysTests`.
+
+### Changed
+
+- Update `get_own_user_details()` by creating `client_with_secret_key` in `mailgun/examples/users_examples.py`.
+- Improve the users' example in `README.md`.
+- Fix markdown structure in `README.md`.
+- Update environment variables in `README.md`.
+- Move `BounceClassificationTests` to another place in `tests/tests.py`.
+- Replace some pytest's skip marks with xfail.
+- Disable `codespell` pre-commit hook as it lashes with `typos`.
+- Update `pre-commit` hooks to the latest versions.
+- Update test dependencies: add `openssl` and `pytest-asyncio` to `environment-dev.yaml` and `pyproject.toml`.
+- Add `.server.key` to `.gitignore`.
+- Add a constraint `py<311` for `typing_extensions >=4.7.1` in files `environment.yaml`, `environment-dev.yaml`, `pyproject.toml`, and in `mailgun/client.py`.
+
+### Pull Requests Merged
+
+- [PR_27](https://github.com/mailgun/mailgun-python/pull/27) - Add Keys and Domain Keys API endpoints
+
 ## [1.5.0] - 2025-12-11
 
 ### Added
