@@ -75,7 +75,7 @@ def get_user_details() -> None:
     GET /v5/users/{user_id}
     :return:
     """
-    query = {"role": "admin", "limit": "0", "skip": "0"}
+    query = {"role": role, "limit": "0", "skip": "0"}
     req1 = client.users.get(filters=query)
     users = req1.json()["users"]
 

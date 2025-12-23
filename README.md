@@ -23,6 +23,8 @@ Check out all the resources and Python code examples in the official
   - [Overview](#overview)
     - [Base URL](#base-url)
     - [Authentication](#authentication)
+    - [Client](#client)
+    - [AsyncClient](#asyncclient)
     - [API Response Codes](#api-response-codes)
   - [Request examples](#request-examples)
     - [Full list of supported endpoints](#full-list-of-supported-endpoints)
@@ -37,6 +39,8 @@ Check out all the resources and Python code examples in the official
       - [Update a domain](#update-a-domain)
       - [Domain connections](#domain-connections)
       - [Domain keys](#domain-keys)
+        - [List keys for all domains](#list-keys-for-all-domains)
+        - [Create a domain key](#create-a-domain-key)
         - [Update DKIM authority](#update-dkim-authority)
       - [Domain Tracking](#domain-tracking)
         - [Get tracking settings](#get-tracking-settings)
@@ -234,7 +238,13 @@ export DOMAINS_DEDICATED_IP="127.0.0.1"
 export MAILLIST_ADDRESS="everyone@mailgun.domain.com"
 export VALIDATION_ADDRESS_1="test1@i.ua"
 export VALIDATION_ADDRESS_2="test2@gmail.com"
+export MAILGUN_EMAIL="username@example.com"
+export USER_ID="123456789012345678901234"
+export USER_NAME="Name Surname"
+export ROLE="admin"
 ```
+
+### Client
 
 Initialize your [Mailgun](http://www.mailgun.com/) client:
 
@@ -500,6 +510,68 @@ def get_connections() -> None:
 ```
 
 #### Domain keys
+
+### List keys for all domains
+
+List domain keys, and optionally filter by signing domain or selector. The page & limit data is only required when paging through the data.
+
+```python
+def get_dkim_keys() -> None:
+    """
+    GET /v1/dkim/keys
+    :return:
+    """
+    data = {
+        "page": "string",
+        "limit": "0",
+        "signing_domain": "python.test.domain5",
+        "selector": "smtp",
+    }
+
+    request = client.dkim_keys.get(data=data)
+    print(request.json())
+```
+
+#### Create a domain key
+
+Create a domain key.
+Note that once private keys are created or imported they are never exported.
+Alternatively, you can import an existing PEM file containing a RSA private key in PKCS #1, ASn.1 DER format.
+Note, the pem can be passed as a file attachment or as a form-string parameter.
+
+```python
+def post_dkim_keys() -> None:
+    """
+    POST /v1/dkim/keys
+    :return:
+    """
+    import subprocess
+    from pathlib import Path
+
+    # Private key PEM file must be generated in PKCS1 format. You need 'openssl' on your machine
+    # example:
+    # openssl genrsa -traditional -out .server.key 2048
+    subprocess.run(["openssl", "genrsa", "-traditional", "-out", ".server.key", "2048"])
+
+    files = [
+        (
+            "pem",
+            ("server.key", Path(".server.key").read_bytes()),
+        )
+    ]
+
+    data = {
+        "signing_domain": "python.test.domain5",
+        "selector": "smtp",
+        "bits": "2048",
+        "pem": files,
+    }
+
+    headers = {"Content-Type": "multipart/form-data"}
+
+    request = client.dkim_keys.create(data=data, headers=headers, files=files)
+    print(request.json())
+```
 
 ##### Update DKIM authority
 
@@ -1313,6 +1385,76 @@ def get_all_inbox() -> None:
     print(req.json())
 ```
 
+### Keys
+
+The Keys API lets you view and manage api keys.
+
+#### List Mailgun API keys
+
+```python
+def get_keys() -> None:
+    """
+    GET /v1/keys
+    :return:
+    """
+    query = {"domain_name": "python.test.domain5", "kind": "web"}
+    req = client.keys.get(filters=query)
+    print(req.json())
+```
+
+#### Create Mailgun API key
+
+```python
+import os
+
+from mailgun.client import Client
+
+
+key: str = os.environ["APIKEY"]
+domain: str = os.environ["DOMAIN"]
+mailgun_email = os.environ["MAILGUN_EMAIL"]
+role = os.environ["ROLE"]
+user_id = os.environ["USER_ID"]
+user_name = os.environ["USER_NAME"]
+
+client: Client = Client(auth=("api", key))
+
+
+def post_keys() -> None:
+    """
+    POST /v1/keys
+
+    This code generate a Web API key tied to the account user associated with the data inputted for the USER_EMAIL field and USER_ID  values.
+    This is returned by the API in the "secret":"API_KEY" key/value pair. This key will authenticate the call (Get one's own user details) made to the /v5/users/me endpoint,   # pragma: allowlist secret
+    and will return the user's data associated with the USER_EMAIL and USER_ID values.
+
+    Important Notes:
+    USER_EMAIL - The user login email address of the user that is trying to make the call to the /v5/users/me endpoint.
+    SECONDS - How many seconds you want the key to be active before it expires.
+    ROLE - The role of the API Key. This dictates what permissions the key has (https://help.mailgun.com/hc/en-us/articles/26016288026907-API-Key-Roles)
+    USER_ID - The internal User ID of the user that is trying to call the /v5/users/me endpoint. This is present in the URL in the address bar when viewing the User details in the GUI or in Admin. Both will show /users/USER_ID in the address.
+    DESCRIPTION - Description of the key.
+
+    :return:
+    """
+
+    data = {
+        "email": mailgun_email,
+        "domain_name": "python.test.domain5",
+        "kind": "web",
+        "expiration": "3600",
+        "role": role,
+        "user_id": user_id,
+        "user_name": user_name,
+        "description": "a new key",
+    }
+
+    headers = {"Content-Type": "multipart/form-data"}
+
+    req = client.keys.create(data=data, headers=headers)
+    print(req.json())
+```
+
 ### Credentials
 
 #### List Mailgun SMTP credential metadata for a given domain
@@ -1361,13 +1503,17 @@ def get_users() -> None:
 #### Get a user's details
 
 ```python
+mailgun_email = os.environ["MAILGUN_EMAIL"]
+role = os.environ["ROLE"]
+user_name = os.environ["USER_NAME"]
+
+
 def get_user_details() -> None:
     """
     GET /v5/users/{user_id}
     :return:
     """
-    mailgun_email = os.environ["MAILGUN_EMAIL"]
-    query = {"role": "admin", "limit": "0", "skip": "0"}
+    query = {"role": role, "limit": "0", "skip": "0"}
     req1 = client.users.get(filters=query)
     users = req1.json()["users"]
 
