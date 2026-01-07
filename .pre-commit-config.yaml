@@ -39,6 +39,7 @@ repos:
       # ensure syntaxes are valid
       - id: check-toml
       - id: debug-statements
+        language_version: python3
       # Makes sure files end in a newline and only a newline;
       - id: end-of-file-fixer
       - id: mixed-line-ending
@@ -175,3 +176,8 @@ repos:
           # gfm = GitHub Flavored Markdown
           - mdformat-gfm
           - mdformat-black
+
+  - repo: https://github.com/abravalheri/validate-pyproject
+    rev: v0.24.1
+    hooks:
+      - id: validate-pyproject
