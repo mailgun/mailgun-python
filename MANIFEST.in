@@ -1,0 +1,30 @@
+# MANIFEST.in
+# Include critical files for building/installing
+include LICENSE
+include README.md
+include pyproject.toml
+include *.md
+include *.typed
+include *.yaml
+include Makefile
+include MANIFEST.in
+
+# Include package data
+recursive-include mailgun *.py
+recursive-include mailgun *.csv
+recursive-include mailgun *.mime
+recursive-include mailgun *.txt
+
+# Exclude development/CI files
+exclude .editorconfig
+exclude .pylintrc
+exclude .pre-commit-config.yaml
+
+# Exclude conda-specific files (not needed in PyPI sdist)
+prune conda.recipe
+
+# Exclude test files (optional - include if you want tests in sdist)
+prune tests
+
+# Exclude CI/CD configs
+prune .github

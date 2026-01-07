@@ -3,9 +3,27 @@
 #   pre-commit run --all-files
 # Update this file:
 #   pre-commit autoupdate
+
+exclude: |
+  (?x)^(
+      .*\{\{.*\}\}.*|     # Exclude any files with cookiecutter variables
+      docs/site/.*|       # Exclude mkdocs compiled files
+      \.history/.*|       # Exclude history files
+      .*cache.*/.*|       # Exclude cache directories
+      .*venv.*/.*|        # Exclude virtual environment directories
+      .*/versioneer\.py|
+      .*/_version\.py|
+      .*/.*\.svg
+  )$
+
+fail_fast: true
+
+default_install_hook_types:
+  - pre-commit
+  - commit-msg
+
 default_language_version:
   python: python3
-exclude: ^(.*/versioneer\.py|.*/_version\.py|.*/.*\.svg)
 
 ci:
     autofix_commit_msg: |
@@ -126,6 +144,14 @@ repos:
         name: "🔒 security · Audit Python dependencies"
         args: ['--desc', 'on']
 
+  - repo: https://github.com/semgrep/pre-commit
+    rev: 'v1.146.0'
+    hooks:
+      - id: semgrep
+        name: "🔒 security · Static analysis (semgrep)"
+        args: [ '--config=auto', '--error' ]
+
+
   # Spelling and typos
   - repo: https://github.com/crate-ci/typos
     rev: v1.40.0
@@ -192,6 +218,7 @@ repos:
     hooks:
       - id: flake8
         name: "🐍 lint · Check style (Flake8)"
+        args: ["--ignore=E501,C901", --max-complexity=13]  # Sets McCabe complexity limit
         additional_dependencies:
           - radon
           - flake8-docstrings
@@ -214,7 +241,9 @@ repos:
     rev: v2.2.0
     hooks:
       - id: refurb
-        name: "🐍 lint · Suggest modernizations"
+        name: "🐍 performance · Suggest modernizations"
+        # TODO: Fix FURB147.
+        args: ["--enable-all", "--ignore", "FURB147"]
 
   # Python documentation
   - repo: https://github.com/pycqa/pydocstyle
@@ -224,6 +253,13 @@ repos:
         name: "🐍 docs · Validate docstrings"
         args: [--select=D200,D213,D400,D415]
         additional_dependencies: [tomli]
+
+  - repo: https://github.com/econchick/interrogate
+    rev: 1.7.0
+    hooks:
+      - id: interrogate
+        name: "📝 docs · Check docstring coverage"
+        args: [ --verbose, --fail-under=53, --ignore-init-method ]
 
   # Python type checking
   - repo: https://github.com/pre-commit/mirrors-mypy
@@ -249,6 +285,36 @@ repos:
     hooks:
       - id: validate-pyproject
         name: "🐍 config · Validate pyproject.toml"
+
+  - repo: https://github.com/tox-dev/pyproject-fmt
+    rev: v2.8.0
+    hooks:
+      - id: pyproject-fmt
+        name: "🐍 config · Format pyproject.toml"
+
+#  - repo: https://github.com/mgedmin/check-manifest
+#    rev: '0.50'
+#    hooks:
+#      - id: check-manifest
+#        name: "🐍 📦 packaging · Verify MANIFEST"
+#        args: [--no-build-isolation, --ignore-bad-ideas=MANIFEST.in]
+#        additional_dependencies: [setuptools, wheel, setuptools-scm]
+
+  - repo: https://github.com/pre-commit/pygrep-hooks
+    rev: v1.10.0
+    hooks:
+      - id: python-check-blanket-noqa
+        name: "🐍 lint · Disallow blanket noqa"
+      - id: python-use-type-annotations
+        name: "🐍 types · Enforce type annotations"
+      - id: python-check-blanket-type-ignore
+        name: "🐍 types · Disallow blanket type:ignore"
+      - id: python-no-log-warn
+        name: "🐍 lint · Use logging.warning not warn"
+      - id: text-unicode-replacement-char
+        name: "📋 format · Detect unicode replacement char"
+      - id: python-no-eval
+        name: "🔒 security · Prevent eval() usage"
 
   # Markdown formatting
   - repo: https://github.com/executablebooks/mdformat
