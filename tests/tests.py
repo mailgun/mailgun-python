@@ -24,7 +24,6 @@ class MessagesTests(unittest.TestCase):
     messages functionality, with authentication and client initialization handled
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
-
     """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
@@ -68,7 +67,6 @@ class DomainTests(unittest.TestCase):
 
     It's happening because domain name is not deleting permanently after API call, so every new create will cause an error,
     as that domain is still exists. To avoid the problems we use a random domain name generator.
-
     """
 
     def setUp(self) -> None:
@@ -574,7 +572,6 @@ class IpTests(unittest.TestCase):
     messages functionality, with authentication and client initialization handled
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
-
     """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
@@ -622,7 +619,6 @@ class IpPoolsTests(unittest.TestCase):
     messages functionality, with authentication and client initialization handled
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
-
     """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
@@ -689,7 +685,6 @@ class EventsTests(unittest.TestCase):
     messages functionality, with authentication and client initialization handled
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
-
     """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
@@ -721,7 +716,6 @@ class TagsTests(unittest.TestCase):
     messages functionality, with authentication and client initialization handled
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
-
     """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
@@ -795,7 +789,6 @@ class BouncesTests(unittest.TestCase):
     messages functionality, with authentication and client initialization handled
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
-
     """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
@@ -873,7 +866,6 @@ class UnsubscribesTests(unittest.TestCase):
     messages functionality, with authentication and client initialization handled
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
-
     """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
@@ -954,7 +946,6 @@ class ComplaintsTests(unittest.TestCase):
     messages functionality, with authentication and client initialization handled
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
-
     """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
@@ -1040,7 +1031,6 @@ class WhiteListTests(unittest.TestCase):
     messages functionality, with authentication and client initialization handled
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
-
     """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
@@ -1099,7 +1089,6 @@ class RoutesTests(unittest.TestCase):
     messages functionality, with authentication and client initialization handled
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
-
     """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
@@ -1261,7 +1250,6 @@ class WebhooksTests(unittest.TestCase):
     messages functionality, with authentication and client initialization handled
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
-
     """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
@@ -1325,7 +1313,6 @@ class MailingListsTests(unittest.TestCase):
     messages functionality, with authentication and client initialization handled
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
-
     """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
@@ -1520,7 +1507,6 @@ class TemplatesTests(unittest.TestCase):
     messages functionality, with authentication and client initialization handled
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
-
     """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
@@ -1735,7 +1721,6 @@ class EmailValidationTests(unittest.TestCase):
     messages functionality, with authentication and client initialization handled
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
-
     """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
@@ -1795,7 +1780,6 @@ class InboxPlacementTests(unittest.TestCase):
     messages functionality, with authentication and client initialization handled
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
-
     """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
@@ -4990,10 +4974,7 @@ class AsyncUsersTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_get_user_details(self) -> None:
         """Test to get user details: happy path."""
-        """
-        GET /v5/users/{user_id}
-        :return:
-        """
+
         query = {"role": "admin", "limit": "0", "skip": "0"}
         req1 = await self.client.users.get(filters=query)
         users = req1.json()["users"]

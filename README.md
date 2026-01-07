@@ -104,7 +104,7 @@ Check out all the resources and Python code examples in the official
       - [Create Mailgun SMTP credentials for a given domain](#create-mailgun-smtp-credentials-for-a-given-domain)
     - [Users](#users)
       - [Get users on an account](#get-users-on-an-account)
-      - [Get a user's details](#)
+      - [Get a user's details](#get-a-users-details)
   - [License](#license)
   - [Contribute](#contribute)
   - [Contributors](#contributors)
@@ -1013,9 +1013,7 @@ def import_list_unsubs() -> None:
     :return:
     """
     files = {
-        "unsubscribe2_csv": Path(
-            "mailgun/doc_tests/files/mailgun_unsubscribes.csv"
-        ).read_bytes()
+        "unsubscribe2_csv": Path("mailgun/doc_tests/files/mailgun_unsubscribes.csv").read_bytes()
     }
     req = client.unsubscribes_import.create(domain=domain, files=files)
     print(req.json())
@@ -1048,11 +1046,7 @@ def import_complaint_list() -> None:
     POST /<domain>/complaints/import, Content-Type: multipart/form-data
     :return:
     """
-    files = {
-        "complaints_csv": Path(
-            "mailgun/doc_tests/files/mailgun_complaints.csv"
-        ).read_bytes()
-    }
+    files = {"complaints_csv": Path("mailgun/doc_tests/files/mailgun_complaints.csv").read_bytes()}
     req = client.complaints_import.create(domain=domain, files=files)
     print(req.json())
 ```
@@ -1237,9 +1231,7 @@ def get_all_versions() -> None:
     GET /<domain>/templates/<template>/versions
     :return:
     """
-    req = client.templates.get(
-        domain=domain, template_name="template.name1", versions=True
-    )
+    req = client.templates.get(domain=domain, template_name="template.name1", versions=True)
     print(req.json())
 ```
 
@@ -1268,9 +1260,7 @@ def update_ippool() -> None:
         "name": "test_pool3",
         "description": "Test3",
     }
-    req = client.ippools.patch(
-        domain=domain, data=data, pool_id="60140bc1fee3e84dec5abeeb"
-    )
+    req = client.ippools.patch(domain=domain, data=data, pool_id="60140bc1fee3e84dec5abeeb")
     print(req.json())
 ```
 
@@ -1349,9 +1339,7 @@ def get_aggregate_countries() -> None:
     GET /<domain>/tags/<tag>/stats/aggregates/countries
     :return:
     """
-    req = client.tags_stats_aggregates_countries.get(
-        domain=domain, tag_name="September newsletter"
-    )
+    req = client.tags_stats_aggregates_countries.get(domain=domain, tag_name="September newsletter")
     print(req.json())
 ```
 

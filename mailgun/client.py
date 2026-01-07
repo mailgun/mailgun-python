@@ -100,7 +100,10 @@ HANDLERS: dict[str, Callable] = {  # type: ignore[type-arg]
 
 
 class Config:
-    """Config class. Configure client with basic (urls, version, headers)."""
+    """Config class.
+
+    Configure client with basic (urls, version, headers).
+    """
 
     DEFAULT_API_URL: str = "https://api.mailgun.net/"
     API_REF: str = "https://documentation.mailgun.com/en/latest/api_reference.html"
@@ -109,8 +112,9 @@ class Config:
     def __init__(self, api_url: str | None = None) -> None:
         """Initialize a new Config instance with specified or default API settings.
 
-        This initializer sets the API version and base URL. If no version or URL
-        is provided, it defaults to the predefined class values.
+        This initializer sets the API version and base URL. If no
+        version or URL is provided, it defaults to the predefined class
+        values.
 
         :param version: API version (default: v3)
         :type version: str | None
@@ -123,8 +127,8 @@ class Config:
     def __getitem__(self, key: str) -> tuple[Any, dict[str, str]]:
         """Parse incoming split attr name, check it and prepare endpoint url.
 
-        Most urls generated here can't be generated dynamically as we are doing this
-        in build_url() method under Endpoint class.
+        Most urls generated here can't be generated dynamically as we
+        are doing this in build_url() method under Endpoint class.
         :param key: incoming attr name
         :type key: str
         :return: url, headers
@@ -278,7 +282,10 @@ class Config:
 
 
 class BaseEndpoint:
-    """Base class for endpoints. Contains methods common for Endpoint and AsyncEndpoint."""
+    """Base class for endpoints.
+
+    Contains methods common for Endpoint and AsyncEndpoint.
+    """
 
     def __init__(
         self,
@@ -586,7 +593,8 @@ class Client:
     def __getattr__(self, name: str) -> Any:
         """Get named attribute of an object, split it and execute.
 
-        :param name: attribute name (Example: client.domains_ips. names: ["domains", "ips"])
+        :param name: attribute name (Example: client.domains_ips. names:
+            ["domains", "ips"])
         :type name: str
         :return: type object (executes existing handler)
         """
@@ -943,7 +951,8 @@ class AsyncClient(Client):
     def __getattr__(self, name: str) -> Any:
         """Get named attribute of an object, split it and execute.
 
-        :param name: attribute name (Example: client.domains_ips. names: ["domains", "ips"])
+        :param name: attribute name (Example: client.domains_ips. names:
+            ["domains", "ips"])
         :type name: str
         :return: type object (executes existing handler)
         """
@@ -967,7 +976,8 @@ class AsyncClient(Client):
     async def aclose(self) -> None:
         """Close the underlying httpx.AsyncClient.
 
-        Call this when done with the client to properly clean up resources.
+        Call this when done with the client to properly clean up
+        resources.
         """
         if self._httpx_client:
             await self._httpx_client.aclose()

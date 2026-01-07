@@ -19,130 +19,218 @@ ci:
     skip: []
     submodules: false
 
+# .pre-commit-config.yaml
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
+      # Python-specific checks
       - id: check-ast
+        name: "🐍 python · Validate syntax"
       - id: check-builtin-literals
-      - id: fix-byte-order-marker
-      - id: check-case-conflict
+        name: "🐍 python · Use literal syntax"
       - id: check-docstring-first
-      - id: check-vcs-permalinks
-      # Fail if staged files are above a certain size.
-      # To add a large file, use 'git lfs track <file>; git add <file> to track large files with
-      # git-lfs rather than committing them directly to the git history
-      - id: check-added-large-files
-        args: [ "--maxkb=500" ]
-      # Fails if there are any ">>>>>" lines in files due to merge conflicts.
-      - id: check-merge-conflict
-      # ensure syntaxes are valid
-      - id: check-toml
+        name: "🐍 python · Validate docstring placement"
       - id: debug-statements
+        name: "🐍 python · Detect debug statements"
         language_version: python3
-      # Makes sure files end in a newline and only a newline;
-      - id: end-of-file-fixer
-      - id: mixed-line-ending
-      # Trims trailing whitespace. Allow a single space on the end of .md lines for hard line breaks.
-      - id: trailing-whitespace
-        args: [ --markdown-linebreak-ext=md ]
-      # Sort requirements in requirements.txt files.
-      - id: requirements-txt-fixer
-      # Prevent committing directly to trunk
-      - id: no-commit-to-branch
-        args: [ "--branch=master" ]
-      # Detects the presence of private keys
-      - id: detect-private-key
 
+      # Git workflow protection
+      - id: check-added-large-files
+        name: "🌳 git · Block large files"
+        args: ['--maxkb=500']
+      - id: check-merge-conflict
+        name: "🌳 git · Detect conflict markers"
+      - id: forbid-new-submodules
+        name: "🌳 git · Prevent submodules"
+      - id: no-commit-to-branch
+        name: "🌳 git · Protect main branches"
+        args: ["--branch", "main", "--branch", "master"]
+      - id: check-vcs-permalinks
+        name: "🌳 git · Validate VCS links"
+
+      # Filesystem and naming validation
+      - id: check-case-conflict
+        name: "📁 filesystem · Check case sensitivity"
+      - id: check-illegal-windows-names
+        name: "📁 filesystem · Validate Windows names"
+      - id: check-symlinks
+        name: "📁 filesystem · Check symlink validity"
+      - id: destroyed-symlinks
+        name: "📁 filesystem · Detect broken symlinks"
+
+      # File format validation
+      - id: check-toml
+        name: "📋 format · Validate TOML"
+      - id: check-yaml
+        name: "📋 format · Validate YAML"
+        exclude: conda.recipe/meta.yaml
+
+      # File content fixes
+      - id: fix-byte-order-marker
+        name: "✨ fix · Remove BOM markers"
+      - id: end-of-file-fixer
+        name: "✨ fix · Ensure final newline"
+      - id: mixed-line-ending
+        name: "✨ fix · Normalize line endings"
+      - id: trailing-whitespace
+        name: "✨ fix · Trim trailing whitespace"
+        args: [--markdown-linebreak-ext=md]
+      - id: requirements-txt-fixer
+        name: "✨ fix · Sort requirements"
+
+      # Security checks
+      - id: detect-private-key
+        name: "🔒 security · Detect private keys"
+
+  # Git commit quality
   - repo: https://github.com/jorisroovers/gitlint
     rev: v0.19.1
     hooks:
       - id: gitlint
+        name: "🌳 git · Validate commit format"
 
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v4.11.1
+    hooks:
+      - id: commitizen
+        name: "🌳 git · Validate commit message"
+        stages: [commit-msg]
+
+  # Security scanning (grouped together)
   - repo: https://github.com/Yelp/detect-secrets
     rev: v1.5.0
     hooks:
-      - id: detect-secrets  # Detect accidentally committed secrets
+      - id: detect-secrets
+        name: "🔒 security · Detect committed secrets"
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.0
+    hooks:
+      - id: gitleaks
+        name: "🔒 security · Scan for hardcoded secrets"
+
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.9.2
+    hooks:
+      - id: bandit
+        name: "🔒 security · Check Python vulnerabilities"
+        args: ["-c", "pyproject.toml", "-r", "."]
+        exclude: ^tests/
+        additional_dependencies: [".[toml]"]
+
+  - repo: https://github.com/pypa/pip-audit
+    rev: v2.10.0
+    hooks:
+      - id: pip-audit
+        name: "🔒 security · Audit Python dependencies"
+        args: ['--desc', 'on']
+
+  # Spelling and typos
+  - repo: https://github.com/crate-ci/typos
+    rev: v1.40.0
+    hooks:
+      - id: typos
+        name: "📝 spelling · Check typos"
 
 #  - repo: https://github.com/codespell-project/codespell
 #    rev: v2.4.1
 #    hooks:
 #      - id: codespell
+#        name: "📝 spelling · Fix common misspellings"
 #        args: [--write]
 #        exclude: ^tests
 
+  # CI/CD validation
   - repo: https://github.com/python-jsonschema/check-jsonschema
     rev: 0.36.0
     hooks:
+      - id: check-dependabot
+        name: "🔧 ci/cd · Validate Dependabot config"
       - id: check-github-workflows
+        name: "🔧 ci/cd · Validate GitHub workflows"
         files: ^\.github/workflows/.*\.ya?ml$
 
-  - repo: https://github.com/akaihola/darker
-    rev: v3.0.0
-    hooks:
-      - id: darker
-        additional_dependencies: [black]
-
+  # Python code formatting (order matters: autoflake → pyupgrade → darker/ruff)
   - repo: https://github.com/PyCQA/autoflake
     rev: v2.3.1
     hooks:
       - id: autoflake
+        name: "🐍 format · Remove unused imports"
         args:
           - --in-place
           - --remove-all-unused-imports
           - --remove-unused-variable
           - --ignore-init-module-imports
 
+  - repo: https://github.com/asottile/pyupgrade
+    rev: v3.21.2
+    hooks:
+      - id: pyupgrade
+        name: "🐍 format · Modernize syntax"
+        args: [--py310-plus, --keep-runtime-typing]
+
+  - repo: https://github.com/akaihola/darker
+    rev: v3.0.0
+    hooks:
+      - id: darker
+        name: "🐍 format · Format changed lines"
+        additional_dependencies: [black]
+
+  - repo: https://github.com/charliermarsh/ruff-pre-commit
+    rev: v0.14.10
+    hooks:
+      - id: ruff-check
+        name: "🐍 lint · Check with Ruff"
+        args: [--fix, --preview, --exit-non-zero-on-fix]
+      - id: ruff-format
+        name: "🐍 format · Format with Ruff"
+
+  # Python linting (comprehensive checks)
   - repo: https://github.com/pycqa/flake8
     rev: 7.3.0
     hooks:
-    -   id: flake8
+      - id: flake8
+        name: "🐍 lint · Check style (Flake8)"
         additional_dependencies:
           - radon
           - flake8-docstrings
           - Flake8-pyproject
-        # TODO: Remove tests when we will be ready to process tests
+          - flake8-bugbear
+          - flake8-comprehensions
+          - flake8-tidy-imports
+          - pycodestyle
         exclude: ^tests
 
   - repo: https://github.com/PyCQA/pylint
     rev: v4.0.4
     hooks:
       - id: pylint
+        name: "🐍 lint · Check code quality"
         args:
           - --exit-zero
 
-  - repo: https://github.com/asottile/pyupgrade
-    rev: v3.21.2
+  - repo: https://github.com/dosisod/refurb
+    rev: v2.2.0
     hooks:
-      - id: pyupgrade
-        args: [--py310-plus, --keep-runtime-typing]
+      - id: refurb
+        name: "🐍 lint · Suggest modernizations"
 
-  - repo: https://github.com/charliermarsh/ruff-pre-commit
-    # Ruff version.
-    rev: v0.14.10
-    hooks:
-      # Run the linter.
-      - id: ruff-check
-        args: [--fix, --preview, --exit-non-zero-on-fix]
-      # Run the formatter.
-      - id: ruff-format
-
+  # Python documentation
   - repo: https://github.com/pycqa/pydocstyle
     rev: 6.3.0
     hooks:
       - id: pydocstyle
+        name: "🐍 docs · Validate docstrings"
         args: [--select=D200,D213,D400,D415]
         additional_dependencies: [tomli]
 
-  -   repo: https://github.com/dosisod/refurb
-      rev: v2.2.0
-      hooks:
-      -   id: refurb
-
+  # Python type checking
   - repo: https://github.com/pre-commit/mirrors-mypy
     rev: v1.19.1
     hooks:
-    -   id: mypy
+      - id: mypy
+        name: "🐍 types · Check with mypy"
         args: [--config-file=./pyproject.toml]
         additional_dependencies:
           - types-requests
@@ -152,32 +240,36 @@ repos:
   - repo: https://github.com/RobertCraigie/pyright-python
     rev: v1.1.407
     hooks:
-    - id: pyright
+      - id: pyright
+        name: "🐍 types · Check with pyright"
 
-  - repo: https://github.com/PyCQA/bandit
-    rev: 1.9.2
-    hooks:
-      - id: bandit
-        args: ["-c", "pyproject.toml", "-r", "."]
-        # ignore all tests, not just tests data
-        exclude: ^tests/
-        additional_dependencies: [".[toml]"]
-
-  - repo: https://github.com/crate-ci/typos
-    rev: v1.40.0
-    hooks:
-      - id: typos
-
-  - repo: https://github.com/executablebooks/mdformat
-    rev: 1.0.0
-    hooks:
-      - id: mdformat
-        additional_dependencies:
-          # gfm = GitHub Flavored Markdown
-          - mdformat-gfm
-          - mdformat-black
-
+  # Python project configuration
   - repo: https://github.com/abravalheri/validate-pyproject
     rev: v0.24.1
     hooks:
       - id: validate-pyproject
+        name: "🐍 config · Validate pyproject.toml"
+
+  # Markdown formatting
+  - repo: https://github.com/executablebooks/mdformat
+    rev: 1.0.0
+    hooks:
+      - id: mdformat
+        name: "📝 markdown · Format files"
+        additional_dependencies:
+          - mdformat-gfm
+          - mdformat-black
+          - mdformat-ruff
+# TODO: Enable it for a single check
+#  - repo: https://github.com/tcort/markdown-link-check
+#    rev: v3.14.2
+#    hooks:
+#      - id: markdown-link-check
+#        name: "📝 docs · Check markdown links"
+
+  # Makefile linting
+  - repo: https://github.com/checkmake/checkmake
+    rev: 0.2.2
+    hooks:
+      - id: checkmake
+        name: "🔧 build · Lint Makefile"
