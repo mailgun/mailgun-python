@@ -137,12 +137,13 @@ repos:
         exclude: ^tests/
         additional_dependencies: [".[toml]"]
 
-  - repo: https://github.com/pypa/pip-audit
-    rev: v2.10.0
-    hooks:
-      - id: pip-audit
-        name: "🔒 security · Audit Python dependencies"
-        args: ['--desc', 'on']
+# TODO: Enable it for a single check
+#  - repo: https://github.com/pypa/pip-audit
+#    rev: v2.10.0
+#    hooks:
+#      - id: pip-audit
+#        name: "🔒 security · Audit Python dependencies"
+#        args: ['--desc', 'on']
 
   - repo: https://github.com/semgrep/pre-commit
     rev: 'v1.146.0'

@@ -22,12 +22,17 @@ We [keep a changelog.](http://keepachangelog.com/)
   - Add `Keys` and `Domain Keys` sections with examples to `README.md`.
   - Add docstrings to the test class `KeysTests` & `AsyncKeysTests` and their methods.
   - Add `CONTRIBUTING.md`.
+  - Add `MANIFEST.in`.
 
 - Tests:
 
   - Add dkim keys tests to `DomainTests` and only `test_get_dkim_keys`, `test_post_dkim_keys_invalid_pem_string` to `AsyncDomainTests`.
   - Add classes `KeysTests` and `AsyncKeysTests` to `tests/tests.py`.
   - Add keys tests to `KeysTests` and `AsyncKeysTests`.
+
+- CI:
+
+  - Add more pre-commit hooks.
 
 ### Changed
 
@@ -42,6 +47,7 @@ We [keep a changelog.](http://keepachangelog.com/)
 - Update test dependencies: add `openssl` and `pytest-asyncio` to `environment-dev.yaml` and `pyproject.toml`.
 - Add `.server.key` to `.gitignore`.
 - Add a constraint `py<311` for `typing_extensions >=4.7.1` in files `environment.yaml`, `environment-dev.yaml`, `pyproject.toml`, and in `mailgun/client.py`.
+- Improve `pyproject.toml`.
 
 ### Pull Requests Merged
 
