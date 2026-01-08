@@ -14,7 +14,7 @@ jobs:
   pre-commit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'  # Specify a Python version explicitly
@@ -36,7 +36,7 @@ jobs:
       APIKEY: ${{ secrets.APIKEY }}
       DOMAIN: ${{ secrets.DOMAIN }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0  # Required for setuptools-scm
 
