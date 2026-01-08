@@ -54,7 +54,7 @@ We [keep a changelog.](http://keepachangelog.com/)
 ### Pull Requests Merged
 
 - [PR_27](https://github.com/mailgun/mailgun-python/pull/27) - Add Keys and Domain Keys API endpoints
-- [PR_28](https://github.com/mailgun/mailgun-python/pull/28) - Release v1.6.0
+- [PR_29](https://github.com/mailgun/mailgun-python/pull/29) - Release v1.6.0
 
 ## [1.5.0] - 2025-12-11
 
