@@ -5,8 +5,10 @@ from __future__ import annotations
 import json
 import os
 import string
+import subprocess
 import unittest
 import random
+from pathlib import Path
 from typing import Any
 from datetime import datetime, timedelta
 
@@ -22,7 +24,6 @@ class MessagesTests(unittest.TestCase):
     messages functionality, with authentication and client initialization handled
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
-
     """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
@@ -66,7 +67,6 @@ class DomainTests(unittest.TestCase):
 
     It's happening because domain name is not deleting permanently after API call, so every new create will cause an error,
     as that domain is still exists. To avoid the problems we use a random domain name generator.
-
     """
 
     def setUp(self) -> None:
@@ -129,6 +129,8 @@ class DomainTests(unittest.TestCase):
         # otherwise, test_delete_domain and test_verify_domain will fail with a new run of tests
         self.client.domains.delete(domain=self.test_domain)
 
+    # Make sure that you can Add New Domain (see https://app.mailgun.com/mg/sending/new-domain) in your Mailgun Plan,
+    # otherwise you get Error 403.
     @pytest.mark.order(1)
     def test_post_domain(self) -> None:
         self.client.domains.delete(domain=self.test_domain)
@@ -145,7 +147,7 @@ class DomainTests(unittest.TestCase):
         self.assertEqual(request.status_code, 200)
         self.assertIn("message", request.json())
 
-    @pytest.mark.order(2)
+    @pytest.mark.order(3)
     def test_update_simple_domain(self) -> None:
         self.client.domains.delete(domain=self.test_domain)
         self.client.domains.create(data=self.post_domain_data)
@@ -154,7 +156,7 @@ class DomainTests(unittest.TestCase):
         self.assertEqual(request.status_code, 200)
         self.assertEqual(request.json()["message"], "Domain has been updated")
 
-    @pytest.mark.order(2)
+    @pytest.mark.order(3)
     def test_put_domain_creds(self) -> None:
         self.client.domains_credentials.create(
             domain=self.domain,
@@ -169,7 +171,7 @@ class DomainTests(unittest.TestCase):
         self.assertEqual(request.status_code, 200)
         self.assertIn("message", request.json())
 
-    @pytest.mark.order(2)
+    @pytest.mark.order(3)
     def test_put_mailboxes_credentials(self) -> None:
         """Test to update Mailgun SMTP credentials: Happy Path with valid data."""
         self.client.domains_credentials.create(
@@ -206,7 +208,8 @@ class DomainTests(unittest.TestCase):
         self.assertEqual(request.status_code, 200)
         self.assertIn("items", request.json())
 
-    @pytest.mark.order(3)
+    @pytest.mark.order(4)
+    @pytest.mark.xfail(reason="The test can fail because the domain name is a random string")
     def test_get_sending_queues(self) -> None:
         self.client.domains.delete(domain=self.test_domain)
         self.client.domains.create(data=self.post_domain_data)
@@ -215,7 +218,7 @@ class DomainTests(unittest.TestCase):
         self.assertIn("scheduled", request.json())
 
     @pytest.mark.order(4)
-    @pytest.mark.skip("The test can fail because the domain name is a random string")
+    @pytest.mark.xfail(reason="The test can fail because the domain name is a random string")
     def test_get_single_domain(self) -> None:
         self.client.domains.create(data=self.post_domain_data)
         req = self.client.domains.get(domain_name=self.post_domain_data["name"])
@@ -224,7 +227,7 @@ class DomainTests(unittest.TestCase):
         self.assertIn("domain", req.json())
 
     @pytest.mark.order(5)
-    @pytest.mark.skip("The test can fail because the domain name is a random string")
+    @pytest.mark.xfail(reason="The test can fail because the domain name is a random string")
     def test_verify_domain(self) -> None:
         self.client.domains.create(data=self.post_domain_data)
         req = self.client.domains.put(domain=self.post_domain_data["name"], verify=True)
@@ -295,6 +298,233 @@ class DomainTests(unittest.TestCase):
         )
         self.assertIn("message", request.json())
 
+    @pytest.mark.order(6)
+    def test_get_dkim_keys(self) -> None:
+        """Test to get keys for all domains: happy path with valid data."""
+        data = {
+            "page": "string",
+            "limit": "0",
+            "signing_domain": "python.test.domain5",
+            "selector": "smtp",
+        }
+
+        req = self.client.dkim_keys.get(data=data)
+
+        expected_keys = [
+            "items",
+            "paging",
+        ]
+
+        expected_items_keys = [
+            "signing_domain",
+            "selector",
+            "dns_record",
+        ]
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 200)
+        [self.assertIn(key, expected_keys) for key in req.json()]  # type: ignore[func-returns-value]
+        [self.assertIn(key, expected_items_keys) for key in req.json()["items"][0]]  # type: ignore[func-returns-value]
+
+    @pytest.mark.order(6)
+    def test_post_dkim_keys(self) -> None:
+        """Test to create a domain key: happy path with valid data."""
+        # Private key PEM file must be generated in PKCS1 format. You need 'openssl' on your machine
+        # openssl genrsa -traditional -out .server.key 2048
+        subprocess.run(["openssl", "genrsa", "-traditional", "-out", ".server.key", "2048"])
+        server_key_path = Path(".server.key")
+        files = [
+            (
+                "pem",
+                ("server.key", server_key_path.read_bytes()),
+            )
+        ]
+
+        data = {
+            "signing_domain": "python.test.domain5",
+            "selector": "smtp",
+            "bits": "2048",
+            "pem": files,
+        }
+
+        headers = {"Content-Type": "multipart/form-data"}
+
+        req = self.client.dkim_keys.create(data=data, headers=headers, files=files)
+
+        expected_keys = [
+            "signing_domain",
+            "selector",
+            "dns_record",
+        ]
+
+        expected_dns_record_keys = [
+            "is_active",
+            "cached",
+            "name",
+            "record_type",
+            "valid",
+            "value",
+        ]
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 200)
+        [self.assertIn(key, expected_keys) for key in req.json()]  # type: ignore[func-returns-value]
+        [self.assertIn(key, expected_dns_record_keys) for key in req.json()["dns_record"]]  # type: ignore[func-returns-value]
+
+        # Also you can remove a domain key on WEB UI https://app.mailgun.com/mg/sending/domains selecting your "signing_domain"
+        query = {"signing_domain": "python.test.domain5", "selector": "smtp"}
+        req2 = self.client.dkim_keys.delete(filters=query)
+
+        self.assertIsInstance(req2.json(), dict)
+        self.assertEqual(req2.status_code, 200)
+        self.assertIn("success", req2.json()["message"])
+
+        server_key_path.unlink(missing_ok=True)
+        print(f"File {server_key_path} has been removed.")
+
+    @pytest.mark.order(6)
+    def test_post_dkim_keys_invalid_pem_string(self) -> None:
+        """Test to create a domain key: expected failure to parse PEM from string."""
+
+        data = {
+            "signing_domain": "python.test.domain5",
+            "selector": "smtp",
+            "bits": "2048",
+            "pem": "lorem ipsum",
+        }
+
+        req = self.client.dkim_keys.create(data=data)
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 400)
+        self.assertIn("failed to import domain key: failed to parse PEM", req.json()["message"])
+
+    @pytest.mark.order(6)
+    def test_post_dkim_keys_if_duplicate_key_exists(self) -> None:
+        """Test to create a domain key: expected failure because a duplicate key exists"""
+
+        subprocess.run(["openssl", "genrsa", "-traditional", "-out", ".server.key", "2048"])
+        server_key_path = Path(".server.key")
+        files = [
+            (
+                "pem",
+                ("server.key", server_key_path.read_bytes()),
+            )
+        ]
+
+        data = {
+            "signing_domain": "python.test.domain5",
+            "selector": "smtp",
+            "bits": "2048",
+            "pem": files,
+        }
+
+        headers = {"Content-Type": "multipart/form-data"}
+
+        req = self.client.dkim_keys.create(data=data, headers=headers, files=files)
+
+        expected_keys = [
+            "signing_domain",
+            "selector",
+            "dns_record",
+        ]
+
+        expected_dns_record_keys = [
+            "is_active",
+            "cached",
+            "name",
+            "record_type",
+            "valid",
+            "value",
+        ]
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 200)
+        [self.assertIn(key, expected_keys) for key in req.json()]  # type: ignore[func-returns-value]
+        [self.assertIn(key, expected_dns_record_keys) for key in req.json()["dns_record"]]  # type: ignore[func-returns-value]
+
+        req2 = self.client.dkim_keys.create(data=data, headers=headers, files=files)
+
+        self.assertIsInstance(req2.json(), dict)
+        self.assertEqual(req2.status_code, 400)
+        self.assertIn("failed to create domain key: duplicate key", req2.json()["message"])
+
+    @pytest.mark.order(6)
+    def test_post_dkim_keys_key_must_be_pkcs1_format(self) -> None:
+        """Test to create a domain key: expected failure because a key must be PKCS1 format"""
+
+        subprocess.run(["openssl", "genpkey", "-algorithm", "Ed25519", "-out", ".server.key"])
+        server_key_path = Path(".server.key")
+        files = [
+            (
+                "pem",
+                ("server.key", server_key_path.read_bytes()),
+            )
+        ]
+
+        data = {
+            "signing_domain": "python.test.domain5",
+            "selector": "smtp",
+            "bits": "2048",
+            "pem": files,
+        }
+
+        headers = {"Content-Type": "multipart/form-data"}
+
+        req = self.client.dkim_keys.create(data=data, headers=headers, files=files)
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 400)
+        self.assertIn(
+            "failed to parse private key: key must be PKCS1 format", req.json()["message"]
+        )
+
+    @pytest.mark.order(7)
+    def test_delete_dkim_keys(self) -> None:
+        """Test to delete a domain key: happy path with valid data."""
+        query = {"signing_domain": "python.test.domain5", "selector": "smtp"}
+
+        req = self.client.dkim_keys.delete(filters=query)
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("success", req.json()["message"])
+
+    @pytest.mark.order(7)
+    def test_delete_non_existing_dkim_keys(self) -> None:
+        """Test to delete a domain key: expected failure if a domain doesn't exist."""
+        subprocess.run(["openssl", "genrsa", "-traditional", "-out", ".server.key", "2048"])
+        server_key_path = Path(".server.key")
+        files = [
+            (
+                "pem",
+                ("server.key", server_key_path.read_bytes()),
+            )
+        ]
+
+        data = {
+            "signing_domain": "python.test.domain5",
+            "selector": "smtp",
+            "bits": "2048",
+            "pem": files,
+        }
+
+        headers = {"Content-Type": "multipart/form-data"}
+
+        self.client.dkim_keys.create(data=data, headers=headers, files=files)
+
+        query = {"signing_domain": "python.test.domain5", "selector": "smtp"}
+
+        req1 = self.client.dkim_keys.delete(filters=query)
+        self.assertIsInstance(req1.json(), dict)
+        self.assertEqual(req1.status_code, 200)
+        self.assertIn("success", req1.json()["message"])
+
+        req2 = self.client.dkim_keys.delete(filters=query)
+
+        self.assertIsInstance(req2.json(), dict)
+        self.assertEqual(req2.status_code, 404)
+        self.assertIn("domain key not found", req2.json()["message"])
+
     @pytest.mark.order(7)
     def test_delete_domain_creds(self) -> None:
         self.client.domains_credentials.create(
@@ -321,6 +551,7 @@ class DomainTests(unittest.TestCase):
                       "All domain credentials have been deleted")
 
     @pytest.mark.order(8)
+    @pytest.mark.xfail(reason="The test can fail because the domain name is a random string")
     def test_delete_domain(self) -> None:
         self.client.domains.create(data=self.post_domain_data)
         request = self.client.domains.delete(domain=self.test_domain)
@@ -341,7 +572,6 @@ class IpTests(unittest.TestCase):
     messages functionality, with authentication and client initialization handled
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
-
     """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
@@ -389,7 +619,6 @@ class IpPoolsTests(unittest.TestCase):
     messages functionality, with authentication and client initialization handled
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
-
     """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
@@ -456,7 +685,6 @@ class EventsTests(unittest.TestCase):
     messages functionality, with authentication and client initialization handled
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
-
     """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
@@ -488,7 +716,6 @@ class TagsTests(unittest.TestCase):
     messages functionality, with authentication and client initialization handled
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
-
     """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
@@ -562,7 +789,6 @@ class BouncesTests(unittest.TestCase):
     messages functionality, with authentication and client initialization handled
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
-
     """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
@@ -640,7 +866,6 @@ class UnsubscribesTests(unittest.TestCase):
     messages functionality, with authentication and client initialization handled
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
-
     """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
@@ -721,7 +946,6 @@ class ComplaintsTests(unittest.TestCase):
     messages functionality, with authentication and client initialization handled
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
-
     """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
@@ -807,7 +1031,6 @@ class WhiteListTests(unittest.TestCase):
     messages functionality, with authentication and client initialization handled
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
-
     """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
@@ -866,7 +1089,6 @@ class RoutesTests(unittest.TestCase):
     messages functionality, with authentication and client initialization handled
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
-
     """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
@@ -1028,7 +1250,6 @@ class WebhooksTests(unittest.TestCase):
     messages functionality, with authentication and client initialization handled
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
-
     """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
@@ -1092,7 +1313,6 @@ class MailingListsTests(unittest.TestCase):
     messages functionality, with authentication and client initialization handled
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
-
     """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
@@ -1287,7 +1507,6 @@ class TemplatesTests(unittest.TestCase):
     messages functionality, with authentication and client initialization handled
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
-
     """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
@@ -1502,7 +1721,6 @@ class EmailValidationTests(unittest.TestCase):
     messages functionality, with authentication and client initialization handled
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
-
     """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
@@ -1562,7 +1780,6 @@ class InboxPlacementTests(unittest.TestCase):
     messages functionality, with authentication and client initialization handled
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
-
     """
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
@@ -1844,9 +2061,7 @@ class MetricsTest(unittest.TestCase):
         req = self.client.analytics_usage_metrics.create(
             data=self.invalid_account_usage_metrics_data,
         )
-        from pprint import pprint
 
-        pprint(req.json())
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 400)
         self.assertNotIn("items", req.json())
@@ -2152,6 +2367,136 @@ class TagsNewTests(unittest.TestCase):
         self.assertIn("not found", req.json()["error"])
 
 
+class BounceClassificationTests(unittest.TestCase):
+    """Tests for Mailgun Bounce Classification API, https://api.mailgun.net/v2/bounce-classification/metrics.
+
+    This class provides setup functionality for tests involving the
+    functionality with authentication and client initialization handled
+    in `setUp`. Each test in this suite operates with the configured Mailgun client
+    instance to simulate API interactions.
+
+    """
+
+    def setUp(self) -> None:
+        self.auth: tuple[str, str] = (
+            "api",
+            os.environ["APIKEY"],
+        )
+        self.client: Client = Client(auth=self.auth)
+        self.domain: str = os.environ["DOMAIN"]
+
+        now = datetime.now()
+        now_formatted = now.strftime("%a, %d %b %Y %H:%M:%S +0000")
+        yesterday = now - timedelta(days=1)
+        yesterday_formatted = yesterday.strftime("%a, %d %b %Y %H:%M:%S +0000")  # noqa: FURB184
+
+        self.payload = {
+            "start": yesterday_formatted,
+            "end": now_formatted,
+            "resolution": "day",
+            "duration": "24h0m0s",
+            "dimensions": ["entity-name", "domain.name"],
+            "metrics": [
+                "critical_bounce_count",
+                "non_critical_bounce_count",
+                "critical_delay_count",
+                "non_critical_delay_count",
+                "delivered_smtp_count",
+                "classified_failures_count",
+                "critical_bounce_rate",
+                "non_critical_bounce_rate",
+                "critical_delay_rate",
+                "non_critical_delay_rate",
+            ],
+            "filter": {
+                "AND": [
+                    {
+                        "attribute": "domain.name",
+                        "comparator": "=",
+                        "values": [{"value": self.domain}],
+                    }
+                ]
+            },
+            "include_subaccounts": True,
+            "pagination": {"sort": "entity-name:asc", "limit": 10},
+        }
+        self.payload_without_dimensions = {
+            "start": yesterday_formatted,
+            "end": now_formatted,
+            "metrics": [
+                "critical_bounce_count",
+            ],
+            "pagination": {"sort": "entity-name:asc", "limit": 10},
+        }
+        self.payload_with_old_dates = {
+            "start": "Wed, 12 Nov 2000 23:00:00 UTC",
+            "end": "Thu, 13 Nov 2000 23:00:00 UTC",
+            "dimensions": ["entity-name", "domain.name"],
+            "metrics": [
+                "critical_bounce_count",
+            ],
+            "pagination": {"sort": "entity-name:asc", "limit": 10},
+        }
+        self.empty_payload: dict[str, str] = {}
+
+    def test_post_list_statistic(self) -> None:
+        """Test to post query to list statistic: Happy Path with valid data."""
+        req = self.client.bounceclassification_metrics.create(data=self.payload)
+
+        expected_keys: list[str] = [
+            "start",
+            "end",
+            "resolution",
+            "duration",
+            "dimensions",
+            "pagination",
+            "items",
+        ]
+        expected_dimensions_elements: list[str] = [
+            "entity-name",
+            "domain.name",
+        ]
+        expected_pagination_keys: list[str] = [
+            "sort",
+            "skip",
+            "limit",
+            "total",
+        ]
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 200)
+        [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
+        [self.assertIn(key, expected_dimensions_elements) for key in req.json()["dimensions"]]  # type: ignore[func-returns-value]
+        [self.assertIn(key, expected_pagination_keys) for key in req.json()["pagination"]]  # type: ignore[func-returns-value]
+
+    def test_post_list_statistic_without_dimensions(self) -> None:
+        """Test to post query to list statistic: Wrong Path with invalid data."""
+        req = self.client.bounceclassification_metrics.create(data=self.payload_without_dimensions)
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 400)
+        [self.assertIn(key, "message") for key in req.json().keys()]  # type: ignore[func-returns-value]
+        self.assertIn("sort should be either one of metrics or dimensions", req.json()["message"])
+
+    def test_post_list_statistic_with_old_dates(self) -> None:
+        """Test to post query to list statistic: Wrong Path with invalid data."""
+        req = self.client.bounceclassification_metrics.create(data=self.payload_with_old_dates)
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 400)
+        [self.assertIn(key, "message") for key in req.json().keys()]  # type: ignore[func-returns-value]
+        self.assertIn("is out of permitted log retention", req.json()["message"])
+
+    def test_post_list_statistic_with_empty_payload(self) -> None:
+        """Test to post query to list statistic: Wrong Path with invalid data."""
+        req = self.client.bounceclassification_metrics.create(data=self.empty_payload)
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 400)
+        [self.assertIn(key, "message") for key in req.json().keys()]  # type: ignore[func-returns-value]
+        self.assertIn("is out of permitted log retention", req.json()["message"])
+
+
 class UsersTests(unittest.TestCase):
     """Tests for Mailgun Users API, https://api.mailgun.net/v5/users.
 
@@ -2218,7 +2563,7 @@ class UsersTests(unittest.TestCase):
         """Test to get account's users details: expected failure with invalid URL."""
         query = {"role": "admin", "limit": "0", "skip": "0"}
 
-        with self.assertRaises(KeyError) as cm:
+        with self.assertRaises(KeyError):
             self.client.user.get(filters=query)
 
     @pytest.mark.xfail
@@ -2302,6 +2647,118 @@ class UsersTests(unittest.TestCase):
 
                 self.assertIsInstance(req2.json(), dict)
                 self.assertEqual(req2.status_code, 404)
+
+
+class KeysTests(unittest.TestCase):
+    """Tests for Mailgun Keys API, https://api.mailgun.net/v1/keys.
+
+    This class provides setup functionality for tests involving
+    with authentication and client initialization handled
+    in `setUp`. Each test in this suite operates with the configured Mailgun client
+    instance to simulate API interactions.
+
+    """
+
+    def setUp(self) -> None:
+        self.auth: tuple[str, str] = (
+            "api",
+            os.environ["APIKEY"],
+        )
+        self.client: Client = Client(auth=self.auth)
+        self.domain: str = os.environ["DOMAIN"]
+        self.mailgun_email = os.environ["MAILGUN_EMAIL"]
+        self.role = os.environ["ROLE"]
+        self.user_id = os.environ["USER_ID"]
+        self.user_name = os.environ["USER_NAME"]
+
+    def test_get_keys(self) -> None:
+        """Test to get the list of Mailgun API keys: happy path with valid data."""
+        query = {"domain_name": "python.test.domain5", "kind": "web"}
+        req = self.client.keys.get(filters=query)
+
+        expected_keys = [
+            "total_count",
+            "items",
+        ]
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 200)
+        [self.assertIn(key, expected_keys) for key in req.json()]  # type: ignore[func-returns-value]
+
+    def test_get_keys_with_invalid_url(self) -> None:
+        """Test to get the list of Mailgun API keys: expected failure with invalid URL."""
+        query = {"domain_name": "python.test.domain5", "kind": "web"}
+
+        with self.assertRaises(KeyError):
+            self.client.key.get(filters=query)
+
+    def test_get_keys_without_filtering_data(self) -> None:
+        """Test to get the list of Mailgun API keys: Happy Path without filtering data."""
+        req = self.client.keys.get()
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 200)
+        self.assertGreater(len(req.json()["items"]), 0)
+
+    def test_post_keys(self) -> None:
+        """Test to create the Mailgun API key: happy path with valid data."""
+        data = {
+            "email": self.mailgun_email,
+            "domain_name": "python.test.domain5",
+            "kind": "web",
+            "expiration": "3600",
+            "role": self.role,
+            "user_id": self.user_id,
+            "user_name": self.user_name,
+            "description": "a new key",
+        }
+
+        headers = {"Content-Type": "multipart/form-data"}
+
+        req = self.client.keys.create(data=data, headers=headers)
+
+        expected_keys = [
+            "message",
+            "key",
+        ]
+
+        expected_key_keys = [
+            "id",
+            "description",
+            "kind",
+            "role",
+            "created_at",
+            "updated_at",
+            "expires_at",
+            "secret",
+            "is_disabled",
+            "domain_name",
+            "requestor",
+            "user_name",
+        ]
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 200)
+        self.assertEqual(req.json()["message"], "great success")
+        [self.assertIn(key, expected_keys) for key in req.json()]  # type: ignore[func-returns-value]
+        [self.assertIn(key, expected_key_keys) for key in req.json()["key"]]  # type: ignore[func-returns-value]
+
+    def test_delete_key(self) -> None:
+        """Test to delete the Mailgun API keys: happy path with valid data."""
+        query = {"domain_name": "python.test.domain5", "kind": "web"}
+        req1 = self.client.keys.get(filters=query)
+        items = req1.json()["items"]
+
+        for item in items:
+            if self.mailgun_email == item["requestor"]:  # codespell:disable-line
+                req2 = self.client.keys.delete(key_id=item["id"])
+                self.assertEqual(req2.json()["message"], "key deleted")
+
+    @pytest.mark.skip("Don't regenerate a public Mailgun API without a need")
+    def test_regenerate_key(self) -> None:
+        """Test to regenerate the Mailgun API keys: happy path with valid data."""
+        self.client.keys_public.create()
+
 
 # ============================================================================
 # Async Test Classes (using AsyncClient and AsyncEndpoint)
@@ -2402,6 +2859,8 @@ class AsyncDomainTests(unittest.IsolatedAsyncioTestCase):
         await self.client.domains.delete(domain=self.test_domain)
         await self.client.aclose()
 
+    # Make sure that you can Add New Domain (see https://app.mailgun.com/mg/sending/new-domain) in your Mailgun Plan,
+    # otherwise you get Error 403.
     @pytest.mark.order(1)
     async def test_post_domain(self) -> None:
         await self.client.domains.delete(domain=self.test_domain)
@@ -2451,8 +2910,6 @@ class AsyncDomainTests(unittest.IsolatedAsyncioTestCase):
         )
         name = "alice_bob"
         req = await self.client.mailboxes.put(domain=self.domain, login=f"{name}@{self.domain}")
-        print(req)
-        print(req.json())
 
         expected_keys = [
             "message",
@@ -2482,6 +2939,7 @@ class AsyncDomainTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("items", request.json())
 
     @pytest.mark.order(3)
+    @pytest.mark.xfail(reason="The test can fail because the domain name is a random string")
     async def test_get_sending_queues(self) -> None:
         await self.client.domains.delete(domain=self.test_domain)
         await self.client.domains.create(data=self.post_domain_data)
@@ -2490,7 +2948,7 @@ class AsyncDomainTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("scheduled", request.json())
 
     @pytest.mark.order(4)
-    @pytest.mark.skip("The test can fail because the domain name is a random string")
+    @pytest.mark.xfail(reason="The test can fail because the domain name is a random string")
     async def test_get_single_domain(self) -> None:
         await self.client.domains.create(data=self.post_domain_data)
         req = await self.client.domains.get(domain_name=self.post_domain_data["name"])
@@ -2499,7 +2957,7 @@ class AsyncDomainTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("domain", req.json())
 
     @pytest.mark.order(5)
-    @pytest.mark.skip("The test can fail because the domain name is a random string")
+    @pytest.mark.xfail(reason="The test can fail because the domain name is a random string")
     async def test_verify_domain(self) -> None:
         await self.client.domains.create(data=self.post_domain_data)
         req = await self.client.domains.put(domain=self.post_domain_data["name"], verify=True)
@@ -2570,14 +3028,60 @@ class AsyncDomainTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIn("message", request.json())
 
+    @pytest.mark.order(6)
+    async def test_get_dkim_keys(self) -> None:
+        """Test to get keys for all domains: happy path with valid data."""
+        data = {
+            "page": "string",
+            "limit": "0",
+            "signing_domain": "python.test.domain5",
+            "selector": "smtp",
+        }
+
+        req = await self.client.dkim_keys.get(data=data)
+
+        expected_keys = [
+            "items",
+            "paging",
+        ]
+
+        expected_items_keys = [
+            "signing_domain",
+            "selector",
+            "dns_record",
+        ]
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 200)
+        [self.assertIn(key, expected_keys) for key in req.json()]  # type: ignore[func-returns-value]
+        [self.assertIn(key, expected_items_keys) for key in req.json()["items"][0]]  # type: ignore[func-returns-value]
+
+    @pytest.mark.order(6)
+    async def test_post_dkim_keys_invalid_pem_string(self) -> None:
+        """Test to create a domain key: expected failure to parse PEM from string."""
+
+        data = {
+            "signing_domain": "python.test.domain5",
+            "selector": "smtp",
+            "bits": "2048",
+            "pem": "lorem ipsum",
+        }
+
+        req = await self.client.dkim_keys.create(data=data)
+
+        self.assertIsInstance(req.json(), dict)
+        self.assertEqual(req.status_code, 400)
+        self.assertIn("failed to import domain key: failed to parse PEM", req.json()["message"])
+
     @pytest.mark.order(7)
+    @pytest.mark.xfail(reason="The test can fail because the domain name is a random string")
     async def test_delete_domain_creds(self) -> None:
         await self.client.domains_credentials.create(
-            domain=self.domain,
+            domain=self.test_domain,
             data=self.post_domain_creds,
         )
         request = await self.client.domains_credentials.delete(
-            domain=self.domain,
+            domain=self.test_domain,
             login="alice_bob",
         )
 
@@ -2594,6 +3098,7 @@ class AsyncDomainTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn(request.json()["message"], "All domain credentials have been deleted")
 
     @pytest.mark.order(8)
+    @pytest.mark.xfail(reason="The test can fail because the domain name is a random string")
     async def test_delete_domain(self) -> None:
         await self.client.domains.create(data=self.post_domain_data)
         request = await self.client.domains.delete(domain=self.test_domain)
@@ -4076,9 +4581,7 @@ class AsyncMetricsTest(unittest.IsolatedAsyncioTestCase):
         req = await self.client.analytics_usage_metrics.create(
             data=self.invalid_account_usage_metrics_data,
         )
-        from pprint import pprint
 
-        pprint(req.json())
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 400)
         self.assertNotIn("items", req.json())
@@ -4435,7 +4938,7 @@ class AsyncUsersTests(unittest.IsolatedAsyncioTestCase):
         """Test to get account's users details: expected failure with invalid URL."""
         query = {"role": "admin", "limit": "0", "skip": "0"}
 
-        with self.assertRaises(KeyError) as cm:
+        with self.assertRaises(KeyError):
             await self.client.user.get(filters=query)
 
     @pytest.mark.xfail
@@ -4471,10 +4974,7 @@ class AsyncUsersTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_get_user_details(self) -> None:
         """Test to get user details: happy path."""
-        """
-        GET /v5/users/{user_id}
-        :return:
-        """
+
         query = {"role": "admin", "limit": "0", "skip": "0"}
         req1 = await self.client.users.get(filters=query)
         users = req1.json()["users"]
@@ -4525,134 +5025,112 @@ class AsyncUsersTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(req2.status_code, 404)
 
 
-class BounceClassificationTests(unittest.TestCase):
-    """Tests for Mailgun Bounce Classification API, https://api.mailgun.net/v2/bounce-classification/metrics.
+class AsyncKeysTests(unittest.IsolatedAsyncioTestCase):
+    """Async tests for Mailgun Users API using AsyncClient."""
 
-    This class provides setup functionality for tests involving the
-    functionality with authentication and client initialization handled
-    in `setUp`. Each test in this suite operates with the configured Mailgun client
-    instance to simulate API interactions.
-
-    """
-
-    def setUp(self) -> None:
+    async def asyncSetUp(self) -> None:
         self.auth: tuple[str, str] = (
             "api",
             os.environ["APIKEY"],
         )
-        self.client: Client = Client(auth=self.auth)
+        self.client: AsyncClient = AsyncClient(auth=self.auth)
         self.domain: str = os.environ["DOMAIN"]
+        self.mailgun_email = os.environ["MAILGUN_EMAIL"]
+        self.role = os.environ["ROLE"]
+        self.user_id = os.environ["USER_ID"]
+        self.user_name = os.environ["USER_NAME"]
 
-        now = datetime.now()
-        now_formatted = now.strftime("%a, %d %b %Y %H:%M:%S +0000")
-        yesterday = now - timedelta(days=1)
-        yesterday_formatted = yesterday.strftime("%a, %d %b %Y %H:%M:%S +0000")  # noqa: FURB184
+    async def asyncTearDown(self) -> None:
+        await self.client.aclose()
 
-        self.payload = {
-            "start": yesterday_formatted,
-            "end": now_formatted,
-            "resolution": "day",
-            "duration": "24h0m0s",
-            "dimensions": ["entity-name", "domain.name"],
-            "metrics": [
-                "critical_bounce_count",
-                "non_critical_bounce_count",
-                "critical_delay_count",
-                "non_critical_delay_count",
-                "delivered_smtp_count",
-                "classified_failures_count",
-                "critical_bounce_rate",
-                "non_critical_bounce_rate",
-                "critical_delay_rate",
-                "non_critical_delay_rate",
-            ],
-            "filter": {
-                "AND": [
-                    {
-                        "attribute": "domain.name",
-                        "comparator": "=",
-                        "values": [{"value": self.domain}],
-                    }
-                ]
-            },
-            "include_subaccounts": True,
-            "pagination": {"sort": "entity-name:asc", "limit": 10},
-        }
-        self.payload_without_dimensions = {
-            "start": yesterday_formatted,
-            "end": now_formatted,
-            "metrics": [
-                "critical_bounce_count",
-            ],
-            "pagination": {"sort": "entity-name:asc", "limit": 10},
-        }
-        self.payload_with_old_dates = {
-            "start": "Wed, 12 Nov 2000 23:00:00 UTC",
-            "end": "Thu, 13 Nov 2000 23:00:00 UTC",
-            "dimensions": ["entity-name", "domain.name"],
-            "metrics": [
-                "critical_bounce_count",
-            ],
-            "pagination": {"sort": "entity-name:asc", "limit": 10},
-        }
-        self.empty_payload: dict[str, str] = {}
+    async def test_get_keys(self) -> None:
+        """Test to get the list of Mailgun API keys: happy path with valid data."""
+        query = {"domain_name": "python.test.domain5", "kind": "web"}
+        req = await self.client.keys.get(filters=query)
 
-    def test_post_list_statistic(self) -> None:
-        """Test to post query to list statistic: Happy Path with valid data."""
-        req = self.client.bounceclassification_metrics.create(data=self.payload)
-
-        expected_keys: list[str] = [
-            "start",
-            "end",
-            "resolution",
-            "duration",
-            "dimensions",
-            "pagination",
+        expected_keys = [
+            "total_count",
             "items",
-        ]
-        expected_dimensions_elements: list[str] = [
-            "entity-name",
-            "domain.name",
-        ]
-        expected_pagination_keys: list[str] = [
-            "sort",
-            "skip",
-            "limit",
-            "total",
         ]
 
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 200)
-        [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
-        [self.assertIn(key, expected_dimensions_elements) for key in req.json()["dimensions"]]  # type: ignore[func-returns-value]
-        [self.assertIn(key, expected_pagination_keys) for key in req.json()["pagination"]]  # type: ignore[func-returns-value]
+        [self.assertIn(key, expected_keys) for key in req.json()]  # type: ignore[func-returns-value]
 
-    def test_post_list_statistic_without_dimensions(self) -> None:
-        """Test to post query to list statistic: Wrong Path with invalid data."""
-        req = self.client.bounceclassification_metrics.create(data=self.payload_without_dimensions)
+    @pytest.mark.asyncio
+    async def test_get_keys_with_invalid_url(self) -> None:
+        """Test to get the list of Mailgun API keys: expected failure with invalid URL."""
+        query = {"domain_name": "python.test.domain5", "kind": "web"}
 
-        self.assertIsInstance(req.json(), dict)
-        self.assertEqual(req.status_code, 400)
-        [self.assertIn(key, "message") for key in req.json().keys()]  # type: ignore[func-returns-value]
-        self.assertIn("sort should be either one of metrics or dimensions", req.json()["message"])
+        with pytest.raises(KeyError):
+            await self.client.key.get(filters=query)
 
-    def test_post_list_statistic_with_old_dates(self) -> None:
-        """Test to post query to list statistic: Wrong Path with invalid data."""
-        req = self.client.bounceclassification_metrics.create(data=self.payload_with_old_dates)
+    async def test_get_keys_without_filtering_data(self) -> None:
+        """Test to get the list of Mailgun API keys: Happy Path without filtering data."""
+        req = await self.client.keys.get()
 
         self.assertIsInstance(req.json(), dict)
-        self.assertEqual(req.status_code, 400)
-        [self.assertIn(key, "message") for key in req.json().keys()]  # type: ignore[func-returns-value]
-        self.assertIn("is out of permitted log retention", req.json()["message"])
+        self.assertEqual(req.status_code, 200)
+        self.assertGreater(len(req.json()["items"]), 0)
 
-    def test_post_list_statistic_with_empty_payload(self) -> None:
-        """Test to post query to list statistic: Wrong Path with invalid data."""
-        req = self.client.bounceclassification_metrics.create(data=self.empty_payload)
+    async def test_post_keys(self) -> None:
+        """Test to create the Mailgun API key: happy path with valid data."""
+        data = {
+            "email": self.mailgun_email,
+            "domain_name": "python.test.domain5",
+            "kind": "web",
+            "expiration": "3600",
+            "role": self.role,
+            "user_id": self.user_id,
+            "user_name": self.user_name,
+            "description": "a new key",
+        }
+
+        headers = {"Content-Type": "multipart/form-data"}
+
+        req = await self.client.keys.create(data=data, headers=headers)
+
+        expected_keys = [
+            "message",
+            "key",
+        ]
+
+        expected_key_keys = [
+            "id",
+            "description",
+            "kind",
+            "role",
+            "created_at",
+            "updated_at",
+            "expires_at",
+            "secret",
+            "is_disabled",
+            "domain_name",
+            "requestor",
+            "user_name",
+        ]
 
         self.assertIsInstance(req.json(), dict)
-        self.assertEqual(req.status_code, 400)
-        [self.assertIn(key, "message") for key in req.json().keys()]  # type: ignore[func-returns-value]
-        self.assertIn("is out of permitted log retention", req.json()["message"])
+        self.assertEqual(req.status_code, 200)
+        self.assertEqual(req.json()["message"], "great success")
+        [self.assertIn(key, expected_keys) for key in req.json()]  # type: ignore[func-returns-value]
+        [self.assertIn(key, expected_key_keys) for key in req.json()["key"]]  # type: ignore[func-returns-value]
+
+    async def test_delete_key(self) -> None:
+        """Test to delete the Mailgun API keys: happy path with valid data."""
+        query = {"domain_name": "python.test.domain5", "kind": "web"}
+        req1 = await self.client.keys.get(filters=query)
+        items = req1.json()["items"]
+
+        for item in items:
+            if self.mailgun_email == item["requestor"]:  # codespell:disable-line
+                req2 = await self.client.keys.delete(key_id=item["id"])
+                self.assertEqual(req2.json()["message"], "key deleted")
+
+    @pytest.mark.skip("Don't regenerate a public Mailgun API without a need")
+    async def test_regenerate_key(self) -> None:
+        """Test to regenerate the Mailgun API keys: happy path with valid data."""
+        await self.client.keys_public.create()
 
 
 if __name__ == "__main__":

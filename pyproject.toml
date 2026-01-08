@@ -1,9 +1,123 @@
 [build-system]
-requires = ["setuptools>=77.0.0", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
+requires = [ "setuptools>=77", "setuptools-scm" ]
+
+[project]
+name = "mailgun"
+description = "Python SDK for Mailgun"
+readme = "README.md"
+keywords = [
+  "email python-wrapper",
+  "mailgun",
+  "Mailgun API Python Wrapper",
+  "mailgun-api",
+  "Python SDK for Mailgun",
+  "transactional-emails",
+  "wrapper",
+]
+license = "Apache-2.0"
+license-files = [ "LICENSE" ]
+maintainers = [
+  { name = "Serhii Kupriienko", email = "kupriienko.serhii@gmail.com" },
+]
+authors = [
+  { name = "diskovod", email = "diskovodik@gmail.com" },
+  { name = "Mailgun", email = "api@mailgun.com" },
+]
+requires-python = ">=3.10"
+
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Natural Language :: English",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Topic :: Communications :: Email",
+  "Topic :: Utilities",
+]
+
+dynamic = [ "version" ]
+dependencies = [ "httpx>=0.24", "requests>=2.32.5", "typing-extensions>=4.7.1; python_version<'3.11'" ]
+
+optional-dependencies.conda_build = [ "conda-build" ]
+optional-dependencies.docs = [
+  "docconvert",
+  "pyment>=0.3.3", # for generating docstrings
+]
+optional-dependencies.linting = [
+  "autoflake",
+  "autopep8",
+  "bandit",
+  "black>=21.7",
+  "flake8>=3.7.8", # the modular source code checker: pep8 pyflakes and co
+  "isort",         # A Python utility / library to sort Python imports.
+  # dev tools
+  "make",
+  "monkeytype",   # It can generate type hints based on the observed behavior of your code.
+  "mypy",         # Optional static typing for Python
+  "pandas-stubs", # mypy pandas stub
+  "pep8-naming",
+  "pre-commit",   # A framework for managing and maintaining multi-language pre-commit hooks.
+  "pycodestyle",
+  "pydocstyle",
+  "pylint",
+  "pyright",
+  # env variables
+  "python-dotenv>=0.19.2",
+  "pytype",                # a static type checker for any type hints you have put in your code
+  "pyupgrade",
+  "radon",
+  "refurb",
+  "ruff",                  # An extremely fast Python linter and code formatter, written in Rust.
+  "safety",                # Checks installed dependencies for known vulnerabilities and licenses.
+  "toml",
+  "types-pyyaml",
+  "types-requests",        # mypy requests stub
+  "vulture",
+  "yapf",                  # A formatter for Python code
+]
+optional-dependencies.metrics = [
+  "pystra",    # provides functionalities to enable structural reliability analysis
+  "wily>=1.2", # a tool for reporting code complexity metrics
+]
+optional-dependencies.other = [ "toml" ]
+optional-dependencies.profilers = [ "scalene>=1.3.16", "snakeviz" ]
+optional-dependencies.spelling = [ "typos" ]
+optional-dependencies.tests = [
+  "codecov",
+  "coverage>=4.5.4",
+  # For a Private key PEM file generated in PKCS1 format.
+  "openssl",
+  # tests
+  "pytest>=7",
+  "pytest-asyncio",
+  "pytest-benchmark",
+  "pytest-cov",
+  "pytest-order",
+]
+urls."Documentation" = "https://documentation.mailgun.com"
+urls."Homepage" = "https://www.mailgun.com"
+urls."Issue Tracker" = "https://github.com/mailgun/mailgun-python/issues"
+urls."Repository" = "https://github.com/mailgun/mailgun-python"
+
+[tool.setuptools]
+py-modules = [ "mailgun._version" ]
+
+[tool.setuptools.packages.find]
+include = [ "mailgun", "mailgun.handlers", "mailgun.*", "tests", "tests.*" ]
+
+[tool.setuptools.package-data]
+mailgun = [ "py.typed", "*.pyi" ]
 
 [tool.setuptools_scm]
-version_scheme = "no-guess-dev"  # Don't try to guess next version
+version_scheme = "no-guess-dev"   # Don't try to guess next version
 local_scheme = "no-local-version"
 # Ignore uncommitted changes
 git_describe_command = "git describe --tags --match 'v[0-9]*.[0-9]*.[0-9]*'"
@@ -11,133 +125,16 @@ write_to = "mailgun/_version.py"
 write_to_template = '__version__ = "{version}"'
 #fallback_version = "X.Y.ZrcN.postN.devN"  # Explicit fallback
 
-[tool.setuptools]
-py-modules = ["mailgun._version"]
-
-[tool.setuptools.packages.find]
-include = ["mailgun", "mailgun.handlers", "mailgun.*", "tests", "tests.*"]
-
-[tool.setuptools.package-data]
-mailgun = ["py.typed", "*.pyi"]
-
-
-[project]
-name = "mailgun"
-dynamic = ["version"]
-description = "Python SDK for Mailgun"
-authors = [
-    { name = "diskovod", email = "diskovodik@gmail.com" },
-    { name = "Mailgun", email = "api@mailgun.com" },
-]
-maintainers = [
-  {name = "Serhii Kupriienko", email = "kupriienko.serhii@gmail.com"}
-]
-license = "Apache-2.0"
-license-files = ["LICENSE"]
-readme = "README.md"
-requires-python = ">=3.10"
-
-dependencies = ["requests>=2.32.5", "httpx>=0.24.0", "typing_extensions>=4.7.1"]
-
-keywords = [
-        "Python SDK for Mailgun",
-        "Mailgun API Python Wrapper",
-        "wrapper",
-        "email python-wrapper",
-        "transactional-emails",
-        "mailgun",
-        "mailgun-api",
-    ]
-classifiers = [
-        "Development Status :: 3 - Alpha",
-        "Environment :: Console",
-        "Intended Audience :: Developers",
-        "Natural Language :: English",
-        "Operating System :: OS Independent",
-        "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.10",
-        "Programming Language :: Python :: 3.11",
-        "Programming Language :: Python :: 3.12",
-        "Programming Language :: Python :: 3.13",
-        "Programming Language :: Python :: 3.14",
-        "Programming Language :: Python :: 3 :: Only",
-        "Programming Language :: Python :: Implementation :: CPython",
-        "Topic :: Communications :: Email",
-        "Topic :: Utilities",
-]
-
-[project.urls]
-"Homepage" = "https://www.mailgun.com"
-"Documentation" = "https://documentation.mailgun.com"
-"Repository" = "https://github.com/mailgun/mailgun-python"
-"Issue Tracker" = "https://github.com/mailgun/mailgun-python/issues"
-
-[project.optional-dependencies]
-linting = [
-    # dev tools
-    "make",
-    "toml",
-    "autopep8",
-    "bandit",
-    "black>=21.7",
-    "autoflake",
-    "flake8>=3.7.8",  # the modular source code checker: pep8 pyflakes and co
-    "pep8-naming",
-    "isort",  # A Python utility / library to sort Python imports.
-    "yapf",  # A formatter for Python code
-    "pycodestyle",
-    "pydocstyle",
-    "pyupgrade",
-    "refurb",
-    "pre-commit",  # A framework for managing and maintaining multi-language pre-commit hooks.
-    "ruff",  # An extremely fast Python linter and code formatter, written in Rust.
-    "mypy",  # Optional static typing for Python
-    "types-requests",   # mypy requests stub
-    "pandas-stubs",  # mypy pandas stub
-    "types-PyYAML",
-    "monkeytype",  # It can generate type hints based on the observed behavior of your code.
-    "pyright",
-    "pylint",
-    "pytype",  # a static type checker for any type hints you have put in your code
-    "radon",
-    "safety", # Checks installed dependencies for known vulnerabilities and licenses.
-    "vulture",
-    # env variables
-    "python-dotenv>=0.19.2",
-]
-
-docs = [
-    "docconvert",
-    "pyment>=0.3.3",  # for generating docstrings
-]
-
-metrics = [
-    "pystra",  # provides functionalities to enable structural reliability analysis
-    "wily>=1.2.0",  # a tool for reporting code complexity metrics
-]
-
-profilers = ["scalene>=1.3.16", "snakeviz"]
-
-tests = [
-    # tests
-    "pytest>=7.0.0",
-    "pytest-benchmark",
-    "pytest-order",
-    "pytest-cov",
-    "coverage>=4.5.4",
-    "codecov",
-]
-
-conda_build = ["conda-build"]
-
-spelling = ["typos"]
-
-other = ["toml"]
-
+[tool.autopep8]
+max_line_length = 88
+ignore = ""          # or ["E501", "W6"]
+in-place = true
+recursive = true
+aggressive = 3
 
 [tool.black]
 line-length = 100
-target-version = ["py310", "py311", "py312", "py313", "py314"]
+target-version = [ "py310", "py311", "py312", "py313", "py314" ]
 skip-string-normalization = false
 skip-magic-trailing-comma = false
 extend-exclude = '''
@@ -148,172 +145,148 @@ extend-exclude = '''
 )/
 '''
 
-[tool.autopep8]
-max_line_length = 88
-ignore = ""  # or ["E501", "W6"]
-in-place = true
-recursive = true
-aggressive = 3
-
 [tool.ruff]
-# Exclude a variety of commonly ignored directories.
-exclude = [
-    ".bzr",
-    ".direnv",
-    ".eggs",
-    ".git",
-    ".git-rewrite",
-    ".hg",
-    ".ipynb_checkpoints",
-    ".mypy_cache",
-    ".nox",
-    ".pants.d",
-    ".pyenv",
-    ".pytest_cache",
-    ".pytype",
-    ".ruff_cache",
-    ".svn",
-    ".tox",
-    ".venv",
-    ".vscode",
-    "__pypackages__",
-    "_build",
-    "buck-out",
-    "build",
-    "dist",
-    "node_modules",
-    "site-packages",
-    "venv",
-]
-extend-exclude = ["tests", "test"]
-
-line-length = 100
 #indent-width = 4
 
 # Assume Python 3.10.
 target-version = "py310"
+line-length = 100
+# Exclude a variety of commonly ignored directories.
+exclude = [
+  ".bzr",
+  ".direnv",
+  ".eggs",
+  ".git",
+  ".git-rewrite",
+  ".hg",
+  ".ipynb_checkpoints",
+  ".mypy_cache",
+  ".nox",
+  ".pants.d",
+  ".pyenv",
+  ".pytest_cache",
+  ".pytype",
+  ".ruff_cache",
+  ".svn",
+  ".tox",
+  ".venv",
+  ".vscode",
+  "__pypackages__",
+  "_build",
+  "buck-out",
+  "build",
+  "dist",
+  "node_modules",
+  "site-packages",
+  "venv",
+]
+extend-exclude = [ "test", "tests" ]
+
 # Enumerate all fixed violations.
 show-fixes = true
 
-[tool.ruff.lint]
-# Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
-# McCabe complexity (`C901`) by default.
-# Enable pycodestyle (`E`) and Pyflakes (`F`) codes by default, ('UP') is pyupgrade.
-# "ERA" - Found commented-out code
-# see https://docs.astral.sh/ruff/rules/#rules
-select = ["ALL"]
-#select = ["A", "ARG", "B", "C4", "DTZ", "E", "EM", "ERA", "EXE", "F", "FA", "FLY", "FURB", "G", "ICN", "INP", "INT", "LOG", "N", "PD", "PERF", "PIE", "PLC", "PLE", "PLW", "PT", "PTH", "PYI", "Q", "RET", "RSE", "RUF", "S", "SIM", "T10", "TID", "TRY", "UP", "W"]
-
-external = ["DOC", "PLR"]
-
-exclude = ["mailgun/examples/*", "tests"]
-
-#extend-select = ["W", "N", "UP", "B", "A", "C4", "PT", "SIM", "PD", "PLE", "RUF"]
-# Never enforce `E501` (line length violations).
-
-ignore = [
-    # TODO: Enable C901, TRY201, TRY003, EM101, PTH118, PLR0917 later
-    "C901", "TRY201", "TRY003", "EM101", "PTH118", "PLR0912", "PLR0917", "TD002", "TD003", "FIX002",
-    "ANN401",  # ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
-    "ARG001",  # ARG001 Unused function argument: `kwargs`
-    "B904",  # Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None`
-    # pycodestyle (E, W)
-    "CPY001",   # Missing copyright notice at top of file
-    "DOC201",  # DOC201 `return` is not documented in docstring
-    # TODO: Enable DOC501 when the upstream issue is fixed, see https://github.com/astral-sh/ruff/issues/12520
-    "DOC501",  # DOC501 Raised exception `ApiError` missing from docstring
-    "E501",
-    "PLR0911",  # PLR0911 Too many return statements (9 > 6)
-    "PLR0913",  # PLR0913 Too many arguments in function definition (6 > 5)
-]
-
-# Allow fix for all enabled rules (when `--fix`) is provided.
-fixable = ["ALL"]
-unfixable = ["B"]
-
-# Allow unused variables when underscore-prefixed.
-dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
-
-[tool.ruff.lint.flake8-annotations]
-allow-star-arg-any = false
-ignore-fully-untyped = false
-
-[tool.ruff.lint.flake8-quotes]
-docstring-quotes = "double"
-
-[tool.ruff.format]
-exclude = ["*.pyi"]
-# Like Black, use double quotes for strings.
-quote-style = "double"
-
 # Like Black, indent with spaces, rather than tabs.
-indent-style = "space"
-
-# Like Black, respect magic trailing commas.
-skip-magic-trailing-comma = false
-
+format.indent-style = "space"
+# Like Black, use double quotes for strings.
+format.quote-style = "double"
 # Like Black, automatically detect the appropriate line ending.
-line-ending = "auto"
-
-# Enable auto-formatting of code examples in docstrings. Markdown,
-# reStructuredText code/literal blocks and doctests are all supported.
-#
-# This is currently disabled by default, but it is planned for this
-# to be opt-out in the future.
-docstring-code-format = true
-
+format.line-ending = "auto"
+# Like Black, respect magic trailing commas.
+format.skip-magic-trailing-comma = false
 # Set the line length limit used when formatting code snippets in
 # docstrings.
 #
 # This only has an effect when the `docstring-code-format` setting is
 # enabled.
-docstring-code-line-length = "dynamic"
-
-# Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
-[tool.ruff.lint.per-file-ignores]
-"__init__.py" = ["E402"]
+format.docstring-code-line-length = "dynamic"
+format.exclude = [ "*.pyi" ]
+# Enable auto-formatting of code examples in docstrings. Markdown,
+# reStructuredText code/literal blocks and doctests are all supported.
+#
+# This is currently disabled by default, but it is planned for this
+# to be opt-out in the future.
+format.docstring-code-format = true
+# Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
+# McCabe complexity (`C901`) by default.
+# Enable pycodestyle (`E`) and Pyflakes (`F`) codes by default, ('UP') is pyupgrade.
+# "ERA" - Found commented-out code
+# see https://docs.astral.sh/ruff/rules/#rules
+lint.select = [ "ALL" ]
+#extend-select = ["W", "N", "UP", "B", "A", "C4", "PT", "SIM", "PD", "PLE", "RUF"]
+# Never enforce `E501` (line length violations).
+lint.ignore = [
+  "ANN401", # ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+  "ARG001", # ARG001 Unused function argument: `kwargs`
+  "B904",   # Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None`
+  # TODO: Enable C901, TRY201, TRY003, EM101, PTH118, PLR0917 later
+  "C901",
+  # pycodestyle (E, W)
+  "CPY001", # Missing copyright notice at top of file
+  "DOC201", # DOC201 `return` is not documented in docstring
+  # TODO: Enable DOC501 when the upstream issue is fixed, see https://github.com/astral-sh/ruff/issues/12520
+  "DOC501",  # DOC501 Raised exception `ApiError` missing from docstring
+  "E501",
+  "EM101",
+  "FIX002",
+  "PLR0911", # PLR0911 Too many return statements (9 > 6)
+  "PLR0912",
+  "PLR0913", # PLR0913 Too many arguments in function definition (6 > 5)
+  "PLR0917",
+  "PTH118",
+  "TD002",
+  "TD003",
+  "TRY003",
+  "TRY201",
+]
+lint.exclude = [ "mailgun/examples/*", "tests" ]
+lint.per-file-ignores."__init__.py" = [ "E402" ]
+# Allow fix for all enabled rules (when `--fix`) is provided.
+lint.fixable = [ "ALL" ]
+lint.unfixable = [ "B" ]
+# Allow unused variables when underscore-prefixed.
+lint.dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+#select = ["A", "ARG", "B", "C4", "DTZ", "E", "EM", "ERA", "EXE", "F", "FA", "FLY", "FURB", "G", "ICN", "INP", "INT", "LOG", "N", "PD", "PERF", "PIE", "PLC", "PLE", "PLW", "PT", "PTH", "PYI", "Q", "RET", "RSE", "RUF", "S", "SIM", "T10", "TID", "TRY", "UP", "W"]
+lint.external = [ "DOC", "PLR" ]
+lint.flake8-annotations.allow-star-arg-any = false
+lint.flake8-annotations.ignore-fully-untyped = false
+lint.flake8-quotes.docstring-quotes = "double"
 #"path/to/file.py" = ["E402"]
-
-[tool.ruff.lint.isort]
-force-single-line = true
-force-sort-within-sections = false
-lines-after-imports = 2
-
-[tool.ruff.lint.mccabe]
-# Unlike Flake8, default to a complexity level of 10.
-max-complexity = 10
-
-[tool.ruff.lint.pycodestyle]
-ignore-overlong-task-comments = true
-
-[tool.ruff.lint.pydocstyle]
+lint.isort.force-single-line = true
+lint.isort.force-sort-within-sections = false
+lint.isort.lines-after-imports = 2
+lint.mccabe.max-complexity = 13
+lint.pycodestyle.ignore-overlong-task-comments = true
+# Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
 # TODO: Enable the 'sphinx' style when it will be available, see https://github.com/astral-sh/ruff/pull/13286
-convention = "google"
-
-[tool.pydocstyle]
-convention = "google"
-match = ".*.py"
-match_dir = '^examples/'
+lint.pydocstyle.convention = "google"
 
 [tool.flake8]
-exclude = ["mailgun/examples/*", "tests"]
-ignore = ['E501']
+exclude = [ "mailgun/examples/*", "tests" ]
+ignore = [ 'E501' ]
 extend-ignore = "W503"
 per-file-ignores = [
-    '__init__.py:F401',
+  '__init__.py:F401',
 ]
 max-line-length = 100
 count = true
+max-complexity = 13
 
-[tool.yapf]
-based_on_style = "facebook"
-SPLIT_BEFORE_BITWISE_OPERATOR = true
-SPLIT_BEFORE_ARITHMETIC_OPERATOR = true
-SPLIT_BEFORE_LOGICAL_OPERATOR = true
-SPLIT_BEFORE_DOT = true
+[tool.coverage.run]
+source_pkgs = [ "mailgun" ]
+branch = true
+parallel = true
+omit = [
+  "mailgun/examples/*",
+]
 
-[tool.yapfignore]
-ignore_patterns = [
+[tool.coverage.paths]
+tests = [ "tests" ]
+
+[tool.coverage.report]
+exclude_lines = [
+  "no cov",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
 ]
 
 [tool.mypy]
@@ -359,7 +332,7 @@ strict_equality = true
 #    (^|/)test[^/]*\.py$    # files named "test*.py"
 #  )'''
 exclude = [
-    "mailgun/examples/*",
+  "mailgun/examples/*",
 ]
 
 # Configuring error messages
@@ -369,17 +342,35 @@ show_error_codes = true
 disable_error_code = 'misc'
 
 [tool.pyright]
-include = ["mailgun"]
-exclude = ["mailgun/examples/*", "**/__pycache__"]
+include = [ "mailgun" ]
+exclude = [ "mailgun/examples/*", "**/__pycache__" ]
 reportAttributeAccessIssue = false
 reportMissingImports = false
 
+[tool.typos.default.extend-words]
+requestor = "requestor"
+
+[tool.pydocstyle]
+convention = "google"
+match = ".*.py"
+match_dir = '^examples/'
+
+[tool.yapf]
+based_on_style = "facebook"
+SPLIT_BEFORE_BITWISE_OPERATOR = true
+SPLIT_BEFORE_ARITHMETIC_OPERATOR = true
+SPLIT_BEFORE_LOGICAL_OPERATOR = true
+SPLIT_BEFORE_DOT = true
+
+[tool.yapfignore]
+ignore_patterns = [
+]
 
 [tool.bandit]
 # usage: bandit -c pyproject.toml -r .
-exclude_dirs = ["tests", "tests.py"]
-tests = ["B201", "B301"]
-skips = ["B101", "B601"]
+exclude_dirs = [ "tests", "tests.py" ]
+tests = [ "B201", "B301" ]
+skips = [ "B101", "B601" ]
 
 [tool.bandit.any_other_function_with_shell_equals_true]
 no_shell = [
@@ -399,7 +390,7 @@ no_shell = [
   "os.spawnve",
   "os.spawnvp",
   "os.spawnvpe",
-  "os.startfile"
+  "os.startfile",
 ]
 shell = [
   "os.system",
@@ -413,29 +404,11 @@ shell = [
   "popen2.Popen3",
   "popen2.Popen4",
   "commands.getoutput",
-  "commands.getstatusoutput"
+  "commands.getstatusoutput",
 ]
 subprocess = [
   "subprocess.Popen",
   "subprocess.call",
   "subprocess.check_call",
-  "subprocess.check_output"
-]
-
-[tool.coverage.run]
-source_pkgs = ["mailgun"]
-branch = true
-parallel = true
-omit = [
-    "mailgun/examples/*",
-]
-
-[tool.coverage.paths]
-tests = ["tests"]
-
-[tool.coverage.report]
-exclude_lines = [
-    "no cov",
-    "if __name__ == .__main__.:",
-    "if TYPE_CHECKING:",
+  "subprocess.check_output",
 ]

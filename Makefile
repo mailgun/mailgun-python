@@ -1,4 +1,4 @@
-.PHONY: clean clean-env clean-test clean-pyc clean-build clean-other help dev test test-debug test-cov pre-commit lint format format-docs analyze docs
+.PHONY: all clean clean-env clean-test clean-pyc clean-build clean-other help dev test test-debug test-cov pre-commit lint format format-docs analyze docs
 .DEFAULT_GOAL := help
 
 # The `.ONESHELL` and setting `SHELL` allows us to run commands that require

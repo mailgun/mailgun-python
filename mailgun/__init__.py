@@ -6,5 +6,4 @@ Packages:
 
 Modules:
     - client: Defines the main API client.
-
 """
