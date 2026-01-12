@@ -334,3 +334,45 @@ class DomainTests(unittest.TestCase):
             request.json()["message"], "Domain will be deleted in the background"
         )
         self.assertEqual(request.status_code, 200)
+
+
+class IpTests(unittest.TestCase):
+    """Mirror of integration IpTests with mocked HTTP."""
+
+    def setUp(self) -> None:
+        self.client = Client(auth=AUTH)
+        self.domain = DOMAIN
+        self.ip_data = {"ip": "1.2.3.4"}
+
+    @patch("mailgun.client.requests.get")
+    def test_get_ip_from_domain(self, m_get: MagicMock) -> None:
+        m_get.return_value = mock_response(200, {"items": []})
+        req = self.client.ips.get(domain=self.domain, params={"dedicated": "true"})
+        self.assertIn("items", req.json())
+        self.assertEqual(req.status_code, 200)
+
+    @patch("mailgun.client.requests.get")
+    @patch("mailgun.client.requests.post")
+    def test_get_ip_by_address(self, m_post: MagicMock, m_get: MagicMock) -> None:
+        m_post.return_value = mock_response(200)
+        m_get.return_value = mock_response(200, {"ip": self.ip_data["ip"]})
+        self.client.domains_ips.create(domain=self.domain, data=self.ip_data)
+        req = self.client.ips.get(domain=self.domain, ip=self.ip_data["ip"])
+        self.assertIn("ip", req.json())
+        self.assertEqual(req.status_code, 200)
+
+    @patch("mailgun.client.requests.post")
+    def test_create_ip(self, m_post: MagicMock) -> None:
+        m_post.return_value = mock_response(200, {"message": "success"})
+        request = self.client.domains_ips.create(domain=self.domain, data=self.ip_data)
+        self.assertEqual("success", request.json()["message"])
+        self.assertEqual(request.status_code, 200)
+
+    @patch("mailgun.client.requests.delete")
+    def test_delete_ip(self, m_delete: MagicMock) -> None:
+        m_delete.return_value = mock_response(200, {"message": "success"})
+        request = self.client.domains_ips.delete(
+            domain=self.domain, ip=self.ip_data["ip"]
+        )
+        self.assertEqual("success", request.json()["message"])
+        self.assertEqual(request.status_code, 200)
