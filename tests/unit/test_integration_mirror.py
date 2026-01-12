@@ -376,3 +376,54 @@ class IpTests(unittest.TestCase):
         )
         self.assertEqual("success", request.json()["message"])
         self.assertEqual(request.status_code, 200)
+
+
+class IpPoolsTests(unittest.TestCase):
+    """Mirror of integration IpPoolsTests with mocked HTTP."""
+
+    def setUp(self) -> None:
+        self.client = Client(auth=AUTH)
+        self.domain = DOMAIN
+        self.data = {"name": "test_pool", "description": "Test", "add_ip": "1.2.3.4"}
+        self.patch_data = {"name": "test_pool1", "description": "Test1"}
+
+    @patch("mailgun.client.requests.get")
+    @patch("mailgun.client.requests.post")
+    def test_get_ippools(self, m_post: MagicMock, m_get: MagicMock) -> None:
+        m_post.return_value = mock_response(200, {"pool_id": "pid"})
+        m_get.return_value = mock_response(200, {"ip_pools": []})
+        self.client.ippools.create(domain=self.domain, data=self.data)
+        req = self.client.ippools.get(domain=self.domain)
+        self.assertIn("ip_pools", req.json())
+        self.assertEqual(req.status_code, 200)
+
+    @patch("mailgun.client.requests.patch")
+    @patch("mailgun.client.requests.post")
+    def test_patch_ippool(self, m_post: MagicMock, m_patch: MagicMock) -> None:
+        m_post.return_value = mock_response(200, {"pool_id": "pid123"})
+        m_patch.return_value = mock_response(200, {"message": "success"})
+        self.client.ippools.create(domain=self.domain, data=self.data)
+        req = self.client.ippools.patch(
+            domain=self.domain, data=self.patch_data, pool_id="pid123"
+        )
+        self.assertEqual("success", req.json()["message"])
+        self.assertEqual(req.status_code, 200)
+
+    @patch("mailgun.client.requests.post")
+    def test_link_domain_ippool(self, m_post: MagicMock) -> None:
+        m_post.return_value = mock_response(200, {"message": "Linked"})
+        req = self.client.domains_ips.create(
+            domain=self.domain, data={"pool_id": "pid123"}
+        )
+        self.assertIn("message", req.json())
+
+    @patch("mailgun.client.requests.delete")
+    @patch("mailgun.client.requests.post")
+    def test_delete_ippool(self, m_post: MagicMock, m_delete: MagicMock) -> None:
+        m_post.return_value = mock_response(200, {"pool_id": "pid123"})
+        m_delete.return_value = mock_response(200, {"message": "started"})
+        self.client.ippools.create(domain=self.domain, data=self.data)
+        req_del = self.client.ippools.delete(
+            domain=self.domain, pool_id="pid123"
+        )
+        self.assertEqual("started", req_del.json()["message"])
