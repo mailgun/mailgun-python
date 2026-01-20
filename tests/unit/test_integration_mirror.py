@@ -427,3 +427,26 @@ class IpPoolsTests(unittest.TestCase):
             domain=self.domain, pool_id="pid123"
         )
         self.assertEqual("started", req_del.json()["message"])
+
+
+class EventsTests(unittest.TestCase):
+    """Mirror of integration EventsTests with mocked HTTP."""
+
+    def setUp(self) -> None:
+        self.client = Client(auth=AUTH)
+        self.domain = DOMAIN
+        self.params = {"event": "rejected"}
+
+    @patch("mailgun.client.requests.get")
+    def test_events_get(self, m_get: MagicMock) -> None:
+        m_get.return_value = mock_response(200, {"items": []})
+        req = self.client.events.get(domain=self.domain)
+        self.assertIn("items", req.json())
+        self.assertEqual(req.status_code, 200)
+
+    @patch("mailgun.client.requests.get")
+    def test_event_params(self, m_get: MagicMock) -> None:
+        m_get.return_value = mock_response(200, {"items": []})
+        req = self.client.events.get(domain=self.domain, filters=self.params)
+        self.assertIn("items", req.json())
+        self.assertEqual(req.status_code, 200)
