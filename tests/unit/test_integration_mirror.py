@@ -450,3 +450,71 @@ class EventsTests(unittest.TestCase):
         req = self.client.events.get(domain=self.domain, filters=self.params)
         self.assertIn("items", req.json())
         self.assertEqual(req.status_code, 200)
+
+
+class TagsTests(unittest.TestCase):
+    """Mirror of integration TagsTests with mocked HTTP."""
+
+    def setUp(self) -> None:
+        self.client = Client(auth=AUTH)
+        self.domain = DOMAIN
+        self.data = {"description": "Tests running"}
+        self.put_tags_data = {"description": "Python testtt"}
+        self.stats_params = {"event": "accepted"}
+        self.tag_name = "Python test"
+
+    @patch("mailgun.client.requests.get")
+    def test_get_tags(self, m_get: MagicMock) -> None:
+        m_get.return_value = mock_response(200, {"items": []})
+        req = self.client.tags.get(domain=self.domain)
+        self.assertIn("items", req.json())
+        self.assertEqual(req.status_code, 200)
+
+    @patch("mailgun.client.requests.get")
+    def test_tag_get_by_name(self, m_get: MagicMock) -> None:
+        m_get.return_value = mock_response(200, {"tag": {"name": self.tag_name}})
+        req = self.client.tags.get(domain=self.domain, tag_name=self.tag_name)
+        self.assertIn("tag", req.json())
+        self.assertEqual(req.status_code, 200)
+
+    @patch("mailgun.client.requests.put")
+    def test_tag_put(self, m_put: MagicMock) -> None:
+        m_put.return_value = mock_response(200, {"message": "Updated"})
+        req = self.client.tags.put(
+            domain=self.domain,
+            tag_name=self.tag_name,
+            data=self.put_tags_data,
+        )
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("message", req.json())
+
+    @patch("mailgun.client.requests.get")
+    def test_tags_stats_get(self, m_get: MagicMock) -> None:
+        m_get.return_value = mock_response(200, {"tag": {}})
+        req = self.client.tags_stats.get(
+            domain=self.domain,
+            filters=self.stats_params,
+            tag_name=self.tag_name,
+        )
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("tag", req.json())
+
+    @patch("mailgun.client.requests.get")
+    def test_tags_stats_aggregate_get(self, m_get: MagicMock) -> None:
+        m_get.return_value = mock_response(200, {"tag": {}})
+        req = self.client.tags_stats_aggregates_devices.get(
+            domain=self.domain,
+            filters=self.stats_params,
+            tag_name=self.tag_name,
+        )
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("tag", req.json())
+
+    @patch("mailgun.client.requests.delete")
+    def test_delete_tags(self, m_delete: MagicMock) -> None:
+        m_delete.return_value = mock_response(200, {"message": "Deleted"})
+        req = self.client.tags.delete(
+            domain=self.domain, tag_name=self.tag_name
+        )
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("message", req.json())
