@@ -6,6 +6,7 @@ Mirrors test classes and test methods from tests/integration/tests.py (sync only
 
 from __future__ import annotations
 
+import json
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -516,5 +517,85 @@ class TagsTests(unittest.TestCase):
         req = self.client.tags.delete(
             domain=self.domain, tag_name=self.tag_name
         )
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("message", req.json())
+
+
+class BouncesTests(unittest.TestCase):
+    """Mirror of integration BouncesTests with mocked HTTP."""
+
+    def setUp(self) -> None:
+        self.client = Client(auth=AUTH)
+        self.domain = DOMAIN
+        self.bounces_data = {
+            "address": "test30@gmail.com",
+            "code": 550,
+            "error": "Test error",
+        }
+        self.bounces_json_data = """[{
+            "address": "test121@i.ua",
+            "code": "550",
+            "error": "Test error2312"
+        }, {
+            "address": "test122@gmail.com",
+            "code": "550",
+            "error": "Test error"
+        }]"""
+
+    @patch("mailgun.client.requests.get")
+    def test_bounces_get(self, m_get: MagicMock) -> None:
+        m_get.return_value = mock_response(200, {"items": []})
+        req = self.client.bounces.get(domain=self.domain)
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("items", req.json())
+
+    @patch("mailgun.client.requests.post")
+    def test_bounces_create(self, m_post: MagicMock) -> None:
+        m_post.return_value = mock_response(200, {"address": self.bounces_data["address"]})
+        req = self.client.bounces.create(data=self.bounces_data, domain=self.domain)
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("address", req.json())
+
+    @patch("mailgun.client.requests.get")
+    @patch("mailgun.client.requests.post")
+    def test_bounces_get_address(self, m_post: MagicMock, m_get: MagicMock) -> None:
+        m_post.return_value = mock_response(200)
+        m_get.return_value = mock_response(200, {"address": self.bounces_data["address"]})
+        self.client.bounces.create(data=self.bounces_data, domain=self.domain)
+        req = self.client.bounces.get(
+            domain=self.domain, bounce_address=self.bounces_data["address"]
+        )
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("address", req.json())
+
+    @patch("mailgun.client.requests.post")
+    def test_bounces_create_json(self, m_post: MagicMock) -> None:
+        m_post.return_value = mock_response(200, {"message": "Added"})
+        json_data = json.loads(self.bounces_json_data)
+        for address in json_data:
+            req = self.client.bounces.create(
+                data=address,
+                domain=self.domain,
+                headers={"Content-type": "application/json"},
+            )
+            self.assertEqual(req.status_code, 200)
+            self.assertIn("message", req.json())
+
+    @patch("mailgun.client.requests.delete")
+    @patch("mailgun.client.requests.post")
+    def test_bounces_delete_single(self, m_post: MagicMock, m_delete: MagicMock) -> None:
+        m_post.return_value = mock_response(200)
+        m_delete.return_value = mock_response(200, {"message": "Deleted"})
+        self.client.bounces.create(data=self.bounces_data, domain=self.domain)
+        req = self.client.bounces.delete(
+            domain=self.domain, bounce_address=self.bounces_data["address"]
+        )
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("message", req.json())
+
+    @patch("mailgun.client.requests.delete")
+    def test_bounces_delete_all(self, m_delete: MagicMock) -> None:
+        m_delete.return_value = mock_response(200, {"message": "Deleted"})
+        req = self.client.bounces.delete(domain=self.domain)
         self.assertEqual(req.status_code, 200)
         self.assertIn("message", req.json())
