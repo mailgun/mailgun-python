@@ -599,3 +599,66 @@ class BouncesTests(unittest.TestCase):
         req = self.client.bounces.delete(domain=self.domain)
         self.assertEqual(req.status_code, 200)
         self.assertIn("message", req.json())
+
+
+class UnsubscribesTests(unittest.TestCase):
+    """Mirror of integration UnsubscribesTests with mocked HTTP."""
+
+    def setUp(self) -> None:
+        self.client = Client(auth=AUTH)
+        self.domain = DOMAIN
+        self.unsub_data = {"address": "test@gmail.com", "tag": "unsub_test_tag"}
+        self.unsub_json_data = """[{"address": "test1@gmail.com", "tags": ["some tag"]},
+            {"address": "test2@gmail.com", "code": ["*"]}, {"address": "test3@gmail.com"}]"""
+
+    @patch("mailgun.client.requests.post")
+    def test_unsub_create(self, m_post: MagicMock) -> None:
+        m_post.return_value = mock_response(200, {"message": "Added"})
+        req = self.client.unsubscribes.create(data=self.unsub_data, domain=self.domain)
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("message", req.json())
+
+    @patch("mailgun.client.requests.get")
+    def test_unsub_get(self, m_get: MagicMock) -> None:
+        m_get.return_value = mock_response(200, {"items": []})
+        req = self.client.unsubscribes.get(domain=self.domain)
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("items", req.json())
+
+    @patch("mailgun.client.requests.get")
+    def test_unsub_get_single(self, m_get: MagicMock) -> None:
+        m_get.return_value = mock_response(200, {"address": self.unsub_data["address"]})
+        req = self.client.unsubscribes.get(
+            domain=self.domain, unsubscribe_address=self.unsub_data["address"]
+        )
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("address", req.json())
+
+    @patch("mailgun.client.requests.post")
+    def test_unsub_create_multiple(self, m_post: MagicMock) -> None:
+        m_post.return_value = mock_response(200, {"message": "Added"})
+        json_data = json.loads(self.unsub_json_data)
+        for address in json_data:
+            req = self.client.unsubscribes.create(
+                data=address,
+                domain=self.domain,
+                headers={"Content-type": "application/json"},
+            )
+            self.assertEqual(req.status_code, 200)
+            self.assertIn("message", req.json())
+
+    @patch("mailgun.client.requests.delete")
+    def test_unsub_delete(self, m_delete: MagicMock) -> None:
+        m_delete.return_value = mock_response(200, {"message": "Deleted"})
+        req = self.client.unsubscribes.delete(
+            domain=self.domain, unsubscribe_address=self.unsub_data["address"]
+        )
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("message", req.json())
+
+    @patch("mailgun.client.requests.delete")
+    def test_unsub_delete_all(self, m_delete: MagicMock) -> None:
+        m_delete.return_value = mock_response(200, {"message": "Deleted"})
+        req = self.client.unsubscribes.delete(domain=self.domain)
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("message", req.json())
