@@ -662,3 +662,78 @@ class UnsubscribesTests(unittest.TestCase):
         req = self.client.unsubscribes.delete(domain=self.domain)
         self.assertEqual(req.status_code, 200)
         self.assertIn("message", req.json())
+
+
+class ComplaintsTests(unittest.TestCase):
+    """Mirror of integration ComplaintsTests with mocked HTTP."""
+
+    def setUp(self) -> None:
+        self.client = Client(auth=AUTH)
+        self.domain = DOMAIN
+        self.compl_data = {"address": "test@gmail.com", "tag": "compl_test_tag"}
+        self.compl_json_data = """[{"address": "test1@gmail.com", "tags": ["some tag"]},
+            {"address": "test3@gmail.com"}]"""
+
+    @patch("mailgun.client.requests.post")
+    def test_compl_create(self, m_post: MagicMock) -> None:
+        m_post.return_value = mock_response(200, {"message": "Added"})
+        req = self.client.complaints.create(data=self.compl_data, domain=self.domain)
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("message", req.json())
+
+    @patch("mailgun.client.requests.get")
+    def test_get_single_complaint(self, m_get: MagicMock) -> None:
+        m_get.return_value = mock_response(200, {"items": []})
+        req = self.client.complaints.get(data=self.compl_data, domain=self.domain)
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("items", req.json())
+
+    @patch("mailgun.client.requests.get")
+    def test_compl_get_all(self, m_get: MagicMock) -> None:
+        m_get.return_value = mock_response(200, {"items": []})
+        req = self.client.complaints.get(domain=self.domain)
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("items", req.json())
+
+    @patch("mailgun.client.requests.get")
+    @patch("mailgun.client.requests.post")
+    def test_compl_get_single(self, m_post: MagicMock, m_get: MagicMock) -> None:
+        m_post.return_value = mock_response(200)
+        m_get.return_value = mock_response(200, {"address": self.compl_data["address"]})
+        self.client.complaints.create(data=self.compl_data, domain=self.domain)
+        req = self.client.complaints.get(
+            domain=self.domain, complaint_address=self.compl_data["address"]
+        )
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("address", req.json())
+
+    @patch("mailgun.client.requests.post")
+    def test_compl_create_multiple(self, m_post: MagicMock) -> None:
+        m_post.return_value = mock_response(200, {"message": "Added"})
+        json_data = json.loads(self.compl_json_data)
+        for address in json_data:
+            req = self.client.complaints.create(
+                data=address,
+                domain=self.domain,
+                headers={"Content-type": "application/json"},
+            )
+            self.assertEqual(req.status_code, 200)
+            self.assertIn("message", req.json())
+
+    @patch("mailgun.client.requests.delete")
+    @patch("mailgun.client.requests.post")
+    def test_compl_delete_single(self, m_post: MagicMock, m_delete: MagicMock) -> None:
+        m_post.return_value = mock_response(200)
+        m_delete.return_value = mock_response(200, {"message": "Deleted"})
+        req = self.client.complaints.delete(
+            domain=self.domain, unsubscribe_address=self.compl_data["address"]
+        )
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("message", req.json())
+
+    @patch("mailgun.client.requests.delete")
+    def test_compl_delete_all(self, m_delete: MagicMock) -> None:
+        m_delete.return_value = mock_response(200, {"message": "Deleted"})
+        req = self.client.complaints.delete(domain=self.domain)
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("message", req.json())
