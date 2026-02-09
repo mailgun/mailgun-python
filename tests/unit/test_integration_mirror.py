@@ -769,3 +769,115 @@ class WhiteListTests(unittest.TestCase):
         )
         self.assertEqual(req.status_code, 200)
         self.assertIn("message", req.json())
+
+
+class RoutesTests(unittest.TestCase):
+    """Mirror of integration RoutesTests with mocked HTTP."""
+
+    def setUp(self) -> None:
+        self.client = Client(auth=AUTH)
+        self.domain = DOMAIN
+        self.sender = "sender@example.com"
+        self.routes_data = {
+            "priority": 0,
+            "description": "Sample route",
+            "expression": f"match_recipient('.*@{self.domain}')",
+            "action": ["forward('http://myhost.com/messages/')", "stop()"],
+        }
+        self.routes_params = {"skip": 1, "limit": 1}
+        self.routes_put_data = {"priority": 2}
+
+    @patch("mailgun.client.requests.post")
+    @patch("mailgun.client.requests.delete")
+    @patch("mailgun.client.requests.get")
+    def test_routes_create(
+        self, m_get: MagicMock, m_delete: MagicMock, m_post: MagicMock
+    ) -> None:
+        m_get.return_value = mock_response(200, {"items": [{"id": "rid"}]})
+        m_delete.return_value = mock_response(200)
+        m_post.return_value = mock_response(200, {"message": "Route created"})
+        params = {"skip": 0, "limit": 1}
+        req1 = self.client.routes.get(domain=self.domain, filters=params)
+        if req1.json().get("items"):
+            self.client.routes.delete(
+                domain=self.domain, route_id=req1.json()["items"][0]["id"]
+            )
+        req = self.client.routes.create(domain=self.domain, data=self.routes_data)
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("message", req.json())
+
+    @patch("mailgun.client.requests.get")
+    def test_routes_get_all(self, m_get: MagicMock) -> None:
+        m_get.return_value = mock_response(200, {"items": []})
+        req = self.client.routes.get(domain=self.domain, filters=self.routes_params)
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("items", req.json())
+
+    @patch("mailgun.client.requests.get")
+    @patch("mailgun.client.requests.post")
+    def test_get_route_by_id(self, m_post: MagicMock, m_get: MagicMock) -> None:
+        m_post.return_value = mock_response(200, {"route": {"id": "rid123"}})
+        m_get.return_value = mock_response(200, {"route": {"id": "rid123"}})
+        req_post = self.client.routes.create(
+            domain=self.domain, data=self.routes_data
+        )
+        req = self.client.routes.get(
+            domain=self.domain, route_id=req_post.json()["route"]["id"]
+        )
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("route", req.json())
+
+    @patch("mailgun.client.requests.put")
+    @patch("mailgun.client.requests.post")
+    def test_routes_put(self, m_post: MagicMock, m_put: MagicMock) -> None:
+        m_post.return_value = mock_response(200, {"route": {"id": "rid123"}})
+        m_put.return_value = mock_response(200, {"message": "Updated"})
+        req_post = self.client.routes.create(
+            domain=self.domain, data=self.routes_data
+        )
+        req = self.client.routes.put(
+            domain=self.domain,
+            data=self.routes_put_data,
+            route_id=req_post.json()["route"]["id"],
+        )
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("message", req.json())
+
+    @patch("mailgun.client.requests.delete")
+    @patch("mailgun.client.requests.post")
+    def test_routes_delete(self, m_post: MagicMock, m_delete: MagicMock) -> None:
+        m_post.return_value = mock_response(200, {"route": {"id": "rid123"}})
+        m_delete.return_value = mock_response(200, {"message": "Deleted"})
+        req_post = self.client.routes.create(
+            domain=self.domain, data=self.routes_data
+        )
+        req = self.client.routes.delete(
+            domain=self.domain, route_id=req_post.json()["route"]["id"]
+        )
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("message", req.json())
+
+    @patch("mailgun.client.requests.get")
+    def test_get_routes_match(self, m_get: MagicMock) -> None:
+        m_get.return_value = mock_response(
+            200,
+            {
+                "route": {
+                    "actions": [],
+                    "created_at": "",
+                    "description": "",
+                    "expression": "",
+                    "id": "r1",
+                    "priority": 0,
+                }
+            },
+        )
+        query = {"address": self.sender}
+        req = self.client.routes_match.get(domain=self.domain, filters=query)
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("route", req.json())
+        expected_keys = [
+            "actions", "created_at", "description", "expression", "id", "priority"
+        ]
+        for key in expected_keys:
+            self.assertIn(key, req.json()["route"])
