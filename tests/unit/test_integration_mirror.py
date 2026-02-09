@@ -737,3 +737,35 @@ class ComplaintsTests(unittest.TestCase):
         req = self.client.complaints.delete(domain=self.domain)
         self.assertEqual(req.status_code, 200)
         self.assertIn("message", req.json())
+
+
+class WhiteListTests(unittest.TestCase):
+    """Mirror of integration WhiteListTests with mocked HTTP."""
+
+    def setUp(self) -> None:
+        self.client = Client(auth=AUTH)
+        self.domain = DOMAIN
+        self.whitel_data = {"address": "test@gmail.com"}
+
+    @patch("mailgun.client.requests.post")
+    def test_whitel_create(self, m_post: MagicMock) -> None:
+        m_post.return_value = mock_response(200, {"message": "Added"})
+        req = self.client.whitelists.create(data=self.whitel_data, domain=self.domain)
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("message", req.json())
+
+    @patch("mailgun.client.requests.get")
+    def test_whitel_get_simple(self, m_get: MagicMock) -> None:
+        m_get.return_value = mock_response(200, {"items": []})
+        req = self.client.whitelists.get(domain=self.domain)
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("items", req.json())
+
+    @patch("mailgun.client.requests.delete")
+    def test_whitel_delete_simple(self, m_delete: MagicMock) -> None:
+        m_delete.return_value = mock_response(200, {"message": "Deleted"})
+        req = self.client.whitelists.delete(
+            domain=self.domain, whitelist_address=self.whitel_data["address"]
+        )
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("message", req.json())
