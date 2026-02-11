@@ -881,3 +881,72 @@ class RoutesTests(unittest.TestCase):
         ]
         for key in expected_keys:
             self.assertIn(key, req.json()["route"])
+
+
+class WebhooksTests(unittest.TestCase):
+    """Mirror of integration WebhooksTests with mocked HTTP."""
+
+    def setUp(self) -> None:
+        self.client = Client(auth=AUTH)
+        self.domain = DOMAIN
+        self.webhooks_data = {"id": "clicked", "url": ["https://i.ua"]}
+        self.webhooks_data_put = {"url": "https://twitter.com"}
+
+    @patch("mailgun.client.requests.delete")
+    @patch("mailgun.client.requests.post")
+    def test_webhooks_create(self, m_post: MagicMock, m_delete: MagicMock) -> None:
+        m_post.return_value = mock_response(200, {"message": "Created"})
+        m_delete.return_value = mock_response(200)
+        req = self.client.domains_webhooks.create(
+            domain=self.domain, data=self.webhooks_data
+        )
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("message", req.json())
+        self.client.domains_webhooks_clicked.delete(domain=self.domain)
+
+    @patch("mailgun.client.requests.get")
+    def test_webhooks_get(self, m_get: MagicMock) -> None:
+        m_get.return_value = mock_response(200, {"webhooks": {}})
+        req = self.client.domains_webhooks.get(domain=self.domain)
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("webhooks", req.json())
+
+    @patch("mailgun.client.requests.put")
+    @patch("mailgun.client.requests.post")
+    def test_webhook_put(self, m_post: MagicMock, m_put: MagicMock) -> None:
+        m_post.return_value = mock_response(200)
+        m_put.return_value = mock_response(200, {"message": "Updated"})
+        self.client.domains_webhooks.create(
+            domain=self.domain, data=self.webhooks_data
+        )
+        req = self.client.domains_webhooks_clicked.put(
+            domain=self.domain, data=self.webhooks_data_put
+        )
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("message", req.json())
+        self.client.domains_webhooks_clicked.delete(domain=self.domain)
+
+    @patch("mailgun.client.requests.get")
+    @patch("mailgun.client.requests.post")
+    def test_webhook_get_simple(self, m_post: MagicMock, m_get: MagicMock) -> None:
+        m_post.return_value = mock_response(200)
+        m_get.return_value = mock_response(200, {"webhook": {}})
+        self.client.domains_webhooks.create(
+            domain=self.domain, data=self.webhooks_data
+        )
+        req = self.client.domains_webhooks_clicked.get(domain=self.domain)
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("webhook", req.json())
+        self.client.domains_webhooks_clicked.delete(domain=self.domain)
+
+    @patch("mailgun.client.requests.delete")
+    @patch("mailgun.client.requests.post")
+    def test_webhook_delete(self, m_post: MagicMock, m_delete: MagicMock) -> None:
+        m_post.return_value = mock_response(200)
+        m_delete.return_value = mock_response(200, {"message": "Deleted"})
+        self.client.domains_webhooks.create(
+            domain=self.domain, data=self.webhooks_data
+        )
+        req = self.client.domains_webhooks_clicked.delete(domain=self.domain)
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("message", req.json())
