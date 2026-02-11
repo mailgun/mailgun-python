@@ -950,3 +950,173 @@ class WebhooksTests(unittest.TestCase):
         req = self.client.domains_webhooks_clicked.delete(domain=self.domain)
         self.assertEqual(req.status_code, 200)
         self.assertIn("message", req.json())
+
+
+class MailingListsTests(unittest.TestCase):
+    """Mirror of integration MailingListsTests with mocked HTTP."""
+
+    def setUp(self) -> None:
+        self.client = Client(auth=AUTH)
+        self.domain = DOMAIN
+        self.maillist_address = f"list@{self.domain}"
+        self.mailing_lists_data = {
+            "address": f"python_sdk@{self.domain}",
+            "description": "Mailgun developers list",
+        }
+        self.mailing_lists_data_update = {"description": "Mailgun developers list 121212"}
+        self.mailing_lists_members_data = {
+            "subscribed": True,
+            "address": "bar@example.com",
+            "name": "Bob Bar",
+            "description": "Developer",
+            "vars": '{"age": 26}',
+        }
+        self.mailing_lists_members_put_data = {
+            "subscribed": True,
+            "address": "bar@example.com",
+            "name": "Bob Bar",
+            "description": "Developer",
+            "vars": '{"age": 28}',
+        }
+        self.mailing_lists_members_data_mult = {
+            "upsert": True,
+            "members": '[{"address": "alice@example.com"}, {"address": "bob@example.com"}]',
+        }
+
+    @patch("mailgun.client.requests.get")
+    def test_maillist_pages_get(self, m_get: MagicMock) -> None:
+        m_get.return_value = mock_response(200, {"items": []})
+        req = self.client.lists_pages.get(domain=self.domain)
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("items", req.json())
+
+    @patch("mailgun.client.requests.get")
+    def test_maillist_lists_get(self, m_get: MagicMock) -> None:
+        m_get.return_value = mock_response(200, {"list": {}})
+        req = self.client.lists.get(
+            domain=self.domain, address=self.maillist_address
+        )
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("list", req.json())
+
+    @patch("mailgun.client.requests.post")
+    def test_maillist_lists_create(self, m_post: MagicMock) -> None:
+        m_post.return_value = mock_response(200, {"list": {}})
+        req = self.client.lists.create(
+            domain=self.domain, data=self.mailing_lists_data
+        )
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("list", req.json())
+
+    @patch("mailgun.client.requests.put")
+    @patch("mailgun.client.requests.post")
+    def test_maillists_lists_put(self, m_post: MagicMock, m_put: MagicMock) -> None:
+        m_post.return_value = mock_response(200)
+        m_put.return_value = mock_response(200, {"list": {}})
+        self.client.lists.create(domain=self.domain, data=self.mailing_lists_data)
+        req = self.client.lists.put(
+            domain=self.domain,
+            data=self.mailing_lists_data_update,
+            address=f"python_sdk@{self.domain}",
+        )
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("list", req.json())
+
+    @patch("mailgun.client.requests.delete")
+    @patch("mailgun.client.requests.post")
+    def test_maillists_lists_delete(
+        self, m_post: MagicMock, m_delete: MagicMock
+    ) -> None:
+        m_post.return_value = mock_response(200)
+        m_delete.return_value = mock_response(200)
+        self.client.lists.create(domain=self.domain, data=self.mailing_lists_data)
+        req = self.client.lists.delete(
+            domain=self.domain, address=f"python_sdk@{self.domain}"
+        )
+        self.assertEqual(req.status_code, 200)
+        self.client.lists.create(domain=self.domain, data=self.mailing_lists_data)
+
+    @patch("mailgun.client.requests.get")
+    def test_maillists_lists_members_pages_get(self, m_get: MagicMock) -> None:
+        m_get.return_value = mock_response(200, {"items": []})
+        req = self.client.lists_members_pages.get(
+            domain=self.domain, address=self.maillist_address
+        )
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("items", req.json())
+
+    @patch("mailgun.client.requests.post")
+    @patch("mailgun.client.requests.delete")
+    def test_maillists_lists_members_create(
+        self, m_delete: MagicMock, m_post: MagicMock
+    ) -> None:
+        m_delete.return_value = mock_response(200)
+        m_post.return_value = mock_response(200, {"member": {}})
+        req = self.client.lists_members.create(
+            domain=self.domain,
+            address=self.maillist_address,
+            data=self.mailing_lists_members_data,
+        )
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("member", req.json())
+
+    @patch("mailgun.client.requests.get")
+    def test_maillists_lists_members_get(self, m_get: MagicMock) -> None:
+        m_get.return_value = mock_response(200, {"items": []})
+        req = self.client.lists_members.get(
+            domain=self.domain, address=self.maillist_address
+        )
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("items", req.json())
+
+    @patch("mailgun.client.requests.put")
+    @patch("mailgun.client.requests.post")
+    def test_maillists_lists_members_update(
+        self, m_post: MagicMock, m_put: MagicMock
+    ) -> None:
+        m_post.return_value = mock_response(200)
+        m_put.return_value = mock_response(200, {"member": {}})
+        self.client.lists_members.create(
+            domain=self.domain,
+            address=self.maillist_address,
+            data=self.mailing_lists_members_data,
+        )
+        req = self.client.lists_members.put(
+            domain=self.domain,
+            address=self.maillist_address,
+            data=self.mailing_lists_members_put_data,
+            member_address=self.mailing_lists_members_data["address"],
+        )
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("member", req.json())
+
+    @patch("mailgun.client.requests.delete")
+    @patch("mailgun.client.requests.post")
+    def test_maillists_lists_members_delete(
+        self, m_post: MagicMock, m_delete: MagicMock
+    ) -> None:
+        m_post.return_value = mock_response(200)
+        m_delete.return_value = mock_response(200)
+        self.client.lists_members.create(
+            domain=self.domain,
+            address=self.maillist_address,
+            data=self.mailing_lists_members_data,
+        )
+        req = self.client.lists_members.delete(
+            domain=self.domain,
+            address=self.maillist_address,
+            member_address=self.mailing_lists_members_data["address"],
+        )
+        self.assertEqual(req.status_code, 200)
+
+    @patch("mailgun.client.requests.post")
+    def test_maillists_lists_members_create_mult(self, m_post: MagicMock) -> None:
+        m_post.return_value = mock_response(200, {"message": "Added"})
+        req = self.client.lists_members.create(
+            domain=self.domain,
+            address=self.maillist_address,
+            data=self.mailing_lists_members_data_mult,
+            multiple=True,
+        )
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("message", req.json())
