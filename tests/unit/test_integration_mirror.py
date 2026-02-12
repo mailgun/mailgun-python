@@ -1120,3 +1120,181 @@ class MailingListsTests(unittest.TestCase):
         )
         self.assertEqual(req.status_code, 200)
         self.assertIn("message", req.json())
+
+
+class TemplatesTests(unittest.TestCase):
+    """Mirror of integration TemplatesTests with mocked HTTP."""
+
+    def setUp(self) -> None:
+        self.client = Client(auth=AUTH)
+        self.domain = DOMAIN
+        self.post_template_data = {
+            "name": "template.name20",
+            "description": "template description",
+            "template": "{{fname}} {{lname}}",
+            "engine": "handlebars",
+            "comment": "version comment",
+        }
+        self.put_template_data = {"description": "new template description"}
+        self.post_template_version_data = {
+            "tag": "v11",
+            "template": "{{fname}} {{lname}}",
+            "engine": "handlebars",
+            "active": "no",
+        }
+        self.put_template_version_data = {
+            "template": "{{fname}} {{lname}}",
+            "comment": "Updated version comment",
+            "active": "no",
+        }
+        self.put_template_version = "v11"
+
+    @patch("mailgun.client.requests.delete")
+    @patch("mailgun.client.requests.post")
+    def test_create_template(self, m_post: MagicMock, m_delete: MagicMock) -> None:
+        m_delete.return_value = mock_response(200)
+        m_post.return_value = mock_response(200, {"template": {}})
+        self.client.templates.delete(
+            domain=self.domain,
+            template_name=self.post_template_data["name"],
+        )
+        req = self.client.templates.create(
+            data=self.post_template_data, domain=self.domain
+        )
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("template", req.json())
+
+    @patch("mailgun.client.requests.get")
+    @patch("mailgun.client.requests.post")
+    def test_get_template(self, m_post: MagicMock, m_get: MagicMock) -> None:
+        m_post.return_value = mock_response(200)
+        m_get.return_value = mock_response(200, {"template": {}})
+        params = {"active": "yes"}
+        req = self.client.templates.get(
+            domain=self.domain,
+            filters=params,
+            template_name=self.post_template_data["name"],
+        )
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("template", req.json())
+
+    @patch("mailgun.client.requests.put")
+    @patch("mailgun.client.requests.post")
+    def test_put_template(self, m_post: MagicMock, m_put: MagicMock) -> None:
+        m_post.return_value = mock_response(200)
+        m_put.return_value = mock_response(200, {"template": {}})
+        self.client.templates.create(
+            data=self.post_template_data, domain=self.domain
+        )
+        req = self.client.templates.put(
+            domain=self.domain,
+            data=self.put_template_data,
+            template_name=self.post_template_data["name"],
+        )
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("template", req.json())
+
+    @patch("mailgun.client.requests.delete")
+    @patch("mailgun.client.requests.post")
+    def test_delete_template(self, m_post: MagicMock, m_delete: MagicMock) -> None:
+        m_post.return_value = mock_response(200)
+        m_delete.return_value = mock_response(200)
+        self.client.templates.create(
+            data=self.post_template_data, domain=self.domain
+        )
+        req = self.client.templates.delete(
+            domain=self.domain,
+            template_name=self.post_template_data["name"],
+        )
+        self.assertEqual(req.status_code, 200)
+
+    @patch("mailgun.client.requests.post")
+    def test_post_version_template(self, m_post: MagicMock) -> None:
+        m_post.return_value = mock_response(200, {"template": {}})
+        req = self.client.templates.create(
+            data=self.post_template_version_data,
+            domain=self.domain,
+            template_name=self.post_template_data["name"],
+            versions=True,
+        )
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("template", req.json())
+
+    @patch("mailgun.client.requests.get")
+    @patch("mailgun.client.requests.post")
+    def test_get_version_template(self, m_post: MagicMock, m_get: MagicMock) -> None:
+        m_post.return_value = mock_response(200)
+        m_get.return_value = mock_response(200, {"template": {}})
+        req = self.client.templates.get(
+            domain=self.domain,
+            template_name=self.post_template_data["name"],
+            versions=True,
+        )
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("template", req.json())
+
+    @patch("mailgun.client.requests.put")
+    @patch("mailgun.client.requests.post")
+    def test_put_version_template(self, m_post: MagicMock, m_put: MagicMock) -> None:
+        m_post.return_value = mock_response(200)
+        m_put.return_value = mock_response(200, {"template": {}})
+        req = self.client.templates.put(
+            domain=self.domain,
+            data=self.put_template_version_data,
+            template_name=self.post_template_data["name"],
+            versions=True,
+            tag=self.put_template_version,
+        )
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("template", req.json())
+
+    @patch("mailgun.client.requests.delete")
+    @patch("mailgun.client.requests.post")
+    def test_delete_version_template(
+        self, m_post: MagicMock, m_delete: MagicMock
+    ) -> None:
+        m_post.return_value = mock_response(200)
+        m_delete.return_value = mock_response(200)
+        self.client.templates.create(
+            data=self.post_template_data, domain=self.domain
+        )
+        req = self.client.templates.delete(
+            domain=self.domain,
+            template_name=self.post_template_data["name"],
+            versions=True,
+            tag="v0",
+        )
+        self.assertEqual(req.status_code, 200)
+
+    @patch("mailgun.client.requests.put")
+    def test_update_template_version_copy(self, m_put: MagicMock) -> None:
+        m_put.return_value = mock_response(
+            200,
+            {
+                "message": "version has been copied",
+                "version": {"tag": "v3"},
+                "template": {
+                    "tag": "v3",
+                    "template": "",
+                    "engine": "handlebars",
+                    "mjml": False,
+                    "createdAt": "",
+                    "comment": "",
+                    "active": "no",
+                    "id": "",
+                    "headers": {},
+                },
+            },
+        )
+        data = {"comment": "An updated version comment"}
+        req = self.client.templates.put(
+            domain=self.domain,
+            filters=data,
+            template_name="template.name1",
+            versions=True,
+            tag="v2",
+            copy=True,
+            new_tag="v3",
+        )
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("version has been copied", req.json()["message"])
