@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import unittest
+from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 from mailgun.client import Client
@@ -1298,3 +1299,153 @@ class TemplatesTests(unittest.TestCase):
         )
         self.assertEqual(req.status_code, 200)
         self.assertIn("version has been copied", req.json()["message"])
+
+
+class MetricsTest(unittest.TestCase):
+    """Mirror of integration MetricsTest with mocked HTTP."""
+
+    def setUp(self) -> None:
+        self.client = Client(auth=AUTH)
+        self.domain = DOMAIN
+        now = datetime.now()
+        now_formatted = now.strftime("%a, %d %b %Y %H:%M:%S +0000")
+        yesterday = now - timedelta(days=1)
+        yesterday_formatted = yesterday.strftime("%a, %d %b %Y %H:%M:%S +0000")
+        self.account_metrics_data = {
+            "start": yesterday_formatted,
+            "end": now_formatted,
+            "resolution": "day",
+            "duration": "1m",
+            "dimensions": ["time"],
+            "metrics": ["accepted_count", "delivered_count", "clicked_rate", "opened_rate"],
+            "filter": {
+                "AND": [
+                    {
+                        "attribute": "domain",
+                        "comparator": "=",
+                        "values": [{"label": self.domain, "value": self.domain}],
+                    }
+                ]
+            },
+            "include_subaccounts": True,
+            "include_aggregates": True,
+        }
+        self.invalid_account_metrics_data = {
+            **self.account_metrics_data,
+            "resolution": "century",
+            "duration": "1c",
+        }
+        self.account_usage_metrics_data = {
+            "start": yesterday_formatted,
+            "end": now_formatted,
+            "resolution": "day",
+            "duration": "1m",
+            "dimensions": ["time"],
+            "metrics": ["accessibility_count", "processed_count"],
+            "include_subaccounts": True,
+            "include_aggregates": True,
+        }
+        self.invalid_account_usage_metrics_data = {
+            **self.account_usage_metrics_data,
+            "resolution": "century",
+        }
+
+    @patch("mailgun.client.requests.post")
+    def test_post_query_get_account_metrics(self, m_post: MagicMock) -> None:
+        m_post.return_value = mock_response(
+            200,
+            {
+                "start": "",
+                "end": "",
+                "resolution": "day",
+                "duration": "1m",
+                "dimensions": [],
+                "pagination": {},
+                "items": [{"metrics": {"delivered_count": 0}, "dimensions": {}}],
+                "aggregates": {},
+            },
+        )
+        req = self.client.analytics_metrics.create(data=self.account_metrics_data)
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("items", req.json())
+        self.assertIn("delivered_count", req.json()["items"][0]["metrics"])
+
+    @patch("mailgun.client.requests.post")
+    def test_post_query_get_account_metrics_invalid_data(
+        self, m_post: MagicMock
+    ) -> None:
+        m_post.return_value = mock_response(
+            400, {"message": "'resolution' attribute is invalid"}
+        )
+        req = self.client.analytics_metrics.create(
+            data=self.invalid_account_metrics_data
+        )
+        self.assertEqual(req.status_code, 400)
+        self.assertIn("'resolution' attribute is invalid", req.json()["message"])
+
+    @patch("mailgun.client.requests.post")
+    def test_post_query_get_account_metrics_invalid_url(
+        self, m_post: MagicMock
+    ) -> None:
+        m_post.return_value = mock_response(404, {})
+        req = self.client.analytics_metric.create(data=self.account_metrics_data)
+        self.assertEqual(req.status_code, 404)
+
+    def test_post_query_get_account_metrics_invalid_url_without_underscore(
+        self,
+    ) -> None:
+        with self.assertRaises(KeyError) as cm:
+            self.client.analyticsmetric.create(data=self.account_metrics_data)
+        self.assertEqual(str(cm.exception), "'analyticsmetric'")
+
+    @patch("mailgun.client.requests.post")
+    def test_post_query_get_account_usage_metrics(self, m_post: MagicMock) -> None:
+        m_post.return_value = mock_response(
+            200,
+            {
+                "start": "",
+                "end": "",
+                "resolution": "day",
+                "duration": "1m",
+                "dimensions": [],
+                "pagination": {},
+                "items": [{"metrics": {"email_validation_count": 0}, "dimensions": {}}],
+                "aggregates": {},
+            },
+        )
+        req = self.client.analytics_usage_metrics.create(
+            data=self.account_usage_metrics_data
+        )
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("email_validation_count", req.json()["items"][0]["metrics"])
+
+    @patch("mailgun.client.requests.post")
+    def test_post_query_get_account_usage_metrics_invalid_data(
+        self, m_post: MagicMock
+    ) -> None:
+        m_post.return_value = mock_response(
+            400, {"message": "'resolution' attribute is invalid"}
+        )
+        req = self.client.analytics_usage_metrics.create(
+            data=self.invalid_account_usage_metrics_data
+        )
+        self.assertEqual(req.status_code, 400)
+
+    @patch("mailgun.client.requests.post")
+    def test_post_query_get_account_usage_metrics_invalid_url(
+        self, m_post: MagicMock
+    ) -> None:
+        m_post.return_value = mock_response(404, {})
+        req = self.client.analytics_usage_metric.create(
+            data=self.invalid_account_usage_metrics_data
+        )
+        self.assertEqual(req.status_code, 404)
+
+    def test_post_query_get_account_usage_metrics_invalid_url_without_underscore(
+        self,
+    ) -> None:
+        with self.assertRaises(KeyError) as cm:
+            self.client.analyticsusagemetrics.create(
+                data=json.dumps(self.invalid_account_usage_metrics_data)
+            )
+        self.assertEqual(str(cm.exception), "'analyticsusagemetrics'")
