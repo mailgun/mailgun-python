@@ -1540,3 +1540,71 @@ class LogsTests(unittest.TestCase):
         with self.assertRaises(KeyError) as cm:
             self.client.analyticslogs.create(data=self.account_logs_data)
         self.assertEqual(str(cm.exception), "'analyticslogs'")
+
+
+class TagsNewTests(unittest.TestCase):
+    """Mirror of integration TagsNewTests with mocked HTTP."""
+
+    def setUp(self) -> None:
+        self.client = Client(auth=AUTH)
+        self.domain = DOMAIN
+        self.account_tags_data = {
+            "pagination": {"sort": "lastseen:desc", "limit": 10},
+            "include_subaccounts": True,
+        }
+        self.account_tag_info = '{"tag": "Python test", "description": "updated"}'
+        self.account_tag_invalid_info = '{"tag": "test", "description": "updated"}'
+
+    @patch("mailgun.client.requests.put")
+    def test_update_account_tag(self, m_put: MagicMock) -> None:
+        m_put.return_value = mock_response(200, {"message": "Updated"})
+        req = self.client.analytics_tags.put(data=self.account_tag_info)
+        self.assertEqual(req.status_code, 200)
+
+    def test_update_account_invalid_tag(self) -> None:
+        """Invalid endpoint name raises KeyError when building URL (handler lookup)."""
+        with self.assertRaises(KeyError) as cm:
+            self.client.nonexistent_endpoint.put(data=self.account_tag_invalid_info)
+        self.assertEqual(str(cm.exception), "'nonexistent'")
+
+    @patch("mailgun.client.requests.post")
+    def test_post_query_get_account_tags(self, m_post: MagicMock) -> None:
+        """Post query to list account tags (integration uses .create with data)."""
+        m_post.return_value = mock_response(
+            200,
+            {"pagination": {"sort": "lastseen:desc", "limit": 10}, "items": []},
+        )
+        req = self.client.analytics_tags.create(data=self.account_tags_data)
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("pagination", req.json())
+        self.assertIn("items", req.json())
+        self.assertIn("sort", req.json()["pagination"])
+        self.assertIn("limit", req.json()["pagination"])
+
+    @patch("mailgun.client.requests.post")
+    def test_post_query_get_account_tags_with_incorrect_url(
+        self, m_post: MagicMock
+    ) -> None:
+        """Invalid URL (analytics_tag singular) returns 404."""
+        m_post.return_value = mock_response(404, {"error": "Not found"})
+        req = self.client.analytics_tag.create(data=self.account_tags_data)
+        self.assertEqual(req.status_code, 404)
+        self.assertIn("error", req.json())
+
+    @patch("mailgun.client.requests.delete")
+    def test_delete_account_tag(self, m_delete: MagicMock) -> None:
+        m_delete.return_value = mock_response(200, {"message": "Deleted"})
+        req = self.client.analytics_tags.delete(tag_name="Python test")
+        self.assertEqual(req.status_code, 200)
+
+    @patch("mailgun.client.requests.delete")
+    def test_delete_account_nonexistent_tag(self, m_delete: MagicMock) -> None:
+        m_delete.return_value = mock_response(404, {"message": "Not found"})
+        req = self.client.analytics_tags.delete(tag_name="nonexistent")
+        self.assertEqual(req.status_code, 404)
+
+    @patch("mailgun.client.requests.get")
+    def test_get_account_tag_limit_information(self, m_get: MagicMock) -> None:
+        m_get.return_value = mock_response(200, {"limits": {}})
+        req = self.client.analytics_tags_limits.get()
+        self.assertEqual(req.status_code, 200)
