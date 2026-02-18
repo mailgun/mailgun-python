@@ -1449,3 +1449,94 @@ class MetricsTest(unittest.TestCase):
                 data=json.dumps(self.invalid_account_usage_metrics_data)
             )
         self.assertEqual(str(cm.exception), "'analyticsusagemetrics'")
+
+
+class LogsTests(unittest.TestCase):
+    """Mirror of integration LogsTests with mocked HTTP."""
+
+    def setUp(self) -> None:
+        self.client = Client(auth=AUTH)
+        self.domain = DOMAIN
+        now = datetime.now()
+        now_formatted = now.strftime("%a, %d %b %Y %H:%M:%S +0000")
+        yesterday = now - timedelta(days=1)
+        yesterday_formatted = yesterday.strftime("%a, %d %b %Y %H:%M:%S +0000")
+        self.account_logs_data = {
+            "start": yesterday_formatted,
+            "end": now_formatted,
+            "filter": {
+                "AND": [
+                    {
+                        "attribute": "domain",
+                        "comparator": "=",
+                        "values": [{"label": self.domain, "value": self.domain}],
+                    }
+                ]
+            },
+            "include_subaccounts": True,
+            "pagination": {"sort": "timestamp:asc", "limit": 50},
+        }
+        self.invalid_account_logs_data = {
+            "start": yesterday_formatted,
+            "end": now_formatted,
+            "filter": {
+                "AND": [
+                    {
+                        "attribute": "test",
+                        "comparator": "=",
+                        "values": [{"label": "", "value": ""}],
+                    }
+                ]
+            },
+            "include_subaccounts": True,
+            "pagination": {"sort": "timestamp:asc", "limit": 0},
+        }
+
+    @patch("mailgun.client.requests.post")
+    def test_post_query_get_account_logs(self, m_post: MagicMock) -> None:
+        m_post.return_value = mock_response(
+            200,
+            {
+                "start": "",
+                "end": "",
+                "pagination": {},
+                "items": [{"event": "", "account": ""}],
+                "aggregates": {},
+            },
+        )
+        req = self.client.analytics_logs.create(data=self.account_logs_data)
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("items", req.json())
+        self.assertIn("event", req.json()["items"][0])
+
+    @patch("mailgun.client.requests.post")
+    def test_post_query_get_account_logs_invalid_data(
+        self, m_post: MagicMock
+    ) -> None:
+        m_post.return_value = mock_response(
+            400,
+            {"message": "'test' is not a valid filter predicate attribute"},
+        )
+        req = self.client.analytics_logs.create(
+            data=self.invalid_account_logs_data
+        )
+        self.assertEqual(req.status_code, 400)
+        self.assertIn(
+            "'test' is not a valid filter predicate attribute",
+            req.json()["message"],
+        )
+
+    @patch("mailgun.client.requests.post")
+    def test_post_query_get_account_logs_invalid_url(
+        self, m_post: MagicMock
+    ) -> None:
+        m_post.return_value = mock_response(404, {})
+        req = self.client.analytics_log.create(data=self.account_logs_data)
+        self.assertEqual(req.status_code, 404)
+
+    def test_post_query_get_account_logs_invalid_url_without_underscore(
+        self,
+    ) -> None:
+        with self.assertRaises(KeyError) as cm:
+            self.client.analyticslogs.create(data=self.account_logs_data)
+        self.assertEqual(str(cm.exception), "'analyticslogs'")
