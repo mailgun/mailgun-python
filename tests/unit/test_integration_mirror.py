@@ -1608,3 +1608,49 @@ class TagsNewTests(unittest.TestCase):
         m_get.return_value = mock_response(200, {"limits": {}})
         req = self.client.analytics_tags_limits.get()
         self.assertEqual(req.status_code, 200)
+
+
+class BounceClassificationTests(unittest.TestCase):
+    """Mirror of integration BounceClassificationTests with mocked HTTP."""
+
+    def setUp(self) -> None:
+        self.client = Client(auth=AUTH)
+        self.domain = DOMAIN
+
+    @patch("mailgun.client.requests.post")
+    def test_post_list_statistic(self, m_post: MagicMock) -> None:
+        m_post.return_value = mock_response(200, {"items": []})
+        data = {
+            "dimensions": ["classification_id"],
+            "start": "2024-01-01",
+            "end": "2024-01-31",
+        }
+        req = self.client.analytics_bounce_classification_metrics.create(data=data)
+        self.assertEqual(req.status_code, 200)
+
+    @patch("mailgun.client.requests.post")
+    def test_post_list_statistic_without_dimensions(self, m_post: MagicMock) -> None:
+        m_post.return_value = mock_response(400, {"message": "dimensions required"})
+        data = {"start": "2024-01-01", "end": "2024-01-31"}
+        req = self.client.analytics_bounce_classification_metrics.create(data=data)
+        self.assertEqual(req.status_code, 400)
+
+    @patch("mailgun.client.requests.post")
+    def test_post_list_statistic_with_old_dates(self, m_post: MagicMock) -> None:
+        m_post.return_value = mock_response(
+            400, {"message": "is out of permitted log retention"}
+        )
+        data = {
+            "dimensions": ["classification_id"],
+            "start": "2020-01-01",
+            "end": "2020-01-31",
+        }
+        req = self.client.analytics_bounce_classification_metrics.create(data=data)
+        self.assertEqual(req.status_code, 400)
+        self.assertIn("message", req.json())
+
+    @patch("mailgun.client.requests.post")
+    def test_post_list_statistic_with_empty_payload(self, m_post: MagicMock) -> None:
+        m_post.return_value = mock_response(400, {"message": "Bad request"})
+        req = self.client.analytics_bounce_classification_metrics.create(data={})
+        self.assertEqual(req.status_code, 400)
