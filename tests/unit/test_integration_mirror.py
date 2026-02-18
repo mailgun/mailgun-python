@@ -1785,3 +1785,94 @@ class UsersTests(unittest.TestCase):
                 req2 = self.client.users.get(user_id="xxxxxxx")
                 self.assertEqual(req2.status_code, 404)
             break
+
+
+class KeysTests(unittest.TestCase):
+    """Mirror of integration KeysTests with mocked HTTP."""
+
+    def setUp(self) -> None:
+        self.client = Client(auth=AUTH)
+        self.domain = DOMAIN
+        self.mailgun_email = "user@example.com"
+        self.role = "admin"
+        self.user_id = "uid"
+        self.user_name = "Test User"
+
+    @patch("mailgun.client.requests.get")
+    def test_get_keys(self, m_get: MagicMock) -> None:
+        m_get.return_value = mock_response(
+            200,
+            {"total_count": 1, "items": [{"id": "key1", "requestor": self.mailgun_email}]},
+        )
+        query = {"domain_name": "python.test.domain5", "kind": "web"}
+        req = self.client.keys.get(filters=query)
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("total_count", req.json())
+        self.assertIn("items", req.json())
+
+    def test_get_keys_with_invalid_url(self) -> None:
+        query = {"domain_name": "python.test.domain5", "kind": "web"}
+        with self.assertRaises(KeyError):
+            self.client.key.get(filters=query)
+
+    @patch("mailgun.client.requests.get")
+    def test_get_keys_without_filtering_data(self, m_get: MagicMock) -> None:
+        m_get.return_value = mock_response(
+            200, {"items": [{"id": "k1", "description": "test"}]}
+        )
+        req = self.client.keys.get()
+        self.assertEqual(req.status_code, 200)
+        self.assertGreater(len(req.json()["items"]), 0)
+
+    @patch("mailgun.client.requests.post")
+    def test_post_keys(self, m_post: MagicMock) -> None:
+        m_post.return_value = mock_response(
+            200,
+            {
+                "message": "great success",
+                "key": {
+                    "id": "kid",
+                    "description": "a new key",
+                    "kind": "web",
+                    "role": self.role,
+                    "created_at": "",
+                    "updated_at": "",
+                    "expires_at": "",
+                    "secret": "secret",
+                    "is_disabled": False,
+                    "domain_name": "python.test.domain5",
+                    "requestor": self.mailgun_email,
+                    "user_name": self.user_name,
+                },
+            },
+        )
+        data = {
+            "email": self.mailgun_email,
+            "domain_name": "python.test.domain5",
+            "kind": "web",
+            "expiration": "3600",
+            "role": self.role,
+            "user_id": self.user_id,
+            "user_name": self.user_name,
+            "description": "a new key",
+        }
+        headers = {"Content-Type": "multipart/form-data"}
+        req = self.client.keys.create(data=data, headers=headers)
+        self.assertEqual(req.status_code, 200)
+        self.assertEqual(req.json()["message"], "great success")
+        self.assertIn("key", req.json())
+
+    @patch("mailgun.client.requests.delete")
+    @patch("mailgun.client.requests.get")
+    def test_delete_key(self, m_get: MagicMock, m_delete: MagicMock) -> None:
+        m_get.return_value = mock_response(
+            200,
+            {"items": [{"id": "key1", "requestor": self.mailgun_email}]},
+        )
+        m_delete.return_value = mock_response(200, {"message": "key deleted"})
+        req1 = self.client.keys.get(filters={"domain_name": "python.test.domain5", "kind": "web"})
+        for item in req1.json()["items"]:
+            if self.mailgun_email == item["requestor"]:
+                req2 = self.client.keys.delete(key_id=item["id"])
+                self.assertEqual(req2.json()["message"], "key deleted")
+                break
