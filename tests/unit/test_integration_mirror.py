@@ -1654,3 +1654,134 @@ class BounceClassificationTests(unittest.TestCase):
         m_post.return_value = mock_response(400, {"message": "Bad request"})
         req = self.client.analytics_bounce_classification_metrics.create(data={})
         self.assertEqual(req.status_code, 400)
+
+
+class UsersTests(unittest.TestCase):
+    """Mirror of integration UsersTests with mocked HTTP."""
+
+    def setUp(self) -> None:
+        self.client = Client(auth=AUTH)
+        self.client_with_secret_key = Client(auth=("api", "fake-secret"))
+        self.domain = DOMAIN
+        self.mailgun_email = "user@example.com"
+
+    @patch("mailgun.client.requests.get")
+    def test_get_users(self, m_get: MagicMock) -> None:
+        m_get.return_value = mock_response(
+            200,
+            {
+                "total": 1,
+                "users": [
+                    {
+                        "account_id": "",
+                        "activated": True,
+                        "auth": {},
+                        "email": self.mailgun_email,
+                        "id": "uid",
+                        "role": "admin",
+                        "name": "",
+                        "is_disabled": False,
+                        "is_master": False,
+                        "metadata": {},
+                        "migration_status": "",
+                        "email_details": {},
+                        "github_user_id": "",
+                        "opened_ip": "",
+                        "password_updated_at": "",
+                        "preferences": {},
+                        "salesforce_user_id": "",
+                        "tfa_active": False,
+                        "tfa_created_at": "",
+                        "tfa_enabled": False,
+                    }
+                ],
+            },
+        )
+        query = {"role": "admin", "limit": "0", "skip": "0"}
+        req = self.client.users.get(filters=query)
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("users", req.json())
+        self.assertIn("total", req.json())
+
+    def test_get_user_invalid_url(self) -> None:
+        query = {"role": "admin", "limit": "0", "skip": "0"}
+        with self.assertRaises(KeyError):
+            self.client.user.get(filters=query)
+
+    @patch("mailgun.client.requests.get")
+    def test_own_user_details(self, m_get: MagicMock) -> None:
+        m_get.return_value = mock_response(
+            200,
+            {
+                "account_id": "",
+                "activated": True,
+                "auth": {},
+                "email": self.mailgun_email,
+                "id": "me",
+                "role": "admin",
+                "name": "",
+                "is_disabled": False,
+                "is_master": False,
+                "metadata": {},
+                "migration_status": "",
+                "email_details": {},
+                "github_user_id": "",
+                "opened_ip": "",
+                "password_updated_at": "",
+                "preferences": {},
+                "salesforce_user_id": "",
+                "tfa_active": False,
+                "tfa_created_at": "",
+                "tfa_enabled": False,
+            },
+        )
+        req = self.client_with_secret_key.users.get(user_id="me")
+        self.assertEqual(req.status_code, 200)
+
+    @patch("mailgun.client.requests.get")
+    def test_get_user_details(self, m_get: MagicMock) -> None:
+        user_obj = {
+            "account_id": "",
+            "activated": True,
+            "auth": {},
+            "email": self.mailgun_email,
+            "id": "uid",
+            "role": "admin",
+            "name": "",
+            "is_disabled": False,
+            "is_master": False,
+            "metadata": {},
+            "migration_status": "",
+            "email_details": {},
+            "github_user_id": "",
+            "opened_ip": "",
+            "password_updated_at": "",
+            "preferences": {},
+            "salesforce_user_id": "",
+            "tfa_active": False,
+            "tfa_created_at": "",
+            "tfa_enabled": False,
+        }
+        m_get.side_effect = [
+            mock_response(200, {"users": [user_obj], "total": 1}),
+            mock_response(200, user_obj),
+        ]
+        query = {"role": "admin", "limit": "0", "skip": "0"}
+        req1 = self.client.users.get(filters=query)
+        user_id = req1.json()["users"][0]["id"]
+        req2 = self.client.users.get(user_id=user_id)
+        self.assertEqual(req2.status_code, 200)
+
+    @patch("mailgun.client.requests.get")
+    def test_get_invalid_user_details(self, m_get: MagicMock) -> None:
+        m_get.side_effect = [
+            mock_response(200, {"users": [{"id": "uid", "email": self.mailgun_email}], "total": 1}),
+            mock_response(404, {"message": "Not found"}),
+        ]
+        query = {"role": "admin", "limit": "0", "skip": "0"}
+        req1 = self.client.users.get(filters=query)
+        for user in req1.json()["users"]:
+            if self.mailgun_email == user["email"]:
+                req2 = self.client.users.get(user_id="xxxxxxx")
+                self.assertEqual(req2.status_code, 404)
+            break
