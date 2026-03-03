@@ -1,7 +1,5 @@
 """Unit tests for mailgun.client.Config."""
 
-import pytest
-
 from mailgun.client import Config
 
 

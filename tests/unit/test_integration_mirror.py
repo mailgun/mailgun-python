@@ -106,7 +106,7 @@ class DomainTests(unittest.TestCase):
     def test_update_simple_domain(
         self, m_put: MagicMock, m_post: MagicMock, m_delete: MagicMock
     ) -> None:
-        m_delete.return_value = mock_response(200)
+        m_delete.return_value = mock_response()
         m_post.return_value = mock_response(200, {"domain": {}})
         m_put.return_value = mock_response(200, {"message": "Domain has been updated"})
         self.client.domains.create(data=self.post_domain_data)
@@ -133,7 +133,7 @@ class DomainTests(unittest.TestCase):
     @patch("mailgun.client.requests.post")
     @patch("mailgun.client.requests.put")
     def test_put_mailboxes_credentials(self, m_put: MagicMock, m_post: MagicMock) -> None:
-        m_post.return_value = mock_response(200)
+        m_post.return_value = mock_response()
         m_put.return_value = mock_response(
             200,
             {
@@ -175,7 +175,7 @@ class DomainTests(unittest.TestCase):
     @patch("mailgun.client.requests.get")
     @patch("mailgun.client.requests.post")
     def test_get_single_domain(self, m_post: MagicMock, m_get: MagicMock) -> None:
-        m_post.return_value = mock_response(200)
+        m_post.return_value = mock_response()
         m_get.return_value = mock_response(200, {"domain": {"name": self.test_domain}})
         self.client.domains.create(data=self.post_domain_data)
         req = self.client.domains.get(domain_name=self.post_domain_data["name"])
@@ -185,7 +185,7 @@ class DomainTests(unittest.TestCase):
     @patch("mailgun.client.requests.put")
     @patch("mailgun.client.requests.post")
     def test_verify_domain(self, m_post: MagicMock, m_put: MagicMock) -> None:
-        m_post.return_value = mock_response(200)
+        m_post.return_value = mock_response()
         m_put.return_value = mock_response(200, {"domain": {"state": "verified"}})
         self.client.domains.create(data=self.post_domain_data)
         req = self.client.domains.put(domain=self.post_domain_data["name"], verify=True)
@@ -231,7 +231,7 @@ class DomainTests(unittest.TestCase):
     @patch("mailgun.client.requests.put")
     @patch("mailgun.client.requests.post")
     def test_put_dkim_authority(self, m_post: MagicMock, m_put: MagicMock) -> None:
-        m_post.return_value = mock_response(200)
+        m_post.return_value = mock_response()
         m_put.return_value = mock_response(200, {"message": "Updated"})
         self.client.domains.create(data=self.post_domain_data)
         request = self.client.domains_dkimauthority.put(
@@ -242,7 +242,7 @@ class DomainTests(unittest.TestCase):
     @patch("mailgun.client.requests.put")
     @patch("mailgun.client.requests.post")
     def test_put_webprefix(self, m_post: MagicMock, m_put: MagicMock) -> None:
-        m_post.return_value = mock_response(200)
+        m_post.return_value = mock_response()
         m_put.return_value = mock_response(200, {"message": "Updated"})
         self.client.domains.create(data=self.post_domain_data)
         request = self.client.domains_webprefix.put(
@@ -295,8 +295,8 @@ class DomainTests(unittest.TestCase):
     @patch("mailgun.client.requests.delete")
     @patch("mailgun.client.requests.post")
     def test_delete_domain_creds(self, m_post: MagicMock, m_delete: MagicMock) -> None:
-        m_post.return_value = mock_response(200)
-        m_delete.return_value = mock_response(200)
+        m_post.return_value = mock_response()
+        m_delete.return_value = mock_response()
         self.client.domains_credentials.create(
             domain=self.domain, data=self.post_domain_creds
         )
@@ -310,7 +310,7 @@ class DomainTests(unittest.TestCase):
     def test_delete_all_domain_credentials(
         self, m_post: MagicMock, m_delete: MagicMock
     ) -> None:
-        m_post.return_value = mock_response(200)
+        m_post.return_value = mock_response()
         m_delete.return_value = mock_response(
             200, {"message": "All domain credentials have been deleted"}
         )
@@ -326,7 +326,7 @@ class DomainTests(unittest.TestCase):
     @patch("mailgun.client.requests.delete")
     @patch("mailgun.client.requests.post")
     def test_delete_domain(self, m_post: MagicMock, m_delete: MagicMock) -> None:
-        m_post.return_value = mock_response(200)
+        m_post.return_value = mock_response()
         m_delete.return_value = mock_response(
             200, {"message": "Domain will be deleted in the background"}
         )
@@ -356,7 +356,7 @@ class IpTests(unittest.TestCase):
     @patch("mailgun.client.requests.get")
     @patch("mailgun.client.requests.post")
     def test_get_ip_by_address(self, m_post: MagicMock, m_get: MagicMock) -> None:
-        m_post.return_value = mock_response(200)
+        m_post.return_value = mock_response()
         m_get.return_value = mock_response(200, {"ip": self.ip_data["ip"]})
         self.client.domains_ips.create(domain=self.domain, data=self.ip_data)
         req = self.client.ips.get(domain=self.domain, ip=self.ip_data["ip"])
@@ -560,7 +560,7 @@ class BouncesTests(unittest.TestCase):
     @patch("mailgun.client.requests.get")
     @patch("mailgun.client.requests.post")
     def test_bounces_get_address(self, m_post: MagicMock, m_get: MagicMock) -> None:
-        m_post.return_value = mock_response(200)
+        m_post.return_value = mock_response()
         m_get.return_value = mock_response(200, {"address": self.bounces_data["address"]})
         self.client.bounces.create(data=self.bounces_data, domain=self.domain)
         req = self.client.bounces.get(
@@ -585,7 +585,7 @@ class BouncesTests(unittest.TestCase):
     @patch("mailgun.client.requests.delete")
     @patch("mailgun.client.requests.post")
     def test_bounces_delete_single(self, m_post: MagicMock, m_delete: MagicMock) -> None:
-        m_post.return_value = mock_response(200)
+        m_post.return_value = mock_response()
         m_delete.return_value = mock_response(200, {"message": "Deleted"})
         self.client.bounces.create(data=self.bounces_data, domain=self.domain)
         req = self.client.bounces.delete(
@@ -699,7 +699,7 @@ class ComplaintsTests(unittest.TestCase):
     @patch("mailgun.client.requests.get")
     @patch("mailgun.client.requests.post")
     def test_compl_get_single(self, m_post: MagicMock, m_get: MagicMock) -> None:
-        m_post.return_value = mock_response(200)
+        m_post.return_value = mock_response()
         m_get.return_value = mock_response(200, {"address": self.compl_data["address"]})
         self.client.complaints.create(data=self.compl_data, domain=self.domain)
         req = self.client.complaints.get(
@@ -724,7 +724,7 @@ class ComplaintsTests(unittest.TestCase):
     @patch("mailgun.client.requests.delete")
     @patch("mailgun.client.requests.post")
     def test_compl_delete_single(self, m_post: MagicMock, m_delete: MagicMock) -> None:
-        m_post.return_value = mock_response(200)
+        m_post.return_value = mock_response()
         m_delete.return_value = mock_response(200, {"message": "Deleted"})
         req = self.client.complaints.delete(
             domain=self.domain, unsubscribe_address=self.compl_data["address"]
@@ -795,7 +795,7 @@ class RoutesTests(unittest.TestCase):
         self, m_get: MagicMock, m_delete: MagicMock, m_post: MagicMock
     ) -> None:
         m_get.return_value = mock_response(200, {"items": [{"id": "rid"}]})
-        m_delete.return_value = mock_response(200)
+        m_delete.return_value = mock_response()
         m_post.return_value = mock_response(200, {"message": "Route created"})
         params = {"skip": 0, "limit": 1}
         req1 = self.client.routes.get(domain=self.domain, filters=params)
@@ -897,7 +897,7 @@ class WebhooksTests(unittest.TestCase):
     @patch("mailgun.client.requests.post")
     def test_webhooks_create(self, m_post: MagicMock, m_delete: MagicMock) -> None:
         m_post.return_value = mock_response(200, {"message": "Created"})
-        m_delete.return_value = mock_response(200)
+        m_delete.return_value = mock_response()
         req = self.client.domains_webhooks.create(
             domain=self.domain, data=self.webhooks_data
         )
@@ -915,7 +915,7 @@ class WebhooksTests(unittest.TestCase):
     @patch("mailgun.client.requests.put")
     @patch("mailgun.client.requests.post")
     def test_webhook_put(self, m_post: MagicMock, m_put: MagicMock) -> None:
-        m_post.return_value = mock_response(200)
+        m_post.return_value = mock_response()
         m_put.return_value = mock_response(200, {"message": "Updated"})
         self.client.domains_webhooks.create(
             domain=self.domain, data=self.webhooks_data
@@ -930,7 +930,7 @@ class WebhooksTests(unittest.TestCase):
     @patch("mailgun.client.requests.get")
     @patch("mailgun.client.requests.post")
     def test_webhook_get_simple(self, m_post: MagicMock, m_get: MagicMock) -> None:
-        m_post.return_value = mock_response(200)
+        m_post.return_value = mock_response()
         m_get.return_value = mock_response(200, {"webhook": {}})
         self.client.domains_webhooks.create(
             domain=self.domain, data=self.webhooks_data
@@ -943,7 +943,7 @@ class WebhooksTests(unittest.TestCase):
     @patch("mailgun.client.requests.delete")
     @patch("mailgun.client.requests.post")
     def test_webhook_delete(self, m_post: MagicMock, m_delete: MagicMock) -> None:
-        m_post.return_value = mock_response(200)
+        m_post.return_value = mock_response()
         m_delete.return_value = mock_response(200, {"message": "Deleted"})
         self.client.domains_webhooks.create(
             domain=self.domain, data=self.webhooks_data
@@ -1012,7 +1012,7 @@ class MailingListsTests(unittest.TestCase):
     @patch("mailgun.client.requests.put")
     @patch("mailgun.client.requests.post")
     def test_maillists_lists_put(self, m_post: MagicMock, m_put: MagicMock) -> None:
-        m_post.return_value = mock_response(200)
+        m_post.return_value = mock_response()
         m_put.return_value = mock_response(200, {"list": {}})
         self.client.lists.create(domain=self.domain, data=self.mailing_lists_data)
         req = self.client.lists.put(
@@ -1028,8 +1028,8 @@ class MailingListsTests(unittest.TestCase):
     def test_maillists_lists_delete(
         self, m_post: MagicMock, m_delete: MagicMock
     ) -> None:
-        m_post.return_value = mock_response(200)
-        m_delete.return_value = mock_response(200)
+        m_post.return_value = mock_response()
+        m_delete.return_value = mock_response()
         self.client.lists.create(domain=self.domain, data=self.mailing_lists_data)
         req = self.client.lists.delete(
             domain=self.domain, address=f"python_sdk@{self.domain}"
@@ -1051,7 +1051,7 @@ class MailingListsTests(unittest.TestCase):
     def test_maillists_lists_members_create(
         self, m_delete: MagicMock, m_post: MagicMock
     ) -> None:
-        m_delete.return_value = mock_response(200)
+        m_delete.return_value = mock_response()
         m_post.return_value = mock_response(200, {"member": {}})
         req = self.client.lists_members.create(
             domain=self.domain,
@@ -1075,7 +1075,7 @@ class MailingListsTests(unittest.TestCase):
     def test_maillists_lists_members_update(
         self, m_post: MagicMock, m_put: MagicMock
     ) -> None:
-        m_post.return_value = mock_response(200)
+        m_post.return_value = mock_response()
         m_put.return_value = mock_response(200, {"member": {}})
         self.client.lists_members.create(
             domain=self.domain,
@@ -1096,8 +1096,8 @@ class MailingListsTests(unittest.TestCase):
     def test_maillists_lists_members_delete(
         self, m_post: MagicMock, m_delete: MagicMock
     ) -> None:
-        m_post.return_value = mock_response(200)
-        m_delete.return_value = mock_response(200)
+        m_post.return_value = mock_response()
+        m_delete.return_value = mock_response()
         self.client.lists_members.create(
             domain=self.domain,
             address=self.maillist_address,
@@ -1153,7 +1153,7 @@ class TemplatesTests(unittest.TestCase):
     @patch("mailgun.client.requests.delete")
     @patch("mailgun.client.requests.post")
     def test_create_template(self, m_post: MagicMock, m_delete: MagicMock) -> None:
-        m_delete.return_value = mock_response(200)
+        m_delete.return_value = mock_response()
         m_post.return_value = mock_response(200, {"template": {}})
         self.client.templates.delete(
             domain=self.domain,
@@ -1168,7 +1168,7 @@ class TemplatesTests(unittest.TestCase):
     @patch("mailgun.client.requests.get")
     @patch("mailgun.client.requests.post")
     def test_get_template(self, m_post: MagicMock, m_get: MagicMock) -> None:
-        m_post.return_value = mock_response(200)
+        m_post.return_value = mock_response()
         m_get.return_value = mock_response(200, {"template": {}})
         params = {"active": "yes"}
         req = self.client.templates.get(
@@ -1182,7 +1182,7 @@ class TemplatesTests(unittest.TestCase):
     @patch("mailgun.client.requests.put")
     @patch("mailgun.client.requests.post")
     def test_put_template(self, m_post: MagicMock, m_put: MagicMock) -> None:
-        m_post.return_value = mock_response(200)
+        m_post.return_value = mock_response()
         m_put.return_value = mock_response(200, {"template": {}})
         self.client.templates.create(
             data=self.post_template_data, domain=self.domain
@@ -1198,8 +1198,8 @@ class TemplatesTests(unittest.TestCase):
     @patch("mailgun.client.requests.delete")
     @patch("mailgun.client.requests.post")
     def test_delete_template(self, m_post: MagicMock, m_delete: MagicMock) -> None:
-        m_post.return_value = mock_response(200)
-        m_delete.return_value = mock_response(200)
+        m_post.return_value = mock_response()
+        m_delete.return_value = mock_response()
         self.client.templates.create(
             data=self.post_template_data, domain=self.domain
         )
@@ -1224,7 +1224,7 @@ class TemplatesTests(unittest.TestCase):
     @patch("mailgun.client.requests.get")
     @patch("mailgun.client.requests.post")
     def test_get_version_template(self, m_post: MagicMock, m_get: MagicMock) -> None:
-        m_post.return_value = mock_response(200)
+        m_post.return_value = mock_response()
         m_get.return_value = mock_response(200, {"template": {}})
         req = self.client.templates.get(
             domain=self.domain,
@@ -1237,7 +1237,7 @@ class TemplatesTests(unittest.TestCase):
     @patch("mailgun.client.requests.put")
     @patch("mailgun.client.requests.post")
     def test_put_version_template(self, m_post: MagicMock, m_put: MagicMock) -> None:
-        m_post.return_value = mock_response(200)
+        m_post.return_value = mock_response()
         m_put.return_value = mock_response(200, {"template": {}})
         req = self.client.templates.put(
             domain=self.domain,
@@ -1254,8 +1254,8 @@ class TemplatesTests(unittest.TestCase):
     def test_delete_version_template(
         self, m_post: MagicMock, m_delete: MagicMock
     ) -> None:
-        m_post.return_value = mock_response(200)
-        m_delete.return_value = mock_response(200)
+        m_post.return_value = mock_response()
+        m_delete.return_value = mock_response()
         self.client.templates.create(
             data=self.post_template_data, domain=self.domain
         )
@@ -1309,8 +1309,9 @@ class MetricsTest(unittest.TestCase):
         self.domain = DOMAIN
         now = datetime.now()
         now_formatted = now.strftime("%a, %d %b %Y %H:%M:%S +0000")
-        yesterday = now - timedelta(days=1)
-        yesterday_formatted = yesterday.strftime("%a, %d %b %Y %H:%M:%S +0000")
+        yesterday_formatted = (now - timedelta(days=1)).strftime(
+            "%a, %d %b %Y %H:%M:%S +0000"
+        )
         self.account_metrics_data = {
             "start": yesterday_formatted,
             "end": now_formatted,
@@ -1330,8 +1331,7 @@ class MetricsTest(unittest.TestCase):
             "include_subaccounts": True,
             "include_aggregates": True,
         }
-        self.invalid_account_metrics_data = {
-            **self.account_metrics_data,
+        self.invalid_account_metrics_data = self.account_metrics_data | {
             "resolution": "century",
             "duration": "1c",
         }
@@ -1345,8 +1345,7 @@ class MetricsTest(unittest.TestCase):
             "include_subaccounts": True,
             "include_aggregates": True,
         }
-        self.invalid_account_usage_metrics_data = {
-            **self.account_usage_metrics_data,
+        self.invalid_account_usage_metrics_data = self.account_usage_metrics_data | {
             "resolution": "century",
         }
 
@@ -1459,8 +1458,9 @@ class LogsTests(unittest.TestCase):
         self.domain = DOMAIN
         now = datetime.now()
         now_formatted = now.strftime("%a, %d %b %Y %H:%M:%S +0000")
-        yesterday = now - timedelta(days=1)
-        yesterday_formatted = yesterday.strftime("%a, %d %b %Y %H:%M:%S +0000")
+        yesterday_formatted = (now - timedelta(days=1)).strftime(
+            "%a, %d %b %Y %H:%M:%S +0000"
+        )
         self.account_logs_data = {
             "start": yesterday_formatted,
             "end": now_formatted,

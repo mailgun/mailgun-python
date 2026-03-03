@@ -55,13 +55,13 @@ class TestBaseEndpointBuildUrl:
 
     def test_build_url_domainlist(self) -> None:
         url = {"base": "https://api.mailgun.net/v4/", "keys": ["domainlist"]}
-        result = BaseEndpoint.build_url(url, domain=None, method="get")
+        result = BaseEndpoint.build_url(url, method="get")
         assert "domains" in result
 
     def test_build_url_default_requires_domain(self) -> None:
         url = {"base": "https://api.mailgun.net/v3/", "keys": ["messages"]}
         with pytest.raises(ApiError, match="Domain is missing"):
-            BaseEndpoint.build_url(url, domain=None, method="post")
+            BaseEndpoint.build_url(url, method="post")
 
 
 class TestEndpoint:
@@ -73,7 +73,7 @@ class TestEndpoint:
         auth = ("api", "key-123")
         ep = Endpoint(url=url, headers=headers, auth=auth)
         with patch.object(requests, "get", return_value=MagicMock(status_code=200)) as m_get:
-            resp = ep.get()
+            ep.get()
             m_get.assert_called_once()
             call_kw = m_get.call_args[1]
             assert call_kw["auth"] == auth
