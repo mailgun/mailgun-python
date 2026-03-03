@@ -66,9 +66,9 @@ class DomainTests(unittest.TestCase):
         self.put_domain_data = {"spam_action": "disabled"}
         self.post_domain_creds = {
             "login": f"alice_bob@{self.domain}",
-            "password": "test_new_creds123",
+            "password": "test_new_creds123", # pragma: allowlist secret
         }
-        self.put_domain_creds = {"password": "test_new_creds"}
+        self.put_domain_creds = {"password": "test_new_creds"} # pragma: allowlist secret
         self.put_domain_connections_data = {"require_tls": "false", "skip_verification": "false"}
         self.put_domain_tracking_data = {"active": "yes", "skip_verification": "false"}
         self.put_domain_unsubscribe_data = {
@@ -1838,7 +1838,7 @@ class KeysTests(unittest.TestCase):
                     "created_at": "",
                     "updated_at": "",
                     "expires_at": "",
-                    "secret": "secret",
+                    "secret": "secret", # pragma: allowlist secret
                     "is_disabled": False,
                     "domain_name": "python.test.domain5",
                     "requestor": self.mailgun_email,
