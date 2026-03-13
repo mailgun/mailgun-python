@@ -29,7 +29,7 @@ def add_domain() -> None:
     """
     # Post domain
     data = {
-        "name": "python.test.domain5",
+        "name": "python.test.com",
     }
     # Problem with smtp_password!!!!
 
@@ -46,7 +46,7 @@ def get_simple_domain() -> None:
     GET /domains/<domain>
     :return:
     """
-    domain_name = "python.test.domain5"
+    domain_name = "python.test.com"
     request = client.domains.get(domain_name=domain_name)
     print(request.json())
 
@@ -56,7 +56,7 @@ def update_simple_domain() -> None:
     PUT /domains/<domain>
     :return:
     """
-    domain_name = "python.test.domain5"
+    domain_name = "python.test.com"
     data = {"name": domain_name, "spam_action": "disabled"}
     request = client.domains.put(data=data, domain=domain_name)
     print(request.json())
@@ -67,7 +67,7 @@ def verify_domain() -> None:
     PUT /domains/<domain>/verify
     :return:
     """
-    domain_name = "python.test.domain5"
+    domain_name = "python.test.com"
     request = client.domains.put(domain=domain_name, verify=True)
     print(request.json())
 
@@ -78,7 +78,7 @@ def delete_domain() -> None:
     :return:
     """
     # Delete domain
-    request = client.domains.delete(domain="python.test.domain5")
+    request = client.domains.delete(domain="python.test.com")
     print(request.text)
     print(request.status_code)
 
@@ -165,7 +165,7 @@ def put_dkim_selector() -> None:
     :return:
     """
     data = {"dkim_selector": "s"}
-    request = client.domains_dkimselector.put(domain="python.test.domain5", data=data)
+    request = client.domains_dkimselector.put(domain="python.test.com", data=data)
     print(request.json())
 
 
@@ -175,7 +175,7 @@ def put_web_prefix() -> None:
     :return:
     """
     data = {"web_prefix": "python"}
-    request = client.domains_webprefix.put(domain="python.test.domain5", data=data)
+    request = client.domains_webprefix.put(domain="python.test.com", data=data)
     print(request.json())
 
 
@@ -184,8 +184,9 @@ def get_sending_queues() -> None:
     GET /domains/<domain>/sending_queues
     :return:
     """
-    request = client.domains_sendingqueues.get(domain="python.test.domain5")
+    request = client.domains_sendingqueues.get(domain="python.test.com")
     print(request.json())
+    print(request.status_code)
 
 
 def get_dkim_keys() -> None:
@@ -196,7 +197,7 @@ def get_dkim_keys() -> None:
     data = {
         "page": "string",
         "limit": "0",
-        "signing_domain": "python.test.domain5",
+        "signing_domain": "python.test.com",
         "selector": "smtp",
     }
 
@@ -223,7 +224,7 @@ def post_dkim_keys() -> None:
     ]
 
     data = {
-        "signing_domain": "python.test.domain5",
+        "signing_domain": "python.test.com",
         "selector": "smtp",
         "bits": "2048",
         "pem": files,
@@ -240,7 +241,7 @@ def delete_dkim_keys() -> None:
     GET /v1/dkim/keys
     :return:
     """
-    query = {"signing_domain": "python.test.domain5", "selector": "smtp"}
+    query = {"signing_domain": "python.test.com", "selector": "smtp"}
 
     request = client.dkim_keys.delete(filters=query)
     print(request.json())
@@ -249,9 +250,25 @@ def delete_dkim_keys() -> None:
 if __name__ == "__main__":
     add_domain()
     get_domains()
+    get_simple_domain()
+    update_simple_domain()
+    verify_domain()
+    delete_domain()
+
+    get_connections()
+    put_connections()
+    get_tracking()
+    put_open_tracking()
+    put_click_tracking()
+    put_unsub_tracking()
+
+    put_dkim_authority()
+
+    put_dkim_selector()
+    put_web_prefix()
+
+    get_sending_queues()
 
     post_dkim_keys()
     get_dkim_keys()
-    get_sending_queues()
-    put_dkim_authority()
     delete_dkim_keys()
