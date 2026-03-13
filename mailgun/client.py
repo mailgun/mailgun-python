@@ -17,11 +17,18 @@ from __future__ import annotations
 
 import io
 import json
+import logging
+import re
 import sys
 from collections import defaultdict
+from enum import Enum
+from importlib.resources import files
+from pathlib import Path
+from types import MappingProxyType
 from typing import TYPE_CHECKING
 from typing import Any
-from urllib.parse import urljoin
+from typing import Final
+from urllib.parse import urlparse
 
 import httpx
 import requests
@@ -99,186 +106,175 @@ HANDLERS: dict[str, Callable] = {  # type: ignore[type-arg]
 }
 
 
-class Config:
-    """Config class.
+class APIVersion(str, Enum):
+    """Constants for Mailgun API versions."""
 
-    Configure client with basic (urls, version, headers).
+    V1 = "v1"
+    V2 = "v2"
+    V3 = "v3"
+    V4 = "v4"
+    V5 = "v5"
+
+
+logger = logging.getLogger("mailgun.config")
+
+
+def _load_routing_manifest() -> dict[str, Any]:
+    """Load the JSON routing manifest safely (Zip-safe for .whl packages)."""
+    manifest_name = "mailgun_routes.json"
+    try:
+        # Try to determine the package name dynamically
+        pkg_name = __package__ or Path(__file__).parent.name
+        manifest_text = files(pkg_name).joinpath(manifest_name).read_text(encoding="utf-8")
+        return json.loads(manifest_text)
+    except Exception as e:
+        logger.debug("Falling back to Path-based loading due to: %s", e)
+        manifest_path = Path(__file__).parent / manifest_name
+        with Path(manifest_path).open(encoding="utf-8") as f:
+            return json.load(f)
+
+
+# Load manifest at module level
+_ROUTES_MANIFEST = _load_routing_manifest()
+
+
+class Config:
+    """Configuration engine for the Mailgun API client.
+
+    Refactored to maintain strict parity with legacy URL construction while
+    using a data-driven routing approach.
     """
 
-    DEFAULT_API_URL: str = "https://api.mailgun.net/"
-    API_REF: str = "https://documentation.mailgun.com/en/latest/api_reference.html"
-    user_agent: str = "mailgun-api-python/"
+    __slots__ = ("api_url", "ex_handler")
 
-    def __init__(self, api_url: str | None = None) -> None:
-        """Initialize a new Config instance with specified or default API settings.
+    DEFAULT_API_URL: Final[str] = "https://api.mailgun.net"
+    USER_AGENT: Final[str] = "mailgun-api-python/"
 
-        This initializer sets the API version and base URL. If no
-        version or URL is provided, it defaults to the predefined class
-        values.
+    # --- ENCAPSULATED ROUTING REGISTRIES ---
+    _DOMAINS_RESOURCE: Final[str] = "domains"
+    _SAFE_KEY_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[a-z0-9_]+$")
 
-        :param version: API version (default: v3)
-        :type version: str | None
-        :param api_url: API base url
-        :type api_url: str | None
-        """
+    _EXACT_ROUTES: Final[MappingProxyType[str, tuple[str, tuple[str, ...]]]] = MappingProxyType(
+        {
+            k: (APIVersion(v[0]).value, tuple(v[1]))
+            for k, v in _ROUTES_MANIFEST.get("exact_routes", {}).items()
+            if len(v) >= 2
+        },
+    )
+
+    _PREFIX_ROUTES: Final[MappingProxyType[str, tuple[str, str, Any]]] = MappingProxyType(
+        {
+            k: (APIVersion(v[0]).value, str(v[1]), v[2] if len(v) > 2 else None)
+            for k, v in _ROUTES_MANIFEST.get("prefix_routes", {}).items()
+            if len(v) >= 2
+        },
+    )
+
+    _DOMAIN_ALIASES: Final[MappingProxyType[str, str]] = MappingProxyType(
+        _ROUTES_MANIFEST.get("domain_aliases", {}),
+    )
+
+    _V1_DOMAIN_ENDPOINTS: Final[frozenset[str]] = frozenset(
+        _ROUTES_MANIFEST.get("v1_domain_endpoints", []),
+    )
+    _V3_DOMAIN_ENDPOINTS: Final[frozenset[str]] = frozenset(
+        _ROUTES_MANIFEST.get("v3_domain_endpoints", []),
+    )
+    _V4_DOMAIN_ENDPOINTS: Final[frozenset[str]] = frozenset(
+        _ROUTES_MANIFEST.get("v4_domain_endpoints", []),
+    )
+
+    def __init__(self, api_url: str | None = None) -> None:  # noqa: D107
         self.ex_handler: bool = True
-        self.api_url = api_url or self.DEFAULT_API_URL
+        base_url_input = api_url or self.DEFAULT_API_URL
+        self.api_url = self._sanitize_url(base_url_input)
 
-    def __getitem__(self, key: str) -> tuple[Any, dict[str, str]]:
-        """Parse incoming split attr name, check it and prepare endpoint url.
+    @staticmethod
+    def _sanitize_url(raw_url: str) -> str:
+        """Normalize the base API URL to have NO trailing slash."""
+        raw_url = raw_url.strip().replace("\r", "").replace("\n", "")
+        parsed = urlparse(raw_url)
+        if not parsed.scheme:
+            raw_url = f"https://{raw_url}"
+        return raw_url.rstrip("/")
 
-        Most urls generated here can't be generated dynamically as we
-        are doing this in build_url() method under Endpoint class.
-        :param key: incoming attr name
-        :type key: str
-        :return: url, headers
-        """
+    @classmethod
+    def _sanitize_key(cls, key: str) -> str:
         key = key.lower()
-        headers = {"User-agent": self.user_agent}
-        v1_base = urljoin(self.api_url, "v1/")
-        v2_base = urljoin(self.api_url, "v2/")
-        v3_base = urljoin(self.api_url, "v3/")
-        v4_base = urljoin(self.api_url, "v4/")
-        v5_base = urljoin(self.api_url, "v5/")
+        if not cls._SAFE_KEY_PATTERN.fullmatch(key):
+            key = re.sub(r"[^a-z0-9_]", "", key)
+        if not key:
+            raise KeyError("Invalid endpoint key.")
+        return key
 
-        special_cases = {
-            "messages": {"base": v3_base, "keys": ["messages"]},
-            "mimemessage": {"base": v3_base, "keys": ["messages.mime"]},
-            "resendmessage": {"base": v3_base, "keys": ["resendmessage"]},
-            "ippools": {"base": v3_base, "keys": ["ip_pools"]},
-            # /v1/dkim/keys
-            "dkim": {"base": v1_base, "keys": ["dkim", "keys"]},
-            "domainlist": {"base": v4_base, "keys": ["domainlist"]},
-            # /v1/analytics/metrics
-            # /v1/analytics/usage/metrics
-            # /v1/analytics/logs
-            # /v1/analytics/tags
-            # /v1/analytics/tags/limits
-            "analytics": {
-                "base": v1_base,
-                "keys": ["analytics", "usage", "metrics", "logs", "tags", "limits"],
-            },
-            # /v2/bounce-classification/metrics
-            "bounceclassification": {
-                "base": v2_base,
-                "keys": ["bounce-classification", "metrics"],
-            },
-            # /v5/users
-            "users": {
-                "base": v5_base,
-                "keys": ["users", "me"],
-            },
-        }
+    def _build_base_url(self, version: APIVersion | str, suffix: str = "") -> str:
+        """Construct API URL with precise slash control to prevent 404s."""
+        # ENSURE: Always use .value for consistency in string building
+        ver_str = version.value if isinstance(version, APIVersion) else version
+        base = f"{self.api_url}/{ver_str}"
 
-        if key in special_cases:
-            return special_cases[key], headers
+        if suffix:
+            # MAINTAINER NOTE: 'domains' resource suffix requires a trailing slash for handler compatibility
+            path = f"{suffix}/" if suffix == self._DOMAINS_RESOURCE else suffix
+            return f"{base}/{path}"
 
-        if "analytics" in key:
-            headers |= {"Content-Type": "application/json"}
+        return f"{base}/"
+
+    def _resolve_domains_route(self, route_parts: list[str]) -> dict[str, Any]:
+        """Handle context-aware versioning for domain endpoints using snake_case matching."""
+        if any(action in route_parts for action in ("activate", "deactivate")):
             return {
-                "base": v1_base,
-                "keys": key.split("_"),
-            }, headers
-
-        if "bounceclassification" in key:
-            headers |= {"Content-Type": "application/json"}
-            part1 = key[:6]
-            part2 = key[6:]
-            return {
-                "base": v2_base,
-                "keys": f"{part1}-{part2}".split("_"),
-            }, headers
-
-        if "users" in key:
-            return {
-                "base": v5_base,
-                "keys": key.split("_"),
-            }, headers
-
-        if "keys" in key:
-            return {
-                "base": v1_base,
-                "keys": key.split("_"),
-            }, headers
-
-        # Handle DIPP endpoints
-        if "subaccount" in key:
-            if "ip_pools" in key:
-                return {
-                    "base": v5_base,
-                    "keys": ["accounts", "subaccounts", "ip_pools"],
-                }, headers
-            if "ip_pool" in key:
-                return {
-                    "base": v5_base,
-                    "keys": ["accounts", "subaccounts", "{subaccountId}", "ip_pool"],
-                }, headers
-
-        # Handle DKIM management endpoints
-        if "dkim_management" in key:
-            if "rotation" in key:
-                return {
-                    "base": v1_base,
-                    "keys": ["dkim_management", "domains", "{name}", "rotation"],
-                }, headers
-            if "rotate" in key:
-                return {
-                    "base": v1_base,
-                    "keys": ["dkim_management", "domains", "{name}", "rotate"],
-                }, headers
-
-        if "domains" in key:
-            split = key.split("_") if "_" in key else [key]
-            final_keys = split
-
-            if any(x in key for x in ("activate", "deactivate")):
-                action = "activate" if "activate" in key else "deactivate"
-                final_keys = [
-                    "domains",
+                "base": self._build_base_url(APIVersion.V4.value),
+                "keys": [
+                    self._DOMAINS_RESOURCE,
                     "{authority_name}",
                     "keys",
                     "{selector}",
-                    action,
-                ]
-                return {"base": v4_base, "keys": final_keys}, headers
-
-            if "dkimauthority" in split:
-                final_keys = ["dkim_authority"]
-            elif "dkimselector" in split:
-                final_keys = ["dkim_selector"]
-            elif "webprefix" in split:
-                final_keys = ["web_prefix"]
-            elif "sendingqueues" in split:
-                final_keys = ["sending_queues"]
-
-            v3_domain_endpoints = {
-                "credentials",
-                "connection",
-                "tracking",
-                "dkimauthority",
-                "dkimselector",
-                "webprefix",
-                "webhooks",
-                "sendingqueues",
+                    route_parts[-1],
+                ],
             }
-            base = v3_base if any(x in key for x in v3_domain_endpoints) else v4_base
-            return {"base": f"{base}domains/", "keys": final_keys}, headers
 
-        # "dkim" must follow after "dkim_management", "dkimauthority", "dkimselector",
-        # otherwise a wrong base url will be chosen.
-        if "dkim" in key:
-            return {
-                "base": v1_base,
-                "keys": key.split("_"),
-            }, headers
+        mapped_parts = [self._DOMAIN_ALIASES.get(p, p) for p in route_parts]
 
-        if "addressvalidate" in key:
-            return {
-                "base": f"{v4_base}address/validate",
-                "keys": key.split("_"),
-            }, headers
+        # Version priority check (v1 -> v3 -> fallback v4)
+        # MAINTAINER NOTE: Comparison is done against mapped snake_case names
+        if not self._V1_DOMAIN_ENDPOINTS.isdisjoint(mapped_parts):
+            version = APIVersion.V1.value
+        elif not self._V3_DOMAIN_ENDPOINTS.isdisjoint(mapped_parts):
+            version = APIVersion.V3.value
+        else:
+            version = APIVersion.V4.value
 
-        return {"base": v3_base, "keys": key.split("_")}, headers
+        return {"base": self._build_base_url(version, self._DOMAINS_RESOURCE), "keys": mapped_parts}
+
+    def __getitem__(self, key: str) -> tuple[dict[str, Any], dict[str, str]]:  # noqa: D105
+        key = self._sanitize_key(key)
+        headers = {"User-agent": self.USER_AGENT}
+
+        if "analytics" in key or "bounceclassification" in key:
+            headers["Content-Type"] = "application/json"
+
+        # 1. Exact Match
+        if key in self._EXACT_ROUTES:
+            version, route_keys = self._EXACT_ROUTES[key]
+            return {"base": self._build_base_url(version), "keys": list(route_keys)}, headers
+
+        route_parts = key.split("_")
+        primary_resource = route_parts[0]
+
+        # 2. Domain Logic
+        if primary_resource == self._DOMAINS_RESOURCE:
+            return self._resolve_domains_route(route_parts), headers
+
+        # 3. Prefix & Fallback
+        matched_prefix = key if key in self._PREFIX_ROUTES else primary_resource
+        if matched_prefix in self._PREFIX_ROUTES:
+            version, suffix, key_override = self._PREFIX_ROUTES[matched_prefix]
+            if key_override:
+                route_parts[0] = key_override
+            return {"base": self._build_base_url(version, suffix), "keys": route_parts}, headers
+
+        return {"base": self._build_base_url(APIVersion.V3.value), "keys": route_parts}, headers
 
 
 class BaseEndpoint:

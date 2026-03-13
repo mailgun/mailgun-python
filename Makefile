@@ -129,7 +129,7 @@ check-env:
 	fi
 
 test: check-env		## runs test cases
-	$(PYTHON3) -m pytest -v --capture=no $(TEST_DIR)/tests.py
+	$(PYTHON3) -m pytest -vvv --capture=no $(TEST_DIR)/tests.py
 
 test-debug: check-env		## runs test cases with debugging info enabled
 	$(PYTHON3) -m pytest -vv --capture=no $(TEST_DIR)/tests.py

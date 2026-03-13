@@ -43,14 +43,14 @@ def put_credentials() -> None:
     print(request.json())
 
 
-def put_mailboxes_credentials() -> None:
-    """
-    PUT /v3/{domain_name}/mailboxes/{spec}
-    :return:
-    """
-
-    req = client.mailboxes.put(domain=domain, login=f"alice_bob@{domain}")
-    print(req.json())
+# def put_mailboxes_credentials() -> None:
+#     """
+#     PUT /v3/{domain_name}/mailboxes/{spec}
+#     :return:
+#     """
+#
+#     req = client.mailboxes.put(domain=domain, login=f"alice_bob@{domain}")
+#     print(req.json())
 
 
 def delete_all_domain_credentials() -> None:
@@ -72,4 +72,7 @@ def delete_credentials() -> None:
 
 
 if __name__ == "__main__":
-    put_mailboxes_credentials()
+    post_credentials()
+    get_credentials()
+
+    # put_mailboxes_credentials()
