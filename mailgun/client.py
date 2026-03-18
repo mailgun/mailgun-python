@@ -15,10 +15,8 @@ Classes:
 
 from __future__ import annotations
 
-import io
 import json
 import sys
-from collections import defaultdict
 from typing import TYPE_CHECKING
 from typing import Any
 from urllib.parse import urljoin
@@ -632,70 +630,6 @@ class AsyncEndpoint(BaseEndpoint):
         self._auth = auth
         self._client = client
 
-    @staticmethod
-    def _prepare_files(files: Any) -> dict[str, Any] | None:
-        """Convert files to httpx format: {"field": (filename, file_obj, content_type)}."""
-        min_length = 2
-        httpx_files = None
-        if not files:
-            return httpx_files
-
-        if isinstance(files, dict):
-            # Convert dict[str, bytes] to httpx format
-            # httpx expects: {"field": (filename, file_obj, content_type)}
-            httpx_files = {}
-            for key, value in files.items():
-                if isinstance(value, bytes):
-                    httpx_files[key] = (key, io.BytesIO(value), "application/octet-stream")
-                elif isinstance(value, tuple) and len(value) >= min_length:
-                    # Already in tuple format: (filename, content, ...)
-                    filename = value[0]
-                    content = value[1]
-                    content_type = (
-                        value[2] if len(value) > min_length else "application/octet-stream"
-                    )
-                    if isinstance(content, bytes):
-                        httpx_files[key] = (filename, io.BytesIO(content), content_type)
-                    else:
-                        httpx_files[key] = value
-                else:
-                    httpx_files[key] = value
-        elif isinstance(files, list):
-            # Convert list of tuples to httpx dict format
-            files_dict: dict[str, list[tuple[str, Any, str]]] = defaultdict(list)
-            for item in files:
-                if isinstance(item, tuple) and len(item) >= min_length:
-                    field_name = item[0]
-                    file_data = item[1]
-                    if isinstance(file_data, tuple) and len(file_data) >= min_length:
-                        filename = file_data[0]
-                        content = file_data[1]
-                        content_type = (
-                            file_data[2]
-                            if len(file_data) > min_length
-                            else "application/octet-stream"
-                        )
-                        if isinstance(content, bytes):
-                            files_dict[field_name].append(
-                                (filename, io.BytesIO(content), content_type),
-                            )
-                        else:
-                            files_dict[field_name].append(file_data)
-                    elif isinstance(file_data, bytes):
-                        files_dict[field_name].append(
-                            (field_name, io.BytesIO(file_data), "application/octet-stream"),
-                        )
-                    else:
-                        files_dict[field_name].append(file_data)
-
-            httpx_files = {
-                field: file_list[0] if len(file_list) == 1 else file_list
-                for field, file_list in files_dict.items()
-            }
-        else:
-            httpx_files = files
-        return httpx_files
-
     async def api_call(
         self,
         auth: tuple[str, str] | None,
@@ -742,7 +676,7 @@ class AsyncEndpoint(BaseEndpoint):
             "url": url,
             "params": filters,
             "data": data,
-            "files": self._prepare_files(files),
+            "files": files,
             "headers": headers,
             "auth": auth,
             "timeout": timeout,
