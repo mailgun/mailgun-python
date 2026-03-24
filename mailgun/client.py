@@ -753,11 +753,12 @@ class AsyncEndpoint(BaseEndpoint):
         :rtype: httpx.Response
         :raises: TimeoutError, ApiError
         """
-        url = self.build_url(url, domain=domain, method=method, **kwargs)
+        url_str = self.build_url(url, domain=domain, method=method, **kwargs)
 
+        # Build basic arguments
         request_kwargs: dict[str, Any] = {
             "method": method.upper(),
-            "url": url,
+            "url": url_str,
             "params": filters,
             "data": data,
             "files": self._prepare_files(files),

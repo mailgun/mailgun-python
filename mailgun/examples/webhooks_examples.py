@@ -61,4 +61,5 @@ def delete_webhook() -> None:
 
 
 if __name__ == "__main__":
+    create_webhook()
     get_webhooks()
