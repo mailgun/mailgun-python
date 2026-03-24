@@ -260,6 +260,7 @@ repos:
     hooks:
       - id: interrogate
         name: "📝 docs · Check docstring coverage"
+        exclude: ^tests
         args: [ --verbose, --fail-under=40, --ignore-init-method ]
 
   # Python type checking

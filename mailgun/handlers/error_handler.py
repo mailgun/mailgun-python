@@ -12,3 +12,7 @@ class ApiError(Exception):
     allowing for more specific error handling based on the type of API
     failure encountered.
     """
+
+
+class RouteNotFoundError(ApiError):
+    """Raised when the requested Mailgun endpoint cannot be resolved."""

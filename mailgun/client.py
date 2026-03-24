@@ -22,13 +22,12 @@ import re
 import sys
 from collections import defaultdict
 from enum import Enum
-from importlib.resources import files
-from pathlib import Path
+from functools import lru_cache
 from types import MappingProxyType
 from typing import TYPE_CHECKING
-from typing import Any
-from typing import Final
 from urllib.parse import urlparse
+
+from typing import Any, Final
 
 import httpx
 import requests
@@ -57,7 +56,7 @@ from mailgun.handlers.suppressions_handler import handle_whitelists
 from mailgun.handlers.tags_handler import handle_tags
 from mailgun.handlers.templates_handler import handle_templates
 from mailgun.handlers.users_handler import handle_users
-
+from mailgun import routes
 
 if sys.version_info >= (3, 11):
     from typing import Self
@@ -116,33 +115,50 @@ class APIVersion(str, Enum):
     V5 = "v5"
 
 
+# Static data is accessed directly from the routes module or class constants.
+# Uses a default maxsize=128
+@lru_cache
+def _get_cached_route_data(clean_key: str) -> tuple[dict[str, Any], bool]:
+    """
+    Apply internal cached routing logic.
+
+    Uses only hashable types (str) as arguments to avoid TypeError.
+    """
+    # 1. Exact Match
+    if clean_key in routes.EXACT_ROUTES:
+        version, route_keys = routes.EXACT_ROUTES[clean_key]
+        is_json = "analytics" in clean_key
+        return {"version": version, "keys": tuple(route_keys)}, is_json
+
+    # 2. Parse resource parts
+    route_parts = clean_key.split("_")
+    primary_resource = route_parts[0]
+    is_json = "analytics" in clean_key or "bounceclassification" in clean_key
+
+    # 3. Domain Logic Trigger
+    # We use a hardcoded string 'domains' or import it
+    if primary_resource == "domains":
+        return {"type": "domain", "parts": tuple(route_parts)}, is_json
+
+    # 4. Prefix Logic
+    if primary_resource in routes.PREFIX_ROUTES:
+        version, suffix, key_override = routes.PREFIX_ROUTES[primary_resource]
+        final_parts = route_parts.copy()
+        if key_override:
+            final_parts[0] = key_override
+        return {"version": version, "suffix": suffix, "keys": tuple(final_parts)}, is_json
+
+    # 5. Fallback
+    return {"version": APIVersion.V3.value, "keys": tuple(route_parts)}, is_json
+
+
 logger = logging.getLogger("mailgun.config")
-
-
-def _load_routing_manifest() -> dict[str, Any]:
-    """Load the JSON routing manifest safely (Zip-safe for .whl packages)."""
-    manifest_name = "mailgun_routes.json"
-    try:
-        # Try to determine the package name dynamically
-        pkg_name = __package__ or Path(__file__).parent.name
-        manifest_text = files(pkg_name).joinpath(manifest_name).read_text(encoding="utf-8")
-        return json.loads(manifest_text)
-    except Exception as e:
-        logger.debug("Falling back to Path-based loading due to: %s", e)
-        manifest_path = Path(__file__).parent / manifest_name
-        with Path(manifest_path).open(encoding="utf-8") as f:
-            return json.load(f)
-
-
-# Load manifest at module level
-_ROUTES_MANIFEST = _load_routing_manifest()
 
 
 class Config:
     """Configuration engine for the Mailgun API client.
 
-    Refactored to maintain strict parity with legacy URL construction while
-    using a data-driven routing approach.
+    Using a data-driven routing approach.
     """
 
     __slots__ = ("api_url", "ex_handler")
@@ -150,44 +166,30 @@ class Config:
     DEFAULT_API_URL: Final[str] = "https://api.mailgun.net"
     USER_AGENT: Final[str] = "mailgun-api-python/"
 
+    # Use Mapping to denote read-only dictionary-like structures
+    _HEADERS_BASE: Final[Mapping[str, str]] = MappingProxyType({"User-agent": USER_AGENT})
+    _HEADERS_JSON: Final[Mapping[str, str]] = MappingProxyType(
+        {"User-agent": USER_AGENT, "Content-Type": "application/json"}
+    )
+
     # --- ENCAPSULATED ROUTING REGISTRIES ---
     _DOMAINS_RESOURCE: Final[str] = "domains"
     _SAFE_KEY_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[a-z0-9_]+$")
 
-    _EXACT_ROUTES: Final[MappingProxyType[str, tuple[str, tuple[str, ...]]]] = MappingProxyType(
-        {
-            k: (APIVersion(v[0]).value, tuple(v[1]))
-            for k, v in _ROUTES_MANIFEST.get("exact_routes", {}).items()
-            if len(v) >= 2
-        },
-    )
+    # Mapping[str, Any] is used because the values in routes vary in structure
+    _EXACT_ROUTES: Final[Mapping[str, Any]] = MappingProxyType(routes.EXACT_ROUTES)
+    _PREFIX_ROUTES: Final[Mapping[str, Any]] = MappingProxyType(routes.PREFIX_ROUTES)
+    _DOMAIN_ALIASES: Final[Mapping[str, str]] = MappingProxyType(routes.DOMAIN_ALIASES)
 
-    _PREFIX_ROUTES: Final[MappingProxyType[str, tuple[str, str, Any]]] = MappingProxyType(
-        {
-            k: (APIVersion(v[0]).value, str(v[1]), v[2] if len(v) > 2 else None)
-            for k, v in _ROUTES_MANIFEST.get("prefix_routes", {}).items()
-            if len(v) >= 2
-        },
-    )
-
-    _DOMAIN_ALIASES: Final[MappingProxyType[str, str]] = MappingProxyType(
-        _ROUTES_MANIFEST.get("domain_aliases", {}),
-    )
-
-    _V1_DOMAIN_ENDPOINTS: Final[frozenset[str]] = frozenset(
-        _ROUTES_MANIFEST.get("v1_domain_endpoints", []),
-    )
-    _V3_DOMAIN_ENDPOINTS: Final[frozenset[str]] = frozenset(
-        _ROUTES_MANIFEST.get("v3_domain_endpoints", []),
-    )
-    _V4_DOMAIN_ENDPOINTS: Final[frozenset[str]] = frozenset(
-        _ROUTES_MANIFEST.get("v4_domain_endpoints", []),
-    )
+    _DOMAIN_ENDPOINTS: Final[Mapping[str, list[str]]] = MappingProxyType(routes.DOMAIN_ENDPOINTS)
+    _V1_ENDPOINTS: Final[frozenset[str]] = frozenset(routes.DOMAIN_ENDPOINTS["v1"])
+    _V3_ENDPOINTS: Final[frozenset[str]] = frozenset(routes.DOMAIN_ENDPOINTS["v3"])
+    _V4_ENDPOINTS: Final[frozenset[str]] = frozenset(routes.DOMAIN_ENDPOINTS.get("v4", []))
 
     def __init__(self, api_url: str | None = None) -> None:  # noqa: D107
         self.ex_handler: bool = True
-        base_url_input = api_url or self.DEFAULT_API_URL
-        self.api_url = self._sanitize_url(base_url_input)
+        base_url_input: str = api_url or self.DEFAULT_API_URL
+        self.api_url: str = self._sanitize_url(base_url_input)
 
     @staticmethod
     def _sanitize_url(raw_url: str) -> str:
@@ -200,81 +202,104 @@ class Config:
 
     @classmethod
     def _sanitize_key(cls, key: str) -> str:
-        key = key.lower()
-        if not cls._SAFE_KEY_PATTERN.fullmatch(key):
-            key = re.sub(r"[^a-z0-9_]", "", key)
-        if not key:
-            raise KeyError("Invalid endpoint key.")
-        return key
+        """Normalize and validate the endpoint key."""
+        clean_key: str = key.lower()
+        if not cls._SAFE_KEY_PATTERN.fullmatch(clean_key):
+            clean_key = re.sub(r"[^a-z0-9_]", "", clean_key)
+        if not clean_key:
+            raise KeyError(f"Invalid endpoint key: {key}")
+        return clean_key
 
     def _build_base_url(self, version: APIVersion | str, suffix: str = "") -> str:
         """Construct API URL with precise slash control to prevent 404s."""
-        # ENSURE: Always use .value for consistency in string building
-        ver_str = version.value if isinstance(version, APIVersion) else version
-        base = f"{self.api_url}/{ver_str}"
+        ver_str: str = version.value if isinstance(version, APIVersion) else version
+        base: str = f"{self.api_url}/{ver_str}"
 
         if suffix:
-            # MAINTAINER NOTE: 'domains' resource suffix requires a trailing slash for handler compatibility
-            path = f"{suffix}/" if suffix == self._DOMAINS_RESOURCE else suffix
+            path: str = f"{suffix}/" if suffix == self._DOMAINS_RESOURCE else suffix
             return f"{base}/{path}"
 
         return f"{base}/"
 
     def _resolve_domains_route(self, route_parts: list[str]) -> dict[str, Any]:
-        """Handle context-aware versioning for domain endpoints using snake_case matching."""
+        """
+        Handle context-aware versioning for domain-related endpoints.
+
+        Returns a dict containing a string base and a tuple of keys.
+        """
         if any(action in route_parts for action in ("activate", "deactivate")):
             return {
-                "base": self._build_base_url(APIVersion.V4.value),
-                "keys": [
+                "base": self._build_base_url(APIVersion.V4),
+                "keys": (
                     self._DOMAINS_RESOURCE,
                     "{authority_name}",
                     "keys",
                     "{selector}",
                     route_parts[-1],
-                ],
+                ),
             }
 
-        mapped_parts = [self._DOMAIN_ALIASES.get(p, p) for p in route_parts]
+        mapped_parts: list[str] = [self._DOMAIN_ALIASES.get(p, p) for p in route_parts]
 
-        # Version priority check (v1 -> v3 -> fallback v4)
-        # MAINTAINER NOTE: Comparison is done against mapped snake_case names
-        if not self._V1_DOMAIN_ENDPOINTS.isdisjoint(mapped_parts):
-            version = APIVersion.V1.value
-        elif not self._V3_DOMAIN_ENDPOINTS.isdisjoint(mapped_parts):
-            version = APIVersion.V3.value
+        if not mapped_parts or mapped_parts[0] != self._DOMAINS_RESOURCE:
+            mapped_parts.insert(0, self._DOMAINS_RESOURCE)
+
+        parts_set: set[str] = set(mapped_parts)
+        version: APIVersion
+        if not self._V1_ENDPOINTS.isdisjoint(parts_set):
+            version = APIVersion.V1
+        elif not self._V3_ENDPOINTS.isdisjoint(parts_set):
+            version = APIVersion.V3
         else:
-            version = APIVersion.V4.value
+            version = APIVersion.V4
 
-        return {"base": self._build_base_url(version, self._DOMAINS_RESOURCE), "keys": mapped_parts}
+        return {
+            "base": self._build_base_url(version, self._DOMAINS_RESOURCE),
+            "keys": mapped_parts.copy(),
+        }
 
-    def __getitem__(self, key: str) -> tuple[dict[str, Any], dict[str, str]]:  # noqa: D105
-        key = self._sanitize_key(key)
-        headers = {"User-agent": self.USER_AGENT}
+    def __getitem__(self, key: str) -> tuple[dict[str, Any], dict[str, str]]:
+        """
+        Public entry point.
 
-        if "analytics" in key or "bounceclassification" in key:
-            headers["Content-Type"] = "application/json"
+        Calls a standalone cached function.
+        """
+        clean_key = self._sanitize_key(key)
 
-        # 1. Exact Match
-        if key in self._EXACT_ROUTES:
-            version, route_keys = self._EXACT_ROUTES[key]
-            return {"base": self._build_base_url(version), "keys": list(route_keys)}, headers
+        # Result is now safely cached because clean_key is a string (hashable)
+        route_data, is_json = _get_cached_route_data(clean_key)
 
-        route_parts = key.split("_")
-        primary_resource = route_parts[0]
+        # Prepare headers
+        headers_map = self._HEADERS_JSON if is_json else self._HEADERS_BASE
+        headers = dict(headers_map)
 
-        # 2. Domain Logic
-        if primary_resource == self._DOMAINS_RESOURCE:
-            return self._resolve_domains_route(route_parts), headers
+        # Reconstruct result
+        if route_data.get("type") == "domain":
+            # Domain logic still needs 'self' for internal version frozensets
+            return self._resolve_domains_route(list(route_data["parts"])), headers
 
-        # 3. Prefix & Fallback
-        matched_prefix = key if key in self._PREFIX_ROUTES else primary_resource
-        if matched_prefix in self._PREFIX_ROUTES:
-            version, suffix, key_override = self._PREFIX_ROUTES[matched_prefix]
-            if key_override:
-                route_parts[0] = key_override
-            return {"base": self._build_base_url(version, suffix), "keys": route_parts}, headers
+        # Create mutable copy of the URL structure for HANDLERS
+        safe_url = {
+            "base": self._build_base_url(route_data["version"], route_data.get("suffix", "")),
+            "keys": list(route_data["keys"]),
+        }
 
-        return {"base": self._build_base_url(APIVersion.V3.value), "keys": route_parts}, headers
+        return safe_url, headers
+
+    def _format_exact(self, key: str) -> tuple[dict[str, Any], dict[str, str]]:
+        """Standardize the output format for EXACT_ROUTES matches."""
+        version_str: str
+        route_keys_list: list[str]
+        version_str, route_keys_list = self._EXACT_ROUTES[key]
+
+        headers: Mapping[str, str] = (
+            self._HEADERS_JSON if "analytics" in key else self._HEADERS_BASE
+        )
+
+        return {
+            "base": self._build_base_url(version_str),
+            "keys": tuple(route_keys_list),
+        }, dict(headers)
 
 
 class BaseEndpoint:

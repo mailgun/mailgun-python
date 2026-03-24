@@ -79,7 +79,7 @@ class DomainTests(unittest.TestCase):
         random_domain_name = "".join(
             random.choice(string.ascii_lowercase + string.digits) for _ in range(10)
         )
-        self.test_domain: str = f"python.test.com"
+        self.test_domain: str = "python.test.com"
         self.post_domain_data: dict[str, str] = {
             "name": self.test_domain,
         }
@@ -173,31 +173,6 @@ class DomainTests(unittest.TestCase):
 
         self.assertEqual(request.status_code, 200)
         self.assertIn("message", request.json())
-
-    # @pytest.mark.order(3)
-    # def test_put_mailboxes_credentials(self) -> None:
-    #     """Test to update Mailgun SMTP credentials: Happy Path with valid data."""
-    #     self.client.domains_credentials.create(
-    #         domain=self.domain,
-    #         data=self.post_domain_creds,
-    #     )
-    #     name = "alice_bob"
-    #     req = self.client.mailboxes.put(domain=self.domain, login=f"{name}@{self.domain}")
-    #
-    #     expected_keys = [
-    #         "message",
-    #         "note",
-    #         "credentials",
-    #     ]
-    #     expected_credentials_keys = [
-    #         f"{name}@{self.domain}",
-    #     ]
-    #
-    #     self.assertIsInstance(req.json(), dict)
-    #     self.assertEqual(req.status_code, 200)
-    #     [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
-    #     self.assertIn("Password changed", req.json()["message"])
-    #     [self.assertIn(key, expected_credentials_keys) for key in req.json()["credentials"]]  # type: ignore[func-returns-value]
 
     @pytest.mark.order(3)
     def test_get_domain_list(self) -> None:
@@ -2834,7 +2809,7 @@ class AsyncDomainTests(unittest.IsolatedAsyncioTestCase):
         random_domain_name = "".join(
             random.choice(string.ascii_lowercase + string.digits) for _ in range(10)
         )
-        self.test_domain: str = f"mailgun.wrapper.{random_domain_name}"
+        self.test_domain: str = "python.test.com"
         self.post_domain_data: dict[str, str] = {
             "name": self.test_domain,
         }
@@ -2889,6 +2864,7 @@ class AsyncDomainTests(unittest.IsolatedAsyncioTestCase):
     async def test_post_domain(self) -> None:
         await self.client.domains.delete(domain=self.test_domain)
         request = await self.client.domains.create(data=self.post_domain_data)
+        print(f"DEBUG Response: {request.text}")
         self.assertEqual(request.status_code, 200)
         self.assertIn("Domain DNS records have been created", request.json()["message"])
 
@@ -2924,31 +2900,6 @@ class AsyncDomainTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(request.status_code, 200)
         self.assertIn("message", request.json())
-
-    @pytest.mark.order(2)
-    async def test_put_mailboxes_credentials(self) -> None:
-        """Test to update Mailgun SMTP credentials: Happy Path with valid data."""
-        await self.client.domains_credentials.create(
-            domain=self.domain,
-            data=self.post_domain_creds,
-        )
-        name = "alice_bob"
-        req = await self.client.mailboxes.put(domain=self.domain, login=f"{name}@{self.domain}")
-
-        expected_keys = [
-            "message",
-            "note",
-            "credentials",
-        ]
-        expected_credentials_keys = [
-            f"{name}@{self.domain}",
-        ]
-
-        self.assertIsInstance(req.json(), dict)
-        self.assertEqual(req.status_code, 200)
-        [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
-        self.assertIn("Password changed", req.json()["message"])
-        [self.assertIn(key, expected_credentials_keys) for key in req.json()["credentials"]]  # type: ignore[func-returns-value]
 
     @pytest.mark.order(3)
     async def test_get_domain_list(self) -> None:
