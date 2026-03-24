@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import string
 import subprocess
+import time
 import unittest
 import random
 from pathlib import Path
@@ -76,9 +78,7 @@ class DomainTests(unittest.TestCase):
         )
         self.client: Client = Client(auth=self.auth)
         self.domain: str = os.environ["DOMAIN"]
-        random_domain_name = "".join(
-            random.choice(string.ascii_lowercase + string.digits) for _ in range(10)
-        )
+
         self.test_domain: str = "python.test.com"
         self.post_domain_data: dict[str, str] = {
             "name": self.test_domain,
@@ -136,8 +136,6 @@ class DomainTests(unittest.TestCase):
         self.client.domains.delete(domain=self.test_domain)
         request = self.client.domains.create(data=self.post_domain_data)
 
-        print(request.json())
-
         self.assertEqual(request.status_code, 200)
         self.assertIn("Domain DNS records have been created", request.json()["message"])
 
@@ -155,6 +153,7 @@ class DomainTests(unittest.TestCase):
         self.client.domains.delete(domain=self.test_domain)
         self.client.domains.create(data=self.post_domain_data)
         data = {"spam_action": "disabled"}
+        time.sleep(1)
         request = self.client.domains.put(data=data, domain=self.post_domain_data['name'])
         self.assertEqual(request.status_code, 200)
         self.assertEqual(request.json()["message"], "Domain has been updated")
@@ -192,7 +191,7 @@ class DomainTests(unittest.TestCase):
         self.client.domains.delete(domain=self.test_domain)
         self.client.domains.create(data=self.post_domain_data)
         request = self.client.domains_sendingqueues.get(domain=self.post_domain_data["name"])
-        print(request.json())
+        "python.test.com"
         self.assertEqual(request.status_code, 200)
         self.assertIn("scheduled", request.json())
 
@@ -266,7 +265,7 @@ class DomainTests(unittest.TestCase):
             domain=self.test_domain,
             data=self.put_domain_webprefix_data,
         )
-        print(request.json())
+        "python.test.com"
         self.assertIn("message", request.json())
 
     @pytest.mark.order(6)
@@ -2882,6 +2881,7 @@ class AsyncDomainTests(unittest.IsolatedAsyncioTestCase):
         await self.client.domains.delete(domain=self.test_domain)
         await self.client.domains.create(data=self.post_domain_data)
         data = {"spam_action": "disabled"}
+        await asyncio.sleep(1)
         request = await self.client.domains.put(data=data, domain=self.post_domain_data["name"])
         self.assertEqual(request.status_code, 200)
         self.assertEqual(request.json()["message"], "Domain has been updated")
@@ -3036,7 +3036,7 @@ class AsyncDomainTests(unittest.IsolatedAsyncioTestCase):
         """Test to create a domain key: expected failure to parse PEM from string."""
 
         data = {
-            "signing_domain": "python.test.domain5",
+            "signing_domain": self.test_domain,
             "selector": "smtp",
             "bits": "2048",
             "pem": "lorem ipsum",
@@ -4183,9 +4183,9 @@ class AsyncTemplatesTests(unittest.IsolatedAsyncioTestCase):
         req = await self.client.templates.put(
             domain=self.domain,
             filters=data,
-            template_name="template.name1",
+            template_name="template.name20",
             versions=True,
-            tag="v2",
+            tag="v11",
             copy=True,
             new_tag="v3",
         )

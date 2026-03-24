@@ -73,6 +73,8 @@ if TYPE_CHECKING:
     from requests.models import Response
 
 
+logger = logging.getLogger("mailgun.config")
+
 HANDLERS: dict[str, Callable] = {  # type: ignore[type-arg]
     "resendmessage": handle_resend_message,
     "domains": handle_domains,
@@ -116,7 +118,6 @@ class APIVersion(str, Enum):
 
 
 # Static data is accessed directly from the routes module or class constants.
-# Uses a default maxsize=128
 @lru_cache
 def _get_cached_route_data(clean_key: str) -> tuple[dict[str, Any], bool]:
     """
@@ -150,9 +151,6 @@ def _get_cached_route_data(clean_key: str) -> tuple[dict[str, Any], bool]:
 
     # 5. Fallback
     return {"version": APIVersion.V3.value, "keys": tuple(route_parts)}, is_json
-
-
-logger = logging.getLogger("mailgun.config")
 
 
 class Config:
@@ -266,7 +264,6 @@ class Config:
         """
         clean_key = self._sanitize_key(key)
 
-        # Result is now safely cached because clean_key is a string (hashable)
         route_data, is_json = _get_cached_route_data(clean_key)
 
         # Prepare headers
