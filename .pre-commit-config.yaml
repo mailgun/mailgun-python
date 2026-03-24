@@ -155,7 +155,7 @@ repos:
 
   # Spelling and typos
   - repo: https://github.com/crate-ci/typos
-    rev: v1.40.0
+    rev: v1.44.0
     hooks:
       - id: typos
         name: "📝 spelling · Check typos"
@@ -289,7 +289,7 @@ repos:
         name: "🐍 config · Validate pyproject.toml"
 
   - repo: https://github.com/tox-dev/pyproject-fmt
-    rev: v2.18.1
+    rev: v2.20.0
     hooks:
       - id: pyproject-fmt
         name: "🐍 config · Format pyproject.toml"
