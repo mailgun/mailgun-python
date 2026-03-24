@@ -288,20 +288,6 @@ repos:
       - id: validate-pyproject
         name: "🐍 config · Validate pyproject.toml"
 
-  - repo: https://github.com/tox-dev/pyproject-fmt
-    rev: v2.20.0
-    hooks:
-      - id: pyproject-fmt
-        name: "🐍 config · Format pyproject.toml"
-
-#  - repo: https://github.com/mgedmin/check-manifest
-#    rev: '0.50'
-#    hooks:
-#      - id: check-manifest
-#        name: "🐍 📦 packaging · Verify MANIFEST"
-#        args: [--no-build-isolation, --ignore-bad-ideas=MANIFEST.in]
-#        additional_dependencies: [setuptools, wheel, setuptools-scm]
-
   - repo: https://github.com/pre-commit/pygrep-hooks
     rev: v1.10.0
     hooks:
