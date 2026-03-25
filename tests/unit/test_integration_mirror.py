@@ -577,7 +577,7 @@ class BouncesTests(unittest.TestCase):
             req = self.client.bounces.create(
                 data=address,
                 domain=self.domain,
-                headers={"Content-type": "application/json"},
+                headers={"Content-Type": "application/json"},
             )
             self.assertEqual(req.status_code, 200)
             self.assertIn("message", req.json())
@@ -643,7 +643,7 @@ class UnsubscribesTests(unittest.TestCase):
             req = self.client.unsubscribes.create(
                 data=address,
                 domain=self.domain,
-                headers={"Content-type": "application/json"},
+                headers={"Content-Type": "application/json"},
             )
             self.assertEqual(req.status_code, 200)
             self.assertIn("message", req.json())

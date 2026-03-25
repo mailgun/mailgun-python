@@ -59,7 +59,7 @@ def add_multiple_bounces() -> None:
     json_data = json.loads(data)
     for address in json_data:
         req = client.bounces.create(
-            data=address, domain=domain, headers={"Content-type": "application/json"}
+            data=address, domain=domain, headers={"Content-Type": "application/json"}
         )
         print(req.json())
 
@@ -146,7 +146,7 @@ def create_multiple_unsub() -> None:
     json_data = json.loads(data)
     for address in json_data:
         req = client.unsubscribes.create(
-            data=address, domain=domain, headers={"Content-type": "application/json"}
+            data=address, domain=domain, headers={"Content-Type": "application/json"}
         )
         print(req.json())
 
@@ -232,7 +232,7 @@ def add_multiple_complaints() -> None:
     json_data = json.loads(data)
     for address in json_data:
         req = client.complaints.create(
-            data=address, domain=domain, headers={"Content-type": "application/json"}
+            data=address, domain=domain, headers={"Content-Type": "application/json"}
         )
         print(req.json())
 

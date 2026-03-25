@@ -151,7 +151,7 @@ class TestEndpoint:
         url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
         ep = Endpoint(
             url=url,
-            headers={"Content-type": "application/json"},
+            headers={"Content-Type": "application/json"},
             auth=None,
         )
         with patch.object(requests, "put", return_value=MagicMock(status_code=200)) as m_put:

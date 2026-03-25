@@ -831,7 +831,7 @@ class BouncesTests(unittest.TestCase):
             req = self.client.bounces.create(
                 data=address,
                 domain=self.domain,
-                headers={"Content-type": "application/json"},
+                headers={"Content-Type": "application/json"},
             )
             self.assertEqual(req.status_code, 200)
             self.assertIn("message", req.json())
@@ -910,7 +910,7 @@ class UnsubscribesTests(unittest.TestCase):
             req = self.client.unsubscribes.create(
                 data=address,
                 domain=self.domain,
-                headers={"Content-type": "application/json"},
+                headers={"Content-Type": "application/json"},
             )
 
             self.assertEqual(req.status_code, 200)
@@ -992,7 +992,7 @@ class ComplaintsTests(unittest.TestCase):
             req = self.client.complaints.create(
                 data=address,
                 domain=self.domain,
-                headers={"Content-type": "application/json"},
+                headers={"Content-Type": "application/json"},
             )
 
             self.assertEqual(req.status_code, 200)
@@ -3380,7 +3380,7 @@ class AsyncBouncesTests(unittest.IsolatedAsyncioTestCase):
             req = await self.client.bounces.create(
                 data=address,
                 domain=self.domain,
-                headers={"Content-type": "application/json"},
+                headers={"Content-Type": "application/json"},
             )
             self.assertEqual(req.status_code, 200)
             self.assertIn("message", req.json())
@@ -3456,7 +3456,7 @@ class AsyncUnsubscribesTests(unittest.IsolatedAsyncioTestCase):
             req = await self.client.unsubscribes.create(
                 data=address,
                 domain=self.domain,
-                headers={"Content-type": "application/json"},
+                headers={"Content-Type": "application/json"},
             )
 
             self.assertEqual(req.status_code, 200)
@@ -3535,7 +3535,7 @@ class AsyncComplaintsTests(unittest.IsolatedAsyncioTestCase):
             req = await self.client.complaints.create(
                 data=address,
                 domain=self.domain,
-                headers={"Content-type": "application/json"},
+                headers={"Content-Type": "application/json"},
             )
 
             self.assertEqual(req.status_code, 200)
