@@ -6,6 +6,7 @@ BASE_URL_V3: str = f"https://api.mailgun.net/v3"
 BASE_URL_V4: str = f"https://api.mailgun.net/v4"
 TEST_DOMAIN: str = "example.com"
 TEST_EMAIL: str = "user@example.com"
+TEST_123: str = "test-123"
 
 
 def parse_domain_name(result: str) -> str:

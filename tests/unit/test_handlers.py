@@ -31,6 +31,7 @@ from tests.unit.conftest import (
     BASE_URL_V4,
     BASE_URL_V1,
     TEST_EMAIL,
+    TEST_123,
 )
 
 
@@ -312,26 +313,22 @@ class TestHandleInbox:
 
     def test_with_test_id_only(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["inbox", "tests"]}
-        result = handle_inbox(url, None, None, test_id="test-123")
+        result = handle_inbox(url, None, None, test_id=TEST_123)
         assert result == "https://api.mailgun.net/v3/inbox/tests/test-123"
 
     def test_with_test_id_and_counters_true(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["inbox", "tests"]}
-        result = handle_inbox(
-            url, None, None, test_id="test-123", counters=True
-        )
+        result = handle_inbox(url, None, None, test_id=TEST_123, counters=True)
         assert result == "https://api.mailgun.net/v3/inbox/tests/test-123/counters"
 
     def test_with_test_id_and_counters_false_raises(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["inbox", "tests"]}
         with pytest.raises(ApiError, match="Counters option should be True or absent"):
-            handle_inbox(url, None, None, test_id="test-123", counters=False)
+            handle_inbox(url, None, None, test_id=TEST_123, counters=False)
 
     def test_with_test_id_and_checks_true_no_address(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["inbox", "tests"]}
-        result = handle_inbox(
-            url, None, None, test_id="test-123", checks=True
-        )
+        result = handle_inbox(url, None, None, test_id=TEST_123, checks=True)
         assert result == "https://api.mailgun.net/v3/inbox/tests/test-123/checks"
 
     def test_with_test_id_and_checks_true_with_address(self) -> None:
@@ -340,7 +337,7 @@ class TestHandleInbox:
             url,
             None,
             None,
-            test_id="test-123",
+            test_id=TEST_123,
             checks=True,
             address=TEST_EMAIL,
         )
@@ -351,7 +348,7 @@ class TestHandleInbox:
     def test_with_test_id_and_checks_false_raises(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["inbox", "tests"]}
         with pytest.raises(ApiError, match="Checks option should be True or absent"):
-            handle_inbox(url, None, None, test_id="test-123", checks=False)
+            handle_inbox(url, None, None, test_id=TEST_123, checks=False)
 
 
 class TestHandleResendMessage:
