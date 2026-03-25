@@ -449,15 +449,13 @@ class Endpoint(BaseEndpoint):
         :return: api_call POST request
         :rtype: requests.models.Response
         """
-        if "Content-Type" in self.headers:
-            if self.headers["Content-Type"] == "application/json":
-                data = json.dumps(data)
-        elif headers:
-            if headers == "application/json":
-                data = json.dumps(data)
-                self.headers["Content-Type"] = "application/json"
-            elif headers == "multipart/form-data":
-                self.headers["Content-Type"] = "multipart/form-data"
+        req_headers = self.headers.copy()
+
+        if req_headers.get("Content-Type") == "application/json":
+            data = json.dumps(data) if data is not None else None
+        elif headers == "application/json":
+            data = json.dumps(data) if data is not None else None
+            req_headers["Content-Type"] = "application/json"
 
         return self.api_call(
             self._auth,
@@ -465,7 +463,7 @@ class Endpoint(BaseEndpoint):
             self._url,
             files=files,
             domain=domain,
-            headers=self.headers,
+            headers=req_headers,
             data=data,
             filters=filters,
             **kwargs,
@@ -542,8 +540,8 @@ class Endpoint(BaseEndpoint):
         :return: api_call PUT request
         :rtype: requests.models.Response
         """
-        if self.headers["Content-Type"] == "application/json":
-            data = json.dumps(data)
+        if self.headers.get("Content-Type") == "application/json":
+            data = json.dumps(data) if data is not None else None
         return self.api_call(
             self._auth,
             "put",
