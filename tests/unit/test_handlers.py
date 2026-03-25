@@ -138,6 +138,14 @@ class TestHandleDkimkeys:
     def test_builds_dkim_keys_url(self) -> None:
         url = {"base": f"{BASE_URL_V1}/", "keys": ["dkim", "keys"]}
         result = handle_dkimkeys(url, None, None)
+
+        expected_url = "https://api.mailgun.net/v1/dkim/keys"
+
+        assert result == expected_url
+
+        parsed = urlparse(result)
+        assert "dkim" in parsed.path
+        assert parsed.path.endswith("keys")
         assert "dkim" in result
         assert "keys" in result
 
