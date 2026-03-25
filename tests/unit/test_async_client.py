@@ -25,32 +25,6 @@ class TestAsyncEndpointPrepareFiles:
             client=MagicMock(spec=httpx.AsyncClient),
         )
 
-    # def test_prepare_files_none(self) -> None:
-    #     ep = self._make_endpoint()
-    #     assert ep._prepare_files(None) is None
-
-    # def test_prepare_files_dict_bytes(self) -> None:
-    #     ep = self._make_endpoint()
-    #     files = {"attachment": b"binary content"}
-    #     result = ep._prepare_files(files)
-    #     assert result is not None
-    #     assert "attachment" in result
-    #     # (filename, file_obj, content_type)
-    #     assert len(result["attachment"]) == 3
-    #     assert result["attachment"][0] == "attachment"
-    #     assert isinstance(result["attachment"][1], io.BytesIO)
-    #     assert result["attachment"][1].read() == b"binary content"
-    #     assert result["attachment"][2] == "application/octet-stream"
-
-    # def test_prepare_files_dict_tuple(self) -> None:
-    #     ep = self._make_endpoint()
-    #     files = {"f": ("name.txt", b"data", "text/plain")}
-    #     result = ep._prepare_files(files)
-    #     assert result is not None
-    #     assert result["f"][0] == "name.txt"
-    #     assert result["f"][2] == "text/plain"
-
-
 class TestAsyncEndpoint:
     """Tests for AsyncEndpoint with mocked httpx."""
 
