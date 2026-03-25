@@ -117,7 +117,7 @@ class APIVersion(str, Enum):
 
 # Static data is accessed directly from the routes module or class constants.
 @lru_cache
-def _get_cached_route_data(clean_key: str) -> tuple[dict[str, Any], bool]:
+def _get_cached_route_data(clean_key: str) -> dict[str, Any]:
     """
     Apply internal cached routing logic.
 
@@ -126,18 +126,16 @@ def _get_cached_route_data(clean_key: str) -> tuple[dict[str, Any], bool]:
     # 1. Exact Match
     if clean_key in routes.EXACT_ROUTES:
         version, route_keys = routes.EXACT_ROUTES[clean_key]
-        is_json = "analytics" in clean_key
-        return {"version": version, "keys": tuple(route_keys)}, is_json
+        return {"version": version, "keys": tuple(route_keys)}
 
     # 2. Parse resource parts
     route_parts = clean_key.split("_")
     primary_resource = route_parts[0]
-    is_json = "analytics" in clean_key or "bounceclassification" in clean_key
 
     # 3. Domain Logic Trigger
     # We use a hardcoded string 'domains' or import it
     if primary_resource == "domains":
-        return {"type": "domain", "parts": tuple(route_parts)}, is_json
+        return {"type": "domain", "parts": tuple(route_parts)}
 
     # 4. Prefix Logic
     if primary_resource in routes.PREFIX_ROUTES:
@@ -145,10 +143,10 @@ def _get_cached_route_data(clean_key: str) -> tuple[dict[str, Any], bool]:
         final_parts = route_parts.copy()
         if key_override:
             final_parts[0] = key_override
-        return {"version": version, "suffix": suffix, "keys": tuple(final_parts)}, is_json
+        return {"version": version, "suffix": suffix, "keys": tuple(final_parts)}
 
     # 5. Fallback
-    return {"version": APIVersion.V3.value, "keys": tuple(route_parts)}, is_json
+    return {"version": APIVersion.V3.value, "keys": tuple(route_parts)}
 
 
 class Config:
@@ -262,10 +260,13 @@ class Config:
         """
         clean_key = self._sanitize_key(key)
 
-        route_data, is_json = _get_cached_route_data(clean_key)
+        route_data = _get_cached_route_data(clean_key)
+
+        # HTTP header mapping based on endpoint naming conventions
+        requires_json_headers = "analytics" in clean_key or "bounceclassification" in clean_key
 
         # Prepare headers
-        headers_map = self._HEADERS_JSON if is_json else self._HEADERS_BASE
+        headers_map = self._HEADERS_JSON if requires_json_headers else self._HEADERS_BASE
         headers = dict(headers_map)
 
         # Reconstruct result
