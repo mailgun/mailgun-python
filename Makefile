@@ -134,7 +134,7 @@ test-unit:		## run unit tests only (no API key required)
 	$(PYTHON3) -m pytest -v --capture=no $(TEST_DIR)/unit/
 
 test-integration: check-env		## run integration tests only (requires APIKEY and DOMAIN)
-	$(PYTHON3) -m pytest -v --capture=no $(TEST_DIR)/integration/
+	$(PYTHON3) -m pytest -v --capture=no $(TEST_DIR)/integration/tests.py
 
 test-debug:		## run unit tests with debugging info
 	$(PYTHON3) -m pytest -vv --capture=no $(TEST_DIR)/unit/
