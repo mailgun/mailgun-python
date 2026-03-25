@@ -392,9 +392,7 @@ class Endpoint(BaseEndpoint):
         except requests.exceptions.Timeout:
             raise TimeoutError
         except requests.RequestException as e:
-            raise ApiError(e)
-        except Exception as e:
-            raise e
+            raise ApiError(e) from e
 
     def get(
         self,
