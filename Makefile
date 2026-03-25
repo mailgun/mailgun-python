@@ -1,4 +1,4 @@
-.PHONY: all clean clean-env clean-test clean-pyc clean-build clean-other help dev test test-debug test-cov pre-commit lint format format-docs analyze docs
+.PHONY: all clean clean-env clean-test clean-pyc clean-build clean-other help dev test test-unit test-integration test-debug test-cov tests-cov-fail pre-commit lint format format-docs analyze docs
 .DEFAULT_GOAL := help
 
 # The `.ONESHELL` and setting `SHELL` allows us to run commands that require
@@ -128,21 +128,28 @@ check-env:
 	  exit 1; \
 	fi
 
-test: check-env		## runs test cases
-	$(PYTHON3) -m pytest -vvv --capture=no $(TEST_DIR)/tests.py
+test: test-unit
 
-test-debug: check-env		## runs test cases with debugging info enabled
-	$(PYTHON3) -m pytest -vv --capture=no $(TEST_DIR)/tests.py
 
-test-cov: check-env		## checks test coverage requirements
+test-unit:		## run unit tests only (no API key required)
+	$(PYTHON3) -m pytest -v --capture=no $(TEST_DIR)/unit/
+
+test-integration: check-env		## run integration tests only (requires APIKEY and DOMAIN)
+	$(PYTHON3) -m pytest -v --capture=no $(TEST_DIR)/integration/tests.py
+
+test-debug:		## run unit tests with debugging info
+	$(PYTHON3) -m pytest -vv --capture=no $(TEST_DIR)/unit/
+
+test-cov:		## check test coverage (unit tests only)
 	$(PYTHON3) -m pytest --cov-config=.coveragerc --cov=$(SRC_DIR) \
-		$(TEST_DIR)/tests.py --cov-fail-under=80 --cov-report term-missing
+		$(TEST_DIR)/unit/ --cov-report term-missing
 
-tests-cov-fail:
-	@pytest --cov=$(SRC_DIR) --cov-report term-missing --cov-report=html --cov-fail-under=80
+test-cov-fail:		## check test coverage with fail-under (unit tests only)
+	$(PYTHON3) -m pytest --cov-config=.coveragerc --cov=$(SRC_DIR) \
+		$(TEST_DIR)/unit/ --cov-fail-under=80 --cov-report term-missing --cov-report=html
 
-coverage:	## check code coverage quickly with the default Python
-	coverage run --source $(SRC_DIR) -m pytest
+coverage:	## check code coverage quickly with the default Python (unit tests only)
+	coverage run --source $(SRC_DIR) -m pytest $(TEST_DIR)/unit/
 	coverage report -m
 	coverage html
 	$(BROWSER) htmlcov/index.html

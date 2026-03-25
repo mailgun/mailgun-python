@@ -27,6 +27,7 @@ class MessagesTests(unittest.TestCase):
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
     """
+
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
             "api",
@@ -154,7 +155,7 @@ class DomainTests(unittest.TestCase):
         self.client.domains.create(data=self.post_domain_data)
         data = {"spam_action": "disabled"}
         time.sleep(1)
-        request = self.client.domains.put(data=data, domain=self.post_domain_data['name'])
+        request = self.client.domains.put(data=data, domain=self.post_domain_data["name"])
         self.assertEqual(request.status_code, 200)
         self.assertEqual(request.json()["message"], "Domain has been updated")
 
@@ -534,8 +535,7 @@ class DomainTests(unittest.TestCase):
         )
         request = self.client.domains_credentials.delete(domain=self.domain)
         self.assertEqual(request.status_code, 200)
-        self.assertIn(request.json()['message'],
-                      "All domain credentials have been deleted")
+        self.assertIn(request.json()["message"], "All domain credentials have been deleted")
 
     @pytest.mark.order(8)
     @pytest.mark.xfail(reason="The test can fail because the domain name is a random string")
@@ -560,6 +560,7 @@ class IpTests(unittest.TestCase):
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
     """
+
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
             "api",
@@ -607,6 +608,7 @@ class IpPoolsTests(unittest.TestCase):
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
     """
+
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
             "api",
@@ -673,6 +675,7 @@ class EventsTests(unittest.TestCase):
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
     """
+
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
             "api",
@@ -704,6 +707,7 @@ class TagsTests(unittest.TestCase):
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
     """
+
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
             "api",
@@ -777,6 +781,7 @@ class BouncesTests(unittest.TestCase):
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
     """
+
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
             "api",
@@ -854,6 +859,7 @@ class UnsubscribesTests(unittest.TestCase):
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
     """
+
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
             "api",
@@ -934,6 +940,7 @@ class ComplaintsTests(unittest.TestCase):
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
     """
+
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
             "api",
@@ -1019,6 +1026,7 @@ class WhiteListTests(unittest.TestCase):
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
     """
+
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
             "api",
@@ -1077,6 +1085,7 @@ class RoutesTests(unittest.TestCase):
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
     """
+
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
             "api",
@@ -1139,17 +1148,13 @@ class RoutesTests(unittest.TestCase):
                 route_id=req1.json()["items"][0]["id"],
             )
 
-            req_post = self.client.routes.create(
-                domain=self.domain, data=self.routes_data
-            )
+            req_post = self.client.routes.create(domain=self.domain, data=self.routes_data)
             self.client.routes.create(domain=self.domain, data=self.routes_data)
             req = self.client.routes.get(
                 domain=self.domain, route_id=req_post.json()["route"]["id"]
             )
         else:
-            req_post = self.client.routes.create(
-                domain=self.domain, data=self.routes_data
-            )
+            req_post = self.client.routes.create(domain=self.domain, data=self.routes_data)
             self.client.routes.create(domain=self.domain, data=self.routes_data)
             req = self.client.routes.get(
                 domain=self.domain, route_id=req_post.json()["route"]["id"]
@@ -1166,18 +1171,14 @@ class RoutesTests(unittest.TestCase):
                 domain=self.domain,
                 route_id=req1.json()["items"][0]["id"],
             )
-            req_post = self.client.routes.create(
-                domain=self.domain, data=self.routes_data
-            )
+            req_post = self.client.routes.create(domain=self.domain, data=self.routes_data)
             req = self.client.routes.put(
                 domain=self.domain,
                 data=self.routes_put_data,
                 route_id=req_post.json()["route"]["id"],
             )
         else:
-            req_post = self.client.routes.create(
-                domain=self.domain, data=self.routes_data
-            )
+            req_post = self.client.routes.create(domain=self.domain, data=self.routes_data)
             req = self.client.routes.put(
                 domain=self.domain,
                 data=self.routes_put_data,
@@ -1195,17 +1196,13 @@ class RoutesTests(unittest.TestCase):
                 domain=self.domain,
                 route_id=req1.json()["items"][0]["id"],
             )
-            req_post = self.client.routes.create(
-                domain=self.domain, data=self.routes_data
-            )
+            req_post = self.client.routes.create(domain=self.domain, data=self.routes_data)
 
             req = self.client.routes.delete(
                 domain=self.domain, route_id=req_post.json()["route"]["id"]
             )
         else:
-            req_post = self.client.routes.create(
-                domain=self.domain, data=self.routes_data
-            )
+            req_post = self.client.routes.create(domain=self.domain, data=self.routes_data)
 
             req = self.client.routes.delete(
                 domain=self.domain, route_id=req_post.json()["route"]["id"]
@@ -1238,6 +1235,7 @@ class WebhooksTests(unittest.TestCase):
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
     """
+
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
             "api",
@@ -1301,6 +1299,7 @@ class MailingListsTests(unittest.TestCase):
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
     """
+
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
             "api",
@@ -1495,6 +1494,7 @@ class TemplatesTests(unittest.TestCase):
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
     """
+
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
             "api",
@@ -1720,6 +1720,7 @@ class EmailValidationTests(unittest.TestCase):
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
     """
+
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
             "api",
@@ -1779,6 +1780,7 @@ class InboxPlacementTests(unittest.TestCase):
     in `setUp`. Each test in this suite operates with the configured Mailgun client
     instance to simulate API interactions.
     """
+
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
             "api",
@@ -1876,6 +1878,7 @@ class MetricsTest(unittest.TestCase):
     instance to simulate API interactions.
 
     """
+
     # "https://api.mailgun.net/v1/analytics/metrics"
 
     def setUp(self) -> None:
@@ -2093,6 +2096,7 @@ class LogsTests(unittest.TestCase):
     instance to simulate API interactions.
 
     """
+
     def setUp(self) -> None:
         self.auth: tuple[str, str] = (
             "api",
@@ -2193,9 +2197,7 @@ class LogsTests(unittest.TestCase):
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 400)
         self.assertNotIn("items", req.json())
-        self.assertIn(
-            "'test' is not a valid filter predicate attribute", req.json()["message"]
-        )
+        self.assertIn("'test' is not a valid filter predicate attribute", req.json()["message"])
 
     def test_post_query_get_account_logs_invalid_url(self) -> None:
         """Expected failure with an invalid URL https://api.mailgun.net/v1/analytics_log (without 's' at the end)"""

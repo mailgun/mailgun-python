@@ -252,8 +252,8 @@ repos:
     hooks:
       - id: interrogate
         name: "📝 docs · Check docstring coverage"
-        exclude: ^tests
-        args: [ --verbose, --fail-under=40, --ignore-init-method ]
+        exclude: ^(tests)
+        args: [ --verbose, --fail-under=53, --ignore-init-method ]
 
   # Python type checking
   - repo: https://github.com/pre-commit/mirrors-mypy
