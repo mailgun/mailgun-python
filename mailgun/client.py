@@ -542,7 +542,7 @@ class Endpoint(BaseEndpoint):
         :return: api_call PUT request
         :rtype: requests.models.Response
         """
-        if self.headers["Content-type"] == "application/json":
+        if self.headers["Content-Type"] == "application/json":
             data = json.dumps(data)
         return self.api_call(
             self._auth,
@@ -843,7 +843,7 @@ class AsyncEndpoint(BaseEndpoint):
         :return: api_call PUT request
         :rtype: httpx.Response
         """
-        if self.headers.get("Content-type") == "application/json":
+        if self.headers.get("Content-Type") == "application/json":
             data = json.dumps(data)
         return await self.api_call(
             self._auth,
