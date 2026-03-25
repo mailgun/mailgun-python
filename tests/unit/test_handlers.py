@@ -170,8 +170,14 @@ class TestHandleTags:
     def test_builds_tags_url_with_domain(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["tags"]}
         result = handle_tags(url, "example.com", None)
-        assert "example.com" in result
-        assert "tags" in result
+
+        expected_url = "https://api.mailgun.net/v3/example.com/tags"
+
+        assert result == expected_url
+
+        parsed = urlparse(result)
+        assert TEST_DOMAIN in parsed.path
+        assert parsed.path.endswith("tags")
 
     def test_with_tag_name_kwarg(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["tags"]}
