@@ -30,6 +30,7 @@ from tests.unit.conftest import (
     BASE_URL_V3,
     BASE_URL_V4,
     BASE_URL_V1,
+    TEST_EMAIL,
 )
 
 
@@ -43,7 +44,7 @@ class TestHandleDefault:
 
     def test_builds_url_with_domain(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["messages"]}
-        result = handle_default(url, "example.com", "get")
+        result = handle_default(url, TEST_DOMAIN, "get")
         assert result == "https://api.mailgun.net/v3/example.com/messages"
 
     def test_builds_url_with_keys(self) -> None:
@@ -74,7 +75,7 @@ class TestHandleDomains:
 
     def test_with_domain_and_keys(self) -> None:
         url = {"base": f"{BASE_URL_V4}/domains/", "keys": ["webhooks"]}
-        result = handle_domains(url, "example.com", "get")
+        result = handle_domains(url, TEST_DOMAIN, "get")
 
         expected_url = "https://api.mailgun.net/v4/domains/example.com/webhooks"
 
@@ -92,8 +93,8 @@ class TestHandleDomains:
 
     def test_with_login_kwarg(self) -> None:
         url = {"base": f"{BASE_URL_V4}/domains/", "keys": ["credentials"]}
-        result = handle_domains(url, "example.com", "get", login="user@example.com")
-        assert "user@example.com" in result or "login" in result
+        result = handle_domains(url, TEST_DOMAIN, "get", login=TEST_EMAIL)
+        assert TEST_EMAIL in result or "login" in result
 
     def test_with_domain_name_kwarg_get(self) -> None:
         url = {"base": f"{BASE_URL_V4}/domains/", "keys": []}
@@ -107,7 +108,7 @@ class TestHandleDomains:
     def test_verify_requires_true(self) -> None:
         url = {"base": f"{BASE_URL_V4}/domains/", "keys": []}
         with pytest.raises(ApiError, match="Verify option should be True"):
-            handle_domains(url, "example.com", "put", verify=False)
+            handle_domains(url, TEST_DOMAIN, "put", verify=False)
 
 
 class TestHandleSendingQueues:
@@ -115,7 +116,7 @@ class TestHandleSendingQueues:
 
     def test_builds_sending_queues_url(self) -> None:
         url = {"base": f"{BASE_URL_V4}/domains/", "keys": ["sending_queues"]}
-        result = handle_sending_queues(url, "example.com", None)
+        result = handle_sending_queues(url, TEST_DOMAIN, None)
         assert result.endswith("/example.com/sending_queues")
         assert "sending_queues" in result
 
@@ -125,10 +126,13 @@ class TestHandleMailboxesCredentials:
 
     def test_with_login(self) -> None:
         url = {"base": f"{BASE_URL_V3}/domains/", "keys": ["credentials"]}
-        result = handle_mailboxes_credentials(
-            url, "example.com", None, login="user@example.com"
-        )
-        assert "user@example.com" in result
+        result = handle_mailboxes_credentials(url, TEST_DOMAIN, None, login=TEST_EMAIL)
+
+        parts = TEST_EMAIL.split("@")
+
+        assert len(parts) == 2, "Email must have exactly one '@' symbol"
+        assert parts[0] == "user", "Local part is incorrect"
+        assert parts[1] == TEST_DOMAIN, "Domain part is incorrect"
         assert "credentials" in result
 
 
@@ -169,7 +173,7 @@ class TestHandleTags:
 
     def test_builds_tags_url_with_domain(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["tags"]}
-        result = handle_tags(url, "example.com", None)
+        result = handle_tags(url, TEST_DOMAIN, None)
 
         expected_url = "https://api.mailgun.net/v3/example.com/tags"
 
@@ -181,7 +185,7 @@ class TestHandleTags:
 
     def test_with_tag_name_kwarg(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["tags"]}
-        result = handle_tags(url, "example.com", None, tag_name="my-tag")
+        result = handle_tags(url, TEST_DOMAIN, None, tag_name="my-tag")
         assert "my-tag" in result
 
 
@@ -190,7 +194,7 @@ class TestHandleBounces:
 
     def test_with_domain(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["bounces"]}
-        result = handle_bounces(url, "example.com", None)
+        result = handle_bounces(url, TEST_DOMAIN, None)
 
         expected_url = "https://api.mailgun.net/v3/example.com/bounces"
 
@@ -202,21 +206,28 @@ class TestHandleBounces:
 
     def test_with_bounce_address(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["bounces"]}
-        result = handle_bounces(
-            url, "example.com", None, bounce_address="bad@example.com"
-        )
-        assert "bad@example.com" in result
+        email = "bad@example.com"
+        result = handle_bounces(url, TEST_DOMAIN, None, bounce_address=email)
 
+        parts = email.split("@")
+
+        assert len(parts) == 2, "Email must have exactly one '@' symbol"
+        assert parts[0] == "bad", "Local part is incorrect"
+        assert parts[1] == TEST_DOMAIN, "Domain part is incorrect"
+        assert "bounces" in result
 
 class TestHandleUnsubscribes:
     """Tests for handle_unsubscribes."""
 
     def test_with_unsubscribe_address(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["unsubscribes"]}
-        result = handle_unsubscribes(
-            url, "example.com", None, unsubscribe_address="user@example.com"
-        )
-        assert "user@example.com" in result
+        result = handle_unsubscribes(url, TEST_DOMAIN, None, unsubscribe_address=TEST_EMAIL)
+        parts = TEST_EMAIL.split("@")
+
+        assert len(parts) == 2, "Email must have exactly one '@' symbol"
+        assert parts[0] == "user", "Local part is incorrect"
+        assert parts[1] == TEST_DOMAIN, "Domain part is incorrect"
+        assert "unsubscribes" in result
 
 
 class TestHandleComplaints:
@@ -224,10 +235,14 @@ class TestHandleComplaints:
 
     def test_with_complaint_address(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["complaints"]}
-        result = handle_complaints(
-            url, "example.com", None, complaint_address="spam@example.com"
-        )
-        assert "spam@example.com" in result
+        email = "spam@example.com"
+        result = handle_complaints(url, TEST_DOMAIN, None, complaint_address=email)
+        parts = email.split("@")
+
+        assert len(parts) == 2, "Email must have exactly one '@' symbol"
+        assert parts[0] == "spam", "Local part is incorrect"
+        assert parts[1] == TEST_DOMAIN, "Domain part is incorrect"
+        assert "complaints" in result
 
 
 class TestHandleWhitelists:
@@ -235,9 +250,15 @@ class TestHandleWhitelists:
 
     def test_with_domain(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["whitelists"]}
-        result = handle_whitelists(url, "example.com", None)
-        assert "example.com" in result
-        assert "whitelists" in result
+        result = handle_whitelists(url, TEST_DOMAIN, None)
+
+        expected_url = "https://api.mailgun.net/v3/example.com/whitelists"
+
+        assert result == expected_url
+
+        parsed = urlparse(result)
+        assert TEST_DOMAIN in parsed.path
+        assert parsed.path.endswith("whitelists")
 
 
 class TestHandleAddressValidate:
@@ -321,7 +342,7 @@ class TestHandleInbox:
             None,
             test_id="test-123",
             checks=True,
-            address="user@example.com",
+            address=TEST_EMAIL,
         )
         assert result == (
             "https://api.mailgun.net/v3/inbox/tests/test-123/checks/user@example.com"
