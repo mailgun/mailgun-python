@@ -1,7 +1,9 @@
 from urllib.parse import urlparse
 
-API_VERSION: str = "v3"
-BASE_URL: str = f"https://api.mailgun.net/{API_VERSION}/"
+
+BASE_URL_V1: str = f"https://api.mailgun.net/v1"
+BASE_URL_V3: str = f"https://api.mailgun.net/v3"
+BASE_URL_V4: str = f"https://api.mailgun.net/v4"
 TEST_DOMAIN: str = "example.com"
 
 

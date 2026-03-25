@@ -11,7 +11,7 @@ from mailgun.client import Client
 from mailgun.client import Config
 from mailgun.client import Endpoint
 from mailgun.handlers.error_handler import ApiError
-from tests.unit.conftest import TEST_DOMAIN, parse_domain_name
+from tests.unit.conftest import TEST_DOMAIN, BASE_URL_V4, BASE_URL_V3
 
 
 class TestClient:
@@ -48,19 +48,20 @@ class TestBaseEndpointBuildUrl:
 
     def test_build_url_domains_with_domain(self) -> None:
         # With domain_name in kwargs, handle_domains includes it in the URL
-        url = {"base": "https://api.mailgun.net/v4/domains/", "keys": ["domains"]}
+        url = {"base": f"{BASE_URL_V4}/domains/", "keys": ["domains"]}
         result = BaseEndpoint.build_url(
             url, domain=TEST_DOMAIN, method="get", domain_name=TEST_DOMAIN
         )
-        assert parse_domain_name(result) == TEST_DOMAIN
+        expected_url = "https://api.mailgun.net/v4/domains/example.com"
+        assert result == expected_url
 
     def test_build_url_domainlist(self) -> None:
-        url = {"base": "https://api.mailgun.net/v4/", "keys": ["domainlist"]}
+        url = {"base": BASE_URL_V4, "keys": ["domainlist"]}
         result = BaseEndpoint.build_url(url, method="get")
         assert "domains" in result
 
     def test_build_url_default_requires_domain(self) -> None:
-        url = {"base": "https://api.mailgun.net/v3/", "keys": ["messages"]}
+        url = {"base": BASE_URL_V3, "keys": ["messages"]}
         with pytest.raises(ApiError, match="Domain is missing"):
             BaseEndpoint.build_url(url, method="post")
 
@@ -69,7 +70,7 @@ class TestEndpoint:
     """Tests for Endpoint (sync) with mocked HTTP."""
 
     def test_get_calls_requests_get(self) -> None:
-        url = {"base": "https://api.mailgun.net/v4/", "keys": ["domainlist"]}
+        url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
         headers = {"User-agent": "test"}
         auth = ("api", "key-123")
         ep = Endpoint(url=url, headers=headers, auth=auth)
@@ -82,7 +83,7 @@ class TestEndpoint:
             assert "domainlist" in m_get.call_args[0][0] or "domains" in m_get.call_args[0][0]
 
     def test_get_with_filters(self) -> None:
-        url = {"base": "https://api.mailgun.net/v4/", "keys": ["domainlist"]}
+        url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
         ep = Endpoint(url=url, headers={}, auth=None)
         with patch.object(requests, "get", return_value=MagicMock(status_code=200)) as m_get:
             ep.get(filters={"limit": 10})
@@ -90,7 +91,7 @@ class TestEndpoint:
             assert m_get.call_args[1]["params"] == {"limit": 10}
 
     def test_create_sends_post(self) -> None:
-        url = {"base": "https://api.mailgun.net/v4/", "keys": ["domainlist"]}
+        url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
         ep = Endpoint(url=url, headers={}, auth=("api", "key"))
         with patch.object(requests, "post", return_value=MagicMock(status_code=200)) as m_post:
             ep.create(data={"name": "test.com"})
@@ -98,7 +99,7 @@ class TestEndpoint:
             assert m_post.call_args[1]["data"] is not None
 
     def test_create_json_serializes_when_content_type_json(self) -> None:
-        url = {"base": "https://api.mailgun.net/v4/", "keys": ["domainlist"]}
+        url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
         ep = Endpoint(
             url=url,
             headers={"Content-Type": "application/json"},
@@ -110,21 +111,21 @@ class TestEndpoint:
             assert call_data == '{"name": "test.com"}'
 
     def test_delete_calls_requests_delete(self) -> None:
-        url = {"base": "https://api.mailgun.net/v4/", "keys": ["domainlist"]}
+        url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
         ep = Endpoint(url=url, headers={}, auth=None)
         with patch.object(requests, "delete", return_value=MagicMock(status_code=200)) as m_del:
             ep.delete()
             m_del.assert_called_once()
 
     def test_put_calls_requests_put(self) -> None:
-        url = {"base": "https://api.mailgun.net/v4/", "keys": ["domainlist"]}
+        url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
         ep = Endpoint(url=url, headers={}, auth=None)
         with patch.object(requests, "put", return_value=MagicMock(status_code=200)) as m_put:
             ep.put(data={"key": "value"})
             m_put.assert_called_once()
 
     def test_patch_calls_requests_patch(self) -> None:
-        url = {"base": "https://api.mailgun.net/v4/", "keys": ["domainlist"]}
+        url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
         ep = Endpoint(url=url, headers={}, auth=None)
         with patch.object(requests, "patch", return_value=MagicMock(status_code=200)) as m_patch:
             ep.patch(data={"key": "value"})
@@ -138,7 +139,7 @@ class TestEndpoint:
                 ep.get()
 
     def test_api_call_raises_api_error_on_request_exception(self) -> None:
-        url = {"base": "https://api.mailgun.net/v4/", "keys": ["domainlist"]}
+        url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
         ep = Endpoint(url=url, headers={}, auth=None)
         with patch.object(
             requests, "get", side_effect=requests.exceptions.RequestException("network error")
@@ -147,7 +148,7 @@ class TestEndpoint:
                 ep.get()
 
     def test_update_serializes_json(self) -> None:
-        url = {"base": "https://api.mailgun.net/v4/", "keys": ["domainlist"]}
+        url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
         ep = Endpoint(
             url=url,
             headers={"Content-type": "application/json"},
