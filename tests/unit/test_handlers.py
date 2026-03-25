@@ -191,8 +191,14 @@ class TestHandleBounces:
     def test_with_domain(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["bounces"]}
         result = handle_bounces(url, "example.com", None)
-        assert "example.com" in result
-        assert "bounces" in result
+
+        expected_url = "https://api.mailgun.net/v3/example.com/bounces"
+
+        assert result == expected_url
+
+        parsed = urlparse(result)
+        assert TEST_DOMAIN in parsed.path
+        assert parsed.path.endswith("bounces")
 
     def test_with_bounce_address(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["bounces"]}
