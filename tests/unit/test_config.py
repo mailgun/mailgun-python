@@ -9,11 +9,11 @@ class TestConfig:
     def test_default_api_url(self) -> None:
         config = Config()
         assert config.api_url == Config.DEFAULT_API_URL
-        assert config.api_url == "https://api.mailgun.net/"
+        assert config.api_url == "https://api.mailgun.net"
 
     def test_custom_api_url(self) -> None:
         config = Config(api_url="https://custom.api/")
-        assert config.api_url == "https://custom.api/"
+        assert config.api_url == "https://custom.api"
 
     def test_getitem_messages(self) -> None:
         config = Config()

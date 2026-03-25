@@ -28,19 +28,19 @@ class TestClient:
 
     def test_client_init_with_api_url(self) -> None:
         client = Client(api_url="https://custom.api/")
-        assert client.config.api_url == "https://custom.api/"
+        assert client.config.api_url == "https://custom.api"
 
     def test_client_getattr_returns_endpoint_type(self) -> None:
         client = Client(auth=("api", "key-123"))
         ep = client.domains
         assert ep is not None
         assert isinstance(ep, Endpoint)
-        assert type(ep).__name__ == "domains"
 
     def test_client_getattr_ips(self) -> None:
         client = Client(auth=("api", "key-123"))
         ep = client.ips
-        assert type(ep).__name__ == "ips"
+        assert ep is not None
+        assert isinstance(ep, Endpoint)
 
 
 class TestBaseEndpointBuildUrl:

@@ -598,11 +598,8 @@ class Client:
         :type name: str
         :return: type object (executes existing handler)
         """
-        split = name.split("_")
-        # identify the resource
-        fname = split[0]
         url, headers = self.config[name]
-        return type(fname, (Endpoint,), {})(url=url, headers=headers, auth=self.auth)
+        return Endpoint(url=url, headers=headers, auth=self.auth)
 
 
 class AsyncEndpoint(BaseEndpoint):
