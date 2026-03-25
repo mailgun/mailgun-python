@@ -2776,6 +2776,7 @@ class AsyncMessagesTests(unittest.IsolatedAsyncioTestCase):
         self.data: dict[str, str] = {
             "from": os.environ["MESSAGES_FROM"],
             "to": os.environ["MESSAGES_TO"],
+            "cc": os.environ["MESSAGES_CC"],
             "subject": "Hello Vasyl Bodaj",
             "text": "Congratulations!, you just sent an email with Mailgun! You are truly awesome!",
             "o:tag": "Python test",
@@ -2793,6 +2794,32 @@ class AsyncMessagesTests(unittest.IsolatedAsyncioTestCase):
     async def test_post_wrong_message(self) -> None:
         req = await self.client.messages.create(data={"from": "sdsdsd"}, domain=self.domain)
         self.assertEqual(req.status_code, 400)
+
+    async def test_post_message(self) -> None:
+        data = {
+            "from": self.data["from"],
+            "to": self.data["to"],
+            "cc": self.data["cc"],
+            "subject": "Hello World",
+            "html": """<body style="margin: 0; padding: 0;">
+ <table border="1" cellpadding="0" cellspacing="0" width="100%">
+  <tr>
+   <td>
+    Hello!
+   </td>
+  </tr>
+ </table>
+</body>""",
+            "o:tag": "Python test",
+        }
+        attachments = [
+            ("inline", ("test.txt", b"Hello, this is a test file.")),
+            ("inline", ("test2.txt", b"Hello, this is also a test file.")),
+        ]
+        req = await self.client.messages.create(data=data, files=attachments, domain=self.domain)
+        self.assertEqual(req.status_code, 200)
+        self.assertIn("id", req.json())
+        self.assertIn("Queued", req.json()["message"])
 
 
 class AsyncDomainTests(unittest.IsolatedAsyncioTestCase):

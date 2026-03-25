@@ -145,12 +145,12 @@ repos:
 #        name: "🔒 security · Audit Python dependencies"
 #        args: ['--desc', 'on']
 
-#  - repo: https://github.com/semgrep/pre-commit
-#    rev: 'v1.155.0'
-#    hooks:
-#      - id: semgrep
-#        name: "🔒 security · Static analysis (semgrep)"
-#        args: [ '--config=auto', '--error' ]
+  - repo: https://github.com/semgrep/pre-commit
+    rev: 'v1.156.0'
+    hooks:
+      - id: semgrep
+        name: "🔒 security · Static analysis (semgrep)"
+        args: [ '--config=auto', '--error' ]
 
 
   # Spelling and typos
@@ -159,14 +159,6 @@ repos:
     hooks:
       - id: typos
         name: "📝 spelling · Check typos"
-
-#  - repo: https://github.com/codespell-project/codespell
-#    rev: v2.4.1
-#    hooks:
-#      - id: codespell
-#        name: "📝 spelling · Fix common misspellings"
-#        args: [--write]
-#        exclude: ^tests
 
   # CI/CD validation
   - repo: https://github.com/python-jsonschema/check-jsonschema
