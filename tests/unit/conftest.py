@@ -9,7 +9,6 @@ def parse_domain_name(result: str) -> str:
     path = urlparse(result).path
     parts = [p for p in path.split("/") if p]
 
-    # В API Mailgun домен зазвичай йде після версії (v3/v4)
     # If the path: ['v3', 'example.com', 'events']
     if len(parts) >= 2:
         return parts[1]
