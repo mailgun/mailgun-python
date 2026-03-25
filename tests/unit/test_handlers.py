@@ -1,5 +1,7 @@
 """Unit tests for mailgun handlers."""
 
+from urllib.parse import urlparse
+
 import pytest
 
 from mailgun.handlers.default_handler import handle_default
@@ -22,6 +24,7 @@ from mailgun.handlers.suppressions_handler import (
     handle_whitelists,
 )
 from mailgun.handlers.tags_handler import handle_tags
+from tests.unit.conftest import parse_domain_name, TEST_DOMAIN, BASE_URL
 
 
 class TestHandleDefault:
@@ -38,10 +41,17 @@ class TestHandleDefault:
         assert result == "https://api.mailgun.net/v3/example.com/messages"
 
     def test_builds_url_with_keys(self) -> None:
-        url = {"base": "https://api.mailgun.net/v3/", "keys": ["events"]}
-        result = handle_default(url, "example.com", "get")
-        assert "example.com" in result
-        assert "events" in result
+        url_config = {"base": BASE_URL, "keys": ["events"]}
+        result = handle_default(url_config, TEST_DOMAIN, "get")
+
+        expected_url = "https://api.mailgun.net/v3/example.com/events"
+
+        assert result == expected_url
+        assert parse_domain_name(result) == TEST_DOMAIN
+
+        parsed = urlparse(result)
+        assert TEST_DOMAIN in parsed.path
+        assert parsed.path.endswith("events")
 
 
 class TestHandleDomainlist:

@@ -11,6 +11,7 @@ from mailgun.client import Client
 from mailgun.client import Config
 from mailgun.client import Endpoint
 from mailgun.handlers.error_handler import ApiError
+from tests.unit.conftest import TEST_DOMAIN, parse_domain_name
 
 
 class TestClient:
@@ -49,9 +50,9 @@ class TestBaseEndpointBuildUrl:
         # With domain_name in kwargs, handle_domains includes it in the URL
         url = {"base": "https://api.mailgun.net/v4/domains/", "keys": ["domains"]}
         result = BaseEndpoint.build_url(
-            url, domain="example.com", method="get", domain_name="example.com"
+            url, domain=TEST_DOMAIN, method="get", domain_name=TEST_DOMAIN
         )
-        assert "example.com" in result
+        assert parse_domain_name(result) == TEST_DOMAIN
 
     def test_build_url_domainlist(self) -> None:
         url = {"base": "https://api.mailgun.net/v4/", "keys": ["domainlist"]}
