@@ -281,21 +281,6 @@ class Config:
 
         return safe_url, headers
 
-    def _format_exact(self, key: str) -> tuple[dict[str, Any], dict[str, str]]:
-        """Standardize the output format for EXACT_ROUTES matches."""
-        version_str: str
-        route_keys_list: list[str]
-        version_str, route_keys_list = self._EXACT_ROUTES[key]
-
-        headers: Mapping[str, str] = (
-            self._HEADERS_JSON if "analytics" in key else self._HEADERS_BASE
-        )
-
-        return {
-            "base": self._build_base_url(version_str),
-            "keys": tuple(route_keys_list),
-        }, dict(headers)
-
 
 class BaseEndpoint:
     """Base class for endpoints.

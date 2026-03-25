@@ -19,8 +19,7 @@ def handle_domainlist(
 ) -> Any:
     """Handle a list of domains."""
     # Ensure base ends with slash before appending
-    base = url["base"] if url["base"].endswith("/") else f"{url['base']}/"
-    return base + "domains"
+    return url["base"].rstrip("/") + "/domains"
 
 
 def handle_domains(
