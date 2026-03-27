@@ -10,7 +10,7 @@ from mailgun.client import AsyncClient
 from mailgun.client import AsyncEndpoint
 from mailgun.client import Config
 from mailgun.handlers.error_handler import ApiError
-from tests.unit.conftest import BASE_URL_V3, BASE_URL_V4
+from tests.conftest import BASE_URL_V3, BASE_URL_V4
 
 
 class TestAsyncEndpointPrepareFiles:

@@ -545,18 +545,28 @@ def post_dkim_keys() -> None:
     POST /v1/dkim/keys
     :return:
     """
+    import os
+    import re
     import subprocess
     from pathlib import Path
+
+    secret_key_filename: str = os.environ["SECRET_KEY_FILENAME"]
+    secret_key_path: Path = Path(secret_key_filename)
+    ALLOWED_FILENAME_RE = re.compile(r"^[a-zA-Z0-9._-]{1,255}$")
 
     # Private key PEM file must be generated in PKCS1 format. You need 'openssl' on your machine
     # example:
     # openssl genrsa -traditional -out .server.key 2048
-    subprocess.run(["openssl", "genrsa", "-traditional", "-out", ".server.key", "2048"])
+    if not ALLOWED_FILENAME_RE.match(secret_key_filename):
+        raise ValueError(f"Invalid filename: {secret_key_filename!r}")
+    subprocess.run(
+        ["openssl", "genrsa", "-traditional", "-out", secret_key_filename, "--", "2048"], check=True
+    )
 
     files = [
         (
             "pem",
-            ("server.key", Path(".server.key").read_bytes()),
+            ("server.key", secret_key_path.read_bytes()),
         )
     ]
 

@@ -24,7 +24,7 @@ from mailgun.handlers.suppressions_handler import (
     handle_whitelists,
 )
 from mailgun.handlers.tags_handler import handle_tags
-from tests.unit.conftest import (
+from tests.conftest import (
     parse_domain_name,
     TEST_DOMAIN,
     BASE_URL_V3,

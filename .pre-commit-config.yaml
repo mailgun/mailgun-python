@@ -162,7 +162,7 @@ repos:
 
   # CI/CD validation
   - repo: https://github.com/python-jsonschema/check-jsonschema
-    rev: 0.37.0
+    rev: 0.37.1
     hooks:
       - id: check-dependabot
         name: "🔧 ci/cd · Validate Dependabot config"

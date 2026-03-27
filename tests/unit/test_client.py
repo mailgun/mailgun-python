@@ -11,7 +11,7 @@ from mailgun.client import Client
 from mailgun.client import Config
 from mailgun.client import Endpoint
 from mailgun.handlers.error_handler import ApiError
-from tests.unit.conftest import TEST_DOMAIN, BASE_URL_V4, BASE_URL_V3
+from tests.conftest import TEST_DOMAIN, BASE_URL_V4, BASE_URL_V3
 
 
 class TestClient:

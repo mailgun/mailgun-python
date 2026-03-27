@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import string
 import subprocess
 import time
@@ -17,6 +18,7 @@ from datetime import datetime, timedelta
 import pytest
 
 from mailgun.client import Client, AsyncClient
+from tests.conftest import ALLOWED_FILENAME_RE, secret_key_filename, secret_key_path
 
 
 class MessagesTests(unittest.TestCase):
@@ -311,13 +313,17 @@ class DomainTests(unittest.TestCase):
         """Test to create a domain key: happy path with valid data."""
         # Private key PEM file must be generated in PKCS1 format. You need 'openssl' on your machine
         # openssl genrsa -traditional -out .server.key 2048
-        subprocess.run(["openssl", "genrsa", "-traditional", "-out", ".server.key", "2048"])
-        server_key_path = Path(".server.key")
-        print("server_key_path: ", server_key_path)
+        if not ALLOWED_FILENAME_RE.match(secret_key_filename):
+            raise ValueError(f"Invalid filename: {secret_key_filename!r}")
+        subprocess.run(
+            ["openssl", "genrsa", "-traditional", "-out", secret_key_filename, "--", "2048"],
+            check=True,
+        )
+
         files = [
             (
                 "pem",
-                ("server.key", server_key_path.read_bytes()),
+                ("server.key", secret_key_path.read_bytes()),
             )
         ]
 
@@ -361,8 +367,8 @@ class DomainTests(unittest.TestCase):
         self.assertEqual(req2.status_code, 200)
         self.assertIn("success", req2.json()["message"])
 
-        server_key_path.unlink(missing_ok=True)
-        print(f"File {server_key_path} has been removed.")
+        secret_key_path.unlink(missing_ok=True)
+        print(f"File {secret_key_path} has been removed.")
 
     @pytest.mark.order(6)
     def test_post_dkim_keys_invalid_pem_string(self) -> None:
@@ -386,13 +392,16 @@ class DomainTests(unittest.TestCase):
     @pytest.mark.order(6)
     def test_post_dkim_keys_if_duplicate_key_exists(self) -> None:
         """Test to create a domain key: expected failure because a duplicate key exists"""
-
-        subprocess.run(["openssl", "genrsa", "-traditional", "-out", ".server.key", "2048"])
-        server_key_path = Path(".server.key")
+        if not ALLOWED_FILENAME_RE.match(secret_key_filename):
+            raise ValueError(f"Invalid filename: {secret_key_filename!r}")
+        subprocess.run(
+            ["openssl", "genrsa", "-traditional", "-out", secret_key_filename, "--", "2048"],
+            check=True,
+        )
         files = [
             (
                 "pem",
-                ("server.key", server_key_path.read_bytes()),
+                ("server.key", secret_key_path.read_bytes()),
             )
         ]
 
@@ -436,12 +445,17 @@ class DomainTests(unittest.TestCase):
     def test_post_dkim_keys_key_must_be_pkcs1_format(self) -> None:
         """Test to create a domain key: expected failure because a key must be PKCS1 format"""
 
-        subprocess.run(["openssl", "genpkey", "-algorithm", "Ed25519", "-out", ".server.key"])
-        server_key_path = Path(".server.key")
+        if not ALLOWED_FILENAME_RE.match(secret_key_filename):
+            raise ValueError(f"Invalid filename: {secret_key_filename!r}")
+        subprocess.run(
+            ["openssl", "genpkey", "-algorithm", "Ed25519", "-out", "--", secret_key_filename],
+            check=True,
+        )
+
         files = [
             (
                 "pem",
-                ("server.key", server_key_path.read_bytes()),
+                ("server.key", secret_key_path.read_bytes()),
             )
         ]
 
@@ -480,8 +494,15 @@ class DomainTests(unittest.TestCase):
     @pytest.mark.order(7)
     def test_delete_non_existing_dkim_keys(self) -> None:
         """Test to delete a domain key: expected failure if a domain doesn't exist."""
-        subprocess.run(["openssl", "genrsa", "-traditional", "-out", ".server.key", "2048"])
-        server_key_path = Path(".server.key")
+        ALLOWED_RE = re.compile(r"^[a-zA-Z0-9._-]{1,255}$")
+        filename = ".server.key"
+        server_key_path = Path(filename)
+
+        if not ALLOWED_RE.match(filename):
+            raise ValueError(f"Invalid filename: {filename!r}")
+        subprocess.run(
+            ["openssl", "genrsa", "-traditional", "-out", filename, "--", "2048"], check=True
+        )
         files = [
             (
                 "pem",
