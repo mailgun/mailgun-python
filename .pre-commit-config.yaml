@@ -196,7 +196,7 @@ repos:
         name: "🐍 format · Format changed lines"
         additional_dependencies: [black]
 
-#  - repo: https://github.com/charliermarsh/ruff-pre-commit
+#  - repo: https://github.com/astral-sh/ruff-pre-commit
 #    rev: v0.15.6
 #    hooks:
 #      - id: ruff-check
