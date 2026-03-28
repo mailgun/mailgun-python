@@ -61,4 +61,4 @@ jobs:
           pip install pytest
 
       - name: Tests
-        run: pytest tests/unit/ -v
+        run: pytest -v tests/unit/
