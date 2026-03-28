@@ -44,7 +44,11 @@ classifiers = [
 ]
 
 dynamic = [ "version" ]
-dependencies = [ "httpx>=0.24", "requests>=2.32.5", "typing-extensions>=4.7.1; python_version<'3.11'" ]
+dependencies = [
+    "httpx>=0.24",
+    "requests>=2.32.5",
+    "typing-extensions>=4.7.1; python_version < '3.11'",
+]
 
 optional-dependencies.conda_build = [ "conda-build" ]
 optional-dependencies.docs = [
