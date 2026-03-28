@@ -26,5 +26,5 @@ def handle_bounce_classification(
     :return: final url for Bounce Classification endpoints
     """
     final_keys = "/" + "/".join(url["keys"]) if url["keys"] else ""
-
-    return url["base"][:-1] + final_keys
+    base_url = str(url["base"]).rstrip("/")
+    return f"{base_url}{final_keys}"

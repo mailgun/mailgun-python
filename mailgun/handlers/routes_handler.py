@@ -13,7 +13,7 @@ def handle_routes(
     _domain: str | None,
     _method: str | None,
     **kwargs: Any,
-) -> dict[str, Any]:
+) -> str:
     """Handle Routes.
 
     :param url: Incoming URL dictionary
@@ -26,9 +26,7 @@ def handle_routes(
     :return: final url for Routes endpoint
     """
     final_keys = "/" + "/".join(url["keys"]) if url["keys"] else ""
+    base_url = url["base"][:-1] + final_keys
     if "route_id" in kwargs:
-        url = url["base"][:-1] + final_keys + "/" + kwargs["route_id"]
-    else:
-        url = url["base"][:-1] + final_keys
-
-    return url
+        return f"{base_url}/{kwargs['route_id']}"
+    return base_url

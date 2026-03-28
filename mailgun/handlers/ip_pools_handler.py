@@ -13,7 +13,7 @@ def handle_ippools(
     _domain: str | None,
     _method: str | None,
     **kwargs: Any,
-) -> str | Any:
+) -> str:
     """Handle IP pools URL construction.
 
     :param url: Incoming URL dictionary
@@ -26,7 +26,7 @@ def handle_ippools(
     :return: final url for IP pools endpoint
     """
     final_keys = "/" + "/".join(url["keys"]) if url["keys"] else ""
-    base_url = url["base"][:-1] + final_keys
+    base_url = str(url["base"]).rstrip("/") + final_keys
 
     if "pool_id" not in kwargs:
         return base_url

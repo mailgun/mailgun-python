@@ -361,7 +361,8 @@ class TestHandleResendMessage:
         )
         assert result == "https://storage.mailgun.net/msg/123"
 
-    def test_without_storage_url_returns_none(self) -> None:
+    def test_without_storage_url_raises_api_error(self) -> None:
+        """It should raise an ApiError when storage_url is missing."""
         url = {"base": f"{BASE_URL_V3}/", "keys": ["resendmessage"]}
-        result = handle_resend_message(url, None, None)
-        assert result is None
+        with pytest.raises(ApiError, match="Storage url is required"):
+            handle_resend_message(url, None, None)

@@ -13,7 +13,7 @@ def handle_keys(
     _domain: str | None,
     _method: str | None,
     **kwargs: Any,
-) -> dict[str, Any]:
+) -> str:
     """Handle Keys.
 
     :param url: Incoming URL dictionary
@@ -26,9 +26,7 @@ def handle_keys(
     :return: final url for Keys endpoint
     """
     final_keys = "/" + "/".join(url["keys"]) if url["keys"] else ""
+    base_url = url["base"][:-1] + final_keys
     if "key_id" in kwargs:
-        url = url["base"][:-1] + final_keys + "/" + kwargs["key_id"]
-    else:
-        url = url["base"][:-1] + final_keys
-
-    return url
+        return f"{base_url}/{kwargs['key_id']}"
+    return base_url

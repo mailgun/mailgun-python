@@ -13,7 +13,7 @@ def handle_users(
     _domain: str | None,
     _method: str | None,
     **kwargs: Any,
-) -> dict[str, Any]:
+) -> str:
     """Handle Users.
 
     :param url: Incoming URL dictionary
@@ -26,11 +26,14 @@ def handle_users(
     :return: final url for Users endpoint
     """
     final_keys = "/" + "/".join(url["keys"]) if url["keys"] else ""
-    if "user_id" in kwargs and kwargs["user_id"] != "me":
-        url = url["base"][:-1] + "/" + "users" + "/" + kwargs["user_id"]
-    elif "user_id" in kwargs and kwargs["user_id"] == "me":
-        url = url["base"][:-1] + final_keys
-    else:
-        url = url["base"][:-1] + "/" + "users"
+    base_url = str(url["base"]).rstrip("/")
 
-    return url
+    user_id = kwargs.get("user_id")
+
+    if user_id and user_id != "me":
+        return f"{base_url}/users/{user_id}"
+
+    if user_id == "me":
+        return f"{base_url}{final_keys}"
+
+    return f"{base_url}/users"

@@ -13,7 +13,7 @@ def handle_ips(
     _domain: str | None,
     _method: str | None,
     **kwargs: Any,
-) -> dict[str, Any]:
+) -> str:
     """Handle IPs.
 
     :param url: Incoming URL dictionary
@@ -26,9 +26,7 @@ def handle_ips(
     :return: final url for IPs endpoint
     """
     final_keys = "/" + "/".join(url["keys"]) if url["keys"] else ""
+    base_url = url["base"][:-1] + final_keys
     if "ip" in kwargs:
-        url = url["base"][:-1] + final_keys + "/" + kwargs["ip"]
-    else:
-        url = url["base"][:-1] + final_keys
-
-    return url
+        return f"{base_url}/{kwargs['ip']}"
+    return base_url

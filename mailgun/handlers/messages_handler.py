@@ -15,7 +15,7 @@ def handle_resend_message(
     _domain: str | None,
     _method: str | None,
     **kwargs: Any,
-) -> Any:
+) -> str:
     """Resend message endpoint.
 
     :param _url: Incoming URL dictionary (it's not being used for this handler)
@@ -28,6 +28,5 @@ def handle_resend_message(
     :return: final url for default endpoint
     """
     if "storage_url" in kwargs:
-        return kwargs["storage_url"]
-    ApiError("Storage url is required")
-    return None
+        return str(kwargs["storage_url"])
+    raise ApiError("Storage url is required")

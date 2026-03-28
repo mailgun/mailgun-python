@@ -88,7 +88,7 @@ def handle_whitelists(
     domain: str | None,
     _method: str | None,
     **kwargs: Any,
-) -> dict[str, Any]:
+) -> str:
     """Handle Whitelists.
 
     :param url: Incoming URL dictionary
@@ -101,9 +101,7 @@ def handle_whitelists(
     :return: final url for Whitelists endpoint
     """
     final_keys = "/" + "/".join(url["keys"]) if url["keys"] else ""
+    base = f"{url['base']}{domain}{final_keys}"
     if "whitelist_address" in kwargs:
-        url = url["base"] + domain + final_keys + "/" + kwargs["whitelist_address"]
-    else:
-        url = url["base"] + domain + final_keys
-
-    return url
+        return f"{base}/{kwargs['whitelist_address']}"
+    return base

@@ -15,7 +15,7 @@ def handle_templates(
     domain: str | None,
     _method: str | None,
     **kwargs: Any,
-) -> Any:
+) -> str:
     """Handle Templates dynamically resolving V3 (Domain) or V4 (Account).
 
     :param url: Incoming URL dictionary
@@ -28,23 +28,22 @@ def handle_templates(
     :return: final url for Templates endpoint
     :raises: ApiError
     """
-    # Safe path building without relying on os.path.join (which uses '\\' on Windows)
     final_keys = "/" + "/".join(url["keys"]) if url["keys"] else ""
 
-    base_url_str = url["base"]
+    base_url_str = str(url["base"])
 
-    # DYNAMIC VERSION OVERRIDE:
-    # Mailgun splits Templates API across two versions depending on the scope.
     if domain:
-        # Domain Templates ALWAYS use V3: /v3/{domain_name}/templates
         if "/v4/" in base_url_str:
             base_url_str = base_url_str.replace("/v4/", "/v3/")
+
+        base_url_str = base_url_str if base_url_str.endswith("/") else f"{base_url_str}/"
         domain_url = f"{base_url_str}{domain}{final_keys}"
     else:
-        # Account Templates ALWAYS use V4: /v4/templates
         if "/v3/" in base_url_str:
             base_url_str = base_url_str.replace("/v3/", "/v4/")
-        domain_url = f"{base_url_str}{final_keys.lstrip('/')}"
+
+        base_url_str = base_url_str.rstrip("/")
+        domain_url = f"{base_url_str}{final_keys}"
 
     if "template_name" not in kwargs:
         return domain_url

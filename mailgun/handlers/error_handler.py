@@ -2,6 +2,8 @@
 
 Exceptions:
     - ApiError: Base exception for API errors.
+    - RouteNotFoundError: Raised when the requested endpoint cannot be resolved.
+    - UploadError: Raised when the maximum message size is greater than 25 MB.
 """
 
 
@@ -19,4 +21,4 @@ class RouteNotFoundError(ApiError):
 
 
 class UploadError(ApiError):
-    """Raised when the maximum message size is greater than 25 Mb."""
+    """Raised when the maximum message size is greater than 25 MB."""

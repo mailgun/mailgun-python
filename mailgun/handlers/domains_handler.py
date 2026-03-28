@@ -23,17 +23,17 @@ def handle_domainlist(
 
 
 def handle_domains(
-    url: Any,
+    url: dict[str, Any],
     domain: str | None,
     method: str | None,
     **kwargs: Any,
-) -> Any:
+) -> str:
     """Handle a domain endpoint."""
     if "domains" in url["keys"]:
         domains_index = url["keys"].index("domains")
         url["keys"].pop(domains_index)
 
-    base_url = url["base"]
+    base_url = str(url["base"])
 
     if url["keys"]:
         # Safe concatenation without leading slash to avoid //
@@ -84,16 +84,14 @@ def handle_sending_queues(
     domain: str | None,
     _method: str | None,
     **kwargs: Any,
-) -> str | Any:
+) -> str:
     """Handle sending queues endpoint URL construction."""
     if "sending_queues" in url["keys"] or "sendingqueues" in url["keys"]:
-        # Base is typically .../v3/domains/. We need .../v3/{domain}/sending_queues
-        # So we strip 'domains/' or just use replace.
-        base_clean = url["base"].replace("domains/", "").replace("domains", "")
+        base_clean = str(url["base"]).replace("domains/", "").replace("domains", "")
         if not base_clean.endswith("/"):
             base_clean += "/"
         return f"{base_clean}{domain}/sending_queues"
-    return None
+    return str(url["base"])
 
 
 def handle_mailboxes_credentials(
@@ -101,10 +99,11 @@ def handle_mailboxes_credentials(
     domain: str | None,
     _method: str | None,
     **kwargs: Any,
-) -> Any:
+) -> str:
     """Handle Mailboxes credentials."""
     final_keys = "/".join(url["keys"]) if url["keys"] else ""
-    base_url = url["base"] if url["base"].endswith("/") else f"{url['base']}/"
+    base_raw = str(url["base"])
+    base_url = base_raw if base_raw.endswith("/") else f"{base_raw}/"
 
     constructed_url = f"{base_url}{domain}/{final_keys}" if final_keys else f"{base_url}{domain}"
 
@@ -118,14 +117,10 @@ def handle_dkimkeys(
     _domain: str | None,
     _method: str | None,
     **kwargs: Any,
-) -> Any:
+) -> str:
     """Handle DKIM Keys."""
-    # url["keys"] usually contains ['dkim', 'keys'] from our manifest
     final_keys = "/".join(url["keys"]) if url["keys"] else ""
-
-    base_url = url["base"]
+    base_url = str(url["base"])
     if not base_url.endswith("/"):
         base_url += "/"
-
-    # The result should be exactly https://api.mailgun.net/v1/dkim/keys
     return base_url + final_keys

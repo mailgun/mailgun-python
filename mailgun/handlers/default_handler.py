@@ -34,4 +34,4 @@ def handle_default(
         raise ApiError("Domain is missing!")
 
     final_keys = "/" + "/".join(url["keys"]) if url["keys"] else ""
-    return url["base"] + domain + final_keys
+    return f"{url['base']}{domain}{final_keys}"
