@@ -16,3 +16,7 @@ class ApiError(Exception):
 
 class RouteNotFoundError(ApiError):
     """Raised when the requested Mailgun endpoint cannot be resolved."""
+
+
+class UploadError(ApiError):
+    """Raised when the maximum message size is greater than 25 Mb."""
