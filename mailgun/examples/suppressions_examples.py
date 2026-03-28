@@ -3,7 +3,12 @@ import os
 from pathlib import Path
 
 from mailgun.client import Client
+from mailgun.handlers.error_handler import UploadError
 
+
+# The maximum message size Mailgun supports is 25MB,
+# see https://documentation.mailgun.com/docs/mailgun/user-manual/sending-messages/send-http#send-via-http
+MAX_FILE_SIZE = 25 * 1024 * 1024  # 25 MB
 
 key: str = os.environ["APIKEY"]
 domain: str = os.environ["DOMAIN"]
@@ -69,11 +74,25 @@ def import_bounce_list() -> None:
     POST /<domain>/bounces/import, Content-Type: multipart/form-data
     :return:
     """
+
+    csv_filepath = Path("mailgun/doc_tests/files/mailgun_bounces_test.csv")
+
+    if not csv_filepath:
+        raise FileNotFoundError(f"File {csv_filepath} not found.")
+
+    if csv_filepath.stat().st_size > MAX_FILE_SIZE:
+        raise UploadError(f"File too large and exceeds the limit of {MAX_FILE_SIZE}")
+
     # It is strongly recommended that you open files in binary mode.
     # Because the Content-Length header may be provided for you,
     # and if it does this value will be set to the number of bytes in the file.
     # Errors may occur if you open the file in text mode.
-    files = {"bounce_csv": Path("mailgun/doc_tests/files/mailgun_bounces_test.csv").read_bytes()}
+    csv_data = csv_filepath.read_bytes()
+
+    if not csv_data.startswith(b"") and not csv_data:
+        ValueError("File is empty.")
+    files = {"file": csv_data}
+
     req = client.bounces_import.create(domain=domain, files=files)
     print(req.json())
 
@@ -334,4 +353,5 @@ def delete_all_whitelists() -> None:
 
 
 if __name__ == "__main__":
+    import_bounce_list()
     delete_single_whitelist()

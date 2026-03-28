@@ -264,8 +264,8 @@ repos:
         name: "🐍 types · Check with mypy"
         args: [--config-file=./pyproject.toml]
         additional_dependencies:
-          - types-requests
           - pytest-order
+          - types-requests
         exclude: ^mailgun/examples/
 
   - repo: https://github.com/RobertCraigie/pyright-python
