@@ -3770,7 +3770,7 @@ class AsyncRoutesTests(unittest.IsolatedAsyncioTestCase):
         params = {"skip": 0, "limit": 1}
         query = {"address": self.sender}
         req1 = await self.client.routes.get(domain=self.domain, filters=params)
-        print('len(req1.json()["items"]): ', len(req1.json()["items"]))
+
         if len(req1.json()["items"]) > 0:
             await self.client.routes.delete(
                 domain=self.domain,

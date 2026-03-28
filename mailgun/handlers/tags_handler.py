@@ -15,7 +15,7 @@ def handle_tags(
     domain: str | None,
     _method: str | None,
     **kwargs: Any,
-) -> Any:
+) -> str:
     """Handle Tags.
 
     :param url: Incoming URL dictionary
@@ -27,7 +27,7 @@ def handle_tags(
     :param kwargs: kwargs
     :return: final url for Tags endpoint
     """
-    final_keys = path.join("/", *url["keys"]) if url["keys"] else ""
+    final_keys = "/" + "/".join(url["keys"]) if url["keys"] else ""
     base = url["base"] + domain + "/"
     keys_without_tags = url["keys"][1:]
     url = url["base"] + domain + final_keys

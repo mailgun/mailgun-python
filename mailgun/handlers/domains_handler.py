@@ -16,7 +16,7 @@ def handle_domainlist(
     _domain: str | None,
     _method: str | None,
     **_: Any,
-) -> Any:
+) -> str:
     """Handle a list of domains."""
     # Ensure base ends with slash before appending
     return url["base"].rstrip("/") + "/domains"

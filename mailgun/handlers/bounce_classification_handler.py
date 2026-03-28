@@ -5,7 +5,6 @@ Doc: https://documentation.mailgun.com/docs/mailgun/api-reference/send/mailgun/b
 
 from __future__ import annotations
 
-from os import path
 from typing import Any
 
 
@@ -14,7 +13,7 @@ def handle_bounce_classification(
     _domain: str | None,
     _method: str | None,
     **kwargs: Any,
-) -> Any:
+) -> str:
     """Handle Bounce Classification.
 
     :param url: Incoming URL dictionary
@@ -26,6 +25,6 @@ def handle_bounce_classification(
     :param kwargs: kwargs
     :return: final url for Bounce Classification endpoints
     """
-    final_keys = path.join("/", *url["keys"]) if url["keys"] else ""
+    final_keys = "/" + "/".join(url["keys"]) if url["keys"] else ""
 
     return url["base"][:-1] + final_keys

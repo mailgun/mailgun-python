@@ -14,7 +14,7 @@ def handle_lists(
     _domain: str | None,
     _method: str | None,
     **kwargs: Any,
-) -> Any:
+) -> dict[str, Any]:
     """Handle Mailing List.
 
     :param url: Incoming URL dictionary
@@ -26,7 +26,7 @@ def handle_lists(
     :param kwargs: kwargs
     :return: final url for mailinglist endpoint
     """
-    final_keys = path.join("/", *url["keys"]) if url["keys"] else ""
+    final_keys = "/" + "/".join(url["keys"]) if url["keys"] else ""
     if "validate" in kwargs:
         url = url["base"][:-1] + final_keys + "/" + kwargs["address"] + "/" + "validate"
     elif "multiple" in kwargs and "address" in kwargs:

@@ -5,7 +5,6 @@ Doc: https://documentation.mailgun.com/en/latest/api-inbox-placement.html
 
 from __future__ import annotations
 
-from os import path
 from typing import Any
 
 from .error_handler import ApiError
@@ -16,7 +15,7 @@ def handle_inbox(
     _domain: str | None,
     _method: str | None,
     **kwargs: Any,
-) -> Any:
+) -> str:
     """Handle inbox placement.
 
     :param url: Incoming URL dictionary
@@ -29,31 +28,26 @@ def handle_inbox(
     :return: final url for inbox placement endpoint
     :raises: ApiError
     """
-    final_keys = path.join("/", *url["keys"]) if url["keys"] else ""
-    if "test_id" in kwargs:
-        if "counters" in kwargs:
-            if kwargs["counters"]:
-                url = url["base"][:-1] + final_keys + "/" + kwargs["test_id"] + "/counters"
-            else:
-                raise ApiError("Counters option should be True or absent")
-        elif "checks" in kwargs:
-            if kwargs["checks"]:
-                if "address" in kwargs:
-                    url = (
-                        url["base"][:-1]
-                        + final_keys
-                        + "/"
-                        + kwargs["test_id"]
-                        + "/checks/"
-                        + kwargs["address"]
-                    )
-                else:
-                    url = url["base"][:-1] + final_keys + "/" + kwargs["test_id"] + "/checks"
-            else:
-                raise ApiError("Checks option should be True or absent")
-        else:
-            url = url["base"][:-1] + final_keys + "/" + kwargs["test_id"]
-    else:
-        url = url["base"][:-1] + final_keys
+    final_keys = "/" + "/".join(url["keys"]) if url["keys"] else ""
+    base_url = url["base"].rstrip("/")
+    endpoint_url = f"{base_url}{final_keys}"
 
-    return url
+    if "test_id" not in kwargs:
+        return endpoint_url
+
+    test_id = kwargs["test_id"]
+    endpoint_url = f"{endpoint_url}/{test_id}"
+
+    if "counters" in kwargs:
+        if kwargs["counters"]:
+            return f"{endpoint_url}/counters"
+        raise ApiError("Counters option should be True or absent")
+
+    if "checks" in kwargs:
+        if kwargs["checks"]:
+            if "address" in kwargs:
+                return f"{endpoint_url}/checks/{kwargs['address']}"
+            return f"{endpoint_url}/checks"
+        raise ApiError("Checks option should be True or absent")
+
+    return endpoint_url

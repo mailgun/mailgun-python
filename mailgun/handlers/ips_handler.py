@@ -5,7 +5,6 @@ Doc: https://documentation.mailgun.com/en/latest/api-ips.html
 
 from __future__ import annotations
 
-from os import path
 from typing import Any
 
 
@@ -14,7 +13,7 @@ def handle_ips(
     _domain: str | None,
     _method: str | None,
     **kwargs: Any,
-) -> Any:
+) -> dict[str, Any]:
     """Handle IPs.
 
     :param url: Incoming URL dictionary
@@ -26,7 +25,7 @@ def handle_ips(
     :param kwargs: kwargs
     :return: final url for IPs endpoint
     """
-    final_keys = path.join("/", *url["keys"]) if url["keys"] else ""
+    final_keys = "/" + "/".join(url["keys"]) if url["keys"] else ""
     if "ip" in kwargs:
         url = url["base"][:-1] + final_keys + "/" + kwargs["ip"]
     else:

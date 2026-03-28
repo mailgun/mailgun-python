@@ -5,7 +5,6 @@ Doc: https://documentation.mailgun.com/en/latest/api-ip-pools.html
 
 from __future__ import annotations
 
-from os import path
 from typing import Any
 
 
@@ -26,7 +25,7 @@ def handle_ippools(
     :param kwargs: kwargs
     :return: final url for IP pools endpoint
     """
-    final_keys = path.join("/", *url["keys"]) if url["keys"] else ""
+    final_keys = "/" + "/".join(url["keys"]) if url["keys"] else ""
     base_url = url["base"][:-1] + final_keys
 
     if "pool_id" not in kwargs:

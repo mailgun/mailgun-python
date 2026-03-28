@@ -5,7 +5,6 @@ Doc: https://documentation.mailgun.com/docs/mailgun/api-reference/send/mailgun/u
 
 from __future__ import annotations
 
-from os import path
 from typing import Any
 
 
@@ -14,7 +13,7 @@ def handle_users(
     _domain: str | None,
     _method: str | None,
     **kwargs: Any,
-) -> Any:
+) -> dict[str, Any]:
     """Handle Users.
 
     :param url: Incoming URL dictionary
@@ -26,7 +25,7 @@ def handle_users(
     :param kwargs: kwargs
     :return: final url for Users endpoint
     """
-    final_keys = path.join("/", *url["keys"]) if url["keys"] else ""
+    final_keys = "/" + "/".join(url["keys"]) if url["keys"] else ""
     if "user_id" in kwargs and kwargs["user_id"] != "me":
         url = url["base"][:-1] + "/" + "users" + "/" + kwargs["user_id"]
     elif "user_id" in kwargs and kwargs["user_id"] == "me":
