@@ -321,6 +321,29 @@ response. In the unlikely case you encounter them and need them raised, please r
 **500** - Internal Error on the Mailgun side. Retries are recommended with exponential or logarithmic retry intervals.
 If the issue persists, please reach out to our support team.
 
+### Logging & Debugging
+
+The Mailgun SDK includes built-in logging to help you troubleshoot API requests, inspect generated URLs, and read server error messages (like `400 Bad Request` or `404 Not Found`).
+
+The SDK uses the standard Python `logging` module under the namespace `mailgun.client`.
+
+To enable detailed logging in your application, configure the logger before initializing the client:
+
+```python
+import logging
+from mailgun.client import Client
+
+# Enable DEBUG level for the Mailgun SDK logger
+logging.getLogger("mailgun.client").setLevel(logging.DEBUG)
+
+# Configure the basic console output (if not already configured in your app)
+logging.basicConfig(format="%(levelname)s - %(name)s - %(message)s")
+
+# Now, any API errors or requests will be printed to your console
+client = Client(auth=("api", "YOUR_API_KEY"))
+client.domains.get()
+```
+
 ## Request examples
 
 ### Full list of supported endpoints
