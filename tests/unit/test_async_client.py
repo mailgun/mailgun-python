@@ -91,7 +91,10 @@ class TestAsyncClient:
         assert client.auth == ("api", "key")
         assert client.config.api_url == Config.DEFAULT_API_URL
 
-    def test_async_client_getattr_returns_async_endpoint_type(self) -> None:
+    def test_async_client_getattr_returns_async_endpoint_type(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("SSL_CERT_FILE", raising=False)
         client = AsyncClient(auth=("api", "key"))
         ep = client.domains
 
@@ -101,7 +104,8 @@ class TestAsyncClient:
         assert "domains" in ep._url["keys"] or "domains" in str(ep._url).lower()
 
     @pytest.mark.asyncio
-    async def test_aclose_closes_httpx_client(self) -> None:
+    async def test_aclose_closes_httpx_client(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("SSL_CERT_FILE", raising=False)
         client = AsyncClient(auth=("api", "key"))
         # Trigger _client creation
         _ = client.domains
