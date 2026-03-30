@@ -6,7 +6,6 @@ Doc: https://documentation.mailgun.com/en/latest/api-domains.html#
 from __future__ import annotations
 
 from typing import Any
-from urllib.parse import urljoin
 
 from .error_handler import ApiError
 
@@ -17,7 +16,17 @@ def handle_domainlist(
     _method: str | None,
     **_: Any,
 ) -> str:
-    """Handle a list of domains."""
+    """Handle a list of domains.
+
+    :param url: Incoming URL dictionary
+    :type url: dict
+    :param _domain: Incoming domain (it's not being used for this handler)
+    :type _domain: str
+    :param _method: Incoming request method (it's not being used for this handler)
+    :type _method: str
+    :param _: kwargs
+    :return: final url for domainlist endpoint
+    """
     # Ensure base ends with slash before appending
     return url["base"].rstrip("/") + "/domains"
 
@@ -28,55 +37,54 @@ def handle_domains(
     method: str | None,
     **kwargs: Any,
 ) -> str:
-    """Handle a domain endpoint."""
-    if "domains" in url["keys"]:
-        domains_index = url["keys"].index("domains")
-        url["keys"].pop(domains_index)
+    """Handle a domain endpoint.
 
-    base_url = str(url["base"])
+    :param url: Incoming URL dictionary
+    :type url: dict
+    :param domain: Incoming domain
+    :type domain: str
+    :param method: Incoming request method
+    :type method: str
+    :param kwargs: kwargs
+    :return: final url for domain endpoint
+    :raises: ApiError
+    """
+    keys = list(url["keys"])
+    if "domains" in keys:
+        keys.remove("domains")
 
-    if url["keys"]:
-        # Safe concatenation without leading slash to avoid //
-        final_keys = "/".join(url["keys"])
-        if not domain:
+    base_url = str(url["base"]).rstrip("/")
+    target_domain = kwargs.get("domain_name", domain)
+
+    if not target_domain:
+        if keys:
             raise ApiError("Domain is missing!")
+        return base_url
 
-        # Ensure base URL ends with slash
-        if not base_url.endswith("/"):
-            base_url += "/"
+    # Hierarchical construction: [domain] + [remaining keys from Config]
+    path_segments = [target_domain] + keys
+    domain_path = "/".join(path_segments)
 
-        # Construct path: base_url + domain + / + final_keys
-        domain_path = f"{domain}/{final_keys}"
+    # Specific terminal logic for special arguments
+    if "login" in kwargs:
+        return f"{base_url}/{domain_path}/{kwargs['login']}"
 
-        if "login" in kwargs:
-            return f"{base_url}{domain_path}/{kwargs['login']}"
-        if "ip" in kwargs:
-            return f"{base_url}{domain_path}/{kwargs['ip']}"
-        if "unlink_pool" in kwargs:
-            return f"{base_url}{domain_path}/ip_pool"
-        if "api_storage_url" in kwargs:
-            return kwargs["api_storage_url"]
-        return f"{base_url}{domain_path}"
-
-    if method in {"get", "post", "delete"}:
-        if "domain_name" in kwargs:
-            # e.g. /v4/domains/domain_name
-            return urljoin(base_url, kwargs["domain_name"])
-        if method == "delete":
-            # Parity with legacy API where delete stays on V3
-            # url["base"] is e.g. https://api.mailgun.net/v4/domains/
-            v3_base = base_url.replace("/v4/", "/v3/")
-            return urljoin(v3_base, domain) if domain else v3_base
-        # e.g. POST /domains
-        return base_url.removesuffix("/")
+    if "ip" in kwargs:
+        # Check if 'ips' segment is already present to prevent domains/ips/ips/1.1.1.1
+        prefix = "" if "ips" in keys else "ips/"
+        return f"{base_url}/{domain_path}/{prefix}{kwargs['ip']}"
 
     if "verify" in kwargs:
-        if kwargs["verify"] is not True:
-            raise ApiError("Verify option should be True or absent")
-        # Ensure base ends with slash
-        base = base_url if base_url.endswith("/") else f"{base_url}/"
-        return f"{base}{domain}/verify"
-    return urljoin(base_url, domain) if domain else base_url
+        if kwargs["verify"]:
+            # Append /verify only if it wasn't already in the keys list
+            return (
+                f"{base_url}/{domain_path}"
+                if "verify" in keys
+                else f"{base_url}/{domain_path}/verify"
+            )
+        raise ApiError("Verify option should be True")
+
+    return f"{base_url}/{domain_path}"
 
 
 def handle_sending_queues(
@@ -86,11 +94,10 @@ def handle_sending_queues(
     **kwargs: Any,
 ) -> str:
     """Handle sending queues endpoint URL construction."""
-    if "sending_queues" in url["keys"] or "sendingqueues" in url["keys"]:
-        base_clean = str(url["base"]).replace("domains/", "").replace("domains", "")
-        if not base_clean.endswith("/"):
-            base_clean += "/"
-        return f"{base_clean}{domain}/sending_queues"
+    keys = url["keys"]
+    if "sending_queues" in keys or "sendingqueues" in keys:
+        base_clean = str(url["base"]).replace("domains/", "").replace("domains", "").rstrip("/")
+        return f"{base_clean}/{domain}/sending_queues"
     return str(url["base"])
 
 
@@ -100,12 +107,29 @@ def handle_mailboxes_credentials(
     _method: str | None,
     **kwargs: Any,
 ) -> str:
-    """Handle Mailboxes credentials."""
-    final_keys = "/".join(url["keys"]) if url["keys"] else ""
-    base_raw = str(url["base"])
-    base_url = base_raw if base_raw.endswith("/") else f"{base_raw}/"
+    """Handle Mailboxes credentials.
 
-    constructed_url = f"{base_url}{domain}/{final_keys}" if final_keys else f"{base_url}{domain}"
+    :param url: Incoming URL dictionary
+    :type url: dict
+    :param domain: Incoming domain
+    :type domain: str
+    :param _method: Incoming request method (it's not being used for this handler)
+    :type _method: str
+    :param kwargs: kwargs
+    :return: final url for Mailboxes credentials endpoint
+    """
+    keys = list(url["keys"])
+    if "domains" in keys:
+        keys.remove("domains")
+
+    base_url = str(url["base"]).rstrip("/")
+    target_domain = kwargs.get("domain_name", domain)
+
+    if not target_domain:
+        raise ApiError("Domain is missing!")
+
+    path_segments = [target_domain] + keys
+    constructed_url = f"{base_url}/{'/'.join(path_segments)}"
 
     if "login" in kwargs:
         return f"{constructed_url}/{kwargs['login']}"
@@ -118,9 +142,17 @@ def handle_dkimkeys(
     _method: str | None,
     **kwargs: Any,
 ) -> str:
-    """Handle DKIM Keys."""
+    """Handle Mailboxes credentials.
+
+    :param url: Incoming URL dictionary
+    :type url: dict
+    :param domain: Incoming domain
+    :type domain: str
+    :param _method: Incoming request method (it's not being used for this handler)
+    :type _method: str
+    :param kwargs: kwargs
+    :return: final url for Mailboxes credentials endpoint
+    """
     final_keys = "/".join(url["keys"]) if url["keys"] else ""
-    base_url = str(url["base"])
-    if not base_url.endswith("/"):
-        base_url += "/"
-    return base_url + final_keys
+    base_url = str(url["base"]).rstrip("/")
+    return f"{base_url}/{final_keys}"

@@ -30,5 +30,5 @@ def handle_metrics(
     if "usage" in kwargs:
         return f"{base}/{kwargs['usage']}{final_keys}"
     elif "limits" in kwargs and "tags" in kwargs:
-        return f"{base}/{final_keys}{kwargs['limits']}"
+        return f"{base}{final_keys}/{kwargs['limits']}"
     return f"{base}{final_keys}"

@@ -71,7 +71,10 @@ if TYPE_CHECKING:
     from requests.models import Response
 
 
-logger = logging.getLogger("mailgun.config")
+logger = logging.getLogger("mailgun.client")
+# Ensure logger doesn't stay silent if the user hasn't configured basicConfig
+if not logger.hasHandlers():
+    logger.addHandler(logging.NullHandler())
 
 HANDLERS: dict[str, Callable] = {  # type: ignore[type-arg]
     "resendmessage": handle_resend_message,
@@ -238,14 +241,19 @@ class Config:
         if not mapped_parts or mapped_parts[0] != self._DOMAINS_RESOURCE:
             mapped_parts.insert(0, self._DOMAINS_RESOURCE)
 
-        parts_set: set[str] = set(mapped_parts)
-        version: APIVersion
-        if not self._V1_ENDPOINTS.isdisjoint(parts_set):
-            version = APIVersion.V1
-        elif not self._V3_ENDPOINTS.isdisjoint(parts_set):
-            version = APIVersion.V3
-        else:
-            version = APIVersion.V4
+        version: APIVersion = APIVersion.V3
+
+        if len(mapped_parts) > 1:
+            for part in reversed(mapped_parts[1:]):
+                if part in self._V1_ENDPOINTS:
+                    version = APIVersion.V1
+                    break
+                if part in self._V4_ENDPOINTS:
+                    version = APIVersion.V4
+                    break
+                if part in self._V3_ENDPOINTS:
+                    version = APIVersion.V3
+                    break
 
         return {
             "base": self._build_base_url(version, self._DOMAINS_RESOURCE),
@@ -373,12 +381,14 @@ class Endpoint(BaseEndpoint):
         :rtype: requests.models.Response
         :raises: TimeoutError, ApiError
         """
-        url = self.build_url(url, domain=domain, method=method, **kwargs)
+        target_url = self.build_url(url, domain=domain, method=method, **kwargs)
         req_method = getattr(requests, method)
 
+        logger.debug("Sending Request: %s %s", method.upper(), target_url)
+
         try:
-            return req_method(
-                url,
+            response = req_method(
+                target_url,
                 data=data,
                 params=filters,
                 headers=headers,
@@ -389,9 +399,34 @@ class Endpoint(BaseEndpoint):
                 stream=False,
             )
 
+            try:
+                is_error = response.status_code >= 400
+            except TypeError:
+                is_error = False
+
+            if is_error:
+                logger.error(
+                    "API Error %s | %s %s | Response: %s",
+                    response.status_code,
+                    method.upper(),
+                    target_url,
+                    getattr(response, "text", ""),
+                )
+            else:
+                logger.debug(
+                    "API Success %s | %s %s",
+                    getattr(response, "status_code", 200),
+                    method.upper(),
+                    target_url,
+                )
+
+            return response
+
         except requests.exceptions.Timeout:
+            logger.error("Timeout Error: %s %s", method.upper(), target_url)
             raise TimeoutError
         except requests.RequestException as e:
+            logger.critical("Request Exception: %s | URL: %s", e, target_url)
             raise ApiError(e) from e
 
     def get(
@@ -426,7 +461,7 @@ class Endpoint(BaseEndpoint):
         data: Any | None = None,
         filters: Mapping[str, str | Any] | None = None,
         domain: str | None = None,
-        headers: str | None = None,
+        headers: Any = None,
         files: dict[str, bytes] | None = None,
         **kwargs: Any,
     ) -> Response:
@@ -449,11 +484,12 @@ class Endpoint(BaseEndpoint):
         """
         req_headers = self.headers.copy()
 
-        if req_headers.get("Content-Type") == "application/json":
-            data = json.dumps(data) if data is not None else None
-        elif headers == "application/json":
-            data = json.dumps(data) if data is not None else None
+        is_json = "application/json" in (req_headers.get("Content-Type"), headers)
+
+        if is_json:
             req_headers["Content-Type"] = "application/json"
+            if data is not None and not isinstance(data, (str, bytes)):
+                data = json.dumps(data)
 
         return self.api_call(
             self._auth,
@@ -666,26 +702,58 @@ class AsyncEndpoint(BaseEndpoint):
         :rtype: httpx.Response
         :raises: TimeoutError, ApiError
         """
-        url_str = self.build_url(url, domain=domain, method=method, **kwargs)
+        target_url = self.build_url(url, domain=domain, method=method, **kwargs)
 
         # Build basic arguments
         request_kwargs: dict[str, Any] = {
             "method": method.upper(),
-            "url": url_str,
+            "url": target_url,
             "params": filters,
-            "data": data,
             "files": files,
             "headers": headers,
             "auth": auth,
             "timeout": timeout,
         }
 
+        # For httpx
+        if isinstance(data, (str, bytes)):
+            request_kwargs["content"] = data
+        else:
+            request_kwargs["data"] = data
+
+        logger.debug("Sending Async Request: %s %s", method.upper(), target_url)
+
         try:
-            return await self._client.request(**request_kwargs)
+            response = await self._client.request(**request_kwargs)
+
+            try:
+                is_error = response.status_code >= 400
+            except TypeError:
+                is_error = False
+
+            if is_error:
+                logger.error(
+                    "API Error %s | %s %s | Response: %s",
+                    response.status_code,
+                    method.upper(),
+                    target_url,
+                    getattr(response, "text", ""),
+                )
+            else:
+                logger.debug(
+                    "API Success %s | %s %s",
+                    getattr(response, "status_code", 200),
+                    method.upper(),
+                    target_url,
+                )
+
+            return response
 
         except httpx.TimeoutException:
+            logger.error("Timeout Error: %s %s", method.upper(), target_url)
             raise TimeoutError
         except httpx.RequestError as e:
+            logger.critical("Request Exception: %s | URL: %s", e, target_url)
             raise ApiError(e)
         except Exception as e:
             raise e
@@ -722,7 +790,7 @@ class AsyncEndpoint(BaseEndpoint):
         data: Any | None = None,
         filters: Mapping[str, str | Any] | None = None,
         domain: str | None = None,
-        headers: str | None = None,
+        headers: Any = None,
         files: dict[str, bytes] | None = None,
         **kwargs: Any,
     ) -> httpx.Response:
@@ -743,15 +811,14 @@ class AsyncEndpoint(BaseEndpoint):
         :return: api_call POST request
         :rtype: httpx.Response
         """
-        if "Content-Type" in self.headers:
-            if self.headers["Content-Type"] == "application/json":
+        req_headers = self.headers.copy()
+
+        is_json = "application/json" in (req_headers.get("Content-Type"), headers)
+
+        if is_json:
+            req_headers["Content-Type"] = "application/json"
+            if data is not None and not isinstance(data, (str, bytes)):
                 data = json.dumps(data)
-        elif headers:
-            if headers == "application/json":
-                data = json.dumps(data)
-                self.headers["Content-Type"] = "application/json"
-            elif headers == "multipart/form-data":
-                self.headers["Content-Type"] = "multipart/form-data"
 
         return await self.api_call(
             self._auth,
@@ -759,7 +826,7 @@ class AsyncEndpoint(BaseEndpoint):
             self._url,
             files=files,
             domain=domain,
-            headers=self.headers,
+            headers=req_headers,
             data=data,
             filters=filters,
             **kwargs,
@@ -873,12 +940,11 @@ class AsyncClient(Client):
 
     endpoint_cls = AsyncEndpoint
 
-    def __init__(self, **kwargs: Any) -> None:
+    def __init__(self, auth: tuple[str, str] | None = None, **kwargs: Any) -> None:
         """Initialize a new AsyncClient instance for API interaction."""
-        super().__init__(**kwargs)
-        # Save client kwargs for client reinitialization
-        self._client_kwargs = {k: v for k, v in kwargs.items() if k != "api_url"}
-        self._httpx_client: httpx.AsyncClient = None
+        super().__init__(auth, **kwargs)
+        self._client_kwargs = kwargs.get("client_kwargs", {})
+        self._httpx_client: httpx.AsyncClient | None = None
 
     def __getattr__(self, name: str) -> Any:
         """Get named attribute of an object, split it and execute.
@@ -888,11 +954,8 @@ class AsyncClient(Client):
         :type name: str
         :return: type object (executes existing handler)
         """
-        split = name.split("_")
-        # identify the resource
-        fname = split[0]
         url, headers = self.config[name]
-        return type(fname, (AsyncEndpoint,), {})(
+        return AsyncEndpoint(
             url=url,
             headers=headers,
             auth=self.auth,
@@ -900,7 +963,7 @@ class AsyncClient(Client):
         )
 
     @property
-    def _client(self) -> AsyncClient:
+    def _client(self) -> httpx.AsyncClient:
         if not self._httpx_client or self._httpx_client.is_closed:
             self._httpx_client = httpx.AsyncClient(**self._client_kwargs)
         return self._httpx_client

@@ -94,20 +94,28 @@ class TestAsyncClient:
     def test_async_client_getattr_returns_async_endpoint_type(self) -> None:
         client = AsyncClient(auth=("api", "key"))
         ep = client.domains
+
         assert ep is not None
         assert isinstance(ep, AsyncEndpoint)
-        assert type(ep).__name__ == "domains"
+        assert ep._auth == ("api", "key")
+        assert "domains" in ep._url["keys"] or "domains" in str(ep._url).lower()
 
     @pytest.mark.asyncio
     async def test_aclose_closes_httpx_client(self) -> None:
         client = AsyncClient(auth=("api", "key"))
         # Trigger _client creation
         _ = client.domains
-        assert client._httpx_client is None or not client._httpx_client.is_closed
+
+        httpx_client_before = client._httpx_client
+        assert httpx_client_before is None or not httpx_client_before.is_closed
+
         # Access property to create client
         _ = client._client
         await client.aclose()
-        assert client._httpx_client.is_closed
+
+        httpx_client_after = client._httpx_client
+        assert httpx_client_after is not None
+        assert httpx_client_after.is_closed
 
     @pytest.mark.asyncio
     async def test_async_context_manager(self) -> None:
@@ -115,4 +123,5 @@ class TestAsyncClient:
             assert client is not None
             assert isinstance(client, AsyncClient)
         # After exit, client should be closed
-        assert client._httpx_client is None or client._httpx_client.is_closed
+        httpx_client = client._httpx_client
+        assert httpx_client is None or httpx_client.is_closed
