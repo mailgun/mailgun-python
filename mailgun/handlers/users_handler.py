@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from mailgun.handlers.utils import build_path_from_keys
+
 
 def handle_users(
     url: dict[str, Any],
@@ -25,7 +27,7 @@ def handle_users(
     :param kwargs: kwargs
     :return: final url for Users endpoint
     """
-    final_keys = "/" + "/".join(url["keys"]) if url["keys"] else ""
+    final_keys = build_path_from_keys(url.get("keys", []))
     base_url = str(url["base"]).rstrip("/")
 
     user_id = kwargs.get("user_id")

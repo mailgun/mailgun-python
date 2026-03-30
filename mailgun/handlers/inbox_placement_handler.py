@@ -7,7 +7,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from .error_handler import ApiError
+from mailgun.handlers.error_handler import ApiError
+from mailgun.handlers.utils import build_path_from_keys
 
 
 def handle_inbox(
@@ -28,7 +29,7 @@ def handle_inbox(
     :return: final url for inbox placement endpoint
     :raises: ApiError
     """
-    final_keys = "/" + "/".join(url["keys"]) if url["keys"] else ""
+    final_keys = build_path_from_keys(url.get("keys", []))
     base_url = url["base"].rstrip("/")
     endpoint_url = f"{base_url}{final_keys}"
 

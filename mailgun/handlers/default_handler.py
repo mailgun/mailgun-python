@@ -9,7 +9,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from .error_handler import ApiError
+from mailgun.handlers.error_handler import ApiError
+from mailgun.handlers.utils import build_path_from_keys
 
 
 def handle_default(
@@ -33,5 +34,5 @@ def handle_default(
     if not domain:
         raise ApiError("Domain is missing!")
 
-    final_keys = "/" + "/".join(url["keys"]) if url["keys"] else ""
+    final_keys = build_path_from_keys(url.get("keys", []))
     return f"{url['base']}{domain}{final_keys}"

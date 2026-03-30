@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from mailgun.handlers.utils import build_path_from_keys
+
 
 def handle_bounce_classification(
     url: dict[str, Any],
@@ -25,6 +27,6 @@ def handle_bounce_classification(
     :param kwargs: kwargs
     :return: final url for Bounce Classification endpoints
     """
-    final_keys = "/" + "/".join(url["keys"]) if url["keys"] else ""
+    final_keys = build_path_from_keys(url.get("keys", []))
     base_url = str(url["base"]).rstrip("/")
     return f"{base_url}{final_keys}"

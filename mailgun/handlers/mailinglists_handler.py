@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from mailgun.handlers.utils import build_path_from_keys
+
 
 def handle_lists(
     url: dict[str, Any],
@@ -25,7 +27,7 @@ def handle_lists(
     :param kwargs: kwargs
     :return: final url for mailinglist endpoint
     """
-    final_keys = "/" + "/".join(url["keys"]) if url["keys"] else ""
+    final_keys = build_path_from_keys(url.get("keys", []))
     base = url["base"][:-1]
     if "validate" in kwargs:
         return f"{base}{final_keys}/{kwargs['address']}/validate"

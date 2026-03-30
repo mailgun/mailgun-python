@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from mailgun.handlers.utils import build_path_from_keys
+
 
 def handle_metrics(
     url: dict[str, Any],
@@ -25,7 +27,7 @@ def handle_metrics(
     :param kwargs: kwargs
     :return: final url for Metrics and Tags New endpoints
     """
-    final_keys = "/" + "/".join(url["keys"]) if url["keys"] else ""
+    final_keys = build_path_from_keys(url.get("keys", []))
     base = url["base"][:-1]
     if "usage" in kwargs:
         return f"{base}/{kwargs['usage']}{final_keys}"

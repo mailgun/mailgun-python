@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from mailgun.handlers.utils import build_path_from_keys
+
 
 def handle_bounces(
     url: dict[str, Any],
@@ -100,7 +102,7 @@ def handle_whitelists(
     :param kwargs: kwargs
     :return: final url for Whitelists endpoint
     """
-    final_keys = "/" + "/".join(url["keys"]) if url["keys"] else ""
+    final_keys = build_path_from_keys(url.get("keys", []))
     base = f"{url['base']}{domain}{final_keys}"
     if "whitelist_address" in kwargs:
         return f"{base}/{kwargs['whitelist_address']}"

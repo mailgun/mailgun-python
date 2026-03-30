@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 from urllib.parse import quote
+from mailgun.handlers.utils import build_path_from_keys
 
 
 def handle_tags(
@@ -26,7 +27,7 @@ def handle_tags(
     :param kwargs: kwargs
     :return: final url for Tags endpoint
     """
-    final_keys = "/" + "/".join(url["keys"]) if url["keys"] else ""
+    final_keys = build_path_from_keys(url.get("keys", []))
     base = url["base"] + str(domain) + "/"
     keys_without_tags = url["keys"][1:]
 
