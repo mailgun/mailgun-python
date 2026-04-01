@@ -7,10 +7,10 @@ Stats doc: https://documentation.mailgun.com/en/latest/api-stats.html
 
 from __future__ import annotations
 
-from os import path
 from typing import Any
 
-from .error_handler import ApiError
+from mailgun.handlers.error_handler import ApiError
+from mailgun.handlers.utils import build_path_from_keys
 
 
 def handle_default(
@@ -18,7 +18,7 @@ def handle_default(
     domain: str | None,
     _method: str | None,
     **_: Any,
-) -> Any:
+) -> str:
     """Provide default handler for endpoints with single url pattern (events, messages, stats).
 
     :param url: Incoming URL dictionary
@@ -34,5 +34,5 @@ def handle_default(
     if not domain:
         raise ApiError("Domain is missing!")
 
-    final_keys = path.join("/", *url["keys"]) if url["keys"] else ""
-    return url["base"] + domain + final_keys
+    final_keys = build_path_from_keys(url.get("keys", []))
+    return f"{url['base']}{domain}{final_keys}"

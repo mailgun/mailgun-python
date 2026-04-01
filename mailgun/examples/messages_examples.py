@@ -2,7 +2,12 @@ import os
 from pathlib import Path
 
 from mailgun.client import Client
+from mailgun.handlers.error_handler import UploadError
 
+
+# The maximum message size Mailgun supports is 25MB,
+# see https://documentation.mailgun.com/docs/mailgun/user-manual/sending-messages/send-http#send-via-http
+MAX_FILE_SIZE = 25 * 1024 * 1024  # 25 MB
 
 key: str = os.environ["APIKEY"]
 domain: str = os.environ["DOMAIN"]
@@ -15,6 +20,7 @@ html: str = """<body style="margin: 0; padding: 0;">
   </tr>
  </table>
 </body>"""
+
 client: Client = Client(auth=("api", key))
 
 
@@ -33,15 +39,17 @@ def post_message() -> None:
     # Because the Content-Length header may be provided for you,
     # and if it does this value will be set to the number of bytes in the file.
     # Errors may occur if you open the file in text mode.
+
+    file_bytes_1 = Path("mailgun/doc_tests/files/test1.txt").read_bytes()
+    file_bytes_2 = Path("mailgun/doc_tests/files/test2.txt").read_bytes()
+
+    for file in {file_bytes_1, file_bytes_2}:
+        if len(file) > MAX_FILE_SIZE:
+            raise UploadError("File too large")
+
     files = [
-        (
-            "attachment",
-            ("test1.txt", Path("mailgun/doc_tests/files/test1.txt").read_bytes()),
-        ),
-        (
-            "attachment",
-            ("test2.txt", Path("mailgun/doc_tests/files/test2.txt").read_bytes()),
-        ),
+        ("attachment", ("test1.txt", file_bytes_1)),
+        ("attachment", ("test2.txt", file_bytes_2)),
     ]
 
     req = client.messages.create(data=data, files=files, domain=domain)

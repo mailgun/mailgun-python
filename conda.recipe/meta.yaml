@@ -28,9 +28,9 @@ requirements:
     {% endfor %}
   run:
     - python
-    {% for dep in pyproject['project']['dependencies'] %}
-    - {{ dep.lower() }}
-    {% endfor %}
+    - httpx >=0.24
+    - requests >=2.32.5
+    - typing-extensions >=4.7.1  # [py<311]
 
 test:
   imports:
@@ -38,15 +38,14 @@ test:
     - mailgun.handlers
     - mailgun.examples
   source_files:
-    - tests/tests.py
+    - tests/unit/
   requires:
     - pip
     - pytest
+    - pytest-asyncio
   commands:
     - pip check
-    # Important: export required environment variables for integration tests.
-    # Skip test_update_simple_domain because it can fail.
-    - pytest tests/tests.py -v -k "not test_update_simple_domain"
+    - pytest tests/unit/ -v
 
 about:
   home: {{ project['urls']['Homepage'] }}

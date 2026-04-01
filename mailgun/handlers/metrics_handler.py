@@ -5,8 +5,9 @@ Doc: https://documentation.mailgun.com/docs/mailgun/api-reference/openapi-final/
 
 from __future__ import annotations
 
-from os import path
 from typing import Any
+
+from mailgun.handlers.utils import build_path_from_keys
 
 
 def handle_metrics(
@@ -14,7 +15,7 @@ def handle_metrics(
     _domain: str | None,
     _method: str | None,
     **kwargs: Any,
-) -> Any:
+) -> str:
     """Handle Metrics and Tags New.
 
     :param url: Incoming URL dictionary
@@ -26,12 +27,10 @@ def handle_metrics(
     :param kwargs: kwargs
     :return: final url for Metrics and Tags New endpoints
     """
-    final_keys = path.join("/", *url["keys"]) if url["keys"] else ""
+    final_keys = build_path_from_keys(url.get("keys", []))
+    base = url["base"][:-1]
     if "usage" in kwargs:
-        url = url["base"][:-1] + "/" + kwargs["usage"] + final_keys
+        return f"{base}/{kwargs['usage']}{final_keys}"
     elif "limits" in kwargs and "tags" in kwargs:
-        url = url["base"][:-1] + "/" + final_keys + kwargs["limits"]
-    else:
-        url = url["base"][:-1] + final_keys
-
-    return url
+        return f"{base}{final_keys}/{kwargs['limits']}"
+    return f"{base}{final_keys}"

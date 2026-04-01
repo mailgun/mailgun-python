@@ -5,9 +5,9 @@ Doc: https://documentation.mailgun.com/en/latest/api-tags.html
 
 from __future__ import annotations
 
-from os import path
 from typing import Any
 from urllib.parse import quote
+from mailgun.handlers.utils import build_path_from_keys
 
 
 def handle_tags(
@@ -15,7 +15,7 @@ def handle_tags(
     domain: str | None,
     _method: str | None,
     **kwargs: Any,
-) -> Any:
+) -> str:
     """Handle Tags.
 
     :param url: Incoming URL dictionary
@@ -27,15 +27,17 @@ def handle_tags(
     :param kwargs: kwargs
     :return: final url for Tags endpoint
     """
-    final_keys = path.join("/", *url["keys"]) if url["keys"] else ""
-    base = url["base"] + domain + "/"
+    final_keys = build_path_from_keys(url.get("keys", []))
+    base = url["base"] + str(domain) + "/"
     keys_without_tags = url["keys"][1:]
-    url = url["base"] + domain + final_keys
+
+    result_url = url["base"] + str(domain) + final_keys
+
     if "tag_name" in kwargs:
         if "stats" in final_keys:
-            final_keys = path.join("/", *keys_without_tags) if keys_without_tags else ""
-            url = base + "tags" + "/" + quote(kwargs["tag_name"]) + final_keys
+            final_keys_stats = "/" + "/".join(keys_without_tags) if keys_without_tags else ""
+            return f"{base}tags/{quote(kwargs['tag_name'])}{final_keys_stats}"
         else:
-            url = url + "/" + quote(kwargs["tag_name"])
+            return f"{result_url}/{quote(kwargs['tag_name'])}"
 
-    return url
+    return result_url

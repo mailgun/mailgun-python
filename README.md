@@ -321,6 +321,29 @@ response. In the unlikely case you encounter them and need them raised, please r
 **500** - Internal Error on the Mailgun side. Retries are recommended with exponential or logarithmic retry intervals.
 If the issue persists, please reach out to our support team.
 
+### Logging & Debugging
+
+The Mailgun SDK includes built-in logging to help you troubleshoot API requests, inspect generated URLs, and read server error messages (like `400 Bad Request` or `404 Not Found`).
+
+The SDK uses the standard Python `logging` module under the namespace `mailgun.client`.
+
+To enable detailed logging in your application, configure the logger before initializing the client:
+
+```python
+import logging
+from mailgun.client import Client
+
+# Enable DEBUG level for the Mailgun SDK logger
+logging.getLogger("mailgun.client").setLevel(logging.DEBUG)
+
+# Configure the basic console output (if not already configured in your app)
+logging.basicConfig(format="%(levelname)s - %(name)s - %(message)s")
+
+# Now, any API errors or requests will be printed to your console
+client = Client(auth=("api", "YOUR_API_KEY"))
+client.domains.get()
+```
+
 ## Request examples
 
 ### Full list of supported endpoints
@@ -545,18 +568,28 @@ def post_dkim_keys() -> None:
     POST /v1/dkim/keys
     :return:
     """
+    import os
+    import re
     import subprocess
     from pathlib import Path
+
+    secret_key_filename: str = os.environ["SECRET_KEY_FILENAME"]
+    secret_key_path: Path = Path(secret_key_filename)
+    ALLOWED_FILENAME_RE = re.compile(r"^[a-zA-Z0-9._-]{1,255}$")
 
     # Private key PEM file must be generated in PKCS1 format. You need 'openssl' on your machine
     # example:
     # openssl genrsa -traditional -out .server.key 2048
-    subprocess.run(["openssl", "genrsa", "-traditional", "-out", ".server.key", "2048"])
+    if not ALLOWED_FILENAME_RE.match(secret_key_filename):
+        raise ValueError(f"Invalid filename: {secret_key_filename!r}")
+    subprocess.run(
+        ["openssl", "genrsa", "-traditional", "-out", secret_key_filename, "--", "2048"], check=True
+    )
 
     files = [
         (
             "pem",
-            ("server.key", Path(".server.key").read_bytes()),
+            ("server.key", secret_key_path.read_bytes()),
         )
     ]
 

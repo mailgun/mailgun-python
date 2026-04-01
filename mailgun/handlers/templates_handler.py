@@ -5,10 +5,10 @@ Doc: https://documentation.mailgun.com/en/latest/api-templates.html
 
 from __future__ import annotations
 
-from os import path
 from typing import Any
 
 from .error_handler import ApiError
+from mailgun.handlers.utils import build_path_from_keys
 
 
 def handle_templates(
@@ -16,8 +16,8 @@ def handle_templates(
     domain: str | None,
     _method: str | None,
     **kwargs: Any,
-) -> Any:
-    """Handle Templates.
+) -> str:
+    """Handle Templates dynamically resolving V3 (Domain) or V4 (Account).
 
     :param url: Incoming URL dictionary
     :type url: dict
@@ -29,8 +29,22 @@ def handle_templates(
     :return: final url for Templates endpoint
     :raises: ApiError
     """
-    final_keys = path.join("/", *url["keys"]) if url["keys"] else ""
-    domain_url = f"{url['base']}{domain}{final_keys}"
+    final_keys = build_path_from_keys(url.get("keys", []))
+
+    base_url_str = str(url["base"])
+
+    if domain:
+        if "/v4/" in base_url_str:
+            base_url_str = base_url_str.replace("/v4/", "/v3/")
+
+        base_url_str = base_url_str if base_url_str.endswith("/") else f"{base_url_str}/"
+        domain_url = f"{base_url_str}{domain}{final_keys}"
+    else:
+        if "/v3/" in base_url_str:
+            base_url_str = base_url_str.replace("/v3/", "/v4/")
+
+        base_url_str = base_url_str.rstrip("/")
+        domain_url = f"{base_url_str}{final_keys}"
 
     if "template_name" not in kwargs:
         return domain_url

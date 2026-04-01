@@ -5,8 +5,9 @@ Doc: https://documentation.mailgun.com/docs/mailgun/api-reference/send/mailgun/k
 
 from __future__ import annotations
 
-from os import path
 from typing import Any
+
+from mailgun.handlers.utils import build_path_from_keys
 
 
 def handle_keys(
@@ -14,7 +15,7 @@ def handle_keys(
     _domain: str | None,
     _method: str | None,
     **kwargs: Any,
-) -> Any:
+) -> str:
     """Handle Keys.
 
     :param url: Incoming URL dictionary
@@ -26,10 +27,8 @@ def handle_keys(
     :param kwargs: kwargs
     :return: final url for Keys endpoint
     """
-    final_keys = path.join("/", *url["keys"]) if url["keys"] else ""
+    final_keys = build_path_from_keys(url.get("keys", []))
+    base_url = url["base"][:-1] + final_keys
     if "key_id" in kwargs:
-        url = url["base"][:-1] + final_keys + "/" + kwargs["key_id"]
-    else:
-        url = url["base"][:-1] + final_keys
-
-    return url
+        return f"{base_url}/{kwargs['key_id']}"
+    return base_url

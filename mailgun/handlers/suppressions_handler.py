@@ -5,8 +5,9 @@ Doc: https://documentation.mailgun.com/en/latest/api-suppressions.html
 
 from __future__ import annotations
 
-from os import path
 from typing import Any
+
+from mailgun.handlers.utils import build_path_from_keys
 
 
 def handle_bounces(
@@ -26,7 +27,7 @@ def handle_bounces(
     :param kwargs: kwargs
     :return: final url for Bounces endpoint
     """
-    final_keys = path.join("/", *url["keys"]) if url["keys"] else ""
+    final_keys = "/" + "/".join(url["keys"]) if url["keys"] else ""
     if "bounce_address" in kwargs:
         url = url["base"] + domain + final_keys + "/" + kwargs["bounce_address"]
     else:
@@ -51,7 +52,7 @@ def handle_unsubscribes(
     :param kwargs: kwargs
     :return: final url for Unsubscribes endpoint
     """
-    final_keys = path.join("/", *url["keys"]) if url["keys"] else ""
+    final_keys = "/" + "/".join(url["keys"]) if url["keys"] else ""
     if "unsubscribe_address" in kwargs:
         url = url["base"] + domain + final_keys + "/" + kwargs["unsubscribe_address"]
     else:
@@ -76,7 +77,7 @@ def handle_complaints(
     :param kwargs: kwargs
     :return: final url for Complaints endpoint
     """
-    final_keys = path.join("/", *url["keys"]) if url["keys"] else ""
+    final_keys = "/" + "/".join(url["keys"]) if url["keys"] else ""
     if "complaint_address" in kwargs:
         url = url["base"] + domain + final_keys + "/" + kwargs["complaint_address"]
     else:
@@ -89,7 +90,7 @@ def handle_whitelists(
     domain: str | None,
     _method: str | None,
     **kwargs: Any,
-) -> Any:
+) -> str:
     """Handle Whitelists.
 
     :param url: Incoming URL dictionary
@@ -101,10 +102,8 @@ def handle_whitelists(
     :param kwargs: kwargs
     :return: final url for Whitelists endpoint
     """
-    final_keys = path.join("/", *url["keys"]) if url["keys"] else ""
+    final_keys = build_path_from_keys(url.get("keys", []))
+    base = f"{url['base']}{domain}{final_keys}"
     if "whitelist_address" in kwargs:
-        url = url["base"] + domain + final_keys + "/" + kwargs["whitelist_address"]
-    else:
-        url = url["base"] + domain + final_keys
-
-    return url
+        return f"{base}/{kwargs['whitelist_address']}"
+    return base

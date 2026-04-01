@@ -10,7 +10,7 @@ from mailgun.client import AsyncClient
 from mailgun.client import AsyncEndpoint
 from mailgun.client import Config
 from mailgun.handlers.error_handler import ApiError
-from tests.unit.conftest import BASE_URL_V3, BASE_URL_V4
+from tests.conftest import BASE_URL_V3, BASE_URL_V4
 
 
 class TestAsyncEndpointPrepareFiles:
@@ -91,23 +91,35 @@ class TestAsyncClient:
         assert client.auth == ("api", "key")
         assert client.config.api_url == Config.DEFAULT_API_URL
 
-    def test_async_client_getattr_returns_async_endpoint_type(self) -> None:
+    def test_async_client_getattr_returns_async_endpoint_type(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("SSL_CERT_FILE", raising=False)
         client = AsyncClient(auth=("api", "key"))
         ep = client.domains
+
         assert ep is not None
         assert isinstance(ep, AsyncEndpoint)
-        assert type(ep).__name__ == "domains"
+        assert ep._auth == ("api", "key")
+        assert "domains" in ep._url["keys"] or "domains" in str(ep._url).lower()
 
     @pytest.mark.asyncio
-    async def test_aclose_closes_httpx_client(self) -> None:
+    async def test_aclose_closes_httpx_client(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("SSL_CERT_FILE", raising=False)
         client = AsyncClient(auth=("api", "key"))
         # Trigger _client creation
         _ = client.domains
-        assert client._httpx_client is None or not client._httpx_client.is_closed
+
+        httpx_client_before = client._httpx_client
+        assert httpx_client_before is None or not httpx_client_before.is_closed
+
         # Access property to create client
         _ = client._client
         await client.aclose()
-        assert client._httpx_client.is_closed
+
+        httpx_client_after = client._httpx_client
+        assert httpx_client_after is not None
+        assert httpx_client_after.is_closed
 
     @pytest.mark.asyncio
     async def test_async_context_manager(self) -> None:
@@ -115,4 +127,5 @@ class TestAsyncClient:
             assert client is not None
             assert isinstance(client, AsyncClient)
         # After exit, client should be closed
-        assert client._httpx_client is None or client._httpx_client.is_closed
+        httpx_client = client._httpx_client
+        assert httpx_client is None or httpx_client.is_closed

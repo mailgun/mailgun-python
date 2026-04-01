@@ -4,6 +4,28 @@ We [keep a changelog.](http://keepachangelog.com/)
 
 ## [Unreleased]
 
+### Added
+
+- Implemented Smart Logging (telemetry) in `Client` and `AsyncClient` to help users debug API requests, generated URLs, and server errors (`404`, `400`, `429`).
+- Added a new "Logging & Debugging" section to `README.md`.
+- Added `build_path_from_keys` utility in `mailgun.handlers.utils` to centralize and dry up URL path generation across handlers.
+
+### Changed
+
+- Refactored the `Config` routing engine to use a deterministic, data-driven approach (`EXACT_ROUTES` and `PREFIX_ROUTES`) for better maintainability.
+- Improved dynamic API version resolution for domain endpoints to gracefully switch between `v1`, `v3`, and `v4` for nested resources, with a safe fallback to `v3`.
+- Secured internal configuration registries by wrapping them in `MappingProxyType` to prevent accidental mutations of the client state.
+- Modernized the codebase using modern Python idioms (e.g., `contextlib.suppress`) and resolved strict typing errors for `pyright`.
+- Updated Dependabot configuration to group minor and patch updates and limit open PRs.
+
+### Fixed
+
+- Resolved `httpx` `DeprecationWarning` in `AsyncEndpoint` by properly routing serialized JSON string payloads to the `content` parameter instead of `data`.
+- Fixed a bug in `domains_handler` where intermediate path segments were sometimes dropped for nested resources like `/credentials` or `/ips`.
+- Fixed flaky integration tests failing with `429 Too Many Requests` and `403 Limits Exceeded` by adding proper eventual consistency delays and state teardowns.
+- Fixed DKIM key generation tests to use the `-traditional` OpenSSL flag, ensuring valid PKCS1 format compatibility.
+- Fixed DKIM selector test names to strictly comply with RFC 6376 formatting (replaced underscores with hyphens).
+
 ## [1.6.0] - 2026-01-08
 
 ### Added

@@ -5,8 +5,9 @@ Doc: https://documentation.mailgun.com/en/latest/api-ip-pools.html
 
 from __future__ import annotations
 
-from os import path
 from typing import Any
+
+from mailgun.handlers.utils import build_path_from_keys
 
 
 def handle_ippools(
@@ -14,7 +15,7 @@ def handle_ippools(
     _domain: str | None,
     _method: str | None,
     **kwargs: Any,
-) -> str | Any:
+) -> str:
     """Handle IP pools URL construction.
 
     :param url: Incoming URL dictionary
@@ -26,8 +27,8 @@ def handle_ippools(
     :param kwargs: kwargs
     :return: final url for IP pools endpoint
     """
-    final_keys = path.join("/", *url["keys"]) if url["keys"] else ""
-    base_url = url["base"][:-1] + final_keys
+    final_keys = build_path_from_keys(url.get("keys", []))
+    base_url = str(url["base"]).rstrip("/") + final_keys
 
     if "pool_id" not in kwargs:
         return base_url

@@ -24,12 +24,22 @@ from mailgun.handlers.suppressions_handler import (
     handle_whitelists,
 )
 from mailgun.handlers.tags_handler import handle_tags
-from tests.unit.conftest import (
+from mailgun.handlers.bounce_classification_handler import handle_bounce_classification
+from mailgun.handlers.ip_pools_handler import handle_ippools
+from mailgun.handlers.keys_handler import handle_keys
+from mailgun.handlers.mailinglists_handler import handle_lists
+from mailgun.handlers.metrics_handler import handle_metrics
+from mailgun.handlers.routes_handler import handle_routes
+from mailgun.handlers.templates_handler import handle_templates
+from mailgun.handlers.users_handler import handle_users
+from tests.conftest import (
     parse_domain_name,
     TEST_DOMAIN,
     BASE_URL_V3,
     BASE_URL_V4,
+    BASE_URL_V5,
     BASE_URL_V1,
+    BASE_URL_V2,
     TEST_EMAIL,
     TEST_123,
 )
@@ -61,6 +71,10 @@ class TestHandleDefault:
         assert TEST_DOMAIN in parsed.path
         assert parsed.path.endswith("events")
 
+    def test_with_test_id_and_checks_false_raises(self) -> None:
+        url = {"base": f"{BASE_URL_V3}/", "keys": ["inbox", "tests"]}
+        with pytest.raises(ApiError, match="Checks option should be True or absent"):
+            handle_inbox(url, None, None, test_id=TEST_123, checks=False)
 
 class TestHandleDomainlist:
     """Tests for handle_domainlist."""
@@ -354,14 +368,189 @@ class TestHandleInbox:
 class TestHandleResendMessage:
     """Tests for handle_resend_message."""
 
-    def test_with_storage_url(self) -> None:
+    def test_without_storage_url_raises_api_error(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["resendmessage"]}
-        result = handle_resend_message(
-            url, None, None, storage_url="https://storage.mailgun.net/msg/123"
-        )
-        assert result == "https://storage.mailgun.net/msg/123"
+        with pytest.raises(ApiError, match="Storage url is required"):
+            handle_resend_message(url, None, None)
 
-    def test_without_storage_url_returns_none(self) -> None:
+    def test_with_storage_url_returns_str(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["resendmessage"]}
-        result = handle_resend_message(url, None, None)
-        assert result is None
+        result = handle_resend_message(url, None, None, storage_url="https://store/1")
+        assert result == "https://store/1"
+
+
+class TestHandleTemplates:
+    """Tests for handle_templates (Dynamic V3/V4 routing)."""
+
+    def test_account_templates_forces_v4(self) -> None:
+        """Account templates (no domain) should force V4 even if base is V3."""
+        url = {"base": f"{BASE_URL_V3}/", "keys": ["templates"]}
+        result = handle_templates(url, None, None)
+        assert result == f"{BASE_URL_V4}/templates"
+
+    def test_domain_templates_forces_v3(self) -> None:
+        """Domain templates should force V3 even if base is V4."""
+        url = {"base": f"{BASE_URL_V4}/", "keys": ["templates"]}
+        result = handle_templates(url, TEST_DOMAIN, None)
+        assert result == f"{BASE_URL_V3}/{TEST_DOMAIN}/templates"
+
+    def test_template_name(self) -> None:
+        url = {"base": f"{BASE_URL_V4}/", "keys": ["templates"]}
+        result = handle_templates(url, TEST_DOMAIN, None, template_name="promo")
+        assert result == f"{BASE_URL_V3}/{TEST_DOMAIN}/templates/promo"
+
+    def test_template_versions(self) -> None:
+        url = {"base": f"{BASE_URL_V4}/", "keys": ["templates"]}
+        result = handle_templates(url, TEST_DOMAIN, None, template_name="promo", versions=True)
+        assert result == f"{BASE_URL_V3}/{TEST_DOMAIN}/templates/promo/versions"
+
+    def test_template_versions_false_raises_error(self) -> None:
+        url = {"base": f"{BASE_URL_V4}/", "keys": ["templates"]}
+        with pytest.raises(ApiError, match="Versions should be True or absent"):
+            handle_templates(url, TEST_DOMAIN, None, template_name="promo", versions=False)
+
+    def test_template_tag_and_copy(self) -> None:
+        url = {"base": f"{BASE_URL_V4}/", "keys": ["templates"]}
+        result = handle_templates(
+            url,
+            TEST_DOMAIN,
+            None,
+            template_name="promo",
+            versions=True,
+            tag="v1",
+            copy=True,
+            new_tag="v2",
+        )
+        assert result == f"{BASE_URL_V3}/{TEST_DOMAIN}/templates/promo/versions/v1/copy/v2"
+
+
+class TestHandleUsers:
+    """Tests for handle_users."""
+
+    def test_users_default(self) -> None:
+        url = {"base": f"{BASE_URL_V5}/", "keys": ["users"]}
+        assert handle_users(url, None, None) == f"{BASE_URL_V5}/users"
+
+    def test_users_me(self) -> None:
+        url = {"base": f"{BASE_URL_V5}/", "keys": ["users", "me"]}
+        assert handle_users(url, None, None, user_id="me") == f"{BASE_URL_V5}/users/me"
+
+    def test_users_specific_id(self) -> None:
+        url = {"base": f"{BASE_URL_V5}/", "keys": ["users"]}
+        assert handle_users(url, None, None, user_id="user_123") == f"{BASE_URL_V5}/users/user_123"
+
+
+class TestHandleMetrics:
+    """Tests for handle_metrics."""
+
+    def test_metrics_default(self) -> None:
+        url = {"base": f"{BASE_URL_V1}/", "keys": ["tags"]}
+        assert handle_metrics(url, None, None) == f"{BASE_URL_V1}/tags"
+
+    def test_metrics_usage(self) -> None:
+        url = {"base": f"{BASE_URL_V1}/", "keys": ["tags"]}
+        assert handle_metrics(url, None, None, usage="stats") == f"{BASE_URL_V1}/stats/tags"
+
+    def test_metrics_limits(self) -> None:
+        url = {"base": f"{BASE_URL_V1}/", "keys": ["tags"]}
+        assert (
+            handle_metrics(url, None, None, tags=True, limits="limits")
+            == f"{BASE_URL_V1}/tags/limits"
+        )
+
+
+class TestHandleRoutes:
+    """Tests for handle_routes."""
+
+    def test_routes_default(self) -> None:
+        url = {"base": f"{BASE_URL_V3}/", "keys": ["routes"]}
+        assert handle_routes(url, None, None) == f"{BASE_URL_V3}/routes"
+
+    def test_routes_with_id(self) -> None:
+        url = {"base": f"{BASE_URL_V3}/", "keys": ["routes"]}
+        assert handle_routes(url, None, None, route_id="123") == f"{BASE_URL_V3}/routes/123"
+
+
+class TestHandleLists:
+    """Tests for handle_lists."""
+
+    def test_lists_default(self) -> None:
+        url = {"base": f"{BASE_URL_V3}/", "keys": ["lists"]}
+        assert handle_lists(url, None, None) == f"{BASE_URL_V3}/lists"
+
+    def test_lists_validate(self) -> None:
+        url = {"base": f"{BASE_URL_V3}/", "keys": ["lists"]}
+        assert (
+            handle_lists(url, None, None, address="dev@test", validate=True)
+            == f"{BASE_URL_V3}/lists/dev@test/validate"
+        )
+
+    def test_lists_multiple(self) -> None:
+        url = {"base": f"{BASE_URL_V3}/", "keys": ["lists"]}
+        assert (
+            handle_lists(url, None, None, address="dev@test", multiple=True)
+            == f"{BASE_URL_V3}/lists/dev@test/members.json"
+        )
+
+    def test_lists_members(self) -> None:
+        url = {"base": f"{BASE_URL_V3}/", "keys": ["lists", "members"]}
+        assert (
+            handle_lists(url, None, None, address="dev@test")
+            == f"{BASE_URL_V3}/lists/dev@test/members"
+        )
+
+    def test_lists_member_address(self) -> None:
+        url = {"base": f"{BASE_URL_V3}/", "keys": ["lists", "members"]}
+        assert (
+            handle_lists(url, None, None, address="dev@test", member_address="usr@test")
+            == f"{BASE_URL_V3}/lists/dev@test/members/usr@test"
+        )
+
+
+class TestHandleKeys:
+    """Tests for handle_keys."""
+
+    def test_keys_default(self) -> None:
+        url = {"base": f"{BASE_URL_V1}/", "keys": ["keys"]}
+        assert handle_keys(url, None, None) == f"{BASE_URL_V1}/keys"
+
+    def test_keys_with_id(self) -> None:
+        url = {"base": f"{BASE_URL_V1}/", "keys": ["keys"]}
+        assert handle_keys(url, None, None, key_id="123") == f"{BASE_URL_V1}/keys/123"
+
+
+class TestHandleIpPools:
+    """Tests for handle_ippools."""
+
+    def test_ippools_default(self) -> None:
+        url = {"base": f"{BASE_URL_V3}/", "keys": ["ip_pools"]}
+        assert handle_ippools(url, None, None) == f"{BASE_URL_V3}/ip_pools"
+
+    def test_ippools_with_pool_id(self) -> None:
+        url = {"base": f"{BASE_URL_V3}/", "keys": ["ip_pools"]}
+        assert handle_ippools(url, None, None, pool_id="pool1") == f"{BASE_URL_V3}/ip_pools/pool1"
+
+    def test_ippools_ips_json(self) -> None:
+        url = {"base": f"{BASE_URL_V3}/", "keys": ["ip_pools", "ips.json"]}
+        assert (
+            handle_ippools(url, None, None, pool_id="pool1")
+            == f"{BASE_URL_V3}/ip_pools/ips.json/pool1"
+        )
+
+    def test_ippools_with_ip(self) -> None:
+        url = {"base": f"{BASE_URL_V3}/", "keys": ["ip_pools"]}
+        assert (
+            handle_ippools(url, None, None, pool_id="pool1", ip="1.1.1.1")
+            == f"{BASE_URL_V3}/ip_pools/pool1/ips/1.1.1.1"
+        )
+
+
+class TestHandleBounceClassification:
+    """Tests for handle_bounce_classification."""
+
+    def test_bounce_classification(self) -> None:
+        url = {"base": f"{BASE_URL_V2}/", "keys": ["bounce-classification", "metrics"]}
+        assert (
+            handle_bounce_classification(url, None, None)
+            == f"{BASE_URL_V2}/bounce-classification/metrics"
+        )

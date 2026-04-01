@@ -2,6 +2,8 @@
 
 Exceptions:
     - ApiError: Base exception for API errors.
+    - RouteNotFoundError: Raised when the requested endpoint cannot be resolved.
+    - UploadError: Raised when the maximum message size is greater than 25 MB.
 """
 
 
@@ -12,3 +14,11 @@ class ApiError(Exception):
     allowing for more specific error handling based on the type of API
     failure encountered.
     """
+
+
+class RouteNotFoundError(ApiError):
+    """Raised when the requested Mailgun endpoint cannot be resolved."""
+
+
+class UploadError(ApiError):
+    """Raised when the maximum message size is greater than 25 MB."""

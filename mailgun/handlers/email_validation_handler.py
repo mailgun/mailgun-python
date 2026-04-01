@@ -5,7 +5,6 @@ Doc: https://documentation.mailgun.com/en/latest/api-email-validation.html#email
 
 from __future__ import annotations
 
-from os import path
 from typing import Any
 
 
@@ -14,7 +13,7 @@ def handle_address_validate(
     _domain: str | None,
     _method: str | None,
     **kwargs: Any,
-) -> Any:
+) -> str:
     """Handle email validation.
 
     :param url: Incoming URL dictionary
@@ -26,10 +25,9 @@ def handle_address_validate(
     :param kwargs: kwargs
     :return: final url for email validation endpoint
     """
-    final_keys = path.join("/", *url["keys"][1:]) if url["keys"][1:] else ""
-    if "list_name" in kwargs:
-        url = url["base"] + final_keys + "/" + kwargs["list_name"]
-    else:
-        url = url["base"] + final_keys
+    final_keys = "/" + "/".join(url["keys"][1:]) if url["keys"][1:] else ""
+    base_url = str(url["base"]).rstrip("/")
 
-    return url
+    if "list_name" in kwargs:
+        return f"{base_url}{final_keys}/{kwargs['list_name']}"
+    return f"{base_url}{final_keys}"

@@ -1,5 +1,7 @@
 """Unit tests for mailgun.client.Config."""
 
+import pytest
+
 from mailgun.client import Config
 
 
@@ -9,11 +11,11 @@ class TestConfig:
     def test_default_api_url(self) -> None:
         config = Config()
         assert config.api_url == Config.DEFAULT_API_URL
-        assert config.api_url == "https://api.mailgun.net/"
+        assert config.api_url == "https://api.mailgun.net"
 
     def test_custom_api_url(self) -> None:
         config = Config(api_url="https://custom.api/")
-        assert config.api_url == "https://custom.api/"
+        assert config.api_url == "https://custom.api"
 
     def test_getitem_messages(self) -> None:
         config = Config()
@@ -105,3 +107,52 @@ class TestConfig:
         config = Config()
         url, _ = config["ippools"]
         assert url["keys"] == ["ip_pools"]
+
+    def test_sanitize_url_adds_scheme(self) -> None:
+        """Test that missing scheme defaults to https://"""
+        config = Config(api_url="api.mailgun.net")
+        assert config.api_url == "https://api.mailgun.net"
+
+    def test_sanitize_url_removes_newlines_and_trailing_slashes(self) -> None:
+        """Test url cleanup for carriage returns and trailing slashes."""
+        config = Config(api_url="https://api.custom.com/\r\n")
+        assert config.api_url == "https://api.custom.com"
+
+    def test_sanitize_key_removes_special_chars(self) -> None:
+        """Test that keys with hyphens or special chars are sanitized."""
+        clean_key = Config._sanitize_key("My-Key!@#")
+        assert clean_key == "mykey"
+
+    def test_sanitize_key_raises_error_on_empty(self) -> None:
+        """Test that completely invalid keys raise KeyError."""
+        with pytest.raises(KeyError, match="Invalid endpoint key: !!!"):
+            Config._sanitize_key("!!!")
+
+    def test_resolve_domains_route_activate_deactivate(self) -> None:
+        """Test V4 fallback for domain activate/deactivate routes."""
+        res = Config()._resolve_domains_route(["domains", "auth", "keys", "sel", "activate"])
+        assert res["base"] == "https://api.mailgun.net/v4/"
+        assert res["keys"][-1] == "activate"
+        assert "{authority_name}" in res["keys"]
+
+    def test_resolve_domains_route_v1_security(self) -> None:
+        """Test that security endpoints map to V1."""
+        res = Config()._resolve_domains_route(["domains", "security"])
+        assert "v1/domains" in res["base"]
+        assert "security" in res["keys"]
+
+    def test_resolve_domains_route_v3_tracking(self) -> None:
+        """Test that tracking endpoints map to V3."""
+        res = Config()._resolve_domains_route(["domains", "tracking"])
+        assert "v3/domains" in res["base"]
+
+    def test_resolve_domains_route_alias_mapping(self) -> None:
+        """Test that aliases like dkimauthority map correctly."""
+        res = Config()._resolve_domains_route(["dkimauthority"])
+        assert "dkim_authority" in res["keys"]
+        assert "v3/domains" in res["base"]
+
+    def test_resolve_domains_route_v4_fallback(self) -> None:
+        """Test that unknown domain routes fallback to V3 (Safety Fallback)."""
+        res = Config()._resolve_domains_route(["domains", "unknown_new_feature"])
+        assert "v3/domains" in res["base"]

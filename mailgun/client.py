@@ -16,10 +16,16 @@ Classes:
 from __future__ import annotations
 
 import json
+import logging
+import re
 import sys
+from enum import Enum
+from functools import lru_cache
+from types import MappingProxyType
 from typing import TYPE_CHECKING
-from typing import Any
-from urllib.parse import urljoin
+from urllib.parse import urlparse
+
+from typing import Any, Final
 
 import httpx
 import requests
@@ -48,7 +54,7 @@ from mailgun.handlers.suppressions_handler import handle_whitelists
 from mailgun.handlers.tags_handler import handle_tags
 from mailgun.handlers.templates_handler import handle_templates
 from mailgun.handlers.users_handler import handle_users
-
+from mailgun import routes
 
 if sys.version_info >= (3, 11):
     from typing import Self
@@ -64,6 +70,11 @@ if TYPE_CHECKING:
     from httpx import Response as HttpxResponse
     from requests.models import Response
 
+
+logger = logging.getLogger("mailgun.client")
+# Ensure logger doesn't stay silent if the user hasn't configured basicConfig
+if not logger.hasHandlers():
+    logger.addHandler(logging.NullHandler())
 
 HANDLERS: dict[str, Callable] = {  # type: ignore[type-arg]
     "resendmessage": handle_resend_message,
@@ -97,186 +108,187 @@ HANDLERS: dict[str, Callable] = {  # type: ignore[type-arg]
 }
 
 
-class Config:
-    """Config class.
+class APIVersion(str, Enum):
+    """Constants for Mailgun API versions."""
 
-    Configure client with basic (urls, version, headers).
+    V1 = "v1"
+    V2 = "v2"
+    V3 = "v3"
+    V4 = "v4"
+    V5 = "v5"
+
+
+# Static data is accessed directly from the routes module or class constants.
+@lru_cache
+def _get_cached_route_data(clean_key: str) -> dict[str, Any]:
+    """
+    Apply internal cached routing logic.
+
+    Uses only hashable types (str) as arguments to avoid TypeError.
+    """
+    # 1. Exact Match
+    if clean_key in routes.EXACT_ROUTES:
+        version, route_keys = routes.EXACT_ROUTES[clean_key]
+        return {"version": version, "keys": tuple(route_keys)}
+
+    # 2. Parse resource parts
+    route_parts = clean_key.split("_")
+    primary_resource = route_parts[0]
+
+    # 3. Domain Logic Trigger
+    # We use a hardcoded string 'domains' or import it
+    if primary_resource == "domains":
+        return {"type": "domain", "parts": tuple(route_parts)}
+
+    # 4. Prefix Logic
+    if primary_resource in routes.PREFIX_ROUTES:
+        version, suffix, key_override = routes.PREFIX_ROUTES[primary_resource]
+        final_parts = route_parts.copy()
+        if key_override:
+            final_parts[0] = key_override
+        return {"version": version, "suffix": suffix, "keys": tuple(final_parts)}
+
+    # 5. Fallback
+    return {"version": APIVersion.V3.value, "keys": tuple(route_parts)}
+
+
+class Config:
+    """Configuration engine for the Mailgun API client.
+
+    Using a data-driven routing approach.
     """
 
-    DEFAULT_API_URL: str = "https://api.mailgun.net/"
-    API_REF: str = "https://documentation.mailgun.com/en/latest/api_reference.html"
-    user_agent: str = "mailgun-api-python/"
+    __slots__ = ("api_url", "ex_handler")
 
-    def __init__(self, api_url: str | None = None) -> None:
-        """Initialize a new Config instance with specified or default API settings.
+    DEFAULT_API_URL: Final[str] = "https://api.mailgun.net"
+    USER_AGENT: Final[str] = "mailgun-api-python/"
 
-        This initializer sets the API version and base URL. If no
-        version or URL is provided, it defaults to the predefined class
-        values.
+    # Use Mapping to denote read-only dictionary-like structures
+    _HEADERS_BASE: Final[Mapping[str, str]] = MappingProxyType({"User-agent": USER_AGENT})
+    _HEADERS_JSON: Final[Mapping[str, str]] = MappingProxyType(
+        {"User-agent": USER_AGENT, "Content-Type": "application/json"}
+    )
 
-        :param version: API version (default: v3)
-        :type version: str | None
-        :param api_url: API base url
-        :type api_url: str | None
-        """
+    # --- ENCAPSULATED ROUTING REGISTRIES ---
+    _DOMAINS_RESOURCE: Final[str] = "domains"
+    _SAFE_KEY_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[a-z0-9_]+$")
+
+    # Mapping[str, Any] is used because the values in routes vary in structure
+    _EXACT_ROUTES: Final[Mapping[str, Any]] = MappingProxyType(routes.EXACT_ROUTES)
+    _PREFIX_ROUTES: Final[Mapping[str, Any]] = MappingProxyType(routes.PREFIX_ROUTES)
+    _DOMAIN_ALIASES: Final[Mapping[str, str]] = MappingProxyType(routes.DOMAIN_ALIASES)
+
+    _DOMAIN_ENDPOINTS: Final[Mapping[str, list[str]]] = MappingProxyType(routes.DOMAIN_ENDPOINTS)
+    _V1_ENDPOINTS: Final[frozenset[str]] = frozenset(routes.DOMAIN_ENDPOINTS["v1"])
+    _V3_ENDPOINTS: Final[frozenset[str]] = frozenset(routes.DOMAIN_ENDPOINTS["v3"])
+    _V4_ENDPOINTS: Final[frozenset[str]] = frozenset(routes.DOMAIN_ENDPOINTS.get("v4", []))
+
+    def __init__(self, api_url: str | None = None) -> None:  # noqa: D107
         self.ex_handler: bool = True
-        self.api_url = api_url or self.DEFAULT_API_URL
+        base_url_input: str = api_url or self.DEFAULT_API_URL
+        self.api_url: str = self._sanitize_url(base_url_input)
 
-    def __getitem__(self, key: str) -> tuple[Any, dict[str, str]]:
-        """Parse incoming split attr name, check it and prepare endpoint url.
+    @staticmethod
+    def _sanitize_url(raw_url: str) -> str:
+        """Normalize the base API URL to have NO trailing slash."""
+        raw_url = raw_url.strip().replace("\r", "").replace("\n", "")
+        parsed = urlparse(raw_url)
+        if not parsed.scheme:
+            raw_url = f"https://{raw_url}"
+        return raw_url.rstrip("/")
 
-        Most urls generated here can't be generated dynamically as we
-        are doing this in build_url() method under Endpoint class.
-        :param key: incoming attr name
-        :type key: str
-        :return: url, headers
+    @classmethod
+    def _sanitize_key(cls, key: str) -> str:
+        """Normalize and validate the endpoint key."""
+        clean_key: str = key.lower()
+        if not cls._SAFE_KEY_PATTERN.fullmatch(clean_key):
+            clean_key = re.sub(r"[^a-z0-9_]", "", clean_key)
+        if not clean_key:
+            raise KeyError(f"Invalid endpoint key: {key}")
+        return clean_key
+
+    def _build_base_url(self, version: APIVersion | str, suffix: str = "") -> str:
+        """Construct API URL with precise slash control to prevent 404s."""
+        ver_str: str = version.value if isinstance(version, APIVersion) else version
+        base: str = f"{self.api_url}/{ver_str}"
+
+        if suffix:
+            path: str = f"{suffix}/" if suffix == self._DOMAINS_RESOURCE else suffix
+            return f"{base}/{path}"
+
+        return f"{base}/"
+
+    def _resolve_domains_route(self, route_parts: list[str]) -> dict[str, Any]:
         """
-        key = key.lower()
-        headers = {"User-agent": self.user_agent}
-        v1_base = urljoin(self.api_url, "v1/")
-        v2_base = urljoin(self.api_url, "v2/")
-        v3_base = urljoin(self.api_url, "v3/")
-        v4_base = urljoin(self.api_url, "v4/")
-        v5_base = urljoin(self.api_url, "v5/")
+        Handle context-aware versioning for domain-related endpoints.
 
-        special_cases = {
-            "messages": {"base": v3_base, "keys": ["messages"]},
-            "mimemessage": {"base": v3_base, "keys": ["messages.mime"]},
-            "resendmessage": {"base": v3_base, "keys": ["resendmessage"]},
-            "ippools": {"base": v3_base, "keys": ["ip_pools"]},
-            # /v1/dkim/keys
-            "dkim": {"base": v1_base, "keys": ["dkim", "keys"]},
-            "domainlist": {"base": v4_base, "keys": ["domainlist"]},
-            # /v1/analytics/metrics
-            # /v1/analytics/usage/metrics
-            # /v1/analytics/logs
-            # /v1/analytics/tags
-            # /v1/analytics/tags/limits
-            "analytics": {
-                "base": v1_base,
-                "keys": ["analytics", "usage", "metrics", "logs", "tags", "limits"],
-            },
-            # /v2/bounce-classification/metrics
-            "bounceclassification": {
-                "base": v2_base,
-                "keys": ["bounce-classification", "metrics"],
-            },
-            # /v5/users
-            "users": {
-                "base": v5_base,
-                "keys": ["users", "me"],
-            },
-        }
-
-        if key in special_cases:
-            return special_cases[key], headers
-
-        if "analytics" in key:
-            headers |= {"Content-Type": "application/json"}
+        Returns a dict containing a string base and a tuple of keys.
+        """
+        if any(action in route_parts for action in ("activate", "deactivate")):
             return {
-                "base": v1_base,
-                "keys": key.split("_"),
-            }, headers
-
-        if "bounceclassification" in key:
-            headers |= {"Content-Type": "application/json"}
-            part1 = key[:6]
-            part2 = key[6:]
-            return {
-                "base": v2_base,
-                "keys": f"{part1}-{part2}".split("_"),
-            }, headers
-
-        if "users" in key:
-            return {
-                "base": v5_base,
-                "keys": key.split("_"),
-            }, headers
-
-        if "keys" in key:
-            return {
-                "base": v1_base,
-                "keys": key.split("_"),
-            }, headers
-
-        # Handle DIPP endpoints
-        if "subaccount" in key:
-            if "ip_pools" in key:
-                return {
-                    "base": v5_base,
-                    "keys": ["accounts", "subaccounts", "ip_pools"],
-                }, headers
-            if "ip_pool" in key:
-                return {
-                    "base": v5_base,
-                    "keys": ["accounts", "subaccounts", "{subaccountId}", "ip_pool"],
-                }, headers
-
-        # Handle DKIM management endpoints
-        if "dkim_management" in key:
-            if "rotation" in key:
-                return {
-                    "base": v1_base,
-                    "keys": ["dkim_management", "domains", "{name}", "rotation"],
-                }, headers
-            if "rotate" in key:
-                return {
-                    "base": v1_base,
-                    "keys": ["dkim_management", "domains", "{name}", "rotate"],
-                }, headers
-
-        if "domains" in key:
-            split = key.split("_") if "_" in key else [key]
-            final_keys = split
-
-            if any(x in key for x in ("activate", "deactivate")):
-                action = "activate" if "activate" in key else "deactivate"
-                final_keys = [
-                    "domains",
+                "base": self._build_base_url(APIVersion.V4),
+                "keys": (
+                    self._DOMAINS_RESOURCE,
                     "{authority_name}",
                     "keys",
                     "{selector}",
-                    action,
-                ]
-                return {"base": v4_base, "keys": final_keys}, headers
-
-            if "dkimauthority" in split:
-                final_keys = ["dkim_authority"]
-            elif "dkimselector" in split:
-                final_keys = ["dkim_selector"]
-            elif "webprefix" in split:
-                final_keys = ["web_prefix"]
-            elif "sendingqueues" in split:
-                final_keys = ["sending_queues"]
-
-            v3_domain_endpoints = {
-                "credentials",
-                "connection",
-                "tracking",
-                "dkimauthority",
-                "dkimselector",
-                "webprefix",
-                "webhooks",
-                "sendingqueues",
+                    route_parts[-1],
+                ),
             }
-            base = v3_base if any(x in key for x in v3_domain_endpoints) else v4_base
-            return {"base": f"{base}domains/", "keys": final_keys}, headers
 
-        # "dkim" must follow after "dkim_management", "dkimauthority", "dkimselector",
-        # otherwise a wrong base url will be chosen.
-        if "dkim" in key:
-            return {
-                "base": v1_base,
-                "keys": key.split("_"),
-            }, headers
+        mapped_parts: list[str] = [self._DOMAIN_ALIASES.get(p, p) for p in route_parts]
 
-        if "addressvalidate" in key:
-            return {
-                "base": f"{v4_base}address/validate",
-                "keys": key.split("_"),
-            }, headers
+        if not mapped_parts or mapped_parts[0] != self._DOMAINS_RESOURCE:
+            mapped_parts.insert(0, self._DOMAINS_RESOURCE)
 
-        return {"base": v3_base, "keys": key.split("_")}, headers
+        version: APIVersion = APIVersion.V3
+
+        if len(mapped_parts) > 1:
+            for part in reversed(mapped_parts[1:]):
+                if part in self._V1_ENDPOINTS:
+                    version = APIVersion.V1
+                    break
+                if part in self._V4_ENDPOINTS:
+                    version = APIVersion.V4
+                    break
+                if part in self._V3_ENDPOINTS:
+                    version = APIVersion.V3
+                    break
+
+        return {
+            "base": self._build_base_url(version, self._DOMAINS_RESOURCE),
+            "keys": mapped_parts.copy(),
+        }
+
+    def __getitem__(self, key: str) -> tuple[dict[str, Any], dict[str, str]]:
+        """
+        Public entry point.
+
+        Calls a standalone cached function.
+        """
+        clean_key = self._sanitize_key(key)
+
+        route_data = _get_cached_route_data(clean_key)
+
+        # HTTP header mapping based on endpoint naming conventions
+        requires_json_headers = "analytics" in clean_key or "bounceclassification" in clean_key
+
+        # Prepare headers
+        headers_map = self._HEADERS_JSON if requires_json_headers else self._HEADERS_BASE
+        headers = dict(headers_map)
+
+        # Reconstruct result
+        if route_data.get("type") == "domain":
+            # Domain logic still needs 'self' for internal version frozensets
+            return self._resolve_domains_route(list(route_data["parts"])), headers
+
+        # Create mutable copy of the URL structure for HANDLERS
+        safe_url = {
+            "base": self._build_base_url(route_data["version"], route_data.get("suffix", "")),
+            "keys": list(route_data["keys"]),
+        }
+
+        return safe_url, headers
 
 
 class BaseEndpoint:
@@ -369,12 +381,14 @@ class Endpoint(BaseEndpoint):
         :rtype: requests.models.Response
         :raises: TimeoutError, ApiError
         """
-        url = self.build_url(url, domain=domain, method=method, **kwargs)
+        target_url = self.build_url(url, domain=domain, method=method, **kwargs)
         req_method = getattr(requests, method)
 
+        logger.debug("Sending Request: %s %s", method.upper(), target_url)
+
         try:
-            return req_method(
-                url,
+            response = req_method(
+                target_url,
                 data=data,
                 params=filters,
                 headers=headers,
@@ -385,12 +399,35 @@ class Endpoint(BaseEndpoint):
                 stream=False,
             )
 
+            try:
+                is_error = response.status_code >= 400
+            except TypeError:
+                is_error = False
+
+            if is_error:
+                logger.error(
+                    "API Error %s | %s %s | Response: %s",
+                    response.status_code,
+                    method.upper(),
+                    target_url,
+                    getattr(response, "text", ""),
+                )
+            else:
+                logger.debug(
+                    "API Success %s | %s %s",
+                    getattr(response, "status_code", 200),
+                    method.upper(),
+                    target_url,
+                )
+
+            return response
+
         except requests.exceptions.Timeout:
+            logger.error("Timeout Error: %s %s", method.upper(), target_url)
             raise TimeoutError
         except requests.RequestException as e:
-            raise ApiError(e)
-        except Exception as e:
-            raise e
+            logger.critical("Request Exception: %s | URL: %s", e, target_url)
+            raise ApiError(e) from e
 
     def get(
         self,
@@ -424,7 +461,7 @@ class Endpoint(BaseEndpoint):
         data: Any | None = None,
         filters: Mapping[str, str | Any] | None = None,
         domain: str | None = None,
-        headers: str | None = None,
+        headers: Any = None,
         files: dict[str, bytes] | None = None,
         **kwargs: Any,
     ) -> Response:
@@ -445,15 +482,14 @@ class Endpoint(BaseEndpoint):
         :return: api_call POST request
         :rtype: requests.models.Response
         """
-        if "Content-Type" in self.headers:
-            if self.headers["Content-Type"] == "application/json":
+        req_headers = self.headers.copy()
+
+        is_json = "application/json" in (req_headers.get("Content-Type"), headers)
+
+        if is_json:
+            req_headers["Content-Type"] = "application/json"
+            if data is not None and not isinstance(data, (str, bytes)):
                 data = json.dumps(data)
-        elif headers:
-            if headers == "application/json":
-                data = json.dumps(data)
-                self.headers["Content-Type"] = "application/json"
-            elif headers == "multipart/form-data":
-                self.headers["Content-Type"] = "multipart/form-data"
 
         return self.api_call(
             self._auth,
@@ -461,7 +497,7 @@ class Endpoint(BaseEndpoint):
             self._url,
             files=files,
             domain=domain,
-            headers=self.headers,
+            headers=req_headers,
             data=data,
             filters=filters,
             **kwargs,
@@ -538,8 +574,8 @@ class Endpoint(BaseEndpoint):
         :return: api_call PUT request
         :rtype: requests.models.Response
         """
-        if self.headers["Content-type"] == "application/json":
-            data = json.dumps(data)
+        if self.headers.get("Content-Type") == "application/json":
+            data = json.dumps(data) if data is not None else None
         return self.api_call(
             self._auth,
             "put",
@@ -596,11 +632,8 @@ class Client:
         :type name: str
         :return: type object (executes existing handler)
         """
-        split = name.split("_")
-        # identify the resource
-        fname = split[0]
         url, headers = self.config[name]
-        return type(fname, (Endpoint,), {})(url=url, headers=headers, auth=self.auth)
+        return Endpoint(url=url, headers=headers, auth=self.auth)
 
 
 class AsyncEndpoint(BaseEndpoint):
@@ -669,25 +702,58 @@ class AsyncEndpoint(BaseEndpoint):
         :rtype: httpx.Response
         :raises: TimeoutError, ApiError
         """
-        url = self.build_url(url, domain=domain, method=method, **kwargs)
+        target_url = self.build_url(url, domain=domain, method=method, **kwargs)
 
+        # Build basic arguments
         request_kwargs: dict[str, Any] = {
             "method": method.upper(),
-            "url": url,
+            "url": target_url,
             "params": filters,
-            "data": data,
             "files": files,
             "headers": headers,
             "auth": auth,
             "timeout": timeout,
         }
 
+        # For httpx
+        if isinstance(data, (str, bytes)):
+            request_kwargs["content"] = data
+        else:
+            request_kwargs["data"] = data
+
+        logger.debug("Sending Async Request: %s %s", method.upper(), target_url)
+
         try:
-            return await self._client.request(**request_kwargs)
+            response = await self._client.request(**request_kwargs)
+
+            try:
+                is_error = response.status_code >= 400
+            except TypeError:
+                is_error = False
+
+            if is_error:
+                logger.error(
+                    "API Error %s | %s %s | Response: %s",
+                    response.status_code,
+                    method.upper(),
+                    target_url,
+                    getattr(response, "text", ""),
+                )
+            else:
+                logger.debug(
+                    "API Success %s | %s %s",
+                    getattr(response, "status_code", 200),
+                    method.upper(),
+                    target_url,
+                )
+
+            return response
 
         except httpx.TimeoutException:
+            logger.error("Timeout Error: %s %s", method.upper(), target_url)
             raise TimeoutError
         except httpx.RequestError as e:
+            logger.critical("Request Exception: %s | URL: %s", e, target_url)
             raise ApiError(e)
         except Exception as e:
             raise e
@@ -724,7 +790,7 @@ class AsyncEndpoint(BaseEndpoint):
         data: Any | None = None,
         filters: Mapping[str, str | Any] | None = None,
         domain: str | None = None,
-        headers: str | None = None,
+        headers: Any = None,
         files: dict[str, bytes] | None = None,
         **kwargs: Any,
     ) -> httpx.Response:
@@ -745,15 +811,14 @@ class AsyncEndpoint(BaseEndpoint):
         :return: api_call POST request
         :rtype: httpx.Response
         """
-        if "Content-Type" in self.headers:
-            if self.headers["Content-Type"] == "application/json":
+        req_headers = self.headers.copy()
+
+        is_json = "application/json" in (req_headers.get("Content-Type"), headers)
+
+        if is_json:
+            req_headers["Content-Type"] = "application/json"
+            if data is not None and not isinstance(data, (str, bytes)):
                 data = json.dumps(data)
-        elif headers:
-            if headers == "application/json":
-                data = json.dumps(data)
-                self.headers["Content-Type"] = "application/json"
-            elif headers == "multipart/form-data":
-                self.headers["Content-Type"] = "multipart/form-data"
 
         return await self.api_call(
             self._auth,
@@ -761,7 +826,7 @@ class AsyncEndpoint(BaseEndpoint):
             self._url,
             files=files,
             domain=domain,
-            headers=self.headers,
+            headers=req_headers,
             data=data,
             filters=filters,
             **kwargs,
@@ -838,7 +903,7 @@ class AsyncEndpoint(BaseEndpoint):
         :return: api_call PUT request
         :rtype: httpx.Response
         """
-        if self.headers.get("Content-type") == "application/json":
+        if self.headers.get("Content-Type") == "application/json":
             data = json.dumps(data)
         return await self.api_call(
             self._auth,
@@ -875,12 +940,11 @@ class AsyncClient(Client):
 
     endpoint_cls = AsyncEndpoint
 
-    def __init__(self, **kwargs: Any) -> None:
+    def __init__(self, auth: tuple[str, str] | None = None, **kwargs: Any) -> None:
         """Initialize a new AsyncClient instance for API interaction."""
-        super().__init__(**kwargs)
-        # Save client kwargs for client reinitialization
-        self._client_kwargs = {k: v for k, v in kwargs.items() if k != "api_url"}
-        self._httpx_client: httpx.AsyncClient = None
+        super().__init__(auth, **kwargs)
+        self._client_kwargs = kwargs.get("client_kwargs", {})
+        self._httpx_client: httpx.AsyncClient | None = None
 
     def __getattr__(self, name: str) -> Any:
         """Get named attribute of an object, split it and execute.
@@ -890,11 +954,8 @@ class AsyncClient(Client):
         :type name: str
         :return: type object (executes existing handler)
         """
-        split = name.split("_")
-        # identify the resource
-        fname = split[0]
         url, headers = self.config[name]
-        return type(fname, (AsyncEndpoint,), {})(
+        return AsyncEndpoint(
             url=url,
             headers=headers,
             auth=self.auth,
@@ -902,7 +963,7 @@ class AsyncClient(Client):
         )
 
     @property
-    def _client(self) -> AsyncClient:
+    def _client(self) -> httpx.AsyncClient:
         if not self._httpx_client or self._httpx_client.is_closed:
             self._httpx_client = httpx.AsyncClient(**self._client_kwargs)
         return self._httpx_client
