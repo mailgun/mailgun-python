@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .error_handler import ApiError
+from mailgun.handlers.error_handler import ApiError
 
 
 def handle_resend_message(
@@ -18,14 +18,17 @@ def handle_resend_message(
 ) -> str:
     """Resend message endpoint.
 
-    :param _url: Incoming URL dictionary (it's not being used for this handler)
-    :type _url: dict
-    :param _domain: Incoming domain (it's not being used for this handler)
-    :type _domain: str
-    :param _method: Incoming request method (it's not being used for this handler)
-    :type _method: str
-    :param kwargs: kwargs
-    :return: final url for default endpoint
+    Args:
+        _url: Incoming URL dictionary (unused).
+        _domain: Incoming domain (unused).
+        _method: Incoming request method (unused).
+        **kwargs: Additional keyword arguments.
+
+    Returns:
+        str: Final url for default endpoint.
+
+    Raises:
+        ApiError: If the storage_url is not provided.
     """
     if "storage_url" in kwargs:
         return str(kwargs["storage_url"])

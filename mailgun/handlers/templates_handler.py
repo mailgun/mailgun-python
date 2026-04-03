@@ -7,9 +7,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from mailgun.handlers.error_handler import ApiError
 from mailgun.handlers.utils import build_path_from_keys
-
-from .error_handler import ApiError
 
 
 def handle_templates(
@@ -20,15 +19,17 @@ def handle_templates(
 ) -> str:
     """Handle Templates dynamically resolving V3 (Domain) or V4 (Account).
 
-    :param url: Incoming URL dictionary
-    :type url: dict
-    :param domain: Incoming domain
-    :type domain: str
-    :param _method: Incoming request method (but not used here)
-    :type _method: str
-    :param kwargs: kwargs
-    :return: final url for Templates endpoint
-    :raises: ApiError
+    Args:
+        url: Incoming URL dictionary.
+        domain: Incoming domain.
+        _method: Incoming request method (unused).
+        **kwargs: Additional keyword arguments.
+
+    Returns:
+        str: Final url for Templates endpoint.
+
+    Raises:
+        ApiError: If the versions option is invalid.
     """
     final_keys = build_path_from_keys(url.get("keys", []))
 
