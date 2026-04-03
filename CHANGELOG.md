@@ -6,6 +6,10 @@ We [keep a changelog.](http://keepachangelog.com/)
 
 ### Added
 
+- Explicit `__all__` declaration in `mailgun.client` to cleanly isolate the public API namespace.
+- A `__repr__` method to the `Client` class to improve developer experience (DX) during console debugging.
+- Security guardrail (CWE-319) in `Config` that logs a warning if a cleartext `http://` API URL is configured.
+- Python 3.14 support to the GitHub Actions test matrix.
 - Implemented Smart Logging (telemetry) in `Client` and `AsyncClient` to help users debug API requests, generated URLs, and server errors (`404`, `400`, `429`).
 - Added a new "Logging & Debugging" section to `README.md`.
 - Added `build_path_from_keys` utility in `mailgun.handlers.utils` to centralize and dry up URL path generation across handlers.
@@ -15,16 +19,34 @@ We [keep a changelog.](http://keepachangelog.com/)
 - Refactored the `Config` routing engine to use a deterministic, data-driven approach (`EXACT_ROUTES` and `PREFIX_ROUTES`) for better maintainability.
 - Improved dynamic API version resolution for domain endpoints to gracefully switch between `v1`, `v3`, and `v4` for nested resources, with a safe fallback to `v3`.
 - Secured internal configuration registries by wrapping them in `MappingProxyType` to prevent accidental mutations of the client state.
+- Broadened type hints for `files` (`Any | None`) and `timeout` (`int | float | tuple`) to fully support `requests`/`httpx` capabilities (like multipart lists) without triggering false positives in strict IDEs.
 - Modernized the codebase using modern Python idioms (e.g., `contextlib.suppress`) and resolved strict typing errors for `pyright`.
 - Updated Dependabot configuration to group minor and patch updates and limit open PRs.
+- Migrated the fragmented linting and formatting pipeline (Flake8, Black, Pylint, Pyupgrade, etc.) to a unified, high-performance `ruff` setup in `.pre-commit-config.yaml`.
+- Refactored `api_call` exception blocks to use the `else` clause for successful returns, adhering to strict Ruff (TRY300) standards.
+- Enabled pip dependency caching in GitHub Actions to drastically speed up CI workflows.
 
 ### Fixed
 
+- Fixed a silent data loss bug in `create()` where custom `headers` passed by the user were ignored instead of being merged into the request.
+- Fixed a kwargs collision bug in `update()` by using `.pop("headers")` instead of `.get()` to prevent passing duplicate keyword arguments to the underlying request.
+- Preserved original tracebacks (PEP 3134) by properly chaining `TimeoutError` and `ApiError` using `from e`.
+- Used safely truncating massive HTML error responses to 500 characters (preventing a log-flooding vulnerability (OWASP CWE-532)).
+- Replaced a fragile `try/except TypeError` status code check with robust `getattr` and `isinstance` validation to prevent masking unrelated exceptions.
 - Resolved `httpx` `DeprecationWarning` in `AsyncEndpoint` by properly routing serialized JSON string payloads to the `content` parameter instead of `data`.
 - Fixed a bug in `domains_handler` where intermediate path segments were sometimes dropped for nested resources like `/credentials` or `/ips`.
 - Fixed flaky integration tests failing with `429 Too Many Requests` and `403 Limits Exceeded` by adding proper eventual consistency delays and state teardowns.
 - Fixed DKIM key generation tests to use the `-traditional` OpenSSL flag, ensuring valid PKCS1 format compatibility.
 - Fixed DKIM selector test names to strictly comply with RFC 6376 formatting (replaced underscores with hyphens).
+
+### Pull Requests Merged
+
+- [PR_36](https://github.com/mailgun/mailgun-python/pull/36) - Improve client, update & fix tests
+- [PR_35](https://github.com/mailgun/mailgun-python/pull/35) - Removed \_prepare_files logic
+- [PR_34](https://github.com/mailgun/mailgun-python/pull/34) - Improve the Config class and routes
+- [PR_33](https://github.com/mailgun/mailgun-python/pull/32) - Refactored test framework
+- [PR_31](https://github.com/mailgun/mailgun-python/pull/31) - Add missing py.typed in module directory
+- [PR_30](https://github.com/mailgun/mailgun-python/pull/30) - build(deps): Bump conda-incubator/setup-miniconda from 3.2.0 to 3.3.0
 
 ## [1.6.0] - 2026-01-08
 
