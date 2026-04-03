@@ -62,6 +62,9 @@ class TestClient:
         with pytest.raises(KeyError, match="Invalid endpoint key: !!!"):
             _ = getattr(client, "!!!")
 
+    def test_client_repr(self) -> None:
+        client = Client(api_url="https://api.mailgun.net")
+        assert repr(client) == "<Client api_url='https://api.mailgun.net'>"
 
 class TestBaseEndpointBuildUrl:
     """Tests for BaseEndpoint url building logic."""
@@ -162,3 +165,30 @@ class TestEndpoint:
         with patch.object(requests, "put", return_value=MagicMock(status_code=200)) as m_put:
             ep.update(data={"name": "updated.com"})
             assert '{"name": "updated.com"}' in m_put.call_args[1]["data"]
+
+    def test_update_serializes_json_with_custom_headers(self) -> None:
+        url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
+        ep = Endpoint(url=url, headers={}, auth=None)
+        with patch.object(requests, "put", return_value=MagicMock(status_code=200)) as m_put:
+            ep.update(data={"key": "value"}, headers={"Content-Type": "application/json"})
+            m_put.assert_called_once()
+            assert m_put.call_args[1]["data"] == '{"key": "value"}'
+
+    @patch("mailgun.client.logger.error")
+    def test_api_call_truncates_long_error_response(self, mock_logger_error: MagicMock) -> None:
+        """Test that error responses longer than 500 characters are truncated in logs."""
+        url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
+        ep = Endpoint(url=url, headers={}, auth=None)
+
+        long_response_text = "A" * 600
+        mock_resp = MagicMock(status_code=500, text=long_response_text)
+        mock_resp.json.side_effect = ValueError("No JSON")
+
+        with patch.object(requests, "get", return_value=mock_resp):
+            ep.get()
+
+        mock_logger_error.assert_called_once()
+        # Verify the 4th argument (error_body) is truncated to 503 chars (500 + '...')
+        logged_text = mock_logger_error.call_args[0][4]
+        assert len(logged_text) == 503
+        assert logged_text.endswith("...")

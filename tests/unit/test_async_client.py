@@ -1,6 +1,6 @@
 """Unit tests for mailgun.client (AsyncClient, AsyncEndpoint)."""
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 from unittest.mock import MagicMock
 
 import httpx
@@ -81,6 +81,21 @@ class TestAsyncEndpoint:
         with pytest.raises(ApiError):
             await ep.get()
 
+    @pytest.mark.asyncio
+    async def test_update_serializes_json_with_custom_headers(self) -> None:
+        url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
+        mock_client = AsyncMock(spec=httpx.AsyncClient)
+        mock_client.request = AsyncMock(
+            return_value=MagicMock(status_code=200, spec=httpx.Response)
+        )
+        ep = AsyncEndpoint(url=url, headers={}, auth=None, client=mock_client)
+
+        await ep.update(data={"key": "value"}, headers={"Content-Type": "application/json"})
+
+        mock_client.request.assert_called_once()
+        # Для httpx перевіряємо аргумент "content", а не "data"
+        assert mock_client.request.call_args[1]["content"] == '{"key": "value"}'
+
 
 class TestAsyncClient:
     """Tests for AsyncClient."""
@@ -129,3 +144,25 @@ class TestAsyncClient:
         # After exit, client should be closed
         httpx_client = client._httpx_client
         assert httpx_client is None or httpx_client.is_closed
+
+    @pytest.mark.asyncio
+    @patch("mailgun.client.logger.error")
+    async def test_api_call_truncates_long_error_response(
+        self, mock_logger_error: MagicMock
+    ) -> None:
+        """Test async error responses longer than 500 characters are truncated."""
+        url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
+        mock_client = AsyncMock(spec=httpx.AsyncClient)
+
+        long_response_text = "A" * 600
+        mock_resp = MagicMock(status_code=500, text=long_response_text, spec=httpx.Response)
+        mock_resp.json.side_effect = ValueError("No JSON")
+        mock_client.request = AsyncMock(return_value=mock_resp)
+
+        ep = AsyncEndpoint(url=url, headers={}, auth=None, client=mock_client)
+        await ep.get()
+
+        mock_logger_error.assert_called_once()
+        logged_text = mock_logger_error.call_args[0][4]
+        assert len(logged_text) == 503
+        assert logged_text.endswith("...")

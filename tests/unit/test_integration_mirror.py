@@ -19,6 +19,9 @@ def mock_response(status_code: int = 200, json_data: dict | None = None) -> Magi
     resp = MagicMock()
     resp.status_code = status_code
     resp.json.return_value = json_data if json_data is not None else {}
+
+    resp.text = json.dumps(json_data) if json_data is not None else ""
+
     return resp
 
 

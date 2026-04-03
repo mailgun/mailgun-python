@@ -71,12 +71,24 @@ if TYPE_CHECKING:
     from requests.models import Response
 
 
+# Public API
+__all__ = [
+    "APIVersion",
+    "Config",
+    "BaseEndpoint",
+    "Endpoint",
+    "AsyncEndpoint",
+    "Client",
+    "AsyncClient",
+    "ApiError",
+]
+
 logger = logging.getLogger("mailgun.client")
 # Ensure logger doesn't stay silent if the user hasn't configured basicConfig
 if not logger.hasHandlers():
     logger.addHandler(logging.NullHandler())
 
-HANDLERS: dict[str, Callable] = {  # type: ignore[type-arg]
+HANDLERS: dict[str, Callable[..., str]] = {  # type: ignore[type-arg]
     "resendmessage": handle_resend_message,
     "domains": handle_domains,
     "domainlist": handle_domainlist,
@@ -187,6 +199,7 @@ class Config:
         self.ex_handler: bool = True
         base_url_input: str = api_url or self.DEFAULT_API_URL
         self.api_url: str = self._sanitize_url(base_url_input)
+        self._validate_api_url()
 
     @staticmethod
     def _sanitize_url(raw_url: str) -> str:
@@ -196,6 +209,15 @@ class Config:
         if not parsed.scheme:
             raw_url = f"https://{raw_url}"
         return raw_url.rstrip("/")
+
+    def _validate_api_url(self) -> None:
+        """DX Guardrail & CWE-319: Warn on cleartext HTTP transmission."""
+        parsed = urlparse(self.api_url)
+        if parsed.scheme == "http" and parsed.hostname not in ("localhost", "127.0.0.1"):
+            logger.warning(
+                "SECURITY WARNING: Cleartext HTTP transmission detected in API URL. "
+                "Use 'https://' to prevent CWE-319 vulnerabilities."
+            )
 
     @classmethod
     def _sanitize_key(cls, key: str) -> str:
@@ -322,7 +344,7 @@ class BaseEndpoint:
         domain: str | None = None,
         method: str | None = None,
         **kwargs: Any,
-    ) -> Any:
+    ) -> str:
         """Build final request url using predefined handlers.
 
         Note: Some urls are being built in Config class, as they can't be generated dynamically.
@@ -350,8 +372,8 @@ class Endpoint(BaseEndpoint):
         headers: dict[str, str],
         data: Any | None = None,
         filters: Mapping[str, str | Any] | None = None,
-        timeout: int = 60,
-        files: dict[str, bytes] | None = None,
+        timeout: int | float | tuple[float, float] = 60,
+        files: Any | None = None,
         domain: str | None = None,
         **kwargs: Any,
     ) -> Response | Any:
@@ -399,18 +421,20 @@ class Endpoint(BaseEndpoint):
                 stream=False,
             )
 
-            try:
-                is_error = response.status_code >= 400
-            except TypeError:
-                is_error = False
+            status_code = getattr(response, "status_code", 200)
+            is_error = isinstance(status_code, int) and status_code >= 400
 
             if is_error:
+                # Prevent showing huge HTML-pages in logging
+                raw_text = getattr(response, "text", "")
+                error_body = raw_text[:500] + "..." if len(raw_text) > 500 else raw_text
+
                 logger.error(
                     "API Error %s | %s %s | Response: %s",
-                    response.status_code,
+                    status_code,
                     method.upper(),
                     target_url,
-                    getattr(response, "text", ""),
+                    error_body,
                 )
             else:
                 logger.debug(
@@ -422,9 +446,9 @@ class Endpoint(BaseEndpoint):
 
             return response
 
-        except requests.exceptions.Timeout:
+        except requests.exceptions.Timeout as e:
             logger.error("Timeout Error: %s %s", method.upper(), target_url)
-            raise TimeoutError
+            raise TimeoutError from e
         except requests.RequestException as e:
             logger.critical("Request Exception: %s | URL: %s", e, target_url)
             raise ApiError(e) from e
@@ -462,7 +486,7 @@ class Endpoint(BaseEndpoint):
         filters: Mapping[str, str | Any] | None = None,
         domain: str | None = None,
         headers: Any = None,
-        files: dict[str, bytes] | None = None,
+        files: Any | None = None,
         **kwargs: Any,
     ) -> Response:
         """POST method for API calls.
@@ -476,7 +500,7 @@ class Endpoint(BaseEndpoint):
         :param headers: incoming headers
         :type headers: dict[str, str]
         :param files: incoming files
-        :type files: dict[str, Any] | None
+        :type files: Any | None = None,
         :param kwargs: kwargs
         :type kwargs: Any
         :return: api_call POST request
@@ -484,10 +508,10 @@ class Endpoint(BaseEndpoint):
         """
         req_headers = self.headers.copy()
 
-        is_json = "application/json" in (req_headers.get("Content-Type"), headers)
+        if headers and isinstance(headers, dict):
+            req_headers.update(headers)
 
-        if is_json:
-            req_headers["Content-Type"] = "application/json"
+        if req_headers.get("Content-Type") == "application/json":
             if data is not None and not isinstance(data, (str, bytes)):
                 data = json.dumps(data)
 
@@ -574,13 +598,20 @@ class Endpoint(BaseEndpoint):
         :return: api_call PUT request
         :rtype: requests.models.Response
         """
-        if self.headers.get("Content-Type") == "application/json":
-            data = json.dumps(data) if data is not None else None
+        custom_headers = kwargs.pop("headers", {})
+        req_headers = self.headers.copy()
+        if custom_headers and isinstance(custom_headers, dict):
+            req_headers.update(custom_headers)
+
+        if req_headers.get("Content-Type") == "application/json":
+            if data is not None and not isinstance(data, (str, bytes)):
+                data = json.dumps(data)
+
         return self.api_call(
             self._auth,
             "put",
             self._url,
-            headers=self.headers,
+            headers=req_headers,
             data=data,
             filters=filters,
             **kwargs,
@@ -635,6 +666,14 @@ class Client:
         url, headers = self.config[name]
         return Endpoint(url=url, headers=headers, auth=self.auth)
 
+    def __repr__(self) -> str:
+        """OWASP Secrets Management: Redact sensitive information from object representation.
+
+        Returns:
+            str: A redacted string representation of the Client instance.
+        """
+        return f"<{self.__class__.__name__} api_url={self.config.api_url!r}>"
+
 
 class AsyncEndpoint(BaseEndpoint):
     """Generate async request and return response using httpx."""
@@ -671,8 +710,8 @@ class AsyncEndpoint(BaseEndpoint):
         headers: dict[str, str],
         data: Any | None = None,
         filters: Mapping[str, str | Any] | None = None,
-        timeout: int = 60,
-        files: dict[str, bytes] | None = None,
+        timeout: int | float | tuple[float, float] = 60,
+        files: Any | None = None,
         domain: str | None = None,
         **kwargs: Any,
     ) -> HttpxResponse:
@@ -715,7 +754,7 @@ class AsyncEndpoint(BaseEndpoint):
             "timeout": timeout,
         }
 
-        # For httpx
+        # Deprecation Warning for httpx
         if isinstance(data, (str, bytes)):
             request_kwargs["content"] = data
         else:
@@ -726,18 +765,20 @@ class AsyncEndpoint(BaseEndpoint):
         try:
             response = await self._client.request(**request_kwargs)
 
-            try:
-                is_error = response.status_code >= 400
-            except TypeError:
-                is_error = False
+            status_code = getattr(response, "status_code", 200)
+            is_error = isinstance(status_code, int) and status_code >= 400
 
             if is_error:
+                # Prevent showing huge HTML-pages in logging
+                raw_text = getattr(response, "text", "")
+                error_body = raw_text[:500] + "..." if len(raw_text) > 500 else raw_text
+
                 logger.error(
                     "API Error %s | %s %s | Response: %s",
-                    response.status_code,
+                    status_code,
                     method.upper(),
                     target_url,
-                    getattr(response, "text", ""),
+                    error_body,
                 )
             else:
                 logger.debug(
@@ -749,14 +790,12 @@ class AsyncEndpoint(BaseEndpoint):
 
             return response
 
-        except httpx.TimeoutException:
+        except httpx.TimeoutException as e:
             logger.error("Timeout Error: %s %s", method.upper(), target_url)
-            raise TimeoutError
+            raise TimeoutError from e
         except httpx.RequestError as e:
             logger.critical("Request Exception: %s | URL: %s", e, target_url)
-            raise ApiError(e)
-        except Exception as e:
-            raise e
+            raise ApiError(e) from e
 
     async def get(
         self,
@@ -791,7 +830,7 @@ class AsyncEndpoint(BaseEndpoint):
         filters: Mapping[str, str | Any] | None = None,
         domain: str | None = None,
         headers: Any = None,
-        files: dict[str, bytes] | None = None,
+        files: Any | None = None,
         **kwargs: Any,
     ) -> httpx.Response:
         """POST method for async API calls.
@@ -805,7 +844,7 @@ class AsyncEndpoint(BaseEndpoint):
         :param headers: incoming headers
         :type headers: dict[str, str]
         :param files: incoming files
-        :type files: dict[str, Any] | None
+        :type files: Any | None = None,
         :param kwargs: kwargs
         :type kwargs: Any
         :return: api_call POST request
@@ -813,10 +852,10 @@ class AsyncEndpoint(BaseEndpoint):
         """
         req_headers = self.headers.copy()
 
-        is_json = "application/json" in (req_headers.get("Content-Type"), headers)
+        if headers and isinstance(headers, dict):
+            req_headers.update(headers)
 
-        if is_json:
-            req_headers["Content-Type"] = "application/json"
+        if req_headers.get("Content-Type") == "application/json":
             if data is not None and not isinstance(data, (str, bytes)):
                 data = json.dumps(data)
 
@@ -903,13 +942,20 @@ class AsyncEndpoint(BaseEndpoint):
         :return: api_call PUT request
         :rtype: httpx.Response
         """
-        if self.headers.get("Content-Type") == "application/json":
-            data = json.dumps(data)
+        custom_headers = kwargs.pop("headers", {})
+        req_headers = self.headers.copy()
+        if custom_headers and isinstance(custom_headers, dict):
+            req_headers.update(custom_headers)
+
+        if req_headers.get("Content-Type") == "application/json":
+            if data is not None and not isinstance(data, (str, bytes)):
+                data = json.dumps(data)
+
         return await self.api_call(
             self._auth,
             "put",
             self._url,
-            headers=self.headers,
+            headers=req_headers,
             data=data,
             filters=filters,
             **kwargs,

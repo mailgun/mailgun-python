@@ -1,6 +1,7 @@
 """Unit tests for mailgun.client.Config."""
 
 import pytest
+from unittest.mock import MagicMock, patch
 
 from mailgun.client import Config
 
@@ -156,3 +157,19 @@ class TestConfig:
         """Test that unknown domain routes fallback to V3 (Safety Fallback)."""
         res = Config()._resolve_domains_route(["domains", "unknown_new_feature"])
         assert "v3/domains" in res["base"]
+
+    @patch("mailgun.client.logger.warning")
+    def test_validate_api_url_warns_on_http(self, mock_warn: MagicMock) -> None:
+        Config(api_url="http://insecure.net")
+        mock_warn.assert_called_once()
+        assert "Cleartext HTTP transmission detected" in mock_warn.call_args[0][0]
+
+    @patch("mailgun.client.logger.warning")
+    def test_validate_api_url_no_warning_on_https(self, mock_warn: MagicMock) -> None:
+        Config(api_url="https://secure.net")
+        mock_warn.assert_not_called()
+
+    @patch("mailgun.client.logger.warning")
+    def test_validate_api_url_no_warning_on_localhost(self, mock_warn: MagicMock) -> None:
+        Config(api_url="http://localhost:8000")
+        mock_warn.assert_not_called()
