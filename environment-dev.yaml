@@ -43,7 +43,7 @@ dependencies:
   - yapf
   # other
   - conda
-  - conda-build
+  #- conda-build
   - jsonschema
   - pre-commit
   - python-dotenv >=0.19.2
