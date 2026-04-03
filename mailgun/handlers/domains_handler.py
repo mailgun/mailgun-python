@@ -19,14 +19,13 @@ def handle_domainlist(
 ) -> str:
     """Handle a list of domains.
 
-    :param url: Incoming URL dictionary
-    :type url: dict
-    :param _domain: Incoming domain (it's not being used for this handler)
-    :type _domain: str
-    :param _method: Incoming request method (it's not being used for this handler)
-    :type _method: str
-    :param _: kwargs
-    :return: final url for domainlist endpoint
+    Args:
+        url: Incoming URL dictionary.
+        _domain: Incoming domain (unused).
+        _method: Incoming request method (unused).
+
+    Returns:
+        str: Final url for domainlist endpoint.
     """
     # Ensure base ends with slash before appending
     return url["base"].rstrip("/") + "/domains"
@@ -35,20 +34,22 @@ def handle_domainlist(
 def handle_domains(
     url: dict[str, Any],
     domain: str | None,
-    method: str | None,
+    _method: str | None,
     **kwargs: Any,
 ) -> str:
     """Handle a domain endpoint.
 
-    :param url: Incoming URL dictionary
-    :type url: dict
-    :param domain: Incoming domain
-    :type domain: str
-    :param method: Incoming request method
-    :type method: str
-    :param kwargs: kwargs
-    :return: final url for domain endpoint
-    :raises: ApiError
+    Args:
+        url: Incoming URL dictionary.
+        domain: Incoming domain.
+        _method: Incoming request method.
+        **kwargs: Additional keyword arguments.
+
+    Returns:
+        str: Final url for domain endpoint.
+
+    Raises:
+        ApiError: If the domain is missing or verify option is invalid.
     """
     keys = list(url["keys"])
     if "domains" in keys:
@@ -92,9 +93,13 @@ def handle_sending_queues(
     url: dict[str, Any],
     domain: str | None,
     _method: str | None,
-    **kwargs: Any,
+    **_kwargs: Any,
 ) -> str:
-    """Handle sending queues endpoint URL construction."""
+    """Handle sending queues endpoint URL construction.
+
+    Returns:
+        str: Final url for sending queues endpoint.
+    """
     keys = url["keys"]
     if "sending_queues" in keys or "sendingqueues" in keys:
         base_clean = str(url["base"]).replace("domains/", "").replace("domains", "").rstrip("/")
@@ -110,14 +115,17 @@ def handle_mailboxes_credentials(
 ) -> str:
     """Handle Mailboxes credentials.
 
-    :param url: Incoming URL dictionary
-    :type url: dict
-    :param domain: Incoming domain
-    :type domain: str
-    :param _method: Incoming request method (it's not being used for this handler)
-    :type _method: str
-    :param kwargs: kwargs
-    :return: final url for Mailboxes credentials endpoint
+    Args:
+        url: Incoming URL dictionary.
+        domain: Incoming domain.
+        _method: Incoming request method (unused).
+        **kwargs: Additional keyword arguments.
+
+    Returns:
+        str: Final url for Mailboxes credentials endpoint.
+
+    Raises:
+        ApiError: If the domain is missing.
     """
     keys = list(url["keys"])
     if "domains" in keys:
@@ -141,18 +149,17 @@ def handle_dkimkeys(
     url: dict[str, Any],
     _domain: str | None,
     _method: str | None,
-    **kwargs: Any,
+    **_kwargs: Any,
 ) -> str:
-    """Handle Mailboxes credentials.
+    """Handle DKIM keys.
 
-    :param url: Incoming URL dictionary
-    :type url: dict
-    :param domain: Incoming domain
-    :type domain: str
-    :param _method: Incoming request method (it's not being used for this handler)
-    :type _method: str
-    :param kwargs: kwargs
-    :return: final url for Mailboxes credentials endpoint
+    Args:
+        url: Incoming URL dictionary.
+        _domain: Incoming domain (unused).
+        _method: Incoming request method (unused).
+
+    Returns:
+        str: Final url for DKIM keys endpoint.
     """
     final_keys = build_path_from_keys(url.get("keys", []))
     base_url = str(url["base"]).rstrip("/")
