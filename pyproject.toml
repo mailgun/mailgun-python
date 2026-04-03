@@ -224,9 +224,9 @@ lint.ignore = [
   "B904",   # Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None`
   # TODO: Enable C901, TRY201, TRY003, EM101, PTH118, PLR0917 later
   "C901",
-    # COM812 conflicts with the formatter
-    "COM812",
-    # pycodestyle (E, W)
+  # COM812 conflicts with the formatter
+  "COM812",
+  # pycodestyle (E, W)
   "CPY001", # Missing copyright notice at top of file
   "DOC201", # DOC201 `return` is not documented in docstring
   # TODO: Enable DOC501 when the upstream issue is fixed, see https://github.com/astral-sh/ruff/issues/12520

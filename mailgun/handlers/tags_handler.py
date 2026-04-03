@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 from urllib.parse import quote
+
 from mailgun.handlers.utils import build_path_from_keys
 
 
@@ -37,7 +38,6 @@ def handle_tags(
         if "stats" in final_keys:
             final_keys_stats = "/" + "/".join(keys_without_tags) if keys_without_tags else ""
             return f"{base}tags/{quote(kwargs['tag_name'])}{final_keys_stats}"
-        else:
-            return f"{result_url}/{quote(kwargs['tag_name'])}"
+        return f"{result_url}/{quote(kwargs['tag_name'])}"
 
     return result_url

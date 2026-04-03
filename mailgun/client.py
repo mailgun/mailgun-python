@@ -23,13 +23,14 @@ from enum import Enum
 from functools import lru_cache
 from types import MappingProxyType
 from typing import TYPE_CHECKING
+from typing import Any
+from typing import Final
 from urllib.parse import urlparse
-
-from typing import Any, Final
 
 import httpx
 import requests
 
+from mailgun import routes
 from mailgun.handlers.bounce_classification_handler import handle_bounce_classification
 from mailgun.handlers.default_handler import handle_default
 from mailgun.handlers.domains_handler import handle_dkimkeys
@@ -54,7 +55,7 @@ from mailgun.handlers.suppressions_handler import handle_whitelists
 from mailgun.handlers.tags_handler import handle_tags
 from mailgun.handlers.templates_handler import handle_templates
 from mailgun.handlers.users_handler import handle_users
-from mailgun import routes
+
 
 if sys.version_info >= (3, 11):
     from typing import Self
@@ -74,19 +75,23 @@ if TYPE_CHECKING:
 # Public API
 __all__ = [
     "APIVersion",
-    "Config",
-    "BaseEndpoint",
-    "Endpoint",
-    "AsyncEndpoint",
-    "Client",
-    "AsyncClient",
     "ApiError",
+    "AsyncClient",
+    "AsyncEndpoint",
+    "BaseEndpoint",
+    "Client",
+    "Config",
+    "Endpoint",
 ]
 
 logger = logging.getLogger("mailgun.client")
 # Ensure logger doesn't stay silent if the user hasn't configured basicConfig
 if not logger.hasHandlers():
     logger.addHandler(logging.NullHandler())
+
+# Constants for API error handling and logging (fixes Ruff PLR2004)
+_HTTP_ERROR_THRESHOLD: Final[int] = 400
+_MAX_LOG_LENGTH: Final[int] = 500
 
 HANDLERS: dict[str, Callable[..., str]] = {  # type: ignore[type-arg]
     "resendmessage": handle_resend_message,
@@ -133,8 +138,7 @@ class APIVersion(str, Enum):
 # Static data is accessed directly from the routes module or class constants.
 @lru_cache
 def _get_cached_route_data(clean_key: str) -> dict[str, Any]:
-    """
-    Apply internal cached routing logic.
+    """Apply internal cached routing logic.
 
     Uses only hashable types (str) as arguments to avoid TypeError.
     """
@@ -213,7 +217,7 @@ class Config:
     def _validate_api_url(self) -> None:
         """DX Guardrail & CWE-319: Warn on cleartext HTTP transmission."""
         parsed = urlparse(self.api_url)
-        if parsed.scheme == "http" and parsed.hostname not in ("localhost", "127.0.0.1"):
+        if parsed.scheme == "http" and parsed.hostname not in {"localhost", "127.0.0.1"}:
             logger.warning(
                 "SECURITY WARNING: Cleartext HTTP transmission detected in API URL. "
                 "Use 'https://' to prevent CWE-319 vulnerabilities."
@@ -226,7 +230,8 @@ class Config:
         if not cls._SAFE_KEY_PATTERN.fullmatch(clean_key):
             clean_key = re.sub(r"[^a-z0-9_]", "", clean_key)
         if not clean_key:
-            raise KeyError(f"Invalid endpoint key: {key}")
+            msg = f"Invalid endpoint key: {key}"
+            raise KeyError(msg)
         return clean_key
 
     def _build_base_url(self, version: APIVersion | str, suffix: str = "") -> str:
@@ -241,8 +246,7 @@ class Config:
         return f"{base}/"
 
     def _resolve_domains_route(self, route_parts: list[str]) -> dict[str, Any]:
-        """
-        Handle context-aware versioning for domain-related endpoints.
+        """Handle context-aware versioning for domain-related endpoints.
 
         Returns a dict containing a string base and a tuple of keys.
         """
@@ -283,8 +287,7 @@ class Config:
         }
 
     def __getitem__(self, key: str) -> tuple[dict[str, Any], dict[str, str]]:
-        """
-        Public entry point.
+        """Public entry point.
 
         Calls a standalone cached function.
         """
@@ -372,7 +375,7 @@ class Endpoint(BaseEndpoint):
         headers: dict[str, str],
         data: Any | None = None,
         filters: Mapping[str, str | Any] | None = None,
-        timeout: int | float | tuple[float, float] = 60,
+        timeout: float | tuple[float, float] = 60,
         files: Any | None = None,
         domain: str | None = None,
         **kwargs: Any,
@@ -422,12 +425,15 @@ class Endpoint(BaseEndpoint):
             )
 
             status_code = getattr(response, "status_code", 200)
-            is_error = isinstance(status_code, int) and status_code >= 400
-
+            is_error = isinstance(status_code, int) and status_code >= _HTTP_ERROR_THRESHOLD
             if is_error:
                 # Prevent showing huge HTML-pages in logging
                 raw_text = getattr(response, "text", "")
-                error_body = raw_text[:500] + "..." if len(raw_text) > 500 else raw_text
+                error_body = (
+                    raw_text[:_MAX_LOG_LENGTH] + "..."
+                    if len(raw_text) > _MAX_LOG_LENGTH
+                    else raw_text
+                )
 
                 logger.error(
                     "API Error %s | %s %s | Response: %s",
@@ -444,14 +450,14 @@ class Endpoint(BaseEndpoint):
                     target_url,
                 )
 
-            return response
-
         except requests.exceptions.Timeout as e:
-            logger.error("Timeout Error: %s %s", method.upper(), target_url)
+            logger.exception("Timeout Error: %s %s", method.upper(), target_url)
             raise TimeoutError from e
         except requests.RequestException as e:
             logger.critical("Request Exception: %s | URL: %s", e, target_url)
             raise ApiError(e) from e
+        else:
+            return response
 
     def get(
         self,
@@ -511,9 +517,12 @@ class Endpoint(BaseEndpoint):
         if headers and isinstance(headers, dict):
             req_headers.update(headers)
 
-        if req_headers.get("Content-Type") == "application/json":
-            if data is not None and not isinstance(data, (str, bytes)):
-                data = json.dumps(data)
+        if (
+            req_headers.get("Content-Type") == "application/json"
+            and data is not None
+            and not isinstance(data, (str, bytes))
+        ):
+            data = json.dumps(data)
 
         return self.api_call(
             self._auth,
@@ -603,9 +612,12 @@ class Endpoint(BaseEndpoint):
         if custom_headers and isinstance(custom_headers, dict):
             req_headers.update(custom_headers)
 
-        if req_headers.get("Content-Type") == "application/json":
-            if data is not None and not isinstance(data, (str, bytes)):
-                data = json.dumps(data)
+        if (
+            req_headers.get("Content-Type") == "application/json"
+            and data is not None
+            and not isinstance(data, (str, bytes))
+        ):
+            data = json.dumps(data)
 
         return self.api_call(
             self._auth,
@@ -710,7 +722,7 @@ class AsyncEndpoint(BaseEndpoint):
         headers: dict[str, str],
         data: Any | None = None,
         filters: Mapping[str, str | Any] | None = None,
-        timeout: int | float | tuple[float, float] = 60,
+        timeout: float | tuple[float, float] = 60,
         files: Any | None = None,
         domain: str | None = None,
         **kwargs: Any,
@@ -766,12 +778,16 @@ class AsyncEndpoint(BaseEndpoint):
             response = await self._client.request(**request_kwargs)
 
             status_code = getattr(response, "status_code", 200)
-            is_error = isinstance(status_code, int) and status_code >= 400
+            is_error = isinstance(status_code, int) and status_code >= _HTTP_ERROR_THRESHOLD
 
             if is_error:
                 # Prevent showing huge HTML-pages in logging
                 raw_text = getattr(response, "text", "")
-                error_body = raw_text[:500] + "..." if len(raw_text) > 500 else raw_text
+                error_body = (
+                    raw_text[:_MAX_LOG_LENGTH] + "..."
+                    if len(raw_text) > _MAX_LOG_LENGTH
+                    else raw_text
+                )
 
                 logger.error(
                     "API Error %s | %s %s | Response: %s",
@@ -788,14 +804,14 @@ class AsyncEndpoint(BaseEndpoint):
                     target_url,
                 )
 
-            return response
-
         except httpx.TimeoutException as e:
-            logger.error("Timeout Error: %s %s", method.upper(), target_url)
+            logger.exception("Timeout Error: %s %s", method.upper(), target_url)
             raise TimeoutError from e
         except httpx.RequestError as e:
             logger.critical("Request Exception: %s | URL: %s", e, target_url)
             raise ApiError(e) from e
+        else:
+            return response
 
     async def get(
         self,
@@ -855,9 +871,12 @@ class AsyncEndpoint(BaseEndpoint):
         if headers and isinstance(headers, dict):
             req_headers.update(headers)
 
-        if req_headers.get("Content-Type") == "application/json":
-            if data is not None and not isinstance(data, (str, bytes)):
-                data = json.dumps(data)
+        if (
+            req_headers.get("Content-Type") == "application/json"
+            and data is not None
+            and not isinstance(data, (str, bytes))
+        ):
+            data = json.dumps(data)
 
         return await self.api_call(
             self._auth,
@@ -947,9 +966,12 @@ class AsyncEndpoint(BaseEndpoint):
         if custom_headers and isinstance(custom_headers, dict):
             req_headers.update(custom_headers)
 
-        if req_headers.get("Content-Type") == "application/json":
-            if data is not None and not isinstance(data, (str, bytes)):
-                data = json.dumps(data)
+        if (
+            req_headers.get("Content-Type") == "application/json"
+            and data is not None
+            and not isinstance(data, (str, bytes))
+        ):
+            data = json.dumps(data)
 
         return await self.api_call(
             self._auth,

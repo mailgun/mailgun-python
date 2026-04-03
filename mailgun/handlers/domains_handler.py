@@ -63,7 +63,7 @@ def handle_domains(
         return base_url
 
     # Hierarchical construction: [domain] + [remaining keys from Config]
-    path_segments = [target_domain] + keys
+    path_segments = [target_domain, *keys]
     domain_path = "/".join(path_segments)
 
     # Specific terminal logic for special arguments
@@ -129,7 +129,7 @@ def handle_mailboxes_credentials(
     if not target_domain:
         raise ApiError("Domain is missing!")
 
-    path_segments = [target_domain] + keys
+    path_segments = [target_domain, *keys]
     constructed_url = f"{base_url}/{'/'.join(path_segments)}"
 
     if "login" in kwargs:

@@ -31,7 +31,7 @@ def handle_lists(
     base = url["base"][:-1]
     if "validate" in kwargs:
         return f"{base}{final_keys}/{kwargs['address']}/validate"
-    elif "multiple" in kwargs and "address" in kwargs:
+    if "multiple" in kwargs and "address" in kwargs:
         if kwargs["multiple"]:
             return f"{base}/lists/{kwargs['address']}/members.json"
     elif "members" in final_keys and "address" in kwargs:

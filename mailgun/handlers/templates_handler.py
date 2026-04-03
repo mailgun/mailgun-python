@@ -7,8 +7,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from .error_handler import ApiError
 from mailgun.handlers.utils import build_path_from_keys
+
+from .error_handler import ApiError
 
 
 def handle_templates(
