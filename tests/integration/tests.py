@@ -59,6 +59,28 @@ class MessagesTests(unittest.TestCase):
         req = self.client.messages.create(data={"from": "sdsdsd"}, domain=self.domain)
         self.assertEqual(req.status_code, 400)
 
+    def test_messages_support_advanced_tags_in_testmode(self) -> None:
+        """Integration test proving the API accepts advanced tags without error."""
+        # We merge our base data with the advanced tags
+        advanced_data = self.data.copy()
+        advanced_data.update({
+            "o:deliverytime-optimize-period": "24h",
+            "o:tag": ["integration-test", "python-sdk"],
+            "v:test-variable": "custom_value",
+            "o:testmode": "yes"  # CRITICAL: Ensures the email is NOT actually sent
+        })
+
+        req = self.client.messages.create(
+            domain=self.domain,
+            data=advanced_data
+        )
+
+        self.assertEqual(req.status_code, 200)
+
+        json_response = req.json()
+        self.assertIn("id", json_response)
+        self.assertEqual(json_response.get("message"), "Queued. Thank you.")
+
 
 class DomainTests(unittest.TestCase):
     """Tests for Mailgun Domain API.
@@ -2829,6 +2851,30 @@ class AsyncMessagesTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("id", req.json())
         self.assertIn("Queued", req.json()["message"])
+
+    @pytest.mark.asyncio
+    async def test_async_messages_support_advanced_tags_in_testmode(self) -> None:
+        """Async integration test proving the API accepts advanced tags without error."""
+        # Merge our base data with the advanced Mailgun tags
+        advanced_data = self.data.copy()
+        advanced_data.update({
+            "o:deliverytime-optimize-period": "24h",
+            "o:tag": ["async-integration-test", "httpx-sdk"],
+            "v:test-variable": "custom_async_value",
+            "o:testmode": "yes"  # CRITICAL: Ensures the email is NOT actually sent
+        })
+
+        # Execute the request asynchronously
+        req = await self.client.messages.create(
+            domain=self.domain,
+            data=advanced_data
+        )
+
+        self.assertEqual(req.status_code, 200)
+
+        json_response = req.json()
+        self.assertIn("id", json_response)
+        self.assertEqual(json_response.get("message"), "Queued. Thank you.")
 
 
 class AsyncDomainTests(unittest.IsolatedAsyncioTestCase):

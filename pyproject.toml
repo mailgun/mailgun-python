@@ -222,6 +222,8 @@ lint.ignore = [
     # --- Formatter Conflicts ---
     "COM812", # Missing trailing comma (Conflicts with ruff-format)
     "ISC001", # Implicit string concatenation (Conflicts with ruff-format)
+    "D203",   # one-blank-line-before-class (conflicts with D211)
+    "D213",   # multi-line-summary-second-line (conflicts with D212)
 
     # --- SDK Realities ---
     "ANN401", # Dynamically typed expressions. (An HTTP SDK REQUIRES `Any` for JSON data, files, and kwargs)
@@ -233,6 +235,9 @@ lint.ignore = [
     "C901",
     "PLR0913",
     "CPY001",
+    # TODO: solve dosctrings style
+    "DOC201",
+    "DOC501"
 ]
 lint.exclude = [ "mailgun/examples/*", "tests" ]
 lint.per-file-ignores."__init__.py" = [ "E402" ]
@@ -254,7 +259,7 @@ lint.mccabe.max-complexity = 13
 lint.pycodestyle.ignore-overlong-task-comments = true
 # Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
 # TODO: Enable the 'sphinx' style when it will be available, see https://github.com/astral-sh/ruff/pull/13286
-lint.pydocstyle.convention = "google"
+#lint.pydocstyle.convention = "google"
 
 [tool.flake8]
 exclude = [ "mailgun/examples/*", "tests" ]

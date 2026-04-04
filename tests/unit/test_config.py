@@ -173,3 +173,16 @@ class TestConfig:
     def test_validate_api_url_no_warning_on_localhost(self, mock_warn: MagicMock) -> None:
         Config(api_url="http://localhost:8000")
         mock_warn.assert_not_called()
+
+    def test_available_endpoints_property(self) -> None:
+        """Test that available_endpoints returns a combined set of all valid routes."""
+        from mailgun.client import Config
+
+        config = Config()
+        endpoints = config.available_endpoints
+
+        assert isinstance(endpoints, set)
+        assert "messages" in endpoints
+        assert "bounces" in endpoints
+        assert "domainlist" in endpoints
+        assert "dkim_keys" in endpoints

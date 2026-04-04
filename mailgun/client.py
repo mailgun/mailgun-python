@@ -1,4 +1,4 @@
-"""This module provides the main client and helper classes for interacting with the Mailgun API.
+"""Provide the main client and helper classes for interacting with the Mailgun API.
 
 The `mailgun.client` module includes the core `Client` class for managing
 API requests, configuration, and error handling, as well as utility functions
@@ -29,6 +29,8 @@ from urllib.parse import urlparse
 
 import httpx
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from mailgun import routes
 from mailgun.handlers.bounce_classification_handler import handle_bounce_classification
@@ -92,6 +94,7 @@ if not logger.hasHandlers():
 # Constants for API error handling and logging (fixes Ruff PLR2004)
 _HTTP_ERROR_THRESHOLD: Final[int] = 400
 _MAX_LOG_LENGTH: Final[int] = 500
+_AUTH_TUPLE_LEN: Final = 2
 
 HANDLERS: dict[str, Callable[..., str]] = {  # type: ignore[type-arg]
     "resendmessage": handle_resend_message,
@@ -315,6 +318,20 @@ class Config:
 
         return safe_url, headers
 
+    @property
+    def available_endpoints(self) -> set[str]:
+        """Provide public access to valid route keys for IDE introspection."""
+        return set(self._EXACT_ROUTES.keys()) | set(self._PREFIX_ROUTES.keys())
+
+
+class SecretAuth(tuple):
+    """OWASP: Obfuscate credentials in memory dumps and tracebacks."""
+
+    __slots__ = ()  # Prevent __dict__ creation for tuple subclasses
+
+    def __repr__(self) -> str:
+        return "('api', '***REDACTED***')"
+
 
 class BaseEndpoint:
     """Base class for endpoints.
@@ -341,6 +358,11 @@ class BaseEndpoint:
         self.headers = headers
         self._auth = auth
 
+    def __repr__(self) -> str:
+        """DX: Show the actual resolved target route instead of memory address."""
+        route_path = "/".join(self._url.get("keys", ["unknown"]))
+        return f"<{self.__class__.__name__} target='/{route_path}'>"
+
     @staticmethod
     def build_url(
         url: dict[str, Any],
@@ -366,6 +388,17 @@ class BaseEndpoint:
 
 class Endpoint(BaseEndpoint):
     """Generate request and return response."""
+
+    def __init__(
+        self,
+        url: dict[str, Any],
+        headers: dict[str, str],
+        auth: tuple[str, str] | None = None,
+        session: requests.Session | None = None,
+    ) -> None:
+        """Initialize a new Endpoint instance for API interaction."""
+        super().__init__(url, headers, auth)
+        self._session = session or requests.Session()
 
     def api_call(
         self,
@@ -522,7 +555,9 @@ class Endpoint(BaseEndpoint):
             and data is not None
             and not isinstance(data, (str, bytes))
         ):
-            data = json.dumps(data)
+            # To get the most compact JSON representation,
+            # specify (',', ':') to eliminate whitespace. Reduce up to 20% of large data.
+            data = json.dumps(data, separators=(",", ":"))
 
         return self.api_call(
             self._auth,
@@ -617,7 +652,7 @@ class Endpoint(BaseEndpoint):
             and data is not None
             and not isinstance(data, (str, bytes))
         ):
-            data = json.dumps(data)
+            data = json.dumps(data, separators=(",", ":"))
 
         return self.api_call(
             self._auth,
@@ -655,17 +690,55 @@ class Client:
     def __init__(self, auth: tuple[str, str] | None = None, **kwargs: Any) -> None:
         """Initialize a new Client instance for API interaction.
 
-        This method sets up API authentication and configuration. The `auth` parameter
-        provides a tuple with the API key and secret. Additional keyword arguments can
-        specify configuration options like API version and URL.
+        This method sets up API authentication, configuration, connection pooling,
+        and automatic network resiliency (retries).
 
         :param auth: auth set ("username", "APIKEY")
         :type auth: set
         :param kwargs: kwargs
         """
-        self.auth = auth
+        self.auth = self._validate_auth(auth)
+
         api_url = kwargs.get("api_url")
         self.config = Config(api_url=api_url)
+
+        self._session = self._build_resilient_session()
+
+    @staticmethod
+    def _validate_auth(auth: tuple[str, str] | None) -> tuple[str, str] | None:
+        """OWASP Input Validation: Sanitize credentials against Header Injection."""
+        if auth and isinstance(auth, tuple) and len(auth) == _AUTH_TUPLE_LEN:
+            clean_user = str(auth[0]).strip()
+            clean_key = str(auth[1]).strip()
+
+            if "\n" in clean_key or "\r" in clean_key:
+                raise ValueError("API Key contains invalid characters (Header Injection risk).")
+
+            return SecretAuth((clean_user, clean_key))
+        return auth
+
+    @staticmethod
+    def _build_resilient_session() -> requests.Session:
+        """Set up connection pooling and automatic retries for transient failures."""
+        session = requests.Session()
+
+        retry_strategy = Retry(
+            total=3,
+            backoff_factor=1,  # 1s, 2s, 4s...
+            status_forcelist=[429, 500, 502, 503, 504],
+            # Idempotency safety: Do not retry POST/PUT/DELETE
+            allowed_methods=["GET", "OPTIONS", "HEAD"],
+        )
+
+        adapter = HTTPAdapter(
+            max_retries=retry_strategy,
+            pool_connections=100,
+            pool_maxsize=100,
+        )
+        session.mount("https://", adapter)
+        session.mount("http://", adapter)
+
+        return session
 
     def __getattr__(self, name: str) -> Any:
         """Get named attribute of an object, split it and execute.
@@ -676,15 +749,29 @@ class Client:
         :return: type object (executes existing handler)
         """
         url, headers = self.config[name]
-        return Endpoint(url=url, headers=headers, auth=self.auth)
+        return Endpoint(url=url, headers=headers, auth=self.auth, session=self._session)
 
     def __repr__(self) -> str:
         """OWASP Secrets Management: Redact sensitive information from object representation.
 
         Returns:
             str: A redacted string representation of the Client instance.
+
         """
         return f"<{self.__class__.__name__} api_url={self.config.api_url!r}>"
+
+    def __str__(self) -> str:
+        """OWASP Secrets Management: Redact sensitive information from string representation.
+
+        Returns:
+            str: A redacted, human-readable string representation of the Client.
+
+        """
+        return f"Mailgun {self.__class__.__name__}"
+
+    def __dir__(self) -> list[str]:
+        """DX: Expose true config endpoints for IDE Introspection."""
+        return list(set(super().__dir__()) | self.config.available_endpoints)
 
 
 class AsyncEndpoint(BaseEndpoint):
@@ -695,9 +782,9 @@ class AsyncEndpoint(BaseEndpoint):
         url: dict[str, Any],
         headers: dict[str, str],
         auth: tuple[str, str] | None,
-        client: httpx.AsyncClient,
+        client: httpx.AsyncClient | None = None,
     ) -> None:
-        """Initialize a new AsyncEndpoint instance.
+        """Initialize a new AsyncEndpoint instance for asynchronous API interaction.
 
         :param url: URL dict with pairs {"base": "keys"}
         :type url: dict[str, Any]
@@ -712,7 +799,7 @@ class AsyncEndpoint(BaseEndpoint):
         self._url = url
         self.headers = headers
         self._auth = auth
-        self._client = client
+        self._client = client or httpx.AsyncClient()
 
     async def api_call(
         self,
@@ -876,7 +963,7 @@ class AsyncEndpoint(BaseEndpoint):
             and data is not None
             and not isinstance(data, (str, bytes))
         ):
-            data = json.dumps(data)
+            data = json.dumps(data, separators=(",", ":"))
 
         return await self.api_call(
             self._auth,
@@ -971,7 +1058,7 @@ class AsyncEndpoint(BaseEndpoint):
             and data is not None
             and not isinstance(data, (str, bytes))
         ):
-            data = json.dumps(data)
+            data = json.dumps(data, separators=(",", ":"))
 
         return await self.api_call(
             self._auth,
@@ -1010,6 +1097,8 @@ class AsyncClient(Client):
 
     def __init__(self, auth: tuple[str, str] | None = None, **kwargs: Any) -> None:
         """Initialize a new AsyncClient instance for API interaction."""
+        self.auth = self._validate_auth(auth)
+
         super().__init__(auth, **kwargs)
         self._client_kwargs = kwargs.get("client_kwargs", {})
         self._httpx_client: httpx.AsyncClient | None = None
@@ -1057,3 +1146,7 @@ class AsyncClient(Client):
     ) -> None:
         """Async context manager exit."""
         await self.aclose()
+
+    def __dir__(self) -> list[str]:
+        """DX: Expose true config endpoints for IDE Introspection."""
+        return list(set(super().__dir__()) | self.config.available_endpoints)

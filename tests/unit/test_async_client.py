@@ -94,7 +94,36 @@ class TestAsyncEndpoint:
 
         mock_client.request.assert_called_once()
         # Для httpx перевіряємо аргумент "content", а не "data"
-        assert mock_client.request.call_args[1]["content"] == '{"key": "value"}'
+        assert mock_client.request.call_args[1]["content"] == '{"key":"value"}'
+
+    @pytest.mark.asyncio
+    async def test_async_endpoint_payload_is_strictly_minified(self) -> None:
+        """Prove that json.dumps strips structural spaces to save bandwidth (async)."""
+        url = {"base": "https://api.mailgun.net/v3/", "keys": ["webhooks"]}
+        # Using MagicMock for the client to satisfy AsyncEndpoint's __init__ requirements
+        ep = AsyncEndpoint(
+            url=url,
+            headers={},
+            auth=None,
+            client=MagicMock(spec=httpx.AsyncClient)
+        )
+
+        raw_data = {"key": "value"}
+
+        with patch.object(ep, "api_call") as mock_api_call:
+            mock_api_call.return_value = MagicMock(status_code=200)
+
+            await ep.create(
+                domain="test.com",
+                data=raw_data,
+                headers={"Content-Type": "application/json"}
+            )
+
+            mock_api_call.assert_called_once()
+            actual_payload = mock_api_call.call_args.kwargs.get("data")
+
+            assert actual_payload == '{"key":"value"}'
+            assert '": "' not in actual_payload, "Found illegal structural space after colon!"
 
 
 class TestAsyncClient:
@@ -166,3 +195,18 @@ class TestAsyncClient:
         logged_text = mock_logger_error.call_args[0][4]
         assert len(logged_text) == 503
         assert logged_text.endswith("...")
+
+    def test_async_validate_auth_sanitizes_input(self) -> None:
+        """Test OWASP Header Injection prevention for the AsyncClient."""
+        # Put the carriage return INSIDE the string so .strip() doesn't remove it
+        with pytest.raises(ValueError, match="Header Injection risk"):
+            AsyncClient._validate_auth(("api", "key\rwithnewline"))
+
+    def test_async_client_dir_includes_endpoints(self) -> None:
+        """Test that IDE introspection via __dir__ exposes config endpoints."""
+        client = AsyncClient()
+        client_dir = dir(client)
+
+        # Verify dynamic endpoints are exposed to Jupyter/VSCode autocompletion
+        assert "messages" in client_dir
+        assert "ips" in client_dir
