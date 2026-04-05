@@ -19,17 +19,21 @@ def handle_default(
     _method: str | None,
     **_: Any,
 ) -> str:
-    """Provide default handler for endpoints with single url pattern (events, messages, stats).
+    """Provide default handler for endpoints with a single URL pattern.
 
-    :param url: Incoming URL dictionary
-    :type url: dict
-    :param domain: Incoming domain
-    :type domain: str
-    :param _method: Incoming request method (it's not being used for this handler)
-    :type _method: str
-    :param kwargs: kwargs
-    :return: final url for default endpoint
-    :raises: ApiError
+    Handles resolving paths for endpoints such as events, messages, and stats.
+
+    Args:
+        url: Incoming URL configuration dictionary.
+        domain: Target domain name.
+        _method: Incoming request method (unused in this handler).
+        **_: Additional keyword arguments (unused).
+
+    Returns:
+        The final resolved URL for the endpoint.
+
+    Raises:
+        ApiError: If the domain is missing.
     """
     if not domain:
         raise ApiError("Domain is missing!")

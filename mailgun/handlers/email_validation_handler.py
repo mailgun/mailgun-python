@@ -14,16 +14,16 @@ def handle_address_validate(
     _method: str | None,
     **kwargs: Any,
 ) -> str:
-    """Handle email validation.
+    """Handle email validation URL construction.
 
-    :param url: Incoming URL dictionary
-    :type url: dict
-    :param _domain: Incoming domain (it's not being used for this handler)
-    :type _domain: str
-    :param _method: Incoming request method (it's not being used for this handler)
-    :type _method: str
-    :param kwargs: kwargs
-    :return: final url for email validation endpoint
+    Args:
+        url: Incoming URL configuration dictionary.
+        _domain: Target domain name (unused in this handler).
+        _method: Incoming request method (unused in this handler).
+        **kwargs: Additional parameters, such as 'list_name'.
+
+    Returns:
+        The final URL for the email validation endpoint.
     """
     final_keys = "/" + "/".join(url["keys"][1:]) if url["keys"][1:] else ""
     base_url = str(url["base"]).rstrip("/")

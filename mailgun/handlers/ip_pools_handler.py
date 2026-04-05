@@ -18,14 +18,14 @@ def handle_ippools(
 ) -> str:
     """Handle IP pools URL construction.
 
-    :param url: Incoming URL dictionary
-    :type url: dict
-    :param _domain: Incoming domain (it's not being used for this handler)
-    :type _domain: str
-    :param _method: Incoming request method (it's not being used for this handler)
-    :type _method: str
-    :param kwargs: kwargs
-    :return: final url for IP pools endpoint
+    Args:
+        url: Incoming URL configuration dictionary.
+        _domain: Target domain name (unused in this handler).
+        _method: Incoming request method (unused in this handler).
+        **kwargs: Additional parameters (e.g., 'pool_id', 'ip').
+
+    Returns:
+        The final URL for the IP pools endpoint.
     """
     final_keys = build_path_from_keys(url.get("keys", []))
     base_url = str(url["base"]).rstrip("/") + final_keys

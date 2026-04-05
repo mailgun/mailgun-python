@@ -1,1 +1,1 @@
-"""This package provides predefined handlers for interacting with the Mailgun API."""
+"""Provide predefined handlers for interacting with the Mailgun API."""

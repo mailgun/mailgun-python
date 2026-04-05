@@ -20,13 +20,13 @@ def handle_templates(
     """Handle Templates dynamically resolving V3 (Domain) or V4 (Account).
 
     Args:
-        url: Incoming URL dictionary.
-        domain: Incoming domain.
-        _method: Incoming request method (unused).
-        **kwargs: Additional keyword arguments.
+        url: Incoming URL configuration dictionary.
+        domain: Target domain name.
+        _method: Incoming request method (unused in this handler).
+        **kwargs: Additional keyword arguments (e.g., 'template_name', 'versions', 'tag').
 
     Returns:
-        str: Final url for Templates endpoint.
+        The final URL for the Templates endpoint.
 
     Raises:
         ApiError: If the versions option is invalid.

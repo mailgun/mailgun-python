@@ -16,16 +16,16 @@ def handle_users(
     _method: str | None,
     **kwargs: Any,
 ) -> str:
-    """Handle Users.
+    """Handle Users URL construction.
 
-    :param url: Incoming URL dictionary
-    :type url: dict
-    :param _domain: Incoming domain (it's not being used for this handler)
-    :type _domain: str
-    :param _method: Incoming request method (it's not being used for this handler)
-    :type _method: str
-    :param kwargs: kwargs
-    :return: final url for Users endpoint
+    Args:
+        url: Incoming URL configuration dictionary.
+        _domain: Incoming domain (unused in this handler).
+        _method: Incoming request method (unused in this handler).
+        **kwargs: Additional keyword arguments (e.g., 'user_id').
+
+    Returns:
+        The final URL for the Users endpoint.
     """
     final_keys = build_path_from_keys(url.get("keys", []))
     base_url = str(url["base"]).rstrip("/")

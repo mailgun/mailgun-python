@@ -16,16 +16,16 @@ def handle_metrics(
     _method: str | None,
     **kwargs: Any,
 ) -> str:
-    """Handle Metrics and Tags New.
+    """Handle Metrics and Tags New URL construction.
 
-    :param url: Incoming URL dictionary
-    :type url: dict
-    :param _domain: Incoming domain (it's not being used for this handler)
-    :type _domain: str
-    :param _method: Incoming request method (it's not being used for this handler)
-    :type _method: str
-    :param kwargs: kwargs
-    :return: final url for Metrics and Tags New endpoints
+    Args:
+        url: Incoming URL configuration dictionary.
+        _domain: Incoming domain (unused in this handler).
+        _method: Incoming request method (unused in this handler).
+        **kwargs: Additional keyword arguments (e.g., 'usage', 'limits', 'tags').
+
+    Returns:
+        The final URL for the Metrics and Tags New endpoints.
     """
     final_keys = build_path_from_keys(url.get("keys", []))
     base = url["base"][:-1]

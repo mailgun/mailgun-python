@@ -17,16 +17,16 @@ def handle_tags(
     _method: str | None,
     **kwargs: Any,
 ) -> str:
-    """Handle Tags.
+    """Handle Tags URL construction.
 
-    :param url: Incoming URL dictionary
-    :type url: dict
-    :param domain: Incoming domain
-    :type domain: str
-    :param _method: Incoming request method (but not used here)
-    :type _method: str
-    :param kwargs: kwargs
-    :return: final url for Tags endpoint
+    Args:
+        url: Incoming URL configuration dictionary.
+        domain: Target domain name.
+        _method: Incoming request method (unused in this handler).
+        **kwargs: Additional keyword arguments (e.g., 'tag_name').
+
+    Returns:
+        The final URL for the Tags endpoint.
     """
     final_keys = build_path_from_keys(url.get("keys", []))
     base = url["base"] + str(domain) + "/"

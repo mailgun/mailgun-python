@@ -1,6 +1,6 @@
 """DOMAINS HANDLER.
 
-Doc: https://documentation.mailgun.com/en/latest/api-domains.html#
+Doc: https://documentation.mailgun.com/en/latest/api-domains.html
 """
 
 from __future__ import annotations
@@ -20,12 +20,13 @@ def handle_domainlist(
     """Handle a list of domains.
 
     Args:
-        url: Incoming URL dictionary.
-        _domain: Incoming domain (unused).
-        _method: Incoming request method (unused).
+        url: Incoming URL configuration dictionary.
+        _domain: Incoming domain (unused in this handler).
+        _method: Incoming request method (unused in this handler).
+        **_: Additional keyword arguments (unused).
 
     Returns:
-        str: Final url for domainlist endpoint.
+        The final URL for the domainlist endpoint.
     """
     # Ensure base ends with slash before appending
     return url["base"].rstrip("/") + "/domains"
@@ -37,19 +38,19 @@ def handle_domains(
     _method: str | None,
     **kwargs: Any,
 ) -> str:
-    """Handle a domain endpoint.
+    """Handle a domain endpoint URL construction.
 
     Args:
-        url: Incoming URL dictionary.
-        domain: Incoming domain.
+        url: Incoming URL configuration dictionary.
+        domain: Target domain name.
         _method: Incoming request method.
-        **kwargs: Additional keyword arguments.
+        **kwargs: Additional keyword arguments (e.g., 'domain_name', 'verify').
 
     Returns:
-        str: Final url for domain endpoint.
+        The final URL for the domain endpoint.
 
     Raises:
-        ApiError: If the domain is missing or verify option is invalid.
+        ApiError: If the domain is missing.
     """
     keys = list(url["keys"])
     if "domains" in keys:
@@ -95,10 +96,16 @@ def handle_sending_queues(
     _method: str | None,
     **_kwargs: Any,
 ) -> str:
-    """Handle sending queues endpoint URL construction.
+    """Handle sending queues URL construction.
+
+    Args:
+        url: Incoming URL configuration dictionary.
+        domain: Target domain name.
+        _method: Incoming request method (unused in this handler).
+        **kwargs: Additional keyword arguments (e.g., 'domain_name').
 
     Returns:
-        str: Final url for sending queues endpoint.
+        The final URL for the sending queues endpoint.
     """
     keys = url["keys"]
     if "sending_queues" in keys or "sendingqueues" in keys:
@@ -113,16 +120,16 @@ def handle_mailboxes_credentials(
     _method: str | None,
     **kwargs: Any,
 ) -> str:
-    """Handle Mailboxes credentials.
+    """Handle Mailboxes credentials URL construction.
 
     Args:
-        url: Incoming URL dictionary.
-        domain: Incoming domain.
-        _method: Incoming request method (unused).
-        **kwargs: Additional keyword arguments.
+        url: Incoming URL configuration dictionary.
+        domain: Target domain name.
+        _method: Incoming request method (unused in this handler).
+        **kwargs: Additional keyword arguments (e.g., 'domain_name', 'login').
 
     Returns:
-        str: Final url for Mailboxes credentials endpoint.
+        The final URL for the Mailboxes credentials endpoint.
 
     Raises:
         ApiError: If the domain is missing.
@@ -151,15 +158,16 @@ def handle_dkimkeys(
     _method: str | None,
     **_kwargs: Any,
 ) -> str:
-    """Handle DKIM keys.
+    """Handle DKIM keys URL construction.
 
     Args:
-        url: Incoming URL dictionary.
-        _domain: Incoming domain (unused).
-        _method: Incoming request method (unused).
+        url: Incoming URL configuration dictionary.
+        _domain: Incoming domain (unused in this handler).
+        _method: Incoming request method (unused in this handler).
+        **_kwargs: Additional keyword arguments (unused).
 
     Returns:
-        str: Final url for DKIM keys endpoint.
+        The final URL for the DKIM keys endpoint.
     """
     final_keys = build_path_from_keys(url.get("keys", []))
     base_url = str(url["base"]).rstrip("/")

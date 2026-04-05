@@ -16,16 +16,16 @@ def handle_lists(
     _method: str | None,
     **kwargs: Any,
 ) -> str:
-    """Handle Mailing List.
+    """Handle Mailing List URL construction.
 
-    :param url: Incoming URL dictionary
-    :type url: dict
-    :param _domain: Incoming domain (it's not being used for this handler)
-    :type _domain: str
-    :param _method: Incoming request method (it's not being used for this handler)
-    :type _method: str
-    :param kwargs: kwargs
-    :return: final url for mailinglist endpoint
+    Args:
+        url: Incoming URL configuration dictionary.
+        _domain: Incoming domain (unused in this handler).
+        _method: Incoming request method (unused in this handler).
+        **kwargs: Additional keyword arguments (e.g., 'address', 'validate', 'multiple', 'member_address').
+
+    Returns:
+        The final URL for the mailing list endpoint.
     """
     final_keys = build_path_from_keys(url.get("keys", []))
     base = url["base"][:-1]
@@ -39,6 +39,7 @@ def handle_lists(
         if "member_address" in kwargs:
             return f"{base}/lists/{kwargs['address']}{members_keys}/{kwargs['member_address']}"
         return f"{base}/lists/{kwargs['address']}{members_keys}"
-    elif "address" in kwargs and "validate" not in kwargs:
-        return f"{base}{final_keys}/{kwargs['address']}"
+    elif "address" in kwargs:
+        return f"{base}/lists/{kwargs['address']}"
+
     return f"{base}{final_keys}"

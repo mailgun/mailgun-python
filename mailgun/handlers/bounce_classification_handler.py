@@ -16,15 +16,16 @@ def handle_bounce_classification(
     _method: str | None,
     **_kwargs: Any,
 ) -> str:
-    """Handle Bounce Classification.
+    """Handle Bounce Classification URL construction.
 
     Args:
-        url: Incoming URL dictionary.
-        _domain: Incoming domain (unused).
-        _method: Incoming request method (unused).
+        url: Incoming URL configuration dictionary.
+        _domain: Incoming domain (unused in this handler).
+        _method: Incoming request method (unused in this handler).
+        **_kwargs: Additional keyword arguments (unused).
 
     Returns:
-        str: Final url for Bounce Classification endpoints.
+        The final URL for the Bounce Classification endpoint.
     """
     final_keys = build_path_from_keys(url.get("keys", []))
     base_url = str(url["base"]).rstrip("/")

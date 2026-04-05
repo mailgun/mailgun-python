@@ -16,19 +16,19 @@ def handle_resend_message(
     _method: str | None,
     **kwargs: Any,
 ) -> str:
-    """Resend message endpoint.
+    """Handle the resend message endpoint URL construction.
 
     Args:
-        _url: Incoming URL dictionary (unused).
-        _domain: Incoming domain (unused).
-        _method: Incoming request method (unused).
-        **kwargs: Additional keyword arguments.
+        _url: Incoming URL configuration dictionary (unused).
+        _domain: Incoming domain (unused in this handler).
+        _method: Incoming request method (unused in this handler).
+        **kwargs: Additional keyword arguments containing the 'storage_url'.
 
     Returns:
-        str: Final url for default endpoint.
+        The final URL for the resend message endpoint.
 
     Raises:
-        ApiError: If the storage_url is not provided.
+        ApiError: If the storage_url is not provided in kwargs.
     """
     if "storage_url" in kwargs:
         return str(kwargs["storage_url"])
