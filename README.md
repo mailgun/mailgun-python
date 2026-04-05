@@ -344,6 +344,14 @@ client = Client(auth=("api", "YOUR_API_KEY"))
 client.domains.get()
 ```
 
+### IDE Autocompletion & DX
+
+The `Client` utilizes a dynamic routing engine but is heavily optimized for modern Developer Experience (DX).
+
+- **Introspection**: Calling `dir(client)` or using autocomplete in IDEs like VS Code or PyCharm will automatically expose all available API endpoints (e.g., `client.messages`, `client.domains`, `client.bounces`).
+- **Security Guardrails**: If you accidentally print the client instance or an exception traceback occurs in your CI/CD logs, your API key is strictly redacted from memory dumps: (`'api', '***REDACTED***'`).
+- **Performance**: JSON payloads are automatically minified before transit to save bandwidth on large batch requests, and internal route resolution is heavily cached in memory.
+
 ## Request examples
 
 ### Full list of supported endpoints
@@ -437,6 +445,29 @@ def post_scheduled() -> None:
 
     req = client.messages.create(data=data, domain=domain)
     print(req.json())
+```
+
+#### Send an email with advanced parameters (Tags, Testmode, STO)
+
+Because the SDK maps kwargs directly to the payload, it inherently supports all advanced Mailgun features without needing SDK updates. You can easily add custom variables (`v:`), options (`o:`), and Send Time Optimization (STO) directly to your data dictionary.
+
+```python
+def send_advanced_message() -> None:
+    """
+    POST /v3/<domain>/messages
+    """
+    data = {
+        "from": f"Excited User <mailgun@{domain}>",
+        "to": ["recipient1@example.com", "recipient2@example.com"],
+        "subject": "Advanced Mailgun Features",
+        "text": "Testing out tags, custom variables, and testmode!",
+        "o:tag": ["newsletter", "python-sdk"],  # Multiple tags supported via lists
+        "o:testmode": "yes",  # Validates payload without actually sending
+        "o:deliverytime-optimize-period": "24h",  # Send Time Optimization
+        "v:my-custom-id": "USER-12345",  # Custom user-defined variable
+    }
+    request = client.messages.create(domain=domain, data=data)
+    print(request.json())
 ```
 
 ### Domains
