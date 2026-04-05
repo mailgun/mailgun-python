@@ -74,15 +74,11 @@ if TYPE_CHECKING:
     from requests.models import Response
 
 
-# Public API
+# Public API of the client module
 __all__ = [
-    "APIVersion",
-    "ApiError",
     "AsyncClient",
     "AsyncEndpoint",
-    "BaseEndpoint",
     "Client",
-    "Config",
     "Endpoint",
 ]
 
