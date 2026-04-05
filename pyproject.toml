@@ -231,13 +231,13 @@ lint.ignore = [
     "EM101",  # Exception must not use a string literal (Causes massive file bloat)
     "E501",   # Line too long (Let the formatter handle wrapping)
 
+    # --- Docstring ---
+    "D417", "D100", "D104",
+
     # --- Keep your existing TODO ignores ---
     "C901",
     "PLR0913",
     "CPY001",
-    # TODO: solve dosctrings style
-    "DOC201",
-    "DOC501"
 ]
 lint.exclude = [ "mailgun/examples/*", "tests" ]
 lint.per-file-ignores."__init__.py" = [ "E402" ]
@@ -258,8 +258,7 @@ lint.isort.lines-after-imports = 2
 lint.mccabe.max-complexity = 13
 lint.pycodestyle.ignore-overlong-task-comments = true
 # Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
-# TODO: Enable the 'sphinx' style when it will be available, see https://github.com/astral-sh/ruff/pull/13286
-#lint.pydocstyle.convention = "google"
+lint.pydocstyle.convention = "google"
 
 [tool.flake8]
 exclude = [ "mailgun/examples/*", "tests" ]
