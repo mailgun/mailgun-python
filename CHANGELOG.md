@@ -14,6 +14,9 @@ We [keep a changelog.](http://keepachangelog.com/)
 - Added a new "Logging & Debugging" section to `README.md`.
 - Added `build_path_from_keys` utility in `mailgun.handlers.utils` to centralize and dry up URL path generation across handlers.
 - Overrode __dir__ in Client and AsyncClient to expose dynamic endpoint routes (e.g., .messages, .domains) directly to IDE autocompletion engines (VS Code, PyCharm).
+- Native dynamic routing support for Mailgun Optimize, Validations Service, and Email Preview APIs without requiring new custom handlers.
+- Advanced path interpolation in `handle_default` to automatically inject inline URL parameters (e.g., `/v2/x509/{domain}/status`).
+- An intelligent live meta-testing suite (`test_routing_meta_live.py`) to strictly verify SDK endpoint aliases against live Mailgun servers.
 
 ### Changed
 
@@ -29,6 +32,10 @@ We [keep a changelog.](http://keepachangelog.com/)
 - Migrated the fragmented linting and formatting pipeline (Flake8, Black, Pylint, Pyupgrade, etc.) to a unified, high-performance `ruff` setup in `.pre-commit-config.yaml`.
 - Refactored `api_call` exception blocks to use the `else` clause for successful returns, adhering to strict Ruff (TRY300) standards.
 - Enabled pip dependency caching in GitHub Actions to drastically speed up CI workflows.
+- Fixed API versioning collisions in `DOMAIN_ENDPOINTS` (e.g., ensuring `tracking` correctly resolves to `v3` instead of `v1`).
+- Corrected the `credentials` route prefix to properly inject the `domains/` path segment.
+- Updated `README.md` with new documentation, IDE DX features, and code examples for Validations & Optimize APIs.
+- Cleaned up obsolete unit tests that conflicted with the new forgiving dynamic Catch-All routing architecture.
 
 ### Fixed
 
