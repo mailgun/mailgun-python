@@ -1,6 +1,10 @@
 """Mailgun API Routes Configuration."""
 
-EXACT_ROUTES = {
+from __future__ import annotations
+
+
+# EXACT_ROUTES map an attribute to an exact API version and path array.
+EXACT_ROUTES: dict[str, list[str | list[str]]] = {
     "messages": ["v3", ["messages"]],
     "mimemessage": ["v3", ["messages.mime"]],
     "resend_message": ["v3", ["resendmessage"]],
@@ -17,29 +21,24 @@ EXACT_ROUTES = {
     "dkim_management_rotate": ["v1", ["dkim_management", "domains", "{name}", "rotate"]],
     "account_templates": ["v4", ["templates"]],
     "account_webhooks": ["v1", ["webhooks"]],
+    "x509": ["v2", ["x509", "{domain}"]],
+    "x509_status": ["v2", ["x509", "{domain}", "status"]],
 }
 
-PREFIX_ROUTES = {
+# PREFIX_ROUTES map attributes to a base version, path prefix, and optional suffix.
+PREFIX_ROUTES: dict[str, list[str | None]] = {
     "templates": ["v3", "", None],
     "analytics": ["v1", "", None],
     "bounceclassification": ["v2", "", "bounce-classification"],
-    "addressvalidate": ["v4", "address/validate", None],
-    "addressparse": ["v4", "address/parse", None],
-    "address": ["v4", "address", None],
-    "inbox": ["v4", "inbox", None],
-    "inspect": ["v4", "inspect", None],
-    "spamtraps": ["v3", "spamtraps", None],
-    "blocklists": ["v3", "blocklists", None],
-    "reputation": ["v3", "reputation", None],
+    "credentials": ["v3", "domains", None],
+    "domains": ["v3", "domains", None],
+    "webhooks": ["v3", "domains", None],
+    "spamtraps": ["v3", "", None],
+    "blocklists": ["v3", "", None],
+    "reputation": ["v3", "", None],
     "users": ["v5", "", None],
     "keys": ["v1", "", None],
-    "webhooks": ["v1", "", None],
     "thresholds": ["v1", "", None],
-    "alerts": ["v1", "", None],
-    "accounts": ["v5", "", None],
-    "sandbox": ["v5", "", None],
-    "x509": ["v2", "", None],
-    "ip_whitelist": ["v2", "", None],
     "events": ["v3", "", None],
     "tags": ["v3", "", None],
     "bounces": ["v3", "", None],
@@ -52,36 +51,51 @@ PREFIX_ROUTES = {
     "stats": ["v3", "", None],
     "ips": ["v3", "", None],
     "ip_pools": ["v3", "", None],
+    "ip_whitelist": ["v3", "ip", "whitelist"],
+    # Validations Service API
+    "addressparse": ["v4", "address/parse", "addressparse"],
+    "addressvalidate": ["v4", "address", "validate"],
+    "address": ["v4", "", None],
+    # Email Preview & Code Analysis API
+    "inspect": ["v1", "", None],
+    "preview": ["v1", "", None],
+    "preview_v2": ["v2", "preview", None],
+    # Mailgun Optimize API
+    "alerts": ["v1", "", None],
+    "inboxready": ["v1", "", None],
+    "dmarc": ["v1", "", None],
+    "reputationanalytics": ["v1", "", None],
+    # Account Level
+    "accounts": ["v5", "", None],
+    "sandbox": ["v5", "", None],
 }
 
-DOMAIN_ALIASES = {
+DOMAIN_ALIASES: dict[str, str] = {
     "dkimauthority": "dkim_authority",
     "dkimselector": "dkim_selector",
     "webprefix": "web_prefix",
     "sendingqueues": "sending_queues",
 }
 
-# Grouping domain endpoints by API version
-DOMAIN_ENDPOINTS = {
-    "v1": ["security"],
+DOMAIN_ENDPOINTS: dict[str, list[str]] = {
+    "v1": ["click", "open", "unsubscribe", "dkim", "webhooks", "security"],
+    "v4": ["ips", "connections"],
     "v3": [
-        "connection",
-        "tracking",
-        "dkim_authority",
-        "dkim_selector",
-        "web_prefix",
-        "sending_queues",
         "credentials",
-        "templates",
-        "mailboxes",
-        "ips",
-        "pool",
-        "dynamic_pools",
+        "verify",
+        "messages",
+        "tags",
         "bounces",
         "unsubscribes",
         "complaints",
         "whitelists",
-        "webhooks",
+        "stats",
+        "events",
+        "routes",
+        "lists",
+        "mailboxes",
+        "ip_pools",
+        "sending_queues",
+        "tracking",  # 'tracking' natively lives here
     ],
-    "v4": ["domains", "verify"],
 }

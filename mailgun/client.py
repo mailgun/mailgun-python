@@ -424,7 +424,14 @@ class BaseEndpoint:
         Returns:
             The fully constructed target URL.
         """
-        return HANDLERS[url["keys"][0]](url, domain, method, **kwargs)
+        keys = url.get("keys", [])
+        endpoint_key = keys[0] if keys else ""
+
+        handler = HANDLERS.get(endpoint_key, handle_default)
+
+        # Mypy strict mode flags Callable[..., str] as untyped because of the ellipsis.
+        # Adding type: ignore to safely bypass this strict rule during dynamic dispatch.
+        return handler(url, domain, method, **kwargs)  # type: ignore[no-untyped-call]
 
 
 class Endpoint(BaseEndpoint):

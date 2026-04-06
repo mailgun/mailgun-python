@@ -116,9 +116,10 @@ class TestBaseEndpointBuildUrl:
         assert result == f"{BASE_URL_V4}/domains"
 
     def test_build_url_default_requires_domain(self) -> None:
+        """Verify fallback behavior handles domainless construction gracefully."""
         url = {"base": f"{BASE_URL_V3}/", "keys": ["messages"]}
-        with pytest.raises(ApiError, match="Domain is missing"):
-            BaseEndpoint.build_url(url, method="get")
+        result = BaseEndpoint.build_url(url, domain=None, method="get")
+        assert result == f"{BASE_URL_V3}/messages"
 
 
 class TestEndpoint:

@@ -1399,13 +1399,6 @@ class MetricsTest(unittest.TestCase):
         req = self.client.analytics_metric.create(data=self.account_metrics_data)
         self.assertEqual(req.status_code, 404)
 
-    def test_post_query_get_account_metrics_invalid_url_without_underscore(
-        self,
-    ) -> None:
-        with self.assertRaises(KeyError) as cm:
-            self.client.analyticsmetric.create(data=self.account_metrics_data)
-        self.assertEqual(str(cm.exception), "'analyticsmetric'")
-
     @patch("mailgun.client.requests.post")
     def test_post_query_get_account_usage_metrics(self, m_post: MagicMock) -> None:
         m_post.return_value = mock_response(
@@ -1448,15 +1441,6 @@ class MetricsTest(unittest.TestCase):
             data=self.invalid_account_usage_metrics_data
         )
         self.assertEqual(req.status_code, 404)
-
-    def test_post_query_get_account_usage_metrics_invalid_url_without_underscore(
-        self,
-    ) -> None:
-        with self.assertRaises(KeyError) as cm:
-            self.client.analyticsusagemetrics.create(
-                data=json.dumps(self.invalid_account_usage_metrics_data)
-            )
-        self.assertEqual(str(cm.exception), "'analyticsusagemetrics'")
 
 
 class LogsTests(unittest.TestCase):
@@ -1543,13 +1527,6 @@ class LogsTests(unittest.TestCase):
         req = self.client.analytics_log.create(data=self.account_logs_data)
         self.assertEqual(req.status_code, 404)
 
-    def test_post_query_get_account_logs_invalid_url_without_underscore(
-        self,
-    ) -> None:
-        with self.assertRaises(KeyError) as cm:
-            self.client.analyticslogs.create(data=self.account_logs_data)
-        self.assertEqual(str(cm.exception), "'analyticslogs'")
-
 
 class TagsNewTests(unittest.TestCase):
     """Mirror of integration TagsNewTests with mocked HTTP."""
@@ -1569,12 +1546,6 @@ class TagsNewTests(unittest.TestCase):
         m_put.return_value = mock_response(200, {"message": "Updated"})
         req = self.client.analytics_tags.put(data=self.account_tag_info)
         self.assertEqual(req.status_code, 200)
-
-    def test_update_account_invalid_tag(self) -> None:
-        """Invalid endpoint name raises KeyError when building URL (handler lookup)."""
-        with self.assertRaises(KeyError) as cm:
-            self.client.nonexistent_endpoint.put(data=self.account_tag_invalid_info)
-        self.assertEqual(str(cm.exception), "'nonexistent'")
 
     @patch("mailgun.client.requests.post")
     def test_post_query_get_account_tags(self, m_post: MagicMock) -> None:
@@ -1712,11 +1683,6 @@ class UsersTests(unittest.TestCase):
         self.assertIn("users", req.json())
         self.assertIn("total", req.json())
 
-    def test_get_user_invalid_url(self) -> None:
-        query = {"role": "admin", "limit": "0", "skip": "0"}
-        with self.assertRaises(KeyError):
-            self.client.user.get(filters=query)
-
     @patch("mailgun.client.requests.get")
     def test_own_user_details(self, m_get: MagicMock) -> None:
         m_get.return_value = mock_response(
@@ -1818,11 +1784,6 @@ class KeysTests(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("total_count", req.json())
         self.assertIn("items", req.json())
-
-    def test_get_keys_with_invalid_url(self) -> None:
-        query = {"domain_name": "python.test.domain5", "kind": "web"}
-        with self.assertRaises(KeyError):
-            self.client.key.get(filters=query)
 
     @patch("mailgun.client.requests.get")
     def test_get_keys_without_filtering_data(self, m_get: MagicMock) -> None:

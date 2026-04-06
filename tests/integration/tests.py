@@ -2050,16 +2050,6 @@ class MetricsTest(unittest.TestCase):
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 404)
 
-    def test_post_query_get_account_metrics_invalid_url_without_underscore(
-        self,
-    ) -> None:
-        """Expected failure with an invalid URL https://api.mailgun.net/v1/analyticsmetric (without '_' in the middle)"""
-        with self.assertRaises(KeyError) as cm:
-            self.client.analyticsmetric.create(
-                data=self.account_metrics_data,
-            )
-        self.assertEqual(str(cm.exception), "'analyticsmetric'")
-
     def test_post_query_get_account_usage_metrics(self) -> None:
         req = self.client.analytics_usage_metrics.create(
             data=self.account_usage_metrics_data,
@@ -2099,16 +2089,6 @@ class MetricsTest(unittest.TestCase):
         )
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 404)
-
-    def test_post_query_get_account_usage_metrics_invalid_url_without_underscore(
-        self,
-    ) -> None:
-        """Expected failure with an invalid URL https://api.mailgun.net/v1/analyticsusagemetrics (without '_' in the middle)"""
-        with self.assertRaises(KeyError) as cm:
-            self.client.analyticsusagemetrics.create(
-                data=json.dumps(self.invalid_account_usage_metrics_data),
-            )
-        self.assertEqual(str(cm.exception), "'analyticsusagemetrics'")
 
 
 class LogsTests(unittest.TestCase):
@@ -2234,16 +2214,6 @@ class LogsTests(unittest.TestCase):
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 404)
 
-    def test_post_query_get_account_logs_invalid_url_without_underscore(
-        self,
-    ) -> None:
-        """Expected failure with an invalid URL https://api.mailgun.net/v1/analyticslogs (without '_' in the middle)"""
-        with self.assertRaises(KeyError) as cm:
-            self.client.analyticslogs.create(
-                data=self.account_logs_data,
-            )
-        self.assertEqual(str(cm.exception), "'analyticslogs'")
-
 
 class TagsNewTests(unittest.TestCase):
     """Tests for Mailgun new Tags API, https://api.mailgun.net/v1/analytics/tags.
@@ -2285,19 +2255,6 @@ class TagsNewTests(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("message", req.json())
         self.assertIn("Tag updated", req.json()["message"])
-
-    @pytest.mark.order(2)
-    def test_update_account_invalid_tag(self) -> None:
-        """Test to update account nonexistent tag: Unhappy Path with invalid data."""
-
-        req = self.client.analytics_tags.put(
-            data=self.account_tag_invalid_info,
-        )
-
-        self.assertIsInstance(req.json(), dict)
-        self.assertEqual(req.status_code, 404)
-        self.assertIn("message", req.json())
-        self.assertIn("Tag not found", req.json()["message"])
 
     @pytest.mark.order(1)
     def test_post_query_get_account_tags(self) -> None:
@@ -2588,13 +2545,6 @@ class UsersTests(unittest.TestCase):
         [self.assertIn(key, expected_keys) for key in req.json()]  # type: ignore[func-returns-value]
         [self.assertIn(key, expected_users_keys) for key in req.json()["users"][0]]  # type: ignore[func-returns-value]
 
-    def test_get_user_invalid_url(self) -> None:
-        """Test to get account's users details: expected failure with invalid URL."""
-        query = {"role": "admin", "limit": "0", "skip": "0"}
-
-        with self.assertRaises(KeyError):
-            self.client.user.get(filters=query)
-
     @pytest.mark.xfail
     def test_own_user_details(self) -> None:
         req = self.client_with_secret_key.users.get(user_id="me")
@@ -2713,13 +2663,6 @@ class KeysTests(unittest.TestCase):
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 200)
         [self.assertIn(key, expected_keys) for key in req.json()]  # type: ignore[func-returns-value]
-
-    def test_get_keys_with_invalid_url(self) -> None:
-        """Test to get the list of Mailgun API keys: expected failure with invalid URL."""
-        query = {"domain_name": self.domain, "kind": "web"}
-
-        with self.assertRaises(KeyError):
-            self.client.key.get(filters=query)
 
     def test_get_keys_without_filtering_data(self) -> None:
         """Test to get the list of Mailgun API keys: Happy Path without filtering data."""

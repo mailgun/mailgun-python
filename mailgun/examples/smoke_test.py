@@ -96,7 +96,7 @@ def test_send_message_form_data() -> Any:
 
 def test_create_bounces_json() -> Any:
     """Test 3: Bulk upload bounces using JSON (Validates our new `is_json` serialization)."""
-    # FIX: Mailgun /lists doesn't support JSON. /bounces bulk upload DOES support JSON arrays!
+    # Mailgun /lists doesn't support JSON. /bounces bulk upload DOES support JSON arrays!
     data = [
         {"address": f"bounce1@{DOMAIN}", "code": "550", "error": "Smoke Test Bounce 1"},
         {"address": f"bounce2@{DOMAIN}", "code": "550", "error": "Smoke Test Bounce 2"},
