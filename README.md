@@ -24,6 +24,7 @@ Check out all the resources and Python code examples in the official
     - [Base URL](#base-url)
     - [Authentication](#authentication)
     - [Client](#client)
+    - [IDE Autocompletion & DX](#ide-autocompletion--dx)
     - [AsyncClient](#asyncclient)
     - [API Response Codes](#api-response-codes)
   - [Request examples](#request-examples)
@@ -105,6 +106,7 @@ Check out all the resources and Python code examples in the official
     - [Users](#users)
       - [Get users on an account](#get-users-on-an-account)
       - [Get a user's details](#get-a-users-details)
+    - [Validations & Optimize APIs](#validations--optimize-apis)
   - [License](#license)
   - [Contribute](#contribute)
   - [Contributors](#contributors)
@@ -1573,6 +1575,33 @@ def get_user_details() -> None:
         if mailgun_email == user["email"]:
             req2 = client.users.get(user_id=user["id"])
             print(req2.json())
+```
+
+### Validations & Optimize APIs
+
+Thanks to the dynamic routing engine, the SDK natively supports Mailgun's supplementary APIs (like Email Validation, InboxReady, and Send Time Optimization) out of the box, automatically handling the versioning (`v4`, `v5`, etc.).
+
+#### Validate an email address
+
+```python
+def validate_email() -> None:
+    """
+    GET /v4/address/validate
+    Note: Requires a paid Mailgun plan.
+    """
+    req = client.addressvalidate.get(address="suspicious@example.com")
+    print(req.json())
+```
+
+#### Fetch InboxReady placement tests
+
+```python
+def get_inboxready_tests() -> None:
+    """
+    GET /v1/inboxready/domains
+    """
+    req = client.inboxready_domains.get()
+    print(req.json())
 ```
 
 ## License

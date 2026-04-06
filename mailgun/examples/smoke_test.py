@@ -111,6 +111,13 @@ def test_expected_404_logging() -> Any:
     return sync_client.domains.get(domain_name="this-domain-does-not-exist.com")
 
 
+def test_cross_version_routing() -> Any:
+    """Test 5: Call a v4 endpoint (Validates cross-API dynamic routing)."""
+    # Using addressvalidate (/v4/address/validate).
+    # Returns 403 on Free plans, 200 on Paid plans. Both prove successful URL routing.
+    return sync_client.addressvalidate.get(address="test@example.com")
+
+
 # --- ASYNC TESTS ---
 
 
@@ -144,7 +151,9 @@ if __name__ == "__main__":
     run_sync_test("Send Message (Form-Data)", test_send_message_form_data)
     run_sync_test("Bulk Create Bounces (JSON Payload)", test_create_bounces_json)
     run_sync_test("Test 404 Safe Logging", test_expected_404_logging, expected_status=(404,))
-
+    run_sync_test(
+        "Cross-Version Routing (v4)", test_cross_version_routing, expected_status=(200, 403)
+    )
     # Run Asynchronous Suite
     asyncio.run(async_smoke_suite())
 
