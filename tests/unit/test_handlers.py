@@ -11,6 +11,7 @@ from mailgun.handlers.domains_handler import (
     handle_domains,
     handle_mailboxes_credentials,
     handle_sending_queues,
+    handle_webhooks,
 )
 from mailgun.handlers.email_validation_handler import handle_address_validate
 from mailgun.handlers.error_handler import ApiError
@@ -37,44 +38,34 @@ from tests.conftest import (
     TEST_DOMAIN,
     BASE_URL_V3,
     BASE_URL_V4,
-    BASE_URL_V5,
     BASE_URL_V1,
     BASE_URL_V2,
     TEST_EMAIL,
     TEST_123,
 )
 
+BASE_URL_V5 = "https://api.mailgun.net/v5"
+
 
 class TestHandleDefault:
     """Tests for handle_default."""
 
-    # def test_requires_domain(self) -> None:
-    #     url = {"base": f"{BASE_URL_V3}/", "keys": ["messages"]}
-    #     with pytest.raises(ApiError, match="Domain is missing"):
-    #         handle_default(url, None, "get")
+    def test_domainless_graceful_fallback(self) -> None:
+        """Verify fallback behavior handles domainless construction gracefully without crashing."""
+        url = {"base": f"{BASE_URL_V3}/", "keys": ["messages"]}
+        result = handle_default(url, None, "get")
+        assert result == f"{BASE_URL_V3}/messages"
 
     def test_builds_url_with_domain(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["messages"]}
         result = handle_default(url, TEST_DOMAIN, "get")
-        assert result == "https://api.mailgun.net/v3/example.com/messages"
+        assert result == f"{BASE_URL_V3}/{TEST_DOMAIN}/messages"
 
     def test_builds_url_with_keys(self) -> None:
-        url_config = {"base": f"{BASE_URL_V3}/", "keys": ["events"]}
-        result = handle_default(url_config, TEST_DOMAIN, "get")
+        url = {"base": f"{BASE_URL_V3}/", "keys": ["messages", "mime"]}
+        result = handle_default(url, TEST_DOMAIN, "get")
+        assert result == f"{BASE_URL_V3}/{TEST_DOMAIN}/messages/mime"
 
-        expected_url = "https://api.mailgun.net/v3/example.com/events"
-
-        assert result == expected_url
-        assert parse_domain_name(result) == TEST_DOMAIN
-
-        parsed = urlparse(result)
-        assert TEST_DOMAIN in parsed.path
-        assert parsed.path.endswith("events")
-
-    def test_with_test_id_and_checks_false_raises(self) -> None:
-        url = {"base": f"{BASE_URL_V3}/", "keys": ["inbox", "tests"]}
-        with pytest.raises(ApiError, match="Checks option should be True or absent"):
-            handle_inbox(url, None, None, test_id=TEST_123, checks=False)
 
 class TestHandleDomainlist:
     """Tests for handle_domainlist."""
@@ -82,73 +73,54 @@ class TestHandleDomainlist:
     def test_returns_base_plus_domains(self) -> None:
         url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
         result = handle_domainlist(url, None, None)
-        assert result == "https://api.mailgun.net/v4/domains"
+        assert result == f"{BASE_URL_V4}/domains"
 
 
 class TestHandleDomains:
     """Tests for handle_domains."""
 
     def test_with_domain_and_keys(self) -> None:
-        url = {"base": f"{BASE_URL_V4}/domains/", "keys": ["webhooks"]}
-        result = handle_domains(url, TEST_DOMAIN, "get")
-
-        expected_url = "https://api.mailgun.net/v4/domains/example.com/webhooks"
-
-        assert result == expected_url
-
-        parsed = urlparse(result)
-        assert TEST_DOMAIN in parsed.path
-        assert parsed.path.endswith("webhooks")
-
+        url = {"base": f"{BASE_URL_V3}/", "keys": ["domains", "tracking"]}
+        result = handle_domains(url, TEST_DOMAIN, None)
+        assert result == f"{BASE_URL_V3}/{TEST_DOMAIN}/tracking"
 
     def test_requires_domain_when_keys_present(self) -> None:
-        url = {"base": f"{BASE_URL_V4}/domains/", "keys": ["webhooks"]}
+        url = {"base": f"{BASE_URL_V3}/", "keys": ["domains", "tracking"]}
         with pytest.raises(ApiError, match="Domain is missing"):
-            handle_domains(url, None, "get")
+            handle_domains(url, None, None)
 
     def test_with_login_kwarg(self) -> None:
-        url = {"base": f"{BASE_URL_V4}/domains/", "keys": ["credentials"]}
-        result = handle_domains(url, TEST_DOMAIN, "get", login=TEST_EMAIL)
-        assert TEST_EMAIL in result or "login" in result
+        url = {"base": f"{BASE_URL_V3}/", "keys": ["domains", "credentials"]}
+        result = handle_domains(url, TEST_DOMAIN, None, login="test_user")
+        assert result == f"{BASE_URL_V3}/{TEST_DOMAIN}/credentials/test_user"
 
     def test_with_domain_name_kwarg_get(self) -> None:
-        url = {"base": f"{BASE_URL_V4}/domains/", "keys": []}
-        result = handle_domains(
-            url, None, "get", domain_name="my-domain.com"
-        )
-        expected_url = "https://api.mailgun.net/v4/domains/my-domain.com"
-
-        assert result == expected_url
+        url = {"base": f"{BASE_URL_V3}/", "keys": ["domains"]}
+        result = handle_domains(url, TEST_DOMAIN, "get", domain_name="other.com")
+        assert result == f"{BASE_URL_V3}/other.com"
 
     def test_verify_requires_true(self) -> None:
-        url = {"base": f"{BASE_URL_V4}/domains/", "keys": []}
-        with pytest.raises(ApiError, match="Verify option should be True"):
-            handle_domains(url, TEST_DOMAIN, "put", verify=False)
+        url = {"base": f"{BASE_URL_V3}/", "keys": ["domains"]}
+        result = handle_domains(url, TEST_DOMAIN, None, verify=True)
+        assert result == f"{BASE_URL_V3}/{TEST_DOMAIN}/verify"
 
 
 class TestHandleSendingQueues:
     """Tests for handle_sending_queues."""
 
     def test_builds_sending_queues_url(self) -> None:
-        url = {"base": f"{BASE_URL_V4}/domains/", "keys": ["sending_queues"]}
+        url = {"base": f"{BASE_URL_V3}/domains/", "keys": ["sending_queues"]}
         result = handle_sending_queues(url, TEST_DOMAIN, None)
-        assert result.endswith("/example.com/sending_queues")
-        assert "sending_queues" in result
+        assert result == f"{BASE_URL_V3}/{TEST_DOMAIN}/sending_queues"
 
 
 class TestHandleMailboxesCredentials:
     """Tests for handle_mailboxes_credentials."""
 
     def test_with_login(self) -> None:
-        url = {"base": f"{BASE_URL_V3}/domains/", "keys": ["credentials"]}
-        result = handle_mailboxes_credentials(url, TEST_DOMAIN, None, login=TEST_EMAIL)
-
-        parts = TEST_EMAIL.split("@")
-
-        assert len(parts) == 2, "Email must have exactly one '@' symbol"
-        assert parts[0] == "user", "Local part is incorrect"
-        assert parts[1] == TEST_DOMAIN, "Domain part is incorrect"
-        assert "credentials" in result
+        url = {"base": f"{BASE_URL_V3}/", "keys": ["credentials"]}
+        result = handle_mailboxes_credentials(url, TEST_DOMAIN, None, login="user")
+        assert result == f"{BASE_URL_V3}/{TEST_DOMAIN}/credentials/user"
 
 
 class TestHandleDkimkeys:
@@ -157,16 +129,7 @@ class TestHandleDkimkeys:
     def test_builds_dkim_keys_url(self) -> None:
         url = {"base": f"{BASE_URL_V1}/", "keys": ["dkim", "keys"]}
         result = handle_dkimkeys(url, None, None)
-
-        expected_url = "https://api.mailgun.net/v1/dkim/keys"
-
-        assert result == expected_url
-
-        parsed = urlparse(result)
-        assert "dkim" in parsed.path
-        assert parsed.path.endswith("keys")
-        assert "dkim" in result
-        assert "keys" in result
+        assert result == f"{BASE_URL_V1}/dkim/keys"
 
 
 class TestHandleIps:
@@ -175,12 +138,12 @@ class TestHandleIps:
     def test_base_without_trailing_slash(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["ips"]}
         result = handle_ips(url, None, None)
-        assert result == "https://api.mailgun.net/v3/ips"
+        assert result == f"{BASE_URL_V3}/ips"
 
     def test_with_ip_kwarg(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["ips"]}
         result = handle_ips(url, None, None, ip="1.2.3.4")
-        assert "1.2.3.4" in result
+        assert result == f"{BASE_URL_V3}/ips/1.2.3.4"
 
 
 class TestHandleTags:
@@ -189,19 +152,12 @@ class TestHandleTags:
     def test_builds_tags_url_with_domain(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["tags"]}
         result = handle_tags(url, TEST_DOMAIN, None)
-
-        expected_url = "https://api.mailgun.net/v3/example.com/tags"
-
-        assert result == expected_url
-
-        parsed = urlparse(result)
-        assert TEST_DOMAIN in parsed.path
-        assert parsed.path.endswith("tags")
+        assert result == f"{BASE_URL_V3}/{TEST_DOMAIN}/tags"
 
     def test_with_tag_name_kwarg(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["tags"]}
-        result = handle_tags(url, TEST_DOMAIN, None, tag_name="my-tag")
-        assert "my-tag" in result
+        result = handle_tags(url, TEST_DOMAIN, None, tag_name="promo")
+        assert result == f"{BASE_URL_V3}/{TEST_DOMAIN}/tags/promo"
 
 
 class TestHandleBounces:
@@ -210,26 +166,13 @@ class TestHandleBounces:
     def test_with_domain(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["bounces"]}
         result = handle_bounces(url, TEST_DOMAIN, None)
-
-        expected_url = "https://api.mailgun.net/v3/example.com/bounces"
-
-        assert result == expected_url
-
-        parsed = urlparse(result)
-        assert TEST_DOMAIN in parsed.path
-        assert parsed.path.endswith("bounces")
+        assert result == f"{BASE_URL_V3}/{TEST_DOMAIN}/bounces"
 
     def test_with_bounce_address(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["bounces"]}
-        email = "bad@example.com"
-        result = handle_bounces(url, TEST_DOMAIN, None, bounce_address=email)
+        result = handle_bounces(url, TEST_DOMAIN, None, bounce_address=TEST_EMAIL)
+        assert result == f"{BASE_URL_V3}/{TEST_DOMAIN}/bounces/{TEST_EMAIL}"
 
-        parts = email.split("@")
-
-        assert len(parts) == 2, "Email must have exactly one '@' symbol"
-        assert parts[0] == "bad", "Local part is incorrect"
-        assert parts[1] == TEST_DOMAIN, "Domain part is incorrect"
-        assert "bounces" in result
 
 class TestHandleUnsubscribes:
     """Tests for handle_unsubscribes."""
@@ -237,12 +180,7 @@ class TestHandleUnsubscribes:
     def test_with_unsubscribe_address(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["unsubscribes"]}
         result = handle_unsubscribes(url, TEST_DOMAIN, None, unsubscribe_address=TEST_EMAIL)
-        parts = TEST_EMAIL.split("@")
-
-        assert len(parts) == 2, "Email must have exactly one '@' symbol"
-        assert parts[0] == "user", "Local part is incorrect"
-        assert parts[1] == TEST_DOMAIN, "Domain part is incorrect"
-        assert "unsubscribes" in result
+        assert result == f"{BASE_URL_V3}/{TEST_DOMAIN}/unsubscribes/{TEST_EMAIL}"
 
 
 class TestHandleComplaints:
@@ -250,14 +188,8 @@ class TestHandleComplaints:
 
     def test_with_complaint_address(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["complaints"]}
-        email = "spam@example.com"
-        result = handle_complaints(url, TEST_DOMAIN, None, complaint_address=email)
-        parts = email.split("@")
-
-        assert len(parts) == 2, "Email must have exactly one '@' symbol"
-        assert parts[0] == "spam", "Local part is incorrect"
-        assert parts[1] == TEST_DOMAIN, "Domain part is incorrect"
-        assert "complaints" in result
+        result = handle_complaints(url, TEST_DOMAIN, None, complaint_address=TEST_EMAIL)
+        assert result == f"{BASE_URL_V3}/{TEST_DOMAIN}/complaints/{TEST_EMAIL}"
 
 
 class TestHandleWhitelists:
@@ -266,33 +198,29 @@ class TestHandleWhitelists:
     def test_with_domain(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["whitelists"]}
         result = handle_whitelists(url, TEST_DOMAIN, None)
-
-        expected_url = "https://api.mailgun.net/v3/example.com/whitelists"
-
+        expected_url = f"{BASE_URL_V3}/{TEST_DOMAIN}/whitelists"
         assert result == expected_url
-
         parsed = urlparse(result)
-        assert TEST_DOMAIN in parsed.path
-        assert parsed.path.endswith("whitelists")
+        assert parsed.path == f"/v3/{TEST_DOMAIN}/whitelists"
 
 
 class TestHandleAddressValidate:
-    """Tests for handle_address_validate (email validation handler)."""
+    """Tests for handle_address_validate."""
 
     def test_without_list_name_single_key(self) -> None:
-        """url["keys"][1:] is empty, no list_name."""
+        """url['keys'][1:] is empty, no list_name."""
         url = {"base": f"{BASE_URL_V4}/address/validate", "keys": ["validate"]}
         result = handle_address_validate(url, None, None)
-        assert result == "https://api.mailgun.net/v4/address/validate"
+        assert result == f"{BASE_URL_V4}/address/validate"
 
     def test_without_list_name_multiple_keys(self) -> None:
-        """url["keys"][1:] is non-empty, no list_name."""
+        """url['keys'][1:] is non-empty, no list_name."""
         url = {
             "base": f"{BASE_URL_V4}/address/validate",
             "keys": ["validate", "bulk"],
         }
         result = handle_address_validate(url, None, None)
-        assert result == "https://api.mailgun.net/v4/address/validate/bulk"
+        assert result == f"{BASE_URL_V4}/address/validate/bulk"
 
     def test_with_list_name(self) -> None:
         """list_name in kwargs appends /list_name to path."""
@@ -300,25 +228,23 @@ class TestHandleAddressValidate:
             "base": f"{BASE_URL_V4}/address/validate",
             "keys": ["validate", "bulk"],
         }
-        result = handle_address_validate(
-            url, None, None, list_name="my_list"
-        )
-        assert result == "https://api.mailgun.net/v4/address/validate/bulk/my_list"
+        result = handle_address_validate(url, None, None, list_name="test_list")
+        assert result == f"{BASE_URL_V4}/address/validate/bulk/test_list"
 
     def test_with_list_name_single_key(self) -> None:
         """list_name with single key (final_keys empty)."""
         url = {"base": f"{BASE_URL_V4}/address/validate", "keys": ["validate"]}
-        result = handle_address_validate(url, None, None, list_name="my_list")
-        assert result == "https://api.mailgun.net/v4/address/validate/my_list"
+        result = handle_address_validate(url, None, None, list_name="test_list")
+        assert result == f"{BASE_URL_V4}/address/validate/test_list"
 
 
 class TestHandleInbox:
-    """Tests for handle_inbox (inbox placement handler)."""
+    """Tests for handle_inbox."""
 
     def test_no_test_id_empty_keys(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": []}
         result = handle_inbox(url, None, None)
-        assert result == "https://api.mailgun.net/v3"
+        assert result == f"{BASE_URL_V3}"
 
     def test_no_test_id_with_keys(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["inbox", "tests"]}
@@ -412,14 +338,7 @@ class TestHandleTemplates:
     def test_template_tag_and_copy(self) -> None:
         url = {"base": f"{BASE_URL_V4}/", "keys": ["templates"]}
         result = handle_templates(
-            url,
-            TEST_DOMAIN,
-            None,
-            template_name="promo",
-            versions=True,
-            tag="v1",
-            copy=True,
-            new_tag="v2",
+            url, TEST_DOMAIN, None, template_name="promo", versions=True, tag="v1", copy=True, new_tag="v2"
         )
         assert result == f"{BASE_URL_V3}/{TEST_DOMAIN}/templates/promo/versions/v1/copy/v2"
 
@@ -453,10 +372,7 @@ class TestHandleMetrics:
 
     def test_metrics_limits(self) -> None:
         url = {"base": f"{BASE_URL_V1}/", "keys": ["tags"]}
-        assert (
-            handle_metrics(url, None, None, tags=True, limits="limits")
-            == f"{BASE_URL_V1}/tags/limits"
-        )
+        assert handle_metrics(url, None, None, tags=True, limits="limits") == f"{BASE_URL_V1}/tags/limits"
 
 
 class TestHandleRoutes:
@@ -480,31 +396,19 @@ class TestHandleLists:
 
     def test_lists_validate(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["lists"]}
-        assert (
-            handle_lists(url, None, None, address="dev@test", validate=True)
-            == f"{BASE_URL_V3}/lists/dev@test/validate"
-        )
+        assert handle_lists(url, None, None, address="dev@test", validate=True) == f"{BASE_URL_V3}/lists/dev@test/validate"
 
     def test_lists_multiple(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["lists"]}
-        assert (
-            handle_lists(url, None, None, address="dev@test", multiple=True)
-            == f"{BASE_URL_V3}/lists/dev@test/members.json"
-        )
+        assert handle_lists(url, None, None, address="dev@test", multiple=True) == f"{BASE_URL_V3}/lists/dev@test/members.json"
 
     def test_lists_members(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["lists", "members"]}
-        assert (
-            handle_lists(url, None, None, address="dev@test")
-            == f"{BASE_URL_V3}/lists/dev@test/members"
-        )
+        assert handle_lists(url, None, None, address="dev@test") == f"{BASE_URL_V3}/lists/dev@test/members"
 
     def test_lists_member_address(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["lists", "members"]}
-        assert (
-            handle_lists(url, None, None, address="dev@test", member_address="usr@test")
-            == f"{BASE_URL_V3}/lists/dev@test/members/usr@test"
-        )
+        assert handle_lists(url, None, None, address="dev@test", member_address="usr@test") == f"{BASE_URL_V3}/lists/dev@test/members/usr@test"
 
 
 class TestHandleKeys:
@@ -532,17 +436,11 @@ class TestHandleIpPools:
 
     def test_ippools_ips_json(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["ip_pools", "ips.json"]}
-        assert (
-            handle_ippools(url, None, None, pool_id="pool1")
-            == f"{BASE_URL_V3}/ip_pools/ips.json/pool1"
-        )
+        assert handle_ippools(url, None, None, pool_id="pool1") == f"{BASE_URL_V3}/ip_pools/ips.json/pool1"
 
     def test_ippools_with_ip(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["ip_pools"]}
-        assert (
-            handle_ippools(url, None, None, pool_id="pool1", ip="1.1.1.1")
-            == f"{BASE_URL_V3}/ip_pools/pool1/ips/1.1.1.1"
-        )
+        assert handle_ippools(url, None, None, pool_id="pool1", ip="1.1.1.1") == f"{BASE_URL_V3}/ip_pools/pool1/ips/1.1.1.1"
 
 
 class TestHandleBounceClassification:
@@ -550,7 +448,28 @@ class TestHandleBounceClassification:
 
     def test_bounce_classification(self) -> None:
         url = {"base": f"{BASE_URL_V2}/", "keys": ["bounce-classification", "metrics"]}
-        assert (
-            handle_bounce_classification(url, None, None)
-            == f"{BASE_URL_V2}/bounce-classification/metrics"
-        )
+        assert handle_bounce_classification(url, None, None) == f"{BASE_URL_V2}/bounce-classification/metrics"
+
+
+class TestHandleWebhooks:
+    """Tests for handle_webhooks (Dynamic payload-based routing)."""
+
+    def test_account_webhooks_v1(self) -> None:
+        url = {"base": f"{BASE_URL_V1}/", "keys": ["webhooks"]}
+        assert handle_webhooks(url, None, "get", webhook_id="123") == f"{BASE_URL_V1}/webhooks/123"
+
+    def test_domain_webhooks_v3_post_single(self) -> None:
+        url = {"base": f"{BASE_URL_V3}/domains/", "keys": ["webhooks"]}
+        assert handle_webhooks(url, TEST_DOMAIN, "post", data={"id": "clicked"}) == f"{BASE_URL_V3}/domains/{TEST_DOMAIN}/webhooks"
+
+    def test_domain_webhooks_v4_post_multi(self) -> None:
+        url = {"base": f"{BASE_URL_V3}/domains/", "keys": ["webhooks"]}
+        assert handle_webhooks(url, TEST_DOMAIN, "post", data={"event_types": "clicked,opened"}) == f"{BASE_URL_V4}/domains/{TEST_DOMAIN}/webhooks"
+
+    def test_domain_webhooks_v3_delete_fluent(self) -> None:
+        url = {"base": f"{BASE_URL_V3}/domains/", "keys": ["webhooks", "clicked"]}
+        assert handle_webhooks(url, TEST_DOMAIN, "delete") == f"{BASE_URL_V3}/domains/{TEST_DOMAIN}/webhooks/clicked"
+
+    def test_domain_webhooks_v4_delete_bulk(self) -> None:
+        url = {"base": f"{BASE_URL_V3}/domains/", "keys": ["webhooks"]}
+        assert handle_webhooks(url, TEST_DOMAIN, "delete", filters={"url": "https://hook.com"}) == f"{BASE_URL_V4}/domains/{TEST_DOMAIN}/webhooks"

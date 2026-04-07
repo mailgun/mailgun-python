@@ -31,7 +31,6 @@ def test_intelligent_routing_to_mailgun_servers(live_setup: tuple[Client, str]) 
     """Verify that endpoints chain correctly to valid Mailgun HTTP routes."""
     client, domain = live_setup
 
-    # ВКАЗУЄМО ТИП ДЛЯ MYPY: Словник з ключами str та значеннями-функціями, які не приймають аргументів і повертають Any.
     TEST_CALLS: dict[str, Callable[[], Any]] = {
         "accounts": lambda: client.accounts_subaccounts.get(),
         "addressvalidate": lambda: client.addressvalidate.get(address="test@example.com"),

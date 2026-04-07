@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 
 # EXACT_ROUTES map an attribute to an exact API version and path array.
 EXACT_ROUTES: dict[str, list[str | list[str]]] = {
@@ -78,7 +80,7 @@ DOMAIN_ALIASES: dict[str, str] = {
 }
 
 DOMAIN_ENDPOINTS: dict[str, list[str]] = {
-    "v1": ["click", "open", "unsubscribe", "dkim", "webhooks", "security"],
+    "v1": ["dkim", "security"],
     "v4": ["ips", "connections"],
     "v3": [
         "credentials",
@@ -96,6 +98,42 @@ DOMAIN_ENDPOINTS: dict[str, list[str]] = {
         "mailboxes",
         "ip_pools",
         "sending_queues",
-        "tracking",  # 'tracking' natively lives here
+        "tracking",
+        "click",
+        "open",
+        "unsubscribe",
+        "webhooks",
     ],
+}
+
+# DEPRECATED_ROUTES maps compiled RegEx patterns of obsolete endpoints
+# to user-friendly migration warnings.
+DEPRECATED_ROUTES: dict[re.Pattern[str], str] = {
+    # Old v1 Bounce Classification
+    re.compile(r"^/v1/bounce-classification/"): (
+        "The v1 bounce-classification API is deprecated. "
+        "Please migrate to POST /v2/bounce-classification/metrics."
+    ),
+    # Old Tags API (matches /v3/domain.com/tag and /v3/domain.com/tag/stats
+    # but strictly ignores the new /v3/domain.com/tags API)
+    re.compile(r"^/v3/[^/]+/tag(/|$|\?)"): (
+        "The legacy Tag API (/v3/{domain}/tag) is deprecated. "
+        "Please migrate to the new Tags API (/v3/{domain}/tags)."
+    ),
+    # Old Tag Limits
+    re.compile(r"^/v3/domains/[^/]+/limits/tag"): ("The domain tag limits API is deprecated."),
+    # Old v3 Bulk Validations API
+    re.compile(r"^/v3/lists/[^/]+/validate"): (
+        "The v3 Bulk Validation API is deprecated. "
+        "Please migrate to the v4 Bulk Validations Service (/v4/address/validate/bulk)."
+    ),
+    # Old v3 Address Validation APIs
+    re.compile(r"^/v3/address/(validate|parse|private)"): (
+        "The v3 Address Validation/Parsing APIs are deprecated. "
+        "Please migrate to the v4 Validations Service (/v4/address/validate or /v4/address/parse)."
+    ),
+    # Mailgun Campaigns API (Fully Deprecated)
+    re.compile(r"^/v3/[^/]+/campaigns"): (
+        "The Mailgun Campaigns API is fully deprecated and no longer supported."
+    ),
 }

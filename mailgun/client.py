@@ -19,6 +19,7 @@ import json
 import logging
 import re
 import sys
+import warnings
 from enum import Enum
 from functools import lru_cache
 from types import MappingProxyType
@@ -40,6 +41,7 @@ from mailgun.handlers.domains_handler import handle_domainlist
 from mailgun.handlers.domains_handler import handle_domains
 from mailgun.handlers.domains_handler import handle_mailboxes_credentials
 from mailgun.handlers.domains_handler import handle_sending_queues
+from mailgun.handlers.domains_handler import handle_webhooks
 from mailgun.handlers.email_validation_handler import handle_address_validate
 from mailgun.handlers.error_handler import ApiError
 from mailgun.handlers.inbox_placement_handler import handle_inbox
@@ -114,6 +116,7 @@ HANDLERS: dict[str, Callable[..., str]] = {  # type: ignore[type-arg]
     "templates": handle_templates,
     "addressvalidate": handle_address_validate,
     "inbox": handle_inbox,
+    "webhooks": handle_webhooks,
     "messages": handle_default,
     "messages.mime": handle_default,
     "events": handle_default,
@@ -395,6 +398,22 @@ class BaseEndpoint:
         self.headers = headers
         self._auth = auth
 
+    @staticmethod
+    def _warn_if_deprecated(method: str, target_url: str) -> None:
+        """Check the formulated URL against the registry of deprecated endpoints.
+
+        Issues both a standard Python DeprecationWarning and a SDK logger warning.
+        """
+        path = urlparse(target_url).path
+        for pattern, msg in routes.DEPRECATED_ROUTES.items():
+            if pattern.search(path):
+                warning_message = f"DEPRECATED API CALL ({method.upper()} {path}): {msg}"
+                # Emit standard Python warning (can be caught by test suites/linters)
+                warnings.warn(warning_message, DeprecationWarning, stacklevel=3)
+                # Emit logger warning (visible to users in standard output)
+                logger.warning(warning_message)
+                break
+
     def __repr__(self) -> str:
         """DX: Show the actual resolved target route instead of memory address.
 
@@ -490,7 +509,10 @@ class Endpoint(BaseEndpoint):
             ApiError: If the server returns a 4xx or 5xx status code or a network error occurs.
         """
         target_url = self.build_url(url, domain=domain, method=method, **kwargs)
-        # REVERTED: Using 'requests' directly to ensure unittest.mock.patch intercepts the calls.
+
+        # DX Guardrail: Deprecation Interceptor
+        self._warn_if_deprecated(method, target_url)
+
         req_method = getattr(requests, method)
 
         logger.debug("Sending Request: %s %s", method.upper(), target_url)
@@ -895,6 +917,9 @@ class AsyncEndpoint(BaseEndpoint):
             ApiError: If the server returns a 4xx or 5xx status code or a network error occurs.
         """
         target_url = self.build_url(url, domain=domain, method=method, **kwargs)
+
+        # DX Guardrail: Deprecation Interceptor
+        self._warn_if_deprecated(method, target_url)
 
         # Build basic arguments
         request_kwargs: dict[str, Any] = {

@@ -390,7 +390,7 @@ class DomainTests(unittest.TestCase):
         [self.assertIn(key, expected_dns_record_keys) for key in req.json()["dns_record"]]  # type: ignore[func-returns-value]
 
         # Also you can remove a domain key on WEB UI https://app.mailgun.com/mg/sending/domains selecting your "signing_domain"
-        query = {"signing_domain": self.test_domain, "selector": "smtp"}
+        query = {"signing_domain": self.test_domain, "selector": "smtp-test-new"}
         req2 = self.client.dkim_keys.delete(filters=query)
 
         self.assertIsInstance(req2.json(), dict)
@@ -4553,15 +4553,10 @@ class AsyncMetricsTest(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 404)
 
-    async def test_post_query_get_account_metrics_invalid_url_without_underscore(
-        self,
-    ) -> None:
-        """Expected failure with an invalid URL https://api.mailgun.net/v1/analyticsmetric (without '_' in the middle)"""
-        with self.assertRaises(KeyError) as cm:
-            await self.client.analyticsmetric.create(
-                data=self.account_metrics_data,
-            )
-        self.assertEqual(str(cm.exception), "'analyticsmetric'")
+    async def test_post_query_get_account_metrics_invalid_url_without_underscore(self) -> None:
+        """Expected failure with an invalid URL dynamically handled by Catch-All"""
+        req = await self.client.analyticsmetric.get(filters={"limit": "0", "skip": "0"})
+        self.assertEqual(req.status_code, 404)
 
     async def test_post_query_get_account_usage_metrics(self) -> None:
         req = await self.client.analytics_usage_metrics.create(
@@ -4603,15 +4598,10 @@ class AsyncMetricsTest(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 404)
 
-    async def test_post_query_get_account_usage_metrics_invalid_url_without_underscore(
-        self,
-    ) -> None:
-        """Expected failure with an invalid URL https://api.mailgun.net/v1/analyticsusagemetrics (without '_' in the middle)"""
-        with self.assertRaises(KeyError) as cm:
-            await self.client.analyticsusagemetrics.create(
-                data=json.dumps(self.invalid_account_usage_metrics_data),
-            )
-        self.assertEqual(str(cm.exception), "'analyticsusagemetrics'")
+    async def test_post_query_get_account_usage_metrics_invalid_url_without_underscore(self) -> None:
+        """Expected failure with an invalid URL dynamically handled by Catch-All"""
+        req = await self.client.analyticsusagemetrics.get(filters={"limit": "0", "skip": "0"})
+        self.assertEqual(req.status_code, 404)
 
 
 class AsyncLogsTests(unittest.IsolatedAsyncioTestCase):
@@ -4730,15 +4720,10 @@ class AsyncLogsTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 404)
 
-    async def test_post_query_get_account_logs_invalid_url_without_underscore(
-        self,
-    ) -> None:
-        """Expected failure with an invalid URL https://api.mailgun.net/v1/analyticslogs (without '_' in the middle)"""
-        with self.assertRaises(KeyError) as cm:
-            await self.client.analyticslogs.create(
-                data=self.account_logs_data,
-            )
-        self.assertEqual(str(cm.exception), "'analyticslogs'")
+    async def test_post_query_get_account_logs_invalid_url_without_underscore(self) -> None:
+        """Expected failure with an invalid URL dynamically handled by Catch-All"""
+        req = await self.client.analyticslogs.get(filters={"limit": "0", "skip": "0"})
+        self.assertEqual(req.status_code, 404)
 
 
 class AsyncTagsNewTests(unittest.IsolatedAsyncioTestCase):
@@ -4946,9 +4931,8 @@ class AsyncUsersTests(unittest.IsolatedAsyncioTestCase):
     async def test_get_user_invalid_url(self) -> None:
         """Test to get account's users details: expected failure with invalid URL."""
         query = {"role": "admin", "limit": "0", "skip": "0"}
-
-        with self.assertRaises(KeyError):
-            await self.client.user.get(filters=query)
+        req = await self.client.user.get(filters=query)
+        self.assertEqual(req.status_code, 404)
 
     @pytest.mark.xfail
     async def test_own_user_details(self) -> None:
@@ -5070,9 +5054,8 @@ class AsyncKeysTests(unittest.IsolatedAsyncioTestCase):
     async def test_get_keys_with_invalid_url(self) -> None:
         """Test to get the list of Mailgun API keys: expected failure with invalid URL."""
         query = {"domain_name": self.domain, "kind": "web"}
-
-        with pytest.raises(KeyError):
-            await self.client.key.get(filters=query)
+        req = await self.client.key.get(filters=query)
+        self.assertEqual(req.status_code, 404)
 
     async def test_get_keys_without_filtering_data(self) -> None:
         """Test to get the list of Mailgun API keys: Happy Path without filtering data."""

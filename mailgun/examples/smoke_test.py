@@ -16,6 +16,7 @@ Usage:
 import asyncio
 import logging
 import os
+import warnings
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -118,6 +119,31 @@ def test_cross_version_routing() -> Any:
     return sync_client.addressvalidate.get(address="test@example.com")
 
 
+# --- DEPRECATION WARNING TESTS ---
+
+
+def test_deprecation_warnings() -> Any:
+    """Test 6: Verify SDK intercepts legacy APIs and emits DeprecationWarnings."""
+    with warnings.catch_warnings(record=True) as caught_warnings:
+        # Force Python to capture all DeprecationWarnings
+        warnings.simplefilter("always", DeprecationWarning)
+
+        # Trigger the legacy Tag API (client.tag instead of client.tags)
+        # We don't care if it returns 200 or 404, we only care about the warning.
+        response = sync_client.tag.get(domain=DOMAIN)
+
+        # Validate that our SDK Interceptor successfully fired the warning
+        warning_emitted = any(
+            issubclass(w.category, DeprecationWarning) and "legacy Tag API" in str(w.message)
+            for w in caught_warnings
+        )
+
+        if not warning_emitted:
+            raise AssertionError("SDK failed to emit a DeprecationWarning for a legacy endpoint!")
+
+        return response
+
+
 # --- ASYNC TESTS ---
 
 
@@ -153,6 +179,11 @@ if __name__ == "__main__":
     run_sync_test("Test 404 Safe Logging", test_expected_404_logging, expected_status=(404,))
     run_sync_test(
         "Cross-Version Routing (v4)", test_cross_version_routing, expected_status=(200, 403)
+    )
+    run_sync_test(
+        "Deprecation Warning Interceptor",
+        test_deprecation_warnings,
+        expected_status=(200, 400, 404),
     )
     # Run Asynchronous Suite
     asyncio.run(async_smoke_suite())

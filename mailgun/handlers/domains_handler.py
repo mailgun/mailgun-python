@@ -172,3 +172,67 @@ def handle_dkimkeys(
     final_keys = build_path_from_keys(url.get("keys", []))
     base_url = str(url["base"]).rstrip("/")
     return f"{base_url}{final_keys}"
+
+
+def handle_webhooks(
+    url: dict[str, Any],
+    domain: str | None,
+    method: str | None,
+    **kwargs: Any,
+) -> str:
+    """Dynamically route webhooks to v1, v3, or v4 based on domain and payload.
+
+    Args:
+        url: The base URL and keys dictionary.
+        domain: Target domain name.
+        method: Requested HTTP method (e.g., 'post', 'put', 'delete', 'get').
+        **kwargs: Additional parameters including 'webhook_name', 'webhook_id', 'data', and 'filters'.
+
+    Returns:
+        The formulated webhook URL string.
+    """
+    base_url = str(url["base"]).rstrip("/")
+    keys = list(url.get("keys", []))
+
+    # 1. Account Webhooks (v1)
+    if "/v1" in base_url or not domain:
+        final_keys = build_path_from_keys(keys)
+        path = f"{base_url}{final_keys}"
+        if "webhook_id" in kwargs:
+            return f"{path}/{kwargs['webhook_id']}"
+        return path
+
+    # 2. Domain Webhooks (v3 or v4)
+    webhook_name = kwargs.get("webhook_name")
+
+    # Fluent API support (e.g., client.domains_webhooks_clicked -> keys=["webhooks", "clicked"])
+    if len(keys) > 1 and keys[0] == "webhooks":
+        webhook_name = webhook_name or keys[1]
+        keys = [keys[0]]
+
+    data = kwargs.get("data") or {}
+    filters = kwargs.get("filters") or {}
+
+    # Payload Detection (Content-Based Routing)
+    has_event_types = isinstance(data, dict) and "event_types" in data
+    has_url_query = isinstance(filters, dict) and "url" in filters
+    method_lower = (method or "").lower()
+
+    is_v4 = False
+    if (method_lower in {"post", "put"} and has_event_types) or (
+        method_lower == "delete" and has_url_query
+    ):
+        is_v4 = True
+
+    if is_v4:
+        # Dynamic upgrade: Replace version without hardcoding the host
+        base_url = base_url.replace("/v3/", "/v4/")
+
+    final_keys_str = build_path_from_keys(keys)
+    domain_path = f"{base_url}/{domain}{final_keys_str}"
+
+    if not is_v4 and webhook_name:
+        # v3 API requires webhook name in the URL
+        return f"{domain_path}/{webhook_name}"
+
+    return domain_path
