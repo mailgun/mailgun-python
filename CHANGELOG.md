@@ -28,7 +28,6 @@ We [keep a changelog.](http://keepachangelog.com/)
 - Broadened type hints for `files` (`Any | None`) and `timeout` (`int | float | tuple`) to fully support `requests`/`httpx` capabilities (like multipart lists) without triggering false positives in strict IDEs.
 - **Performance**: Implemented automated Payload Minification. The SDK now strips structural spaces from JSON payloads (`separators=(',', ':')`), reducing network overhead by ~15-20% for large batch requests.
 - **Performance**: Memoized internal route resolution logic using `@lru_cache` in `_get_cached_route_data`, eliminating redundant string splitting and dictionary lookups during repeated API calls.
-- Replaced flat timeouts with strict `(10.0, 60.0)` connect/read tuple timeouts in both `Endpoint` and `AsyncEndpoint` to enforce fail-fast network resiliency.
 - Updated `DOMAIN_ENDPOINTS` mapping to reflect Mailgun's latest architecture, officially moving `tracking`, `click`, `open`, `unsubscribe`, and `webhooks` from `v1` to `v3`.
 - Modernized the codebase using modern Python idioms (e.g., `contextlib.suppress`) and resolved strict typing errors for `pyright`.
 - **Documentation**: Migrated all internal and public docstrings from legacy Sphinx/reST format to modern Google Style for cleaner readability and better IDE hover-hints.
