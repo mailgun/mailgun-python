@@ -17,7 +17,7 @@ class TestRoutingEngine(unittest.TestCase):
         self.client = Client(auth=("api", "fake-api-key"))
         self.domain = "python.test.com"
 
-    @patch("mailgun.client.requests.get")
+    @patch("requests.Session.get")
     def test_all_endpoints_can_generate_urls(self, mock_get: MagicMock) -> None:
         """Verify that every endpoint mapped in routes.py can generate a URL without KeyError."""
         mock_get.return_value = MagicMock(status_code=200)

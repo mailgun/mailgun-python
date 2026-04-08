@@ -45,13 +45,13 @@ class MessagesTests(unittest.TestCase):
             "o:tag": "Python test",
         }
 
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.post")
     def test_post_right_message(self, m_post: MagicMock) -> None:
         m_post.return_value = mock_response(200, {"id": "<msg-id>", "message": "Queued"})
         req = self.client.messages.create(data=self.data, domain=self.domain)
         self.assertEqual(req.status_code, 200)
 
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.post")
     def test_post_wrong_message(self, m_post: MagicMock) -> None:
         m_post.return_value = mock_response(400, {"message": "Invalid from"})
         req = self.client.messages.create(data={"from": "sdsdsd"}, domain=self.domain)
@@ -83,8 +83,8 @@ class DomainTests(unittest.TestCase):
         self.put_domain_webprefix_data = {"web_prefix": "python"}
         self.put_dkim_selector_data = {"dkim_selector": "s"}
 
-    @patch("mailgun.client.requests.delete")
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.delete")
+    @patch("requests.Session.post")
     def test_post_domain(self, m_post: MagicMock, m_delete: MagicMock) -> None:
         m_delete.return_value = mock_response(200, {"message": "ok"})
         m_post.return_value = mock_response(
@@ -94,7 +94,7 @@ class DomainTests(unittest.TestCase):
         self.assertEqual(request.status_code, 200)
         self.assertIn("Domain DNS records have been created", request.json()["message"])
 
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.post")
     def test_post_domain_creds(self, m_post: MagicMock) -> None:
         m_post.return_value = mock_response(200, {"message": "Created"})
         request = self.client.domains_credentials.create(
@@ -103,9 +103,9 @@ class DomainTests(unittest.TestCase):
         self.assertEqual(request.status_code, 200)
         self.assertIn("message", request.json())
 
-    @patch("mailgun.client.requests.delete")
-    @patch("mailgun.client.requests.post")
-    @patch("mailgun.client.requests.put")
+    @patch("requests.Session.delete")
+    @patch("requests.Session.post")
+    @patch("requests.Session.put")
     def test_update_simple_domain(
         self, m_put: MagicMock, m_post: MagicMock, m_delete: MagicMock
     ) -> None:
@@ -119,8 +119,8 @@ class DomainTests(unittest.TestCase):
         self.assertEqual(request.status_code, 200)
         self.assertEqual(request.json()["message"], "Domain has been updated")
 
-    @patch("mailgun.client.requests.post")
-    @patch("mailgun.client.requests.put")
+    @patch("requests.Session.post")
+    @patch("requests.Session.put")
     def test_put_domain_creds(self, m_put: MagicMock, m_post: MagicMock) -> None:
         m_post.return_value = mock_response(200, {"message": "Created"})
         m_put.return_value = mock_response(200, {"message": "Updated"})
@@ -133,8 +133,8 @@ class DomainTests(unittest.TestCase):
         self.assertEqual(request.status_code, 200)
         self.assertIn("message", request.json())
 
-    @patch("mailgun.client.requests.post")
-    @patch("mailgun.client.requests.put")
+    @patch("requests.Session.post")
+    @patch("requests.Session.put")
     def test_put_mailboxes_credentials(self, m_put: MagicMock, m_post: MagicMock) -> None:
         m_post.return_value = mock_response()
         m_put.return_value = mock_response(
@@ -154,29 +154,29 @@ class DomainTests(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("Password changed", req.json()["message"])
 
-    @patch("mailgun.client.requests.get")
+    @patch("requests.Session.get")
     def test_get_domain_list(self, m_get: MagicMock) -> None:
         m_get.return_value = mock_response(200, {"items": []})
         req = self.client.domainlist.get()
         self.assertEqual(req.status_code, 200)
         self.assertIn("items", req.json())
 
-    @patch("mailgun.client.requests.get")
+    @patch("requests.Session.get")
     def test_get_smtp_creds(self, m_get: MagicMock) -> None:
         m_get.return_value = mock_response(200, {"items": []})
         request = self.client.domains_credentials.get(domain=self.domain)
         self.assertEqual(request.status_code, 200)
         self.assertIn("items", request.json())
 
-    @patch("mailgun.client.requests.get")
+    @patch("requests.Session.get")
     def test_get_sending_queues(self, m_get: MagicMock) -> None:
         m_get.return_value = mock_response(200, {"scheduled": [], "retry": []})
         request = self.client.domains_sendingqueues.get(domain=self.test_domain)
         self.assertEqual(request.status_code, 200)
         self.assertIn("scheduled", request.json())
 
-    @patch("mailgun.client.requests.get")
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_get_single_domain(self, m_post: MagicMock, m_get: MagicMock) -> None:
         m_post.return_value = mock_response()
         m_get.return_value = mock_response(200, {"domain": {"name": self.test_domain}})
@@ -185,8 +185,8 @@ class DomainTests(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("domain", req.json())
 
-    @patch("mailgun.client.requests.put")
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.put")
+    @patch("requests.Session.post")
     def test_verify_domain(self, m_post: MagicMock, m_put: MagicMock) -> None:
         m_post.return_value = mock_response()
         m_put.return_value = mock_response(200, {"domain": {"state": "verified"}})
@@ -195,7 +195,7 @@ class DomainTests(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("domain", req.json())
 
-    @patch("mailgun.client.requests.put")
+    @patch("requests.Session.put")
     def test_put_domain_connections(self, m_put: MagicMock) -> None:
         m_put.return_value = mock_response(200, {"message": "Updated"})
         request = self.client.domains_connection.put(
@@ -204,7 +204,7 @@ class DomainTests(unittest.TestCase):
         self.assertEqual(request.status_code, 200)
         self.assertIn("message", request.json())
 
-    @patch("mailgun.client.requests.put")
+    @patch("requests.Session.put")
     def test_put_domain_tracking_open(self, m_put: MagicMock) -> None:
         m_put.return_value = mock_response(200, {"message": "Updated"})
         request = self.client.domains_tracking_open.put(
@@ -213,7 +213,7 @@ class DomainTests(unittest.TestCase):
         self.assertEqual(request.status_code, 200)
         self.assertIn("message", request.json())
 
-    @patch("mailgun.client.requests.put")
+    @patch("requests.Session.put")
     def test_put_domain_tracking_click(self, m_put: MagicMock) -> None:
         m_put.return_value = mock_response(200, {"message": "Updated"})
         request = self.client.domains_tracking_click.put(
@@ -222,7 +222,7 @@ class DomainTests(unittest.TestCase):
         self.assertEqual(request.status_code, 200)
         self.assertIn("message", request.json())
 
-    @patch("mailgun.client.requests.put")
+    @patch("requests.Session.put")
     def test_put_domain_unsubscribe(self, m_put: MagicMock) -> None:
         m_put.return_value = mock_response(200, {"message": "Updated"})
         request = self.client.domains_tracking_unsubscribe.put(
@@ -231,8 +231,8 @@ class DomainTests(unittest.TestCase):
         self.assertEqual(request.status_code, 200)
         self.assertIn("message", request.json())
 
-    @patch("mailgun.client.requests.put")
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.put")
+    @patch("requests.Session.post")
     def test_put_dkim_authority(self, m_post: MagicMock, m_put: MagicMock) -> None:
         m_post.return_value = mock_response()
         m_put.return_value = mock_response(200, {"message": "Updated"})
@@ -242,8 +242,8 @@ class DomainTests(unittest.TestCase):
         )
         self.assertIn("message", request.json())
 
-    @patch("mailgun.client.requests.put")
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.put")
+    @patch("requests.Session.post")
     def test_put_webprefix(self, m_post: MagicMock, m_put: MagicMock) -> None:
         m_post.return_value = mock_response()
         m_put.return_value = mock_response(200, {"message": "Updated"})
@@ -253,7 +253,7 @@ class DomainTests(unittest.TestCase):
         )
         self.assertIn("message", request.json())
 
-    @patch("mailgun.client.requests.put")
+    @patch("requests.Session.put")
     def test_put_dkim_selector(self, m_put: MagicMock) -> None:
         m_put.return_value = mock_response(200, {"message": "Updated"})
         request = self.client.domains_dkimselector.put(
@@ -261,7 +261,7 @@ class DomainTests(unittest.TestCase):
         )
         self.assertIn("message", request.json())
 
-    @patch("mailgun.client.requests.get")
+    @patch("requests.Session.get")
     def test_get_dkim_keys(self, m_get: MagicMock) -> None:
         m_get.return_value = mock_response(
             200,
@@ -287,7 +287,7 @@ class DomainTests(unittest.TestCase):
         self.assertIn("items", req.json())
         self.assertIn("paging", req.json())
 
-    @patch("mailgun.client.requests.delete")
+    @patch("requests.Session.delete")
     def test_delete_dkim_keys(self, m_delete: MagicMock) -> None:
         m_delete.return_value = mock_response(200, {"message": "success"})
         query = {"signing_domain": "python.test.domain5", "selector": "smtp"}
@@ -295,8 +295,8 @@ class DomainTests(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("success", req.json()["message"])
 
-    @patch("mailgun.client.requests.delete")
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.delete")
+    @patch("requests.Session.post")
     def test_delete_domain_creds(self, m_post: MagicMock, m_delete: MagicMock) -> None:
         m_post.return_value = mock_response()
         m_delete.return_value = mock_response()
@@ -308,8 +308,8 @@ class DomainTests(unittest.TestCase):
         )
         self.assertEqual(request.status_code, 200)
 
-    @patch("mailgun.client.requests.delete")
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.delete")
+    @patch("requests.Session.post")
     def test_delete_all_domain_credentials(
         self, m_post: MagicMock, m_delete: MagicMock
     ) -> None:
@@ -326,8 +326,8 @@ class DomainTests(unittest.TestCase):
             request.json()["message"], "All domain credentials have been deleted"
         )
 
-    @patch("mailgun.client.requests.delete")
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.delete")
+    @patch("requests.Session.post")
     def test_delete_domain(self, m_post: MagicMock, m_delete: MagicMock) -> None:
         m_post.return_value = mock_response()
         m_delete.return_value = mock_response(
@@ -349,15 +349,15 @@ class IpTests(unittest.TestCase):
         self.domain = DOMAIN
         self.ip_data = {"ip": "1.2.3.4"}
 
-    @patch("mailgun.client.requests.get")
+    @patch("requests.Session.get")
     def test_get_ip_from_domain(self, m_get: MagicMock) -> None:
         m_get.return_value = mock_response(200, {"items": []})
         req = self.client.ips.get(domain=self.domain, params={"dedicated": "true"})
         self.assertIn("items", req.json())
         self.assertEqual(req.status_code, 200)
 
-    @patch("mailgun.client.requests.get")
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_get_ip_by_address(self, m_post: MagicMock, m_get: MagicMock) -> None:
         m_post.return_value = mock_response()
         m_get.return_value = mock_response(200, {"ip": self.ip_data["ip"]})
@@ -366,14 +366,14 @@ class IpTests(unittest.TestCase):
         self.assertIn("ip", req.json())
         self.assertEqual(req.status_code, 200)
 
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.post")
     def test_create_ip(self, m_post: MagicMock) -> None:
         m_post.return_value = mock_response(200, {"message": "success"})
         request = self.client.domains_ips.create(domain=self.domain, data=self.ip_data)
         self.assertEqual("success", request.json()["message"])
         self.assertEqual(request.status_code, 200)
 
-    @patch("mailgun.client.requests.delete")
+    @patch("requests.Session.delete")
     def test_delete_ip(self, m_delete: MagicMock) -> None:
         m_delete.return_value = mock_response(200, {"message": "success"})
         request = self.client.domains_ips.delete(
@@ -392,8 +392,8 @@ class IpPoolsTests(unittest.TestCase):
         self.data = {"name": "test_pool", "description": "Test", "add_ip": "1.2.3.4"}
         self.patch_data = {"name": "test_pool1", "description": "Test1"}
 
-    @patch("mailgun.client.requests.get")
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_get_ippools(self, m_post: MagicMock, m_get: MagicMock) -> None:
         m_post.return_value = mock_response(200, {"pool_id": "pid"})
         m_get.return_value = mock_response(200, {"ip_pools": []})
@@ -402,8 +402,8 @@ class IpPoolsTests(unittest.TestCase):
         self.assertIn("ip_pools", req.json())
         self.assertEqual(req.status_code, 200)
 
-    @patch("mailgun.client.requests.patch")
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.patch")
+    @patch("requests.Session.post")
     def test_patch_ippool(self, m_post: MagicMock, m_patch: MagicMock) -> None:
         m_post.return_value = mock_response(200, {"pool_id": "pid123"})
         m_patch.return_value = mock_response(200, {"message": "success"})
@@ -414,7 +414,7 @@ class IpPoolsTests(unittest.TestCase):
         self.assertEqual("success", req.json()["message"])
         self.assertEqual(req.status_code, 200)
 
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.post")
     def test_link_domain_ippool(self, m_post: MagicMock) -> None:
         m_post.return_value = mock_response(200, {"message": "Linked"})
         req = self.client.domains_ips.create(
@@ -422,8 +422,8 @@ class IpPoolsTests(unittest.TestCase):
         )
         self.assertIn("message", req.json())
 
-    @patch("mailgun.client.requests.delete")
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.delete")
+    @patch("requests.Session.post")
     def test_delete_ippool(self, m_post: MagicMock, m_delete: MagicMock) -> None:
         m_post.return_value = mock_response(200, {"pool_id": "pid123"})
         m_delete.return_value = mock_response(200, {"message": "started"})
@@ -442,14 +442,14 @@ class EventsTests(unittest.TestCase):
         self.domain = DOMAIN
         self.params = {"event": "rejected"}
 
-    @patch("mailgun.client.requests.get")
+    @patch("requests.Session.get")
     def test_events_get(self, m_get: MagicMock) -> None:
         m_get.return_value = mock_response(200, {"items": []})
         req = self.client.events.get(domain=self.domain)
         self.assertIn("items", req.json())
         self.assertEqual(req.status_code, 200)
 
-    @patch("mailgun.client.requests.get")
+    @patch("requests.Session.get")
     def test_event_params(self, m_get: MagicMock) -> None:
         m_get.return_value = mock_response(200, {"items": []})
         req = self.client.events.get(domain=self.domain, filters=self.params)
@@ -468,21 +468,21 @@ class TagsTests(unittest.TestCase):
         self.stats_params = {"event": "accepted"}
         self.tag_name = "Python test"
 
-    @patch("mailgun.client.requests.get")
+    @patch("requests.Session.get")
     def test_get_tags(self, m_get: MagicMock) -> None:
         m_get.return_value = mock_response(200, {"items": []})
         req = self.client.tags.get(domain=self.domain)
         self.assertIn("items", req.json())
         self.assertEqual(req.status_code, 200)
 
-    @patch("mailgun.client.requests.get")
+    @patch("requests.Session.get")
     def test_tag_get_by_name(self, m_get: MagicMock) -> None:
         m_get.return_value = mock_response(200, {"tag": {"name": self.tag_name}})
         req = self.client.tags.get(domain=self.domain, tag_name=self.tag_name)
         self.assertIn("tag", req.json())
         self.assertEqual(req.status_code, 200)
 
-    @patch("mailgun.client.requests.put")
+    @patch("requests.Session.put")
     def test_tag_put(self, m_put: MagicMock) -> None:
         m_put.return_value = mock_response(200, {"message": "Updated"})
         req = self.client.tags.put(
@@ -493,7 +493,7 @@ class TagsTests(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("message", req.json())
 
-    @patch("mailgun.client.requests.get")
+    @patch("requests.Session.get")
     def test_tags_stats_get(self, m_get: MagicMock) -> None:
         m_get.return_value = mock_response(200, {"tag": {}})
         req = self.client.tags_stats.get(
@@ -504,7 +504,7 @@ class TagsTests(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("tag", req.json())
 
-    @patch("mailgun.client.requests.get")
+    @patch("requests.Session.get")
     def test_tags_stats_aggregate_get(self, m_get: MagicMock) -> None:
         m_get.return_value = mock_response(200, {"tag": {}})
         req = self.client.tags_stats_aggregates_devices.get(
@@ -515,7 +515,7 @@ class TagsTests(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("tag", req.json())
 
-    @patch("mailgun.client.requests.delete")
+    @patch("requests.Session.delete")
     def test_delete_tags(self, m_delete: MagicMock) -> None:
         m_delete.return_value = mock_response(200, {"message": "Deleted"})
         req = self.client.tags.delete(
@@ -546,22 +546,22 @@ class BouncesTests(unittest.TestCase):
             "error": "Test error"
         }]"""
 
-    @patch("mailgun.client.requests.get")
+    @patch("requests.Session.get")
     def test_bounces_get(self, m_get: MagicMock) -> None:
         m_get.return_value = mock_response(200, {"items": []})
         req = self.client.bounces.get(domain=self.domain)
         self.assertEqual(req.status_code, 200)
         self.assertIn("items", req.json())
 
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.post")
     def test_bounces_create(self, m_post: MagicMock) -> None:
         m_post.return_value = mock_response(200, {"address": self.bounces_data["address"]})
         req = self.client.bounces.create(data=self.bounces_data, domain=self.domain)
         self.assertEqual(req.status_code, 200)
         self.assertIn("address", req.json())
 
-    @patch("mailgun.client.requests.get")
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_bounces_get_address(self, m_post: MagicMock, m_get: MagicMock) -> None:
         m_post.return_value = mock_response()
         m_get.return_value = mock_response(200, {"address": self.bounces_data["address"]})
@@ -572,7 +572,7 @@ class BouncesTests(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("address", req.json())
 
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.post")
     def test_bounces_create_json(self, m_post: MagicMock) -> None:
         m_post.return_value = mock_response(200, {"message": "Added"})
         json_data = json.loads(self.bounces_json_data)
@@ -585,8 +585,8 @@ class BouncesTests(unittest.TestCase):
             self.assertEqual(req.status_code, 200)
             self.assertIn("message", req.json())
 
-    @patch("mailgun.client.requests.delete")
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.delete")
+    @patch("requests.Session.post")
     def test_bounces_delete_single(self, m_post: MagicMock, m_delete: MagicMock) -> None:
         m_post.return_value = mock_response()
         m_delete.return_value = mock_response(200, {"message": "Deleted"})
@@ -597,7 +597,7 @@ class BouncesTests(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("message", req.json())
 
-    @patch("mailgun.client.requests.delete")
+    @patch("requests.Session.delete")
     def test_bounces_delete_all(self, m_delete: MagicMock) -> None:
         m_delete.return_value = mock_response(200, {"message": "Deleted"})
         req = self.client.bounces.delete(domain=self.domain)
@@ -615,21 +615,21 @@ class UnsubscribesTests(unittest.TestCase):
         self.unsub_json_data = """[{"address": "test1@gmail.com", "tags": ["some tag"]},
             {"address": "test2@gmail.com", "code": ["*"]}, {"address": "test3@gmail.com"}]"""
 
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.post")
     def test_unsub_create(self, m_post: MagicMock) -> None:
         m_post.return_value = mock_response(200, {"message": "Added"})
         req = self.client.unsubscribes.create(data=self.unsub_data, domain=self.domain)
         self.assertEqual(req.status_code, 200)
         self.assertIn("message", req.json())
 
-    @patch("mailgun.client.requests.get")
+    @patch("requests.Session.get")
     def test_unsub_get(self, m_get: MagicMock) -> None:
         m_get.return_value = mock_response(200, {"items": []})
         req = self.client.unsubscribes.get(domain=self.domain)
         self.assertEqual(req.status_code, 200)
         self.assertIn("items", req.json())
 
-    @patch("mailgun.client.requests.get")
+    @patch("requests.Session.get")
     def test_unsub_get_single(self, m_get: MagicMock) -> None:
         m_get.return_value = mock_response(200, {"address": self.unsub_data["address"]})
         req = self.client.unsubscribes.get(
@@ -638,7 +638,7 @@ class UnsubscribesTests(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("address", req.json())
 
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.post")
     def test_unsub_create_multiple(self, m_post: MagicMock) -> None:
         m_post.return_value = mock_response(200, {"message": "Added"})
         json_data = json.loads(self.unsub_json_data)
@@ -651,7 +651,7 @@ class UnsubscribesTests(unittest.TestCase):
             self.assertEqual(req.status_code, 200)
             self.assertIn("message", req.json())
 
-    @patch("mailgun.client.requests.delete")
+    @patch("requests.Session.delete")
     def test_unsub_delete(self, m_delete: MagicMock) -> None:
         m_delete.return_value = mock_response(200, {"message": "Deleted"})
         req = self.client.unsubscribes.delete(
@@ -660,7 +660,7 @@ class UnsubscribesTests(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("message", req.json())
 
-    @patch("mailgun.client.requests.delete")
+    @patch("requests.Session.delete")
     def test_unsub_delete_all(self, m_delete: MagicMock) -> None:
         m_delete.return_value = mock_response(200, {"message": "Deleted"})
         req = self.client.unsubscribes.delete(domain=self.domain)
@@ -678,29 +678,29 @@ class ComplaintsTests(unittest.TestCase):
         self.compl_json_data = """[{"address": "test1@gmail.com", "tags": ["some tag"]},
             {"address": "test3@gmail.com"}]"""
 
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.post")
     def test_compl_create(self, m_post: MagicMock) -> None:
         m_post.return_value = mock_response(200, {"message": "Added"})
         req = self.client.complaints.create(data=self.compl_data, domain=self.domain)
         self.assertEqual(req.status_code, 200)
         self.assertIn("message", req.json())
 
-    @patch("mailgun.client.requests.get")
+    @patch("requests.Session.get")
     def test_get_single_complaint(self, m_get: MagicMock) -> None:
         m_get.return_value = mock_response(200, {"items": []})
         req = self.client.complaints.get(data=self.compl_data, domain=self.domain)
         self.assertEqual(req.status_code, 200)
         self.assertIn("items", req.json())
 
-    @patch("mailgun.client.requests.get")
+    @patch("requests.Session.get")
     def test_compl_get_all(self, m_get: MagicMock) -> None:
         m_get.return_value = mock_response(200, {"items": []})
         req = self.client.complaints.get(domain=self.domain)
         self.assertEqual(req.status_code, 200)
         self.assertIn("items", req.json())
 
-    @patch("mailgun.client.requests.get")
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_compl_get_single(self, m_post: MagicMock, m_get: MagicMock) -> None:
         m_post.return_value = mock_response()
         m_get.return_value = mock_response(200, {"address": self.compl_data["address"]})
@@ -711,7 +711,7 @@ class ComplaintsTests(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("address", req.json())
 
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.post")
     def test_compl_create_multiple(self, m_post: MagicMock) -> None:
         m_post.return_value = mock_response(200, {"message": "Added"})
         json_data = json.loads(self.compl_json_data)
@@ -724,8 +724,8 @@ class ComplaintsTests(unittest.TestCase):
             self.assertEqual(req.status_code, 200)
             self.assertIn("message", req.json())
 
-    @patch("mailgun.client.requests.delete")
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.delete")
+    @patch("requests.Session.post")
     def test_compl_delete_single(self, m_post: MagicMock, m_delete: MagicMock) -> None:
         m_post.return_value = mock_response()
         m_delete.return_value = mock_response(200, {"message": "Deleted"})
@@ -735,7 +735,7 @@ class ComplaintsTests(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("message", req.json())
 
-    @patch("mailgun.client.requests.delete")
+    @patch("requests.Session.delete")
     def test_compl_delete_all(self, m_delete: MagicMock) -> None:
         m_delete.return_value = mock_response(200, {"message": "Deleted"})
         req = self.client.complaints.delete(domain=self.domain)
@@ -751,21 +751,21 @@ class WhiteListTests(unittest.TestCase):
         self.domain = DOMAIN
         self.whitel_data = {"address": "test@gmail.com"}
 
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.post")
     def test_whitel_create(self, m_post: MagicMock) -> None:
         m_post.return_value = mock_response(200, {"message": "Added"})
         req = self.client.whitelists.create(data=self.whitel_data, domain=self.domain)
         self.assertEqual(req.status_code, 200)
         self.assertIn("message", req.json())
 
-    @patch("mailgun.client.requests.get")
+    @patch("requests.Session.get")
     def test_whitel_get_simple(self, m_get: MagicMock) -> None:
         m_get.return_value = mock_response(200, {"items": []})
         req = self.client.whitelists.get(domain=self.domain)
         self.assertEqual(req.status_code, 200)
         self.assertIn("items", req.json())
 
-    @patch("mailgun.client.requests.delete")
+    @patch("requests.Session.delete")
     def test_whitel_delete_simple(self, m_delete: MagicMock) -> None:
         m_delete.return_value = mock_response(200, {"message": "Deleted"})
         req = self.client.whitelists.delete(
@@ -791,9 +791,9 @@ class RoutesTests(unittest.TestCase):
         self.routes_params = {"skip": 1, "limit": 1}
         self.routes_put_data = {"priority": 2}
 
-    @patch("mailgun.client.requests.post")
-    @patch("mailgun.client.requests.delete")
-    @patch("mailgun.client.requests.get")
+    @patch("requests.Session.post")
+    @patch("requests.Session.delete")
+    @patch("requests.Session.get")
     def test_routes_create(
         self, m_get: MagicMock, m_delete: MagicMock, m_post: MagicMock
     ) -> None:
@@ -810,15 +810,15 @@ class RoutesTests(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("message", req.json())
 
-    @patch("mailgun.client.requests.get")
+    @patch("requests.Session.get")
     def test_routes_get_all(self, m_get: MagicMock) -> None:
         m_get.return_value = mock_response(200, {"items": []})
         req = self.client.routes.get(domain=self.domain, filters=self.routes_params)
         self.assertEqual(req.status_code, 200)
         self.assertIn("items", req.json())
 
-    @patch("mailgun.client.requests.get")
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_get_route_by_id(self, m_post: MagicMock, m_get: MagicMock) -> None:
         m_post.return_value = mock_response(200, {"route": {"id": "rid123"}})
         m_get.return_value = mock_response(200, {"route": {"id": "rid123"}})
@@ -831,8 +831,8 @@ class RoutesTests(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("route", req.json())
 
-    @patch("mailgun.client.requests.put")
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.put")
+    @patch("requests.Session.post")
     def test_routes_put(self, m_post: MagicMock, m_put: MagicMock) -> None:
         m_post.return_value = mock_response(200, {"route": {"id": "rid123"}})
         m_put.return_value = mock_response(200, {"message": "Updated"})
@@ -847,8 +847,8 @@ class RoutesTests(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("message", req.json())
 
-    @patch("mailgun.client.requests.delete")
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.delete")
+    @patch("requests.Session.post")
     def test_routes_delete(self, m_post: MagicMock, m_delete: MagicMock) -> None:
         m_post.return_value = mock_response(200, {"route": {"id": "rid123"}})
         m_delete.return_value = mock_response(200, {"message": "Deleted"})
@@ -861,7 +861,7 @@ class RoutesTests(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("message", req.json())
 
-    @patch("mailgun.client.requests.get")
+    @patch("requests.Session.get")
     def test_get_routes_match(self, m_get: MagicMock) -> None:
         m_get.return_value = mock_response(
             200,
@@ -896,8 +896,8 @@ class WebhooksTests(unittest.TestCase):
         self.webhooks_data = {"id": "clicked", "url": ["https://i.ua"]}
         self.webhooks_data_put = {"url": "https://twitter.com"}
 
-    @patch("mailgun.client.requests.delete")
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.delete")
+    @patch("requests.Session.post")
     def test_webhooks_create(self, m_post: MagicMock, m_delete: MagicMock) -> None:
         m_post.return_value = mock_response(200, {"message": "Created"})
         m_delete.return_value = mock_response()
@@ -908,16 +908,16 @@ class WebhooksTests(unittest.TestCase):
         self.assertIn("message", req.json())
         self.client.domains_webhooks_clicked.delete(domain=self.domain)
 
-    @patch("mailgun.client.requests.get")
+    @patch("requests.Session.get")
     def test_webhooks_get(self, m_get: MagicMock) -> None:
         m_get.return_value = mock_response(200, {"webhooks": {}})
         req = self.client.domains_webhooks.get(domain=self.domain)
         self.assertEqual(req.status_code, 200)
         self.assertIn("webhooks", req.json())
 
-    @patch("mailgun.client.requests.delete")
-    @patch("mailgun.client.requests.put")
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.delete")
+    @patch("requests.Session.put")
+    @patch("requests.Session.post")
     def test_webhook_put(self, m_post: MagicMock, m_put: MagicMock, m_delete: MagicMock) -> None:
         m_post.return_value = mock_response()
         m_put.return_value = mock_response(200, {"message": "Updated"})
@@ -933,9 +933,9 @@ class WebhooksTests(unittest.TestCase):
         self.assertIn("message", req.json())
         self.client.domains_webhooks_clicked.delete(domain=self.domain)
 
-    @patch("mailgun.client.requests.delete")
-    @patch("mailgun.client.requests.get")
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.delete")
+    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_webhook_get_simple(self, m_post: MagicMock, m_get: MagicMock, m_delete: MagicMock) -> None:
         m_post.return_value = mock_response()
         m_get.return_value = mock_response(200, {"webhook": {}})
@@ -949,8 +949,8 @@ class WebhooksTests(unittest.TestCase):
         self.assertIn("webhook", req.json())
         self.client.domains_webhooks_clicked.delete(domain=self.domain)
 
-    @patch("mailgun.client.requests.delete")
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.delete")
+    @patch("requests.Session.post")
     def test_webhook_delete(self, m_post: MagicMock, m_delete: MagicMock) -> None:
         m_post.return_value = mock_response()
         m_delete.return_value = mock_response(200, {"message": "Deleted"})
@@ -993,14 +993,14 @@ class MailingListsTests(unittest.TestCase):
             "members": '[{"address": "alice@example.com"}, {"address": "bob@example.com"}]',
         }
 
-    @patch("mailgun.client.requests.get")
+    @patch("requests.Session.get")
     def test_maillist_pages_get(self, m_get: MagicMock) -> None:
         m_get.return_value = mock_response(200, {"items": []})
         req = self.client.lists_pages.get(domain=self.domain)
         self.assertEqual(req.status_code, 200)
         self.assertIn("items", req.json())
 
-    @patch("mailgun.client.requests.get")
+    @patch("requests.Session.get")
     def test_maillist_lists_get(self, m_get: MagicMock) -> None:
         m_get.return_value = mock_response(200, {"list": {}})
         req = self.client.lists.get(
@@ -1009,7 +1009,7 @@ class MailingListsTests(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("list", req.json())
 
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.post")
     def test_maillist_lists_create(self, m_post: MagicMock) -> None:
         m_post.return_value = mock_response(200, {"list": {}})
         req = self.client.lists.create(
@@ -1018,8 +1018,8 @@ class MailingListsTests(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("list", req.json())
 
-    @patch("mailgun.client.requests.put")
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.put")
+    @patch("requests.Session.post")
     def test_maillists_lists_put(self, m_post: MagicMock, m_put: MagicMock) -> None:
         m_post.return_value = mock_response()
         m_put.return_value = mock_response(200, {"list": {}})
@@ -1032,8 +1032,8 @@ class MailingListsTests(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("list", req.json())
 
-    @patch("mailgun.client.requests.delete")
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.delete")
+    @patch("requests.Session.post")
     def test_maillists_lists_delete(
         self, m_post: MagicMock, m_delete: MagicMock
     ) -> None:
@@ -1046,7 +1046,7 @@ class MailingListsTests(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.client.lists.create(domain=self.domain, data=self.mailing_lists_data)
 
-    @patch("mailgun.client.requests.get")
+    @patch("requests.Session.get")
     def test_maillists_lists_members_pages_get(self, m_get: MagicMock) -> None:
         m_get.return_value = mock_response(200, {"items": []})
         req = self.client.lists_members_pages.get(
@@ -1055,8 +1055,8 @@ class MailingListsTests(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("items", req.json())
 
-    @patch("mailgun.client.requests.post")
-    @patch("mailgun.client.requests.delete")
+    @patch("requests.Session.post")
+    @patch("requests.Session.delete")
     def test_maillists_lists_members_create(
         self, m_delete: MagicMock, m_post: MagicMock
     ) -> None:
@@ -1070,7 +1070,7 @@ class MailingListsTests(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("member", req.json())
 
-    @patch("mailgun.client.requests.get")
+    @patch("requests.Session.get")
     def test_maillists_lists_members_get(self, m_get: MagicMock) -> None:
         m_get.return_value = mock_response(200, {"items": []})
         req = self.client.lists_members.get(
@@ -1079,8 +1079,8 @@ class MailingListsTests(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("items", req.json())
 
-    @patch("mailgun.client.requests.put")
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.put")
+    @patch("requests.Session.post")
     def test_maillists_lists_members_update(
         self, m_post: MagicMock, m_put: MagicMock
     ) -> None:
@@ -1100,8 +1100,8 @@ class MailingListsTests(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("member", req.json())
 
-    @patch("mailgun.client.requests.delete")
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.delete")
+    @patch("requests.Session.post")
     def test_maillists_lists_members_delete(
         self, m_post: MagicMock, m_delete: MagicMock
     ) -> None:
@@ -1119,7 +1119,7 @@ class MailingListsTests(unittest.TestCase):
         )
         self.assertEqual(req.status_code, 200)
 
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.post")
     def test_maillists_lists_members_create_mult(self, m_post: MagicMock) -> None:
         m_post.return_value = mock_response(200, {"message": "Added"})
         req = self.client.lists_members.create(
@@ -1159,8 +1159,8 @@ class TemplatesTests(unittest.TestCase):
         }
         self.put_template_version = "v11"
 
-    @patch("mailgun.client.requests.delete")
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.delete")
+    @patch("requests.Session.post")
     def test_create_template(self, m_post: MagicMock, m_delete: MagicMock) -> None:
         m_delete.return_value = mock_response()
         m_post.return_value = mock_response(200, {"template": {}})
@@ -1174,8 +1174,8 @@ class TemplatesTests(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("template", req.json())
 
-    @patch("mailgun.client.requests.get")
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_get_template(self, m_post: MagicMock, m_get: MagicMock) -> None:
         m_post.return_value = mock_response()
         m_get.return_value = mock_response(200, {"template": {}})
@@ -1188,8 +1188,8 @@ class TemplatesTests(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("template", req.json())
 
-    @patch("mailgun.client.requests.put")
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.put")
+    @patch("requests.Session.post")
     def test_put_template(self, m_post: MagicMock, m_put: MagicMock) -> None:
         m_post.return_value = mock_response()
         m_put.return_value = mock_response(200, {"template": {}})
@@ -1204,8 +1204,8 @@ class TemplatesTests(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("template", req.json())
 
-    @patch("mailgun.client.requests.delete")
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.delete")
+    @patch("requests.Session.post")
     def test_delete_template(self, m_post: MagicMock, m_delete: MagicMock) -> None:
         m_post.return_value = mock_response()
         m_delete.return_value = mock_response()
@@ -1218,7 +1218,7 @@ class TemplatesTests(unittest.TestCase):
         )
         self.assertEqual(req.status_code, 200)
 
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.post")
     def test_post_version_template(self, m_post: MagicMock) -> None:
         m_post.return_value = mock_response(200, {"template": {}})
         req = self.client.templates.create(
@@ -1230,8 +1230,8 @@ class TemplatesTests(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("template", req.json())
 
-    @patch("mailgun.client.requests.get")
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.get")
+    @patch("requests.Session.post")
     def test_get_version_template(self, m_post: MagicMock, m_get: MagicMock) -> None:
         m_post.return_value = mock_response()
         m_get.return_value = mock_response(200, {"template": {}})
@@ -1243,8 +1243,8 @@ class TemplatesTests(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("template", req.json())
 
-    @patch("mailgun.client.requests.put")
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.put")
+    @patch("requests.Session.post")
     def test_put_version_template(self, m_post: MagicMock, m_put: MagicMock) -> None:
         m_post.return_value = mock_response()
         m_put.return_value = mock_response(200, {"template": {}})
@@ -1258,8 +1258,8 @@ class TemplatesTests(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("template", req.json())
 
-    @patch("mailgun.client.requests.delete")
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.delete")
+    @patch("requests.Session.post")
     def test_delete_version_template(
         self, m_post: MagicMock, m_delete: MagicMock
     ) -> None:
@@ -1276,7 +1276,7 @@ class TemplatesTests(unittest.TestCase):
         )
         self.assertEqual(req.status_code, 200)
 
-    @patch("mailgun.client.requests.put")
+    @patch("requests.Session.put")
     def test_update_template_version_copy(self, m_put: MagicMock) -> None:
         m_put.return_value = mock_response(
             200,
@@ -1358,7 +1358,7 @@ class MetricsTest(unittest.TestCase):
             "resolution": "century",
         }
 
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.post")
     def test_post_query_get_account_metrics(self, m_post: MagicMock) -> None:
         m_post.return_value = mock_response(
             200,
@@ -1378,7 +1378,7 @@ class MetricsTest(unittest.TestCase):
         self.assertIn("items", req.json())
         self.assertIn("delivered_count", req.json()["items"][0]["metrics"])
 
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.post")
     def test_post_query_get_account_metrics_invalid_data(
         self, m_post: MagicMock
     ) -> None:
@@ -1391,7 +1391,7 @@ class MetricsTest(unittest.TestCase):
         self.assertEqual(req.status_code, 400)
         self.assertIn("'resolution' attribute is invalid", req.json()["message"])
 
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.post")
     def test_post_query_get_account_metrics_invalid_url(
         self, m_post: MagicMock
     ) -> None:
@@ -1399,7 +1399,7 @@ class MetricsTest(unittest.TestCase):
         req = self.client.analytics_metric.create(data=self.account_metrics_data)
         self.assertEqual(req.status_code, 404)
 
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.post")
     def test_post_query_get_account_usage_metrics(self, m_post: MagicMock) -> None:
         m_post.return_value = mock_response(
             200,
@@ -1420,7 +1420,7 @@ class MetricsTest(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("email_validation_count", req.json()["items"][0]["metrics"])
 
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.post")
     def test_post_query_get_account_usage_metrics_invalid_data(
         self, m_post: MagicMock
     ) -> None:
@@ -1432,7 +1432,7 @@ class MetricsTest(unittest.TestCase):
         )
         self.assertEqual(req.status_code, 400)
 
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.post")
     def test_post_query_get_account_usage_metrics_invalid_url(
         self, m_post: MagicMock
     ) -> None:
@@ -1485,7 +1485,7 @@ class LogsTests(unittest.TestCase):
             "pagination": {"sort": "timestamp:asc", "limit": 0},
         }
 
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.post")
     def test_post_query_get_account_logs(self, m_post: MagicMock) -> None:
         m_post.return_value = mock_response(
             200,
@@ -1502,7 +1502,7 @@ class LogsTests(unittest.TestCase):
         self.assertIn("items", req.json())
         self.assertIn("event", req.json()["items"][0])
 
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.post")
     def test_post_query_get_account_logs_invalid_data(
         self, m_post: MagicMock
     ) -> None:
@@ -1519,7 +1519,7 @@ class LogsTests(unittest.TestCase):
             req.json()["message"],
         )
 
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.post")
     def test_post_query_get_account_logs_invalid_url(
         self, m_post: MagicMock
     ) -> None:
@@ -1541,13 +1541,13 @@ class TagsNewTests(unittest.TestCase):
         self.account_tag_info = '{"tag": "Python test", "description": "updated"}'
         self.account_tag_invalid_info = '{"tag": "test", "description": "updated"}'
 
-    @patch("mailgun.client.requests.put")
+    @patch("requests.Session.put")
     def test_update_account_tag(self, m_put: MagicMock) -> None:
         m_put.return_value = mock_response(200, {"message": "Updated"})
         req = self.client.analytics_tags.put(data=self.account_tag_info)
         self.assertEqual(req.status_code, 200)
 
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.post")
     def test_post_query_get_account_tags(self, m_post: MagicMock) -> None:
         """Post query to list account tags (integration uses .create with data)."""
         m_post.return_value = mock_response(
@@ -1561,7 +1561,7 @@ class TagsNewTests(unittest.TestCase):
         self.assertIn("sort", req.json()["pagination"])
         self.assertIn("limit", req.json()["pagination"])
 
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.post")
     def test_post_query_get_account_tags_with_incorrect_url(
         self, m_post: MagicMock
     ) -> None:
@@ -1571,19 +1571,19 @@ class TagsNewTests(unittest.TestCase):
         self.assertEqual(req.status_code, 404)
         self.assertIn("error", req.json())
 
-    @patch("mailgun.client.requests.delete")
+    @patch("requests.Session.delete")
     def test_delete_account_tag(self, m_delete: MagicMock) -> None:
         m_delete.return_value = mock_response(200, {"message": "Deleted"})
         req = self.client.analytics_tags.delete(tag_name="Python test")
         self.assertEqual(req.status_code, 200)
 
-    @patch("mailgun.client.requests.delete")
+    @patch("requests.Session.delete")
     def test_delete_account_nonexistent_tag(self, m_delete: MagicMock) -> None:
         m_delete.return_value = mock_response(404, {"message": "Not found"})
         req = self.client.analytics_tags.delete(tag_name="nonexistent")
         self.assertEqual(req.status_code, 404)
 
-    @patch("mailgun.client.requests.get")
+    @patch("requests.Session.get")
     def test_get_account_tag_limit_information(self, m_get: MagicMock) -> None:
         m_get.return_value = mock_response(200, {"limits": {}})
         req = self.client.analytics_tags_limits.get()
@@ -1597,7 +1597,7 @@ class BounceClassificationTests(unittest.TestCase):
         self.client = Client(auth=AUTH)
         self.domain = DOMAIN
 
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.post")
     def test_post_list_statistic(self, m_post: MagicMock) -> None:
         m_post.return_value = mock_response(200, {"items": []})
         data = {
@@ -1608,14 +1608,14 @@ class BounceClassificationTests(unittest.TestCase):
         req = self.client.analytics_bounce_classification_metrics.create(data=data)
         self.assertEqual(req.status_code, 200)
 
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.post")
     def test_post_list_statistic_without_dimensions(self, m_post: MagicMock) -> None:
         m_post.return_value = mock_response(400, {"message": "dimensions required"})
         data = {"start": "2024-01-01", "end": "2024-01-31"}
         req = self.client.analytics_bounce_classification_metrics.create(data=data)
         self.assertEqual(req.status_code, 400)
 
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.post")
     def test_post_list_statistic_with_old_dates(self, m_post: MagicMock) -> None:
         m_post.return_value = mock_response(
             400, {"message": "is out of permitted log retention"}
@@ -1629,7 +1629,7 @@ class BounceClassificationTests(unittest.TestCase):
         self.assertEqual(req.status_code, 400)
         self.assertIn("message", req.json())
 
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.post")
     def test_post_list_statistic_with_empty_payload(self, m_post: MagicMock) -> None:
         m_post.return_value = mock_response(400, {"message": "Bad request"})
         req = self.client.analytics_bounce_classification_metrics.create(data={})
@@ -1645,7 +1645,7 @@ class UsersTests(unittest.TestCase):
         self.domain = DOMAIN
         self.mailgun_email = "user@example.com"
 
-    @patch("mailgun.client.requests.get")
+    @patch("requests.Session.get")
     def test_get_users(self, m_get: MagicMock) -> None:
         m_get.return_value = mock_response(
             200,
@@ -1683,7 +1683,7 @@ class UsersTests(unittest.TestCase):
         self.assertIn("users", req.json())
         self.assertIn("total", req.json())
 
-    @patch("mailgun.client.requests.get")
+    @patch("requests.Session.get")
     def test_own_user_details(self, m_get: MagicMock) -> None:
         m_get.return_value = mock_response(
             200,
@@ -1713,7 +1713,7 @@ class UsersTests(unittest.TestCase):
         req = self.client_with_secret_key.users.get(user_id="me")
         self.assertEqual(req.status_code, 200)
 
-    @patch("mailgun.client.requests.get")
+    @patch("requests.Session.get")
     def test_get_user_details(self, m_get: MagicMock) -> None:
         user_obj = {
             "account_id": "",
@@ -1747,7 +1747,7 @@ class UsersTests(unittest.TestCase):
         req2 = self.client.users.get(user_id=user_id)
         self.assertEqual(req2.status_code, 200)
 
-    @patch("mailgun.client.requests.get")
+    @patch("requests.Session.get")
     def test_get_invalid_user_details(self, m_get: MagicMock) -> None:
         m_get.side_effect = [
             mock_response(200, {"users": [{"id": "uid", "email": self.mailgun_email}], "total": 1}),
@@ -1773,7 +1773,7 @@ class KeysTests(unittest.TestCase):
         self.user_id = "uid"
         self.user_name = "Test User"
 
-    @patch("mailgun.client.requests.get")
+    @patch("requests.Session.get")
     def test_get_keys(self, m_get: MagicMock) -> None:
         m_get.return_value = mock_response(
             200,
@@ -1785,7 +1785,7 @@ class KeysTests(unittest.TestCase):
         self.assertIn("total_count", req.json())
         self.assertIn("items", req.json())
 
-    @patch("mailgun.client.requests.get")
+    @patch("requests.Session.get")
     def test_get_keys_without_filtering_data(self, m_get: MagicMock) -> None:
         m_get.return_value = mock_response(
             200, {"items": [{"id": "k1", "description": "test"}]}
@@ -1794,7 +1794,7 @@ class KeysTests(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.assertGreater(len(req.json()["items"]), 0)
 
-    @patch("mailgun.client.requests.post")
+    @patch("requests.Session.post")
     def test_post_keys(self, m_post: MagicMock) -> None:
         m_post.return_value = mock_response(
             200,
@@ -1832,8 +1832,8 @@ class KeysTests(unittest.TestCase):
         self.assertEqual(req.json()["message"], "great success")
         self.assertIn("key", req.json())
 
-    @patch("mailgun.client.requests.delete")
-    @patch("mailgun.client.requests.get")
+    @patch("requests.Session.delete")
+    @patch("requests.Session.get")
     def test_delete_key(self, m_get: MagicMock, m_delete: MagicMock) -> None:
         m_get.return_value = mock_response(
             200,

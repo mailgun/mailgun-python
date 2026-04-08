@@ -80,6 +80,7 @@ if TYPE_CHECKING:
 __all__ = [
     "AsyncClient",
     "AsyncEndpoint",
+    "BaseClient",
     "Client",
     "Endpoint",
 ]
@@ -513,7 +514,7 @@ class Endpoint(BaseEndpoint):
         # DX Guardrail: Deprecation Interceptor
         self._warn_if_deprecated(method, target_url)
 
-        req_method = getattr(requests, method)
+        req_method = getattr(self._session, method.lower())
 
         logger.debug("Sending Request: %s %s", method.upper(), target_url)
 
@@ -749,25 +750,22 @@ class Endpoint(BaseEndpoint):
         )
 
 
-class Client:
-    """Client class."""
+class BaseClient:
+    """Base class for API clients that holds common state and initialization logic."""
 
-    def __init__(self, auth: tuple[str, str] | None = None, **kwargs: Any) -> None:
-        """Initialize a new Client instance for API interaction.
-
-        This method sets up API authentication, configuration, connection pooling,
-        and automatic network resiliency (retries).
+    def __init__(
+        self,
+        auth: tuple[str, str] | None = None,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize common client configuration and state.
 
         Args:
             auth: A tuple containing the API user and API key (e.g., ("api", "key-123")).
             **kwargs: Additional configuration parameters, such as 'api_url'.
         """
         self.auth = self._validate_auth(auth)
-
-        api_url = kwargs.get("api_url")
-        self.config = Config(api_url=api_url)
-
-        self._session = self._build_resilient_session()
+        self.config = Config(api_url=kwargs.get("api_url"))
 
     @staticmethod
     def _validate_auth(auth: tuple[str, str] | None) -> tuple[str, str] | None:
@@ -791,6 +789,51 @@ class Client:
 
             return SecretAuth((clean_user, clean_key))
         return auth
+
+    def __repr__(self) -> str:
+        """OWASP Secrets Management: Redact sensitive information from object representation.
+
+        Returns:
+            A redacted string representation of the Client instance.
+        """
+        return f"<{self.__class__.__name__} api_url={self.config.api_url!r}>"
+
+    def __str__(self) -> str:
+        """OWASP Secrets Management: Redact sensitive information from string representation.
+
+        Returns:
+            A redacted, human-readable string representation of the Client.
+        """
+        return f"Mailgun {self.__class__.__name__}"
+
+    def __dir__(self) -> list[str]:
+        """DX: Expose true config endpoints for IDE Introspection.
+
+        Returns:
+            A list of available attributes and endpoint routes.
+        """
+        return list(set(super().__dir__()) | self.config.available_endpoints)
+
+
+class Client(BaseClient):
+    """Synchronous client class."""
+
+    def __init__(
+        self,
+        auth: tuple[str, str] | None = None,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize a new Client instance for API interaction.
+
+        This method sets up API authentication, configuration, connection pooling,
+        and automatic network resiliency (retries).
+
+        Args:
+            auth: A tuple containing the API user and API key.
+            **kwargs: Additional configuration parameters.
+        """
+        super().__init__(auth=auth, **kwargs)
+        self._session = self._build_resilient_session()
 
     @staticmethod
     def _build_resilient_session() -> requests.Session:
@@ -831,31 +874,33 @@ class Client:
             An endpoint instance configured for the requested route.
         """
         url, headers = self.config[name]
-        return Endpoint(url=url, headers=headers, auth=self.auth, session=self._session)
+        return Endpoint(
+            url=url,
+            headers=headers,
+            auth=self.auth,
+            session=self._session,
+        )
 
-    def __repr__(self) -> str:
-        """OWASP Secrets Management: Redact sensitive information from object representation.
+    def close(self) -> None:
+        """Close the underlying requests.Session connection pool."""
+        self._session.close()
 
-        Returns:
-            A redacted string representation of the Client instance.
-        """
-        return f"<{self.__class__.__name__} api_url={self.config.api_url!r}>"
-
-    def __str__(self) -> str:
-        """OWASP Secrets Management: Redact sensitive information from string representation.
-
-        Returns:
-            A redacted, human-readable string representation of the Client.
-        """
-        return f"Mailgun {self.__class__.__name__}"
-
-    def __dir__(self) -> list[str]:
-        """DX: Expose true config endpoints for IDE Introspection.
+    def __enter__(self) -> Self:
+        """Enter the synchronous context manager.
 
         Returns:
-            A list of available attributes and endpoint routes.
+            The Client instance itself.
         """
-        return list(set(super().__dir__()) | self.config.available_endpoints)
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
+    ) -> None:
+        """Exit the synchronous context manager, ensuring connection pools are closed."""
+        self.close()
 
 
 class AsyncEndpoint(BaseEndpoint):
@@ -1163,21 +1208,23 @@ class AsyncEndpoint(BaseEndpoint):
         )
 
 
-class AsyncClient(Client):
+class AsyncClient(BaseClient):
     """Async client class using httpx."""
 
     endpoint_cls = AsyncEndpoint
 
-    def __init__(self, auth: tuple[str, str] | None = None, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        auth: tuple[str, str] | None = None,
+        **kwargs: Any,
+    ) -> None:
         """Initialize a new AsyncClient instance for asynchronous API interaction.
 
         Args:
             auth: A tuple containing the API user and API key.
             **kwargs: Additional configuration parameters.
         """
-        self.auth = self._validate_auth(auth)
-
-        super().__init__(auth, **kwargs)
+        super().__init__(auth=auth, **kwargs)
         self._client_kwargs = kwargs.get("client_kwargs", {})
         self._httpx_client: httpx.AsyncClient | None = None
 
@@ -1242,11 +1289,3 @@ class AsyncClient(Client):
             exc_tb: The traceback associated with the exception.
         """
         await self.aclose()
-
-    def __dir__(self) -> list[str]:
-        """DX: Expose true config endpoints for IDE Introspection.
-
-        Returns:
-            A list of available attributes and endpoint routes.
-        """
-        return list(set(super().__dir__()) | self.config.available_endpoints)

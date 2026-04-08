@@ -102,6 +102,18 @@ class TestClient:
         assert "domainlist" in client_dir
         assert "webhooks" in client_dir
 
+    def test_client_context_manager_closes_session(self) -> None:
+        """Verify that the context manager properly closes the underlying requests.Session."""
+        with patch("mailgun.client.requests.Session") as mock_session_class:
+            mock_session_instance = mock_session_class.return_value
+
+            with Client(auth=("api", "key")) as client:
+                assert client._session is mock_session_instance
+                mock_session_instance.close.assert_not_called()
+
+            # Exiting the block must trigger close()
+            mock_session_instance.close.assert_called_once()
+
 class TestBaseEndpointBuildUrl:
     """Tests for BaseEndpoint url building logic."""
 
@@ -128,14 +140,14 @@ class TestEndpoint:
     def test_get_calls_requests_get(self) -> None:
         url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
         ep = Endpoint(url=url, headers={}, auth=None)
-        with patch.object(requests, "get", return_value=MagicMock(status_code=200)) as m_get:
+        with patch.object(requests.Session, "get", return_value=MagicMock(status_code=200)) as m_get:
             ep.get()
             m_get.assert_called_once()
 
     def test_get_with_filters(self) -> None:
         url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
         ep = Endpoint(url=url, headers={}, auth=None)
-        with patch.object(requests, "get", return_value=MagicMock()) as m_get:
+        with patch.object(requests.Session, "get", return_value=MagicMock()) as m_get:
             ep.get(filters={"limit": 10})
             m_get.assert_called_once()
             assert m_get.call_args[1]["params"] == {"limit": 10}
@@ -143,14 +155,14 @@ class TestEndpoint:
     def test_create_sends_post(self) -> None:
         url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
         ep = Endpoint(url=url, headers={}, auth=None)
-        with patch.object(requests, "post", return_value=MagicMock(status_code=200)) as m_post:
+        with patch.object(requests.Session, "post", return_value=MagicMock(status_code=200)) as m_post:
             ep.create(data={"key": "value"})
             m_post.assert_called_once()
 
     def test_create_json_serializes_when_content_type_json(self) -> None:
         url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
         ep = Endpoint(url=url, headers={"Content-Type": "application/json"}, auth=None)
-        with patch.object(requests, "post", return_value=MagicMock()) as m_post:
+        with patch.object(requests.Session, "post", return_value=MagicMock()) as m_post:
             ep.create(data={"key": "value"})
             # Verify data was JSON serialized
             assert '{"key":"value"}' in m_post.call_args[1]["data"]
@@ -158,28 +170,28 @@ class TestEndpoint:
     def test_delete_calls_requests_delete(self) -> None:
         url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
         ep = Endpoint(url=url, headers={}, auth=None)
-        with patch.object(requests, "delete", return_value=MagicMock(status_code=200)) as m_delete:
+        with patch.object(requests.Session, "delete", return_value=MagicMock(status_code=200)) as m_delete:
             ep.delete()
             m_delete.assert_called_once()
 
     def test_put_calls_requests_put(self) -> None:
         url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
         ep = Endpoint(url=url, headers={}, auth=None)
-        with patch.object(requests, "put", return_value=MagicMock(status_code=200)) as m_put:
+        with patch.object(requests.Session, "put", return_value=MagicMock(status_code=200)) as m_put:
             ep.put(data={"key": "value"})
             m_put.assert_called_once()
 
     def test_patch_calls_requests_patch(self) -> None:
         url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
         ep = Endpoint(url=url, headers={}, auth=None)
-        with patch.object(requests, "patch", return_value=MagicMock(status_code=200)) as m_patch:
+        with patch.object(requests.Session, "patch", return_value=MagicMock(status_code=200)) as m_patch:
             ep.patch(data={"key": "value"})
             m_patch.assert_called_once()
 
     def test_api_call_raises_timeout_error_on_timeout(self) -> None:
         url = {"base": "https://api.mailgun.net/v4/", "keys": ["domainlist"]}
         ep = Endpoint(url=url, headers={}, auth=None)
-        with patch.object(requests, "get", side_effect=requests.exceptions.Timeout()):
+        with patch.object(requests.Session, "get", side_effect=requests.exceptions.Timeout()):
             with pytest.raises(TimeoutError):
                 ep.get()
 
@@ -187,7 +199,7 @@ class TestEndpoint:
         url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
         ep = Endpoint(url=url, headers={}, auth=None)
         with patch.object(
-            requests, "get", side_effect=requests.exceptions.RequestException("network error")
+            requests.Session, "get", side_effect=requests.exceptions.RequestException("network error")
         ):
             with pytest.raises(ApiError):
                 ep.get()
@@ -199,14 +211,14 @@ class TestEndpoint:
             headers={"Content-Type": "application/json"},
             auth=None,
         )
-        with patch.object(requests, "put", return_value=MagicMock(status_code=200)) as m_put:
+        with patch.object(requests.Session, "put", return_value=MagicMock(status_code=200)) as m_put:
             ep.update(data={"name": "updated.com"})
             assert '{"name":"updated.com"}' in m_put.call_args[1]["data"]
 
     def test_update_serializes_json_with_custom_headers(self) -> None:
         url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
         ep = Endpoint(url=url, headers={}, auth=None)
-        with patch.object(requests, "put", return_value=MagicMock(status_code=200)) as m_put:
+        with patch.object(requests.Session, "put", return_value=MagicMock(status_code=200)) as m_put:
             ep.update(data={"key": "value"}, headers={"Content-Type": "application/json"})
             m_put.assert_called_once()
             assert m_put.call_args[1]["data"] == '{"key":"value"}'
@@ -221,7 +233,7 @@ class TestEndpoint:
         mock_resp = MagicMock(status_code=500, text=long_response_text)
         mock_resp.json.side_effect = ValueError("No JSON")
 
-        with patch.object(requests, "get", return_value=mock_resp):
+        with patch.object(requests.Session, "get", return_value=mock_resp):
             ep.get()
 
         mock_logger_error.assert_called_once()

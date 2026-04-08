@@ -27,7 +27,7 @@ Check out all the resources and Python code examples in the official
     - [Authentication](#authentication)
   - [Quick Start](#quick-start)
     - [Client](#client)
-    - [Advanced Configuration](#advanced-configuration)
+      - [Advanced Configuration](#advanced-configuration)
     - [AsyncClient](#asyncclient)
   - [Usage](#usage)
     - [Logging & Debugging](#logging--debugging)
@@ -276,7 +276,34 @@ auth = ("api", os.environ["APIKEY"])
 client = Client(auth=auth)
 ```
 
-### Advanced Configuration
+#### Client Lifecycle & Resource Management
+
+> [!TIP]
+> **New in v1.7.0:** The SDK now utilizes connection pooling (`requests.Session`) under the hood to dramatically improve performance by reusing TLS connections.
+
+**The Simple Variant (Backward Compatible)**
+For simple scripts, lambdas, or single-request apps, you can initialize and use the client directly. Python's garbage collector will eventually clean up the connection.
+
+```python
+client = Client(auth=("api", "KEY"))
+client.messages.create(data={"to": "user@example.com"})
+```
+
+**The Recommended Variant (Context Manager)**
+
+[!WARNING]
+
+If you are running long-lived applications (like Celery workers, web servers, or high-volume loops), repeatedly initializing the `Client` without closing it can lead to socket leaks (`Too many open files`).
+
+For production applications, \**always use the client as a Context Manager* (`with`) or explicitly call `client.close()`. This ensures deterministic release of TCP connection pools.
+
+```python
+# Sockets are safely managed and closed automatically
+with Client(auth=("api", "KEY")) as client:
+    client.messages.create(data={"to": "user@example.com"})
+```
+
+#### Advanced Configuration
 
 By default, the SDK routes traffic to the US servers (`https://api.mailgun.net`). If you are operating in the EU, you can override the base URL during initialization:
 

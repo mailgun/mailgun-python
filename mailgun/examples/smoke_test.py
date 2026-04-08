@@ -119,6 +119,18 @@ def test_cross_version_routing() -> Any:
     return sync_client.addressvalidate.get(address="test@example.com")
 
 
+def test_sync_context_manager() -> Any:
+    """Test 7: Demonstrate resource-safe client usage via Context Manager."""
+    # Initialize a temporary client strictly for this block
+    with Client(auth=("api", API_KEY)) as safe_client:
+        # Make a lightweight call to prove the connection pool works
+        response = safe_client.domainlist.get(filters={"limit": 1})
+
+        # When this block exits, safe_client._session.close() is automatically called,
+        # safely returning the TCP socket to the OS.
+        return response
+
+
 # --- DEPRECATION WARNING TESTS ---
 
 
@@ -180,6 +192,7 @@ if __name__ == "__main__":
     run_sync_test(
         "Cross-Version Routing (v4)", test_cross_version_routing, expected_status=(200, 403)
     )
+    run_sync_test("Sync Context Manager (Resource Safe)", test_sync_context_manager)
     run_sync_test(
         "Deprecation Warning Interceptor",
         test_deprecation_warnings,
