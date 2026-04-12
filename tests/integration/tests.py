@@ -11,7 +11,7 @@ import time
 import unittest
 import random
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from datetime import datetime, timedelta
 from contextlib import suppress
 
@@ -2729,6 +2729,73 @@ class KeysTests(unittest.TestCase):
         self.client.keys_public.create()
 
 
+class NewIntegrationPaidTierTests(unittest.TestCase):
+    """Final production integration tests for advanced/paid endpoints."""
+
+    def setUp(self) -> None:
+        self.auth = ("api", os.environ.get("APIKEY", "fake-api-key"))
+        self.client = Client(auth=self.auth)
+        self.domain = os.environ.get("DOMAIN", "example.com")
+
+    def _safe_execute(self, func: Callable, *args: Any, **kwargs: Any) -> Any:
+        """Execute a network call and assert it returned a valid JSON response."""
+        req = func(*args, **kwargs)
+
+        # We accept 200s, and standard JSON rejections (401/403/404).
+        # HTML 404s (Infrastructure failures) will fail these tests.
+        valid_codes = {200, 201, 202, 400, 401, 403, 404, 405, 429}
+
+        self.assertIn(req.status_code, valid_codes, f"SDK hit an Infrastructure 404 or Server Error: {req.url}")
+
+        # Verify response is valid JSON (the ultimate proof of backend communication)
+        try:
+            return req.json()
+        except Exception:
+            self.fail(f"API did not return JSON. Route: {req.url}. Response: {req.text}")
+
+    # --- SUCCESSFUL ENDPOINTS (Even for free/sandbox accounts) ---
+    def test_optimize_alerts(self) -> None:
+        res = self._safe_execute(self.client.alerts.get)
+        self.assertIn("events", res)
+
+    def test_optimize_dmarc(self) -> None:
+        res = self._safe_execute(self.client.dmarc.get, domain=self.domain)
+        self.assertIn("entry", res)
+
+    def test_optimize_inboxready(self) -> None:
+        res = self._safe_execute(self.client.inboxready.get)
+        self.assertIn("items", res)
+
+    def test_optimize_reputation_analytics(self) -> None:
+        res = self._safe_execute(self.client.reputationanalytics.get)
+        self.assertIn("total", res)
+
+    def test_subaccounts(self) -> None:
+        res = self._safe_execute(self.client.accounts.get)
+        self.assertIn("subaccounts", res)
+        # Verify the subaccount_ip_pools fix
+        self._safe_execute(self.client.subaccount_ip_pools.get, subaccountId="test-sub")
+
+    # --- PROBED ENDPOINTS (Expects 4xx JSON rejections) ---
+    def test_validations_service(self) -> None:
+        self._safe_execute(self.client.addressvalidate.get, filters={"address": "test@example.com"})
+        self._safe_execute(self.client.addressparse.get, filters={"addresses": "test@example.com"})
+        self._safe_execute(self.client.address.get)
+
+    def test_inspect_and_preview(self) -> None:
+        self._safe_execute(self.client.inspect.get)
+        self._safe_execute(self.client.preview.get)
+        self._safe_execute(self.client.preview_v2.get)
+
+    def test_blocklists_and_spamtraps(self) -> None:
+        self._safe_execute(self.client.blocklists.get, domain=self.domain)
+        self._safe_execute(self.client.spamtraps.get, domain=self.domain)
+
+    def test_mtls_and_dkim(self) -> None:
+        self._safe_execute(self.client.x509_status.get, domain=self.domain)
+        self._safe_execute(self.client.dkim_management_rotation.get, domain=self.domain)
+
+
 # ============================================================================
 # Async Test Classes (using AsyncClient and AsyncEndpoint)
 # ============================================================================
@@ -5106,6 +5173,81 @@ class AsyncKeysTests(unittest.IsolatedAsyncioTestCase):
     async def test_regenerate_key(self) -> None:
         """Test to regenerate the Mailgun API keys: happy path with valid data."""
         await self.client.keys_public.create()
+
+
+class AsyncNewIntegrationPaidTierTests(unittest.IsolatedAsyncioTestCase):
+    """Final production integration tests for advanced/paid endpoints (Asynchronous)."""
+
+    async def asyncSetUp(self) -> None:
+        """Initialize the AsyncClient and configuration."""
+        self.auth = ("api", os.environ.get("APIKEY", "fake-api-key"))
+        self.client = AsyncClient(auth=self.auth)
+        self.domain = os.environ.get("DOMAIN", "example.com")
+
+    async def asyncTearDown(self) -> None:
+        """Ensure the underlying HTTPX client is closed."""
+        await self.client.aclose()
+
+    async def _safe_execute(self, func: Callable, *args: Any, **kwargs: Any) -> Any:
+        """Execute an async network call and assert it returned a valid JSON response."""
+        # Await the asynchronous endpoint call
+        req = await func(*args, **kwargs)
+
+        # We accept 200s, and standard JSON rejections (401/403/404).
+        valid_codes = {200, 201, 202, 400, 401, 403, 404, 405, 429}
+
+        self.assertIn(
+            req.status_code,
+            valid_codes,
+            f"Async SDK hit an Infrastructure 404 or Server Error: {req.url}"
+        )
+
+        try:
+            return req.json()
+        except Exception:
+            self.fail(f"Async API did not return JSON. Route: {req.url}. Response: {req.text}")
+
+    # --- SUCCESSFUL ENDPOINTS ---
+    async def test_optimize_alerts(self) -> None:
+        res = await self._safe_execute(self.client.alerts.get)
+        self.assertIn("events", res)
+
+    async def test_optimize_dmarc(self) -> None:
+        res = await self._safe_execute(self.client.dmarc.get, domain=self.domain)
+        self.assertIn("entry", res)
+
+    async def test_optimize_inboxready(self) -> None:
+        res = await self._safe_execute(self.client.inboxready.get)
+        self.assertIn("items", res)
+
+    async def test_optimize_reputation_analytics(self) -> None:
+        res = await self._safe_execute(self.client.reputationanalytics.get)
+        self.assertIn("total", res)
+
+    async def test_subaccounts(self) -> None:
+        res = await self._safe_execute(self.client.accounts.get)
+        self.assertIn("subaccounts", res)
+        # Verify the subaccount_ip_pools fix
+        await self._safe_execute(self.client.subaccount_ip_pools.get, subaccountId="test-sub")
+
+    # --- PROBED ENDPOINTS ---
+    async def test_validations_service(self) -> None:
+        await self._safe_execute(self.client.addressvalidate.get, filters={"address": "test@example.com"})
+        await self._safe_execute(self.client.addressparse.get, filters={"addresses": "test@example.com"})
+        await self._safe_execute(self.client.address.get)
+
+    async def test_inspect_and_preview(self) -> None:
+        await self._safe_execute(self.client.inspect.get)
+        await self._safe_execute(self.client.preview.get)
+        await self._safe_execute(self.client.preview_v2.get)
+
+    async def test_blocklists_and_spamtraps(self) -> None:
+        await self._safe_execute(self.client.blocklists.get, domain=self.domain)
+        await self._safe_execute(self.client.spamtraps.get, domain=self.domain)
+
+    async def test_mtls_and_dkim(self) -> None:
+        await self._safe_execute(self.client.x509_status.get, domain=self.domain)
+        await self._safe_execute(self.client.dkim_management_rotation.get, domain=self.domain)
 
 
 if __name__ == "__main__":

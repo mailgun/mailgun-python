@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from mailgun.handlers.utils import sanitize_path_segment
+
 
 def handle_address_validate(
     url: dict[str, Any],
@@ -29,5 +31,6 @@ def handle_address_validate(
     base_url = str(url["base"]).rstrip("/")
 
     if "list_name" in kwargs:
-        return f"{base_url}{final_keys}/{kwargs['list_name']}"
+        safe_list = sanitize_path_segment(kwargs["list_name"])
+        return f"{base_url}{final_keys}/{safe_list}"
     return f"{base_url}{final_keys}"

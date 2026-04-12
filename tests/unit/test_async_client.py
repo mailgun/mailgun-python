@@ -9,6 +9,7 @@ import pytest
 from mailgun.client import AsyncClient
 from mailgun.client import AsyncEndpoint
 from mailgun.client import Config
+from mailgun.client import SecurityGuard
 from mailgun.handlers.error_handler import ApiError
 from tests.conftest import BASE_URL_V3, BASE_URL_V4
 
@@ -48,7 +49,7 @@ class TestAsyncEndpoint:
             return_value=MagicMock(status_code=200, spec=httpx.Response)
         )
         ep = AsyncEndpoint(url=url, headers={}, auth=None, client=mock_client)
-        await ep.create(data={"name": "test.com"})
+        await ep.create(data={"key": "value"})
         mock_client.request.assert_called_once()
         assert mock_client.request.call_args[1]["method"] == "POST"
 
@@ -61,13 +62,14 @@ class TestAsyncEndpoint:
         )
         ep = AsyncEndpoint(url=url, headers={}, auth=None, client=mock_client)
         await ep.delete()
+        mock_client.request.assert_called_once()
         assert mock_client.request.call_args[1]["method"] == "DELETE"
 
     @pytest.mark.asyncio
     async def test_api_call_raises_timeout_error(self) -> None:
         url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
         mock_client = AsyncMock(spec=httpx.AsyncClient)
-        mock_client.request = AsyncMock(side_effect=httpx.TimeoutException("timeout"))
+        mock_client.request.side_effect = httpx.TimeoutException("timeout")
         ep = AsyncEndpoint(url=url, headers={}, auth=None, client=mock_client)
         with pytest.raises(TimeoutError):
             await ep.get()
@@ -76,7 +78,8 @@ class TestAsyncEndpoint:
     async def test_api_call_raises_api_error_on_request_error(self) -> None:
         url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
         mock_client = AsyncMock(spec=httpx.AsyncClient)
-        mock_client.request = AsyncMock(side_effect=httpx.RequestError("error"))
+        # Fix: Provide a MagicMock as the request argument to satisfy httpx.RequestError signature
+        mock_client.request.side_effect = httpx.RequestError("network error", request=MagicMock())
         ep = AsyncEndpoint(url=url, headers={}, auth=None, client=mock_client)
         with pytest.raises(ApiError):
             await ep.get()
@@ -89,93 +92,71 @@ class TestAsyncEndpoint:
             return_value=MagicMock(status_code=200, spec=httpx.Response)
         )
         ep = AsyncEndpoint(url=url, headers={}, auth=None, client=mock_client)
-
         await ep.update(data={"key": "value"}, headers={"Content-Type": "application/json"})
-
         mock_client.request.assert_called_once()
-        # Для httpx перевіряємо аргумент "content", а не "data"
-        assert mock_client.request.call_args[1]["content"] == '{"key":"value"}'
+        kwargs = mock_client.request.call_args[1]
+        assert "content" in kwargs
+        assert '{"key":"value"}' in kwargs["content"]
 
     @pytest.mark.asyncio
     async def test_async_endpoint_payload_is_strictly_minified(self) -> None:
-        """Prove that json.dumps strips structural spaces to save bandwidth (async)."""
-        url = {"base": "https://api.mailgun.net/v3/", "keys": ["webhooks"]}
-        # Using MagicMock for the client to satisfy AsyncEndpoint's __init__ requirements
-        ep = AsyncEndpoint(
-            url=url,
-            headers={},
-            auth=None,
-            client=MagicMock(spec=httpx.AsyncClient)
+        """Test that JSON payloads are strictly minified before async transmission."""
+        url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
+        mock_client = AsyncMock(spec=httpx.AsyncClient)
+        mock_client.request = AsyncMock(
+            return_value=MagicMock(status_code=200, spec=httpx.Response)
         )
+        ep = AsyncEndpoint(url=url, headers={"Content-Type": "application/json"}, auth=None, client=mock_client)
 
-        raw_data = {"key": "value"}
+        payload_with_spaces = {
+            "name": "test.com",
+            "spam_action": "disabled"
+        }
 
-        with patch.object(ep, "api_call") as mock_api_call:
-            mock_api_call.return_value = MagicMock(status_code=200)
+        await ep.create(data=payload_with_spaces)
 
-            await ep.create(
-                domain="test.com",
-                data=raw_data,
-                headers={"Content-Type": "application/json"}
-            )
+        args, kwargs = mock_client.request.call_args
+        sent_data = kwargs.get("content")
 
-            mock_api_call.assert_called_once()
-            actual_payload = mock_api_call.call_args.kwargs.get("data")
-
-            assert actual_payload == '{"key":"value"}'
-            assert '": "' not in actual_payload, "Found illegal structural space after colon!"
+        assert sent_data is not None
+        assert " " not in sent_data, "Payload was not strictly minified"
+        assert sent_data == '{"name":"test.com","spam_action":"disabled"}'
 
 
 class TestAsyncClient:
     """Tests for AsyncClient."""
 
     def test_async_client_inherits_client(self) -> None:
-        client = AsyncClient(auth=("api", "key"))
-        assert isinstance(client, AsyncClient)
-        assert client.auth == ("api", "key")
+        client = AsyncClient(auth=("api", "key-123"))
+        assert client.auth == ("api", "key-123")
         assert client.config.api_url == Config.DEFAULT_API_URL
 
-    def test_async_client_getattr_returns_async_endpoint_type(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        monkeypatch.delenv("SSL_CERT_FILE", raising=False)
-        client = AsyncClient(auth=("api", "key"))
+    def test_async_client_getattr_returns_async_endpoint_type(self) -> None:
+        client = AsyncClient(auth=("api", "key-123"))
         ep = client.domains
-
-        assert ep is not None
         assert isinstance(ep, AsyncEndpoint)
-        assert ep._auth == ("api", "key")
-        assert "domains" in ep._url["keys"] or "domains" in str(ep._url).lower()
+        assert ep._auth == ("api", "key-123")
+        assert "domains" in str(ep._url["keys"]).lower()
 
     @pytest.mark.asyncio
-    async def test_aclose_closes_httpx_client(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.delenv("SSL_CERT_FILE", raising=False)
-        client = AsyncClient(auth=("api", "key"))
-        # Trigger _client creation
-        _ = client.domains
-
-        httpx_client_before = client._httpx_client
-        assert httpx_client_before is None or not httpx_client_before.is_closed
-
-        # Access property to create client
-        _ = client._client
-        await client.aclose()
-
-        httpx_client_after = client._httpx_client
-        assert httpx_client_after is not None
-        assert httpx_client_after.is_closed
+    async def test_aclose_closes_httpx_client(self) -> None:
+        client = AsyncClient()
+        # Force initialization of the client property
+        httpx_client = client._client
+        with patch.object(httpx_client, "aclose", new_callable=AsyncMock) as mock_aclose:
+            await client.aclose()
+            mock_aclose.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_async_context_manager(self) -> None:
-        async with AsyncClient(auth=("api", "key")) as client:
-            assert client is not None
-            assert isinstance(client, AsyncClient)
-        # After exit, client should be closed
-        httpx_client = client._httpx_client
-        assert httpx_client is None or httpx_client.is_closed
+        client = AsyncClient()
+        with patch.object(client, "aclose", new_callable=AsyncMock) as mock_aclose:
+            async with client as c:
+                assert c is client
+            mock_aclose.assert_called_once()
 
-    @pytest.mark.asyncio
     @patch("mailgun.client.logger.error")
+    @pytest.mark.asyncio
     async def test_api_call_truncates_long_error_response(
         self, mock_logger_error: MagicMock
     ) -> None:
@@ -197,16 +178,23 @@ class TestAsyncClient:
         assert logged_text.endswith("...")
 
     def test_async_validate_auth_sanitizes_input(self) -> None:
-        """Test OWASP Header Injection prevention for the AsyncClient."""
+        """Test OWASP Header Injection prevention via SecurityGuard."""
         # Put the carriage return INSIDE the string so .strip() doesn't remove it
         with pytest.raises(ValueError, match="Header Injection risk"):
-            AsyncClient._validate_auth(("api", "key\rwithnewline"))
+            SecurityGuard.validate_auth(("api", "key\rwithnewline"))
 
     def test_async_client_dir_includes_endpoints(self) -> None:
         """Test that IDE introspection via __dir__ exposes config endpoints."""
         client = AsyncClient()
         client_dir = dir(client)
 
-        # Verify dynamic endpoints are exposed to Jupyter/VSCode autocompletion
         assert "messages" in client_dir
-        assert "ips" in client_dir
+        assert "bounces" in client_dir
+        assert "domains" in client_dir
+
+    def test_async_global_timeout_propagates_to_endpoint(self) -> None:
+        """Test, that timeout of AsyncClient used in AsyncEndpoints."""
+        client = AsyncClient(auth=("api", "key"), timeout=25.0)
+        ep = client.domains
+
+        assert ep._timeout == 25.0

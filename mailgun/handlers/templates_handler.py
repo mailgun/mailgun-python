@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Any
 
 from mailgun.handlers.error_handler import ApiError
-from mailgun.handlers.utils import build_path_from_keys
+from mailgun.handlers.utils import build_path_from_keys, sanitize_path_segment
 
 
 def handle_templates(
@@ -32,7 +32,6 @@ def handle_templates(
         ApiError: If the versions option is invalid.
     """
     final_keys = build_path_from_keys(url.get("keys", []))
-
     base_url_str = str(url["base"])
 
     if domain:
@@ -51,7 +50,8 @@ def handle_templates(
     if "template_name" not in kwargs:
         return domain_url
 
-    template_url = domain_url + f"/{kwargs['template_name']}"
+    safe_template = sanitize_path_segment(kwargs["template_name"])
+    template_url = f"{domain_url}/{safe_template}"
 
     if "versions" not in kwargs:
         return template_url
@@ -59,11 +59,16 @@ def handle_templates(
     if not kwargs["versions"]:
         raise ApiError("Versions should be True or absent")
 
-    versions_url = template_url + "/versions"
+    versions_url = f"{template_url}/versions"
 
-    if "tag" in kwargs and "copy" not in kwargs:
-        return versions_url + f"/{kwargs['tag']}"
-    if "tag" in kwargs and "copy" in kwargs and "new_tag" in kwargs:
-        return versions_url + f"/{kwargs['tag']}/copy/{kwargs['new_tag']}"
+    if kwargs.get("tag"):
+        safe_tag = sanitize_path_segment(kwargs["tag"])
+
+        # Logic for template version copying
+        if kwargs.get("copy") and "new_tag" in kwargs:
+            safe_new_tag = sanitize_path_segment(kwargs["new_tag"])
+            return f"{versions_url}/{safe_tag}/copy/{safe_new_tag}"
+
+        return f"{versions_url}/{safe_tag}"
 
     return versions_url

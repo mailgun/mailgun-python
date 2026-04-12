@@ -17,14 +17,32 @@ EXACT_ROUTES: dict[str, list[str | list[str]]] = {
     "analytics": ["v1", ["analytics", "usage", "metrics", "logs", "tags", "limits"]],
     "bounce_classification": ["v2", ["bounce-classification", "metrics"]],
     "users": ["v5", ["users", "me"]],
-    "subaccount_ip_pools": ["v5", ["accounts", "subaccounts", "ip_pools"]],
-    "subaccount_ip_pool": ["v5", ["accounts", "subaccounts", "{subaccountId}", "ip_pool"]],
-    "dkim_management_rotation": ["v1", ["dkim_management", "domains", "{name}", "rotation"]],
-    "dkim_management_rotate": ["v1", ["dkim_management", "domains", "{name}", "rotate"]],
     "account_templates": ["v4", ["templates"]],
     "account_webhooks": ["v1", ["webhooks"]],
+    # Validation Service
+    "addressvalidate": ["v4", ["address", "validate"]],
+    "addressparse": ["v4", ["address", "parse"]],
+    "address": ["v4", ["address", "validate", "bulk"]],
+    # Mailgun Optimize & Previews
+    "inspect": ["v1", ["inspect", "analyze"]],
+    "preview": ["v1", ["preview", "tests"]],
+    "preview_v2": ["v2", ["preview", "tests"]],
+    "alerts": ["v1", ["alerts", "events"]],
+    "dmarc": ["v1", ["dmarc", "records", "{domain}"]],
+    "inboxready": ["v1", ["inboxready", "domains"]],
+    "reputationanalytics": ["v1", ["reputationanalytics", "snds"]],
+    # Standard Domain Endpoints (Merged paths to avoid handle_domains intercept)
+    "spamtraps": ["v3", ["domains/{domain}/spamtraps"]],
+    "blocklists": ["v3", ["domains/{domain}/blocklists"]],
+    # MTLS and DKIM
     "x509": ["v2", ["x509", "{domain}"]],
     "x509_status": ["v2", ["x509", "{domain}", "status"]],
+    "dkim_management_rotation": ["v1", ["dkim_management", "domains", "{domain}", "rotation"]],
+    "dkim_management_rotate": ["v1", ["dkim_management", "domains", "{domain}", "rotate"]],
+    # Subaccounts (FIXED: Added placeholders to match Mailgun V5 requirements)
+    "accounts": ["v5", ["accounts", "subaccounts"]],
+    "subaccount_ip_pools": ["v5", ["accounts", "subaccounts", "{subaccountId}", "ip_pools"]],
+    "subaccount_ip_pool": ["v5", ["accounts", "subaccounts", "{subaccountId}", "ip_pool"]],
 }
 
 # PREFIX_ROUTES map attributes to a base version, path prefix, and optional suffix.
@@ -35,8 +53,6 @@ PREFIX_ROUTES: dict[str, list[str | None]] = {
     "credentials": ["v3", "domains", None],
     "domains": ["v3", "domains", None],
     "webhooks": ["v3", "domains", None],
-    "spamtraps": ["v3", "", None],
-    "blocklists": ["v3", "", None],
     "reputation": ["v3", "", None],
     "users": ["v5", "", None],
     "keys": ["v1", "", None],
@@ -54,21 +70,6 @@ PREFIX_ROUTES: dict[str, list[str | None]] = {
     "ips": ["v3", "", None],
     "ip_pools": ["v3", "", None],
     "ip_whitelist": ["v3", "ip", "whitelist"],
-    # Validations Service API
-    "addressparse": ["v4", "address/parse", "addressparse"],
-    "addressvalidate": ["v4", "address", "validate"],
-    "address": ["v4", "", None],
-    # Email Preview & Code Analysis API
-    "inspect": ["v1", "", None],
-    "preview": ["v1", "", None],
-    "preview_v2": ["v2", "preview", None],
-    # Mailgun Optimize API
-    "alerts": ["v1", "", None],
-    "inboxready": ["v1", "", None],
-    "dmarc": ["v1", "", None],
-    "reputationanalytics": ["v1", "", None],
-    # Account Level
-    "accounts": ["v5", "", None],
     "sandbox": ["v5", "", None],
 }
 
@@ -106,34 +107,21 @@ DOMAIN_ENDPOINTS: dict[str, list[str]] = {
     ],
 }
 
-# DEPRECATED_ROUTES maps compiled RegEx patterns of obsolete endpoints
-# to user-friendly migration warnings.
 DEPRECATED_ROUTES: dict[re.Pattern[str], str] = {
-    # Old v1 Bounce Classification
-    re.compile(r"^/v1/bounce-classification/"): (
-        "The v1 bounce-classification API is deprecated. "
-        "Please migrate to POST /v2/bounce-classification/metrics."
-    ),
-    # Old Tags API (matches /v3/domain.com/tag and /v3/domain.com/tag/stats
-    # but strictly ignores the new /v3/domain.com/tags API)
-    re.compile(r"^/v3/[^/]+/tag(/|$|\?)"): (
-        "The legacy Tag API (/v3/{domain}/tag) is deprecated. "
-        "Please migrate to the new Tags API (/v3/{domain}/tags)."
-    ),
-    # Old Tag Limits
-    re.compile(r"^/v3/domains/[^/]+/limits/tag"): ("The domain tag limits API is deprecated."),
-    # Old v3 Bulk Validations API
-    re.compile(r"^/v3/lists/[^/]+/validate"): (
-        "The v3 Bulk Validation API is deprecated. "
-        "Please migrate to the v4 Bulk Validations Service (/v4/address/validate/bulk)."
-    ),
-    # Old v3 Address Validation APIs
-    re.compile(r"^/v3/address/(validate|parse|private)"): (
-        "The v3 Address Validation/Parsing APIs are deprecated. "
-        "Please migrate to the v4 Validations Service (/v4/address/validate or /v4/address/parse)."
-    ),
-    # Mailgun Campaigns API (Fully Deprecated)
-    re.compile(r"^/v3/[^/]+/campaigns"): (
-        "The Mailgun Campaigns API is fully deprecated and no longer supported."
-    ),
+    re.compile(
+        r"^/v1/bounce-classification/"
+    ): "The v1 bounce-classification API is deprecated. Migrate to POST /v2/bounce-classification/metrics.",
+    re.compile(
+        r"^/v3/(stats|[^/]+/stats|[^/]+/aggregates)"
+    ): "The v3 Stats API is deprecated. Migrate to the v1 Metrics API.",
+    re.compile(
+        r"^/v3/[^/]+/tag(/|$|\?)"
+    ): "The legacy Tag API is deprecated. Migrate to the new Tags API (/v3/{domain}/tags).",
+    re.compile(r"^/v3/domains/[^/]+/limits/tag"): "The domain tag limits API is deprecated.",
+    re.compile(
+        r"^/v3/lists/[^/]+/validate"
+    ): "The v3 Bulk Validation API is deprecated. Migrate to the v4 Bulk Validations Service.",
+    re.compile(
+        r"^/v3/address/(validate|parse|private)"
+    ): "The v3 Address Validation/Parsing APIs are deprecated. Migrate to the v4 Validations Service.",
 }

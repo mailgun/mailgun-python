@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from mailgun.handlers.utils import build_path_from_keys
+from mailgun.handlers.utils import build_path_from_keys, sanitize_path_segment
 
 
 def handle_metrics(
@@ -29,8 +29,13 @@ def handle_metrics(
     """
     final_keys = build_path_from_keys(url.get("keys", []))
     base = url["base"][:-1]
+
     if "usage" in kwargs:
-        return f"{base}/{kwargs['usage']}{final_keys}"
+        safe_usage = sanitize_path_segment(kwargs["usage"])
+        return f"{base}/{safe_usage}{final_keys}"
+
     if "limits" in kwargs and "tags" in kwargs:
-        return f"{base}{final_keys}/{kwargs['limits']}"
+        safe_limits = sanitize_path_segment(kwargs["limits"])
+        return f"{base}{final_keys}/{safe_limits}"
+
     return f"{base}{final_keys}"

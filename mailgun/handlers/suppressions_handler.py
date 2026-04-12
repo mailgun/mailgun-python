@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from mailgun.handlers.utils import build_path_from_keys
+from mailgun.handlers.utils import build_path_from_keys, sanitize_path_segment
 
 
 def handle_bounces(
@@ -27,12 +27,12 @@ def handle_bounces(
     Returns:
         The final URL for the Bounces endpoint.
     """
-    final_keys = "/" + "/".join(url["keys"]) if url["keys"] else ""
+    final_keys = build_path_from_keys(url.get("keys", []))
+    base = f"{url['base']}{domain}{final_keys}"
     if "bounce_address" in kwargs:
-        url = url["base"] + str(domain) + final_keys + "/" + kwargs["bounce_address"]
-    else:
-        url = url["base"] + str(domain) + final_keys
-    return url
+        safe_addr = sanitize_path_segment(kwargs["bounce_address"])
+        return f"{base}/{safe_addr}"
+    return base
 
 
 def handle_unsubscribes(
@@ -52,12 +52,12 @@ def handle_unsubscribes(
     Returns:
         The final URL for the Unsubscribes endpoint.
     """
-    final_keys = "/" + "/".join(url["keys"]) if url["keys"] else ""
+    final_keys = build_path_from_keys(url.get("keys", []))
+    base = f"{url['base']}{domain}{final_keys}"
     if "unsubscribe_address" in kwargs:
-        url = url["base"] + str(domain) + final_keys + "/" + kwargs["unsubscribe_address"]
-    else:
-        url = url["base"] + str(domain) + final_keys
-    return url
+        safe_addr = sanitize_path_segment(kwargs["unsubscribe_address"])
+        return f"{base}/{safe_addr}"
+    return base
 
 
 def handle_complaints(
@@ -77,12 +77,12 @@ def handle_complaints(
     Returns:
         The final URL for the Complaints endpoint.
     """
-    final_keys = "/" + "/".join(url["keys"]) if url["keys"] else ""
+    final_keys = build_path_from_keys(url.get("keys", []))
+    base = f"{url['base']}{domain}{final_keys}"
     if "complaint_address" in kwargs:
-        url = url["base"] + str(domain) + final_keys + "/" + kwargs["complaint_address"]
-    else:
-        url = url["base"] + str(domain) + final_keys
-    return url
+        safe_addr = sanitize_path_segment(kwargs["complaint_address"])
+        return f"{base}/{safe_addr}"
+    return base
 
 
 def handle_whitelists(
@@ -103,8 +103,8 @@ def handle_whitelists(
         The final URL for the Whitelists endpoint.
     """
     final_keys = build_path_from_keys(url.get("keys", []))
+    base = f"{url['base']}{domain}{final_keys}"
     if "whitelist_address" in kwargs:
-        url = url["base"] + str(domain) + final_keys + "/" + kwargs["whitelist_address"]
-    else:
-        url = url["base"] + str(domain) + final_keys
-    return str(url)
+        safe_addr = sanitize_path_segment(kwargs["whitelist_address"])
+        return f"{base}/{safe_addr}"
+    return base

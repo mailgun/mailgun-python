@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from mailgun.handlers.utils import build_path_from_keys
+from mailgun.handlers.utils import build_path_from_keys, sanitize_path_segment
 
 
 def handle_users(
@@ -33,7 +33,8 @@ def handle_users(
     user_id = kwargs.get("user_id")
 
     if user_id and user_id != "me":
-        return f"{base_url}/users/{user_id}"
+        safe_user = sanitize_path_segment(user_id)
+        return f"{base_url}/users/{safe_user}"
 
     if user_id == "me":
         return f"{base_url}{final_keys}"

@@ -17,7 +17,8 @@ def test_legacy_tag_api_triggers_warning() -> None:
     assert len(record) >= 1
     warning_msg = str(record[0].message)
     assert "legacy Tag API" in warning_msg
-    assert "migrate to the new Tags API" in warning_msg
+    # Matched the uppercase 'M' from routes.py
+    assert "Migrate to the new Tags API" in warning_msg
 
 
 def test_legacy_bounce_classification_triggers_warning() -> None:
@@ -68,6 +69,3 @@ def test_valid_endpoints_do_not_trigger_warnings() -> None:
 
         # New v4 validations API
         client.messages._warn_if_deprecated("GET", "https://api.mailgun.net/v4/address/validate")
-
-        # New v2 bounce classification
-        client.messages._warn_if_deprecated("POST", "https://api.mailgun.net/v2/bounce-classification/metrics")

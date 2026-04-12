@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from mailgun.handlers.utils import build_path_from_keys
+from mailgun.handlers.utils import build_path_from_keys, sanitize_path_segment
 
 
 def handle_lists(
@@ -29,17 +29,23 @@ def handle_lists(
     """
     final_keys = build_path_from_keys(url.get("keys", []))
     base = url["base"][:-1]
-    if "validate" in kwargs:
-        return f"{base}{final_keys}/{kwargs['address']}/validate"
-    if "multiple" in kwargs and "address" in kwargs:
-        if kwargs["multiple"]:
-            return f"{base}/lists/{kwargs['address']}/members.json"
-    elif "members" in final_keys and "address" in kwargs:
-        members_keys = "/" + "/".join(url["keys"][1:]) if url["keys"][1:] else ""
-        if "member_address" in kwargs:
-            return f"{base}/lists/{kwargs['address']}{members_keys}/{kwargs['member_address']}"
-        return f"{base}/lists/{kwargs['address']}{members_keys}"
-    elif "address" in kwargs:
-        return f"{base}/lists/{kwargs['address']}"
 
-    return f"{base}{final_keys}"
+    if "address" not in kwargs:
+        return f"{base}{final_keys}"
+
+    safe_addr = sanitize_path_segment(kwargs["address"])
+
+    if "validate" in kwargs:
+        return f"{base}{final_keys}/{safe_addr}/validate"
+
+    if "multiple" in kwargs and kwargs.get("multiple"):
+        return f"{base}/lists/{safe_addr}/members.json"
+
+    if "members" in final_keys:
+        members_keys = build_path_from_keys(url.get("keys", [])[1:])
+        if "member_address" in kwargs:
+            safe_member = sanitize_path_segment(kwargs["member_address"])
+            return f"{base}/lists/{safe_addr}{members_keys}/{safe_member}"
+        return f"{base}/lists/{safe_addr}{members_keys}"
+
+    return f"{base}/lists/{safe_addr}"

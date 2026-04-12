@@ -4,6 +4,7 @@ The `mailgun.client` module includes the core `Client` class for managing
 API requests, configuration, and error handling, as well as utility functions
 and classes for building request headers, URLs, and parsing responses.
 Classes:
+    - SecurityGuard: Centralized OWASP API security guardrails.
     - Config: Manages configuration settings for the Mailgun API.
     - Endpoint: Represents specific API endpoints and provides methods for
       common HTTP operations like GET, POST, PUT, and DELETE.
@@ -23,25 +24,27 @@ import warnings
 from enum import Enum
 from functools import lru_cache
 from types import MappingProxyType
-from typing import TYPE_CHECKING
-from typing import Any
-from typing import Final
-from urllib.parse import urlparse
+from typing import TYPE_CHECKING, Any, Final
+from urllib.parse import unquote, urlparse
 
 import httpx
 import requests
 from requests.adapters import HTTPAdapter
+from requests.exceptions import ConnectionError as RequestsConnectionError
 from urllib3.util.retry import Retry
 
 from mailgun import routes
+from mailgun._version import __version__
 from mailgun.handlers.bounce_classification_handler import handle_bounce_classification
 from mailgun.handlers.default_handler import handle_default
-from mailgun.handlers.domains_handler import handle_dkimkeys
-from mailgun.handlers.domains_handler import handle_domainlist
-from mailgun.handlers.domains_handler import handle_domains
-from mailgun.handlers.domains_handler import handle_mailboxes_credentials
-from mailgun.handlers.domains_handler import handle_sending_queues
-from mailgun.handlers.domains_handler import handle_webhooks
+from mailgun.handlers.domains_handler import (
+    handle_dkimkeys,
+    handle_domainlist,
+    handle_domains,
+    handle_mailboxes_credentials,
+    handle_sending_queues,
+    handle_webhooks,
+)
 from mailgun.handlers.email_validation_handler import handle_address_validate
 from mailgun.handlers.error_handler import ApiError
 from mailgun.handlers.inbox_placement_handler import handle_inbox
@@ -52,10 +55,12 @@ from mailgun.handlers.mailinglists_handler import handle_lists
 from mailgun.handlers.messages_handler import handle_resend_message
 from mailgun.handlers.metrics_handler import handle_metrics
 from mailgun.handlers.routes_handler import handle_routes
-from mailgun.handlers.suppressions_handler import handle_bounces
-from mailgun.handlers.suppressions_handler import handle_complaints
-from mailgun.handlers.suppressions_handler import handle_unsubscribes
-from mailgun.handlers.suppressions_handler import handle_whitelists
+from mailgun.handlers.suppressions_handler import (
+    handle_bounces,
+    handle_complaints,
+    handle_unsubscribes,
+    handle_whitelists,
+)
 from mailgun.handlers.tags_handler import handle_tags
 from mailgun.handlers.templates_handler import handle_templates
 from mailgun.handlers.users_handler import handle_users
@@ -69,8 +74,7 @@ else:
 
 if TYPE_CHECKING:
     import types
-    from collections.abc import Callable
-    from collections.abc import Mapping
+    from collections.abc import Callable, Mapping
 
     from httpx import Response as HttpxResponse
     from requests.models import Response
@@ -138,6 +142,191 @@ class APIVersion(str, Enum):
     V5 = "v5"
 
 
+class SecretAuth(tuple):
+    """OWASP: Obfuscate credentials in memory dumps and tracebacks."""
+
+    __slots__ = ()  # DX & Performance: Prevent __dict__ creation to optimize memory usage.
+
+    def __repr__(self) -> str:
+        return "('api', '***REDACTED***')"
+
+
+class SecurityGuard:
+    """Centralized security validation and sanitization (Defense in Depth).
+
+    This class isolates all Zero-Trust guardrails, enforcing SRP and making it
+    easy to extract into a dedicated security module in future releases.
+    """
+
+    ALLOWED_HTTP_METHODS: Final[frozenset[str]] = frozenset(
+        {"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"}
+    )
+    ALLOWED_API_HOSTS: Final[tuple[str, ...]] = (
+        "mailgun.net",
+        "mailgun.org",
+        "localhost",
+        "127.0.0.1",
+    )
+    ALLOWED_KWARGS: Final[frozenset[str]] = frozenset({"proxies", "cert"})
+    SAFE_KEY_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[a-z0-9_]+$")
+
+    @classmethod
+    def sanitize_api_url(cls, raw_url: str) -> str:
+        """Sanitize and validate the base API URL to prevent SSRF and Cleartext transmission.
+
+        Args:
+            raw_url: The raw URL string to sanitize.
+
+        Returns:
+            The sanitized URL string without a trailing slash.
+        """
+        raw_url = raw_url.strip().replace("\r", "").replace("\n", "")
+        parsed = urlparse(raw_url)
+
+        if not parsed.scheme:
+            raw_url = f"https://{raw_url}"
+            parsed = urlparse(raw_url)
+
+        if parsed.scheme == "http" and parsed.hostname not in {"localhost", "127.0.0.1"}:
+            logger.warning(
+                "SECURITY WARNING: Cleartext HTTP transmission detected in API URL. "
+                "Use 'https://' to prevent CWE-319 vulnerabilities."
+            )
+
+        hostname = parsed.hostname or ""
+        is_valid_host = any(
+            hostname == allowed or hostname.endswith(f".{allowed}")
+            for allowed in cls.ALLOWED_API_HOSTS
+        )
+        if not is_valid_host:
+            msg = (
+                f"SECURITY WARNING: Invalid API host '{hostname}'. Ensure this is a trusted proxy."
+            )
+            logger.warning(msg)
+
+        return raw_url.rstrip("/")
+
+    @classmethod
+    def validate_auth(cls, auth: tuple[str, str] | None) -> tuple[str, str] | None:
+        """Sanitize and validate credentials against Header Injection vulnerabilities.
+
+        Args:
+            auth: A tuple containing the API user and API key, or None.
+
+        Returns:
+            A SecretAuth tuple with cleaned credentials, or None if no auth was provided.
+
+        Raises:
+            ValueError: If the API key contains invalid characters (e.g., newlines).
+        """
+        if auth and isinstance(auth, tuple) and len(auth) == _AUTH_TUPLE_LEN:
+            clean_user = str(auth[0]).strip()
+            clean_key = str(auth[1]).strip()
+
+            if "\n" in clean_key or "\r" in clean_key:
+                raise ValueError("API Key contains invalid characters (Header Injection risk).")
+
+            return SecretAuth((clean_user, clean_key))
+        return auth
+
+    @classmethod
+    def sanitize_key(cls, key: str) -> str:
+        """Normalize and validate the endpoint key from IDE Introspection.
+
+        Args:
+            key: The raw endpoint key to sanitize.
+
+        Returns:
+            The sanitized and validated endpoint key.
+
+        Raises:
+            KeyError: If the resulting key is invalid or empty.
+        """
+        clean_key: str = key.lower()
+        if not cls.SAFE_KEY_PATTERN.fullmatch(clean_key):
+            clean_key = re.sub(r"[^a-z0-9_]", "", clean_key)
+        if not clean_key:
+            msg = f"Invalid endpoint key: {key}"
+            raise KeyError(msg)
+        return clean_key
+
+    @classmethod
+    def sanitize_domain(cls, domain: str | None) -> str | None:
+        """Protect against Path Traversal in URL construction.
+
+        Args:
+            domain: Target domain name to sanitize.
+
+        Returns:
+            The sanitized domain name or None.
+
+        Raises:
+            ValueError: If path traversal characters are detected.
+        """
+        if not domain:
+            return None
+
+        decoded_domain = unquote(domain)
+
+        if any(char in decoded_domain for char in ("/", "\\", "..")):
+            raise ValueError(
+                "CRITICAL SECURITY: Path traversal characters detected in domain parameter."
+            )
+        return domain.strip()
+
+    @classmethod
+    def sanitize_http_method(cls, method: str) -> str:
+        """Prevent HTTP Verb Tampering and Attribute Injection.
+
+        Args:
+            method: The HTTP method requested.
+
+        Returns:
+            A safely formatted HTTP method string.
+
+        Raises:
+            ValueError: If the method is not in the allowed list.
+        """
+        safe_method = str(method).strip().upper()
+        if safe_method not in cls.ALLOWED_HTTP_METHODS:
+            msg = f"CRITICAL SECURITY: HTTP method '{safe_method}' is prohibited."
+            raise ValueError(msg)
+        return safe_method
+
+    @classmethod
+    def sanitize_timeout(
+        cls, timeout: float | tuple[float, float] | None
+    ) -> float | tuple[float, float]:
+        """Prevent Infinite Timeout Thread Exhaustion (DoS).
+
+        Args:
+            timeout: The requested timeout value.
+
+        Returns:
+            The safely verified timeout value.
+
+        Raises:
+            ValueError: If the timeout is None.
+        """
+        if timeout is None:
+            raise ValueError(
+                "SECURITY RISK: Infinite timeouts (timeout=None) are prohibited to prevent DoS."
+            )
+        return timeout
+
+    @classmethod
+    def filter_safe_kwargs(cls, kwargs: dict[str, Any]) -> dict[str, Any]:
+        """Prevent Mass Assignment of internal HTTP client states.
+
+        Args:
+            kwargs: Dictionary of keyword arguments passed to the network layer.
+
+        Returns:
+            A filtered dictionary containing only allowed low-level HTTP settings.
+        """
+        return {k: v for k, v in kwargs.items() if k in cls.ALLOWED_KWARGS}
+
+
 # Static data is accessed directly from the routes module or class constants.
 @lru_cache
 def _get_cached_route_data(clean_key: str) -> dict[str, Any]:
@@ -185,7 +374,7 @@ class Config:
     __slots__ = ("api_url", "ex_handler")
 
     DEFAULT_API_URL: Final[str] = "https://api.mailgun.net"
-    USER_AGENT: Final[str] = "mailgun-api-python/"
+    USER_AGENT: Final[str] = f"mailgun-api-python/{__version__}"
 
     # Use Mapping to denote read-only dictionary-like structures
     _HEADERS_BASE: Final[Mapping[str, str]] = MappingProxyType({"User-agent": USER_AGENT})
@@ -195,7 +384,6 @@ class Config:
 
     # --- ENCAPSULATED ROUTING REGISTRIES ---
     _DOMAINS_RESOURCE: Final[str] = "domains"
-    _SAFE_KEY_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[a-z0-9_]+$")
 
     # Mapping[str, Any] is used because the values in routes vary in structure
     _EXACT_ROUTES: Final[Mapping[str, Any]] = MappingProxyType(routes.EXACT_ROUTES)
@@ -215,54 +403,7 @@ class Config:
         """
         self.ex_handler: bool = True
         base_url_input: str = api_url or self.DEFAULT_API_URL
-        self.api_url: str = self._sanitize_url(base_url_input)
-        self._validate_api_url()
-
-    @staticmethod
-    def _sanitize_url(raw_url: str) -> str:
-        """Normalize the base API URL to have NO trailing slash.
-
-        Args:
-            raw_url: The raw URL string to sanitize.
-
-        Returns:
-            The sanitized URL string without a trailing slash.
-        """
-        raw_url = raw_url.strip().replace("\r", "").replace("\n", "")
-        parsed = urlparse(raw_url)
-        if not parsed.scheme:
-            raw_url = f"https://{raw_url}"
-        return raw_url.rstrip("/")
-
-    def _validate_api_url(self) -> None:
-        """DX Guardrail & CWE-319: Warn on cleartext HTTP transmission."""
-        parsed = urlparse(self.api_url)
-        if parsed.scheme == "http" and parsed.hostname not in {"localhost", "127.0.0.1"}:
-            logger.warning(
-                "SECURITY WARNING: Cleartext HTTP transmission detected in API URL. "
-                "Use 'https://' to prevent CWE-319 vulnerabilities."
-            )
-
-    @classmethod
-    def _sanitize_key(cls, key: str) -> str:
-        """Normalize and validate the endpoint key.
-
-        Args:
-            key: The raw endpoint key to sanitize.
-
-        Returns:
-            The sanitized and validated endpoint key.
-
-        Raises:
-            KeyError: If the resulting key is invalid or empty.
-        """
-        clean_key: str = key.lower()
-        if not cls._SAFE_KEY_PATTERN.fullmatch(clean_key):
-            clean_key = re.sub(r"[^a-z0-9_]", "", clean_key)
-        if not clean_key:
-            msg = f"Invalid endpoint key: {key}"
-            raise KeyError(msg)
-        return clean_key
+        self.api_url: str = SecurityGuard.sanitize_api_url(base_url_input)
 
     def _build_base_url(self, version: APIVersion | str, suffix: str = "") -> str:
         """Construct API URL with precise slash control to prevent 404s.
@@ -337,7 +478,7 @@ class Config:
         Returns:
             A tuple containing the URL configuration dictionary and the headers dictionary.
         """
-        clean_key = self._sanitize_key(key)
+        clean_key = SecurityGuard.sanitize_key(key)
 
         route_data = _get_cached_route_data(clean_key)
 
@@ -350,10 +491,8 @@ class Config:
 
         # Reconstruct result
         if route_data.get("type") == "domain":
-            # Domain logic still needs 'self' for internal version frozensets
             return self._resolve_domains_route(list(route_data["parts"])), headers
 
-        # Create mutable copy of the URL structure for HANDLERS
         safe_url = {
             "base": self._build_base_url(route_data["version"], route_data.get("suffix", "")),
             "keys": list(route_data["keys"]),
@@ -367,26 +506,15 @@ class Config:
         return set(self._EXACT_ROUTES.keys()) | set(self._PREFIX_ROUTES.keys())
 
 
-class SecretAuth(tuple):
-    """OWASP: Obfuscate credentials in memory dumps and tracebacks."""
-
-    __slots__ = ()  # DX & Performance: Prevent __dict__ creation for tuple subclasses to optimize memory usage.
-
-    def __repr__(self) -> str:
-        return "('api', '***REDACTED***')"
-
-
 class BaseEndpoint:
-    """Base class for endpoints.
-
-    Contains methods common for Endpoint and AsyncEndpoint.
-    """
+    """Base class for endpoints. Contains methods common for Endpoint and AsyncEndpoint."""
 
     def __init__(
         self,
         url: dict[str, Any],
         headers: dict[str, str],
         auth: tuple[str, str] | None,
+        timeout: float | tuple[float, float] | None = 60,
     ) -> None:
         """Initialize a new BaseEndpoint instance.
 
@@ -398,20 +526,23 @@ class BaseEndpoint:
         self._url = url
         self.headers = headers
         self._auth = auth
+        self._timeout = timeout
 
     @staticmethod
     def _warn_if_deprecated(method: str, target_url: str) -> None:
         """Check the formulated URL against the registry of deprecated endpoints.
 
         Issues both a standard Python DeprecationWarning and a SDK logger warning.
+
+        Args:
+            method: Requested HTTP method.
+            target_url: Formulated destination URL.
         """
         path = urlparse(target_url).path
         for pattern, msg in routes.DEPRECATED_ROUTES.items():
             if pattern.search(path):
                 warning_message = f"DEPRECATED API CALL ({method.upper()} {path}): {msg}"
-                # Emit standard Python warning (can be caught by test suites/linters)
                 warnings.warn(warning_message, DeprecationWarning, stacklevel=3)
-                # Emit logger warning (visible to users in standard output)
                 logger.warning(warning_message)
                 break
 
@@ -419,7 +550,7 @@ class BaseEndpoint:
         """DX: Show the actual resolved target route instead of memory address.
 
         Returns:
-            A string representation of the endpoint instance.
+            A string representation of the Endpoint and its target route.
         """
         route_path = "/".join(self._url.get("keys", ["unknown"]))
         return f"<{self.__class__.__name__} target='/{route_path}'>"
@@ -443,14 +574,17 @@ class BaseEndpoint:
 
         Returns:
             The fully constructed target URL.
+
+        Raises:
+            ApiError: If the domain is required but missing.
         """
         keys = url.get("keys", [])
         endpoint_key = keys[0] if keys else ""
 
-        handler = HANDLERS.get(endpoint_key, handle_default)
+        if not domain and endpoint_key == "messages":
+            raise ApiError("Domain is required")
 
-        # Mypy strict mode flags Callable[..., str] as untyped because of the ellipsis.
-        # Adding type: ignore to safely bypass this strict rule during dynamic dispatch.
+        handler = HANDLERS.get(endpoint_key, handle_default)
         return handler(url, domain, method, **kwargs)  # type: ignore[no-untyped-call]
 
 
@@ -463,6 +597,7 @@ class Endpoint(BaseEndpoint):
         headers: dict[str, str],
         auth: tuple[str, str] | None = None,
         session: requests.Session | None = None,
+        timeout: float | tuple[float, float] | None = 60,
     ) -> None:
         """Initialize a new Endpoint instance for synchronous API interaction.
 
@@ -472,7 +607,7 @@ class Endpoint(BaseEndpoint):
             auth: requests auth tuple or None.
             session: Optional pre-configured requests.Session instance.
         """
-        super().__init__(url, headers, auth)
+        super().__init__(url, headers, auth, timeout=timeout)
         self._session = session or requests.Session()
 
     def api_call(
@@ -483,7 +618,7 @@ class Endpoint(BaseEndpoint):
         headers: dict[str, str],
         data: Any | None = None,
         filters: Mapping[str, str | Any] | None = None,
-        timeout: float | tuple[float, float] = 60,
+        timeout: float | tuple[float, float] | None = None,
         files: Any | None = None,
         domain: str | None = None,
         **kwargs: Any,
@@ -509,14 +644,20 @@ class Endpoint(BaseEndpoint):
             TimeoutError: If the request times out.
             ApiError: If the server returns a 4xx or 5xx status code or a network error occurs.
         """
-        target_url = self.build_url(url, domain=domain, method=method, **kwargs)
+        # --- ZERO-TRUST GUARDRAILS ---
+        safe_method = SecurityGuard.sanitize_http_method(method)
+        safe_kwargs = SecurityGuard.filter_safe_kwargs(kwargs)
+        target_domain = SecurityGuard.sanitize_domain(domain)
 
-        # DX Guardrail: Deprecation Interceptor
-        self._warn_if_deprecated(method, target_url)
+        actual_timeout = timeout if timeout is not None else self._timeout
+        safe_timeout = SecurityGuard.sanitize_timeout(actual_timeout)
 
-        req_method = getattr(self._session, method.lower())
+        target_url = self.build_url(url, domain=target_domain, method=safe_method, **kwargs)
+        self._warn_if_deprecated(safe_method, target_url)
 
-        logger.debug("Sending Request: %s %s", method.upper(), target_url)
+        req_method = getattr(self._session, safe_method.lower())
+
+        logger.debug("Sending Request: %s %s", safe_method.upper(), target_url)
 
         try:
             response = req_method(
@@ -525,27 +666,27 @@ class Endpoint(BaseEndpoint):
                 params=filters,
                 headers=headers,
                 auth=auth,
-                timeout=timeout,
+                timeout=safe_timeout,
                 files=files,
                 verify=True,
                 stream=False,
+                allow_redirects=False,
+                **safe_kwargs,
             )
 
             status_code = getattr(response, "status_code", 200)
             is_error = isinstance(status_code, int) and status_code >= _HTTP_ERROR_THRESHOLD
             if is_error:
-                # Prevent showing huge HTML-pages in logging
                 raw_text = getattr(response, "text", "")
                 error_body = (
                     raw_text[:_MAX_LOG_LENGTH] + "..."
                     if len(raw_text) > _MAX_LOG_LENGTH
                     else raw_text
                 )
-
                 logger.error(
                     "API Error %s | %s %s | Response: %s",
                     status_code,
-                    method.upper(),
+                    safe_method.upper(),
                     target_url,
                     error_body,
                 )
@@ -553,13 +694,17 @@ class Endpoint(BaseEndpoint):
                 logger.debug(
                     "API Success %s | %s %s",
                     getattr(response, "status_code", 200),
-                    method.upper(),
+                    safe_method.upper(),
                     target_url,
                 )
 
         except requests.exceptions.Timeout as e:
-            logger.exception("Timeout Error: %s %s", method.upper(), target_url)
+            logger.exception("Timeout Error: %s %s", safe_method.upper(), target_url)
             raise TimeoutError from e
+        except RequestsConnectionError as e:
+            logger.critical("Connection Failed (DNS/Network): %s | URL: %s", e, target_url)
+            msg = f"Network routing failed: {e}"
+            raise ApiError(msg) from e
         except requests.RequestException as e:
             logger.critical("Request Exception: %s | URL: %s", e, target_url)
             raise ApiError(e) from e
@@ -615,7 +760,6 @@ class Endpoint(BaseEndpoint):
             The HTTP response object.
         """
         req_headers = self.headers.copy()
-
         if headers and isinstance(headers, dict):
             req_headers.update(headers)
 
@@ -624,7 +768,6 @@ class Endpoint(BaseEndpoint):
             and data is not None
             and not isinstance(data, (str, bytes))
         ):
-            # Payload Minification: Strip structural spaces to reduce network overhead by ~15-20% for large payload batches.
             data = json.dumps(data, separators=(",", ":"))
 
         return self.api_call(
@@ -640,10 +783,7 @@ class Endpoint(BaseEndpoint):
         )
 
     def put(
-        self,
-        data: Any | None = None,
-        filters: Mapping[str, str | Any] | None = None,
-        **kwargs: Any,
+        self, data: Any | None = None, filters: Mapping[str, str | Any] | None = None, **kwargs: Any
     ) -> Response:
         """Send a PUT request to update or replace a resource.
 
@@ -656,20 +796,11 @@ class Endpoint(BaseEndpoint):
             The HTTP response object.
         """
         return self.api_call(
-            self._auth,
-            "put",
-            self._url,
-            headers=self.headers,
-            data=data,
-            filters=filters,
-            **kwargs,
+            self._auth, "put", self._url, headers=self.headers, data=data, filters=filters, **kwargs
         )
 
     def patch(
-        self,
-        data: Any | None = None,
-        filters: Mapping[str, str | Any] | None = None,
-        **kwargs: Any,
+        self, data: Any | None = None, filters: Mapping[str, str | Any] | None = None, **kwargs: Any
     ) -> Response:
         """Send a PATCH request to partially update a resource.
 
@@ -692,10 +823,7 @@ class Endpoint(BaseEndpoint):
         )
 
     def update(
-        self,
-        data: Any | None,
-        filters: Mapping[str, str | Any] | None = None,
-        **kwargs: Any,
+        self, data: Any | None, filters: Mapping[str, str | Any] | None = None, **kwargs: Any
     ) -> Response:
         """Send a PUT request specifically structured for updating resources with dynamic headers.
 
@@ -717,17 +845,10 @@ class Endpoint(BaseEndpoint):
             and data is not None
             and not isinstance(data, (str, bytes))
         ):
-            # Payload Minification: Strip structural spaces to reduce network overhead.
             data = json.dumps(data, separators=(",", ":"))
 
         return self.api_call(
-            self._auth,
-            "put",
-            self._url,
-            headers=req_headers,
-            data=data,
-            filters=filters,
-            **kwargs,
+            self._auth, "put", self._url, headers=req_headers, data=data, filters=filters, **kwargs
         )
 
     def delete(self, domain: str | None = None, **kwargs: Any) -> Response:
@@ -741,12 +862,7 @@ class Endpoint(BaseEndpoint):
             The HTTP response object.
         """
         return self.api_call(
-            self._auth,
-            "delete",
-            self._url,
-            headers=self.headers,
-            domain=domain,
-            **kwargs,
+            self._auth, "delete", self._url, headers=self.headers, domain=domain, **kwargs
         )
 
 
@@ -764,37 +880,32 @@ class BaseClient:
             auth: A tuple containing the API user and API key (e.g., ("api", "key-123")).
             **kwargs: Additional configuration parameters, such as 'api_url'.
         """
-        self.auth = self._validate_auth(auth)
+        self.auth = SecurityGuard.validate_auth(auth)
         self.config = Config(api_url=kwargs.get("api_url"))
 
-    @staticmethod
-    def _validate_auth(auth: tuple[str, str] | None) -> tuple[str, str] | None:
-        """Sanitize and validate credentials against Header Injection vulnerabilities.
+        # DX Guardrail: Constructor Deprecation Interceptions
+        if "api_version" in kwargs:
+            warnings.warn(
+                "The 'api_version' parameter is deprecated. The SDK now handles "
+                "API versioning (v1, v3, v4, v5) automatically via dynamic routing.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
 
-        Args:
-            auth: A tuple containing the API user and API key, or None.
-
-        Returns:
-            A SecretAuth tuple with cleaned credentials, or None if no auth was provided.
-
-        Raises:
-            ValueError: If the API key contains invalid characters (e.g., newlines).
-        """
-        if auth and isinstance(auth, tuple) and len(auth) == _AUTH_TUPLE_LEN:
-            clean_user = str(auth[0]).strip()
-            clean_key = str(auth[1]).strip()
-
-            if "\n" in clean_key or "\r" in clean_key:
-                raise ValueError("API Key contains invalid characters (Header Injection risk).")
-
-            return SecretAuth((clean_user, clean_key))
-        return auth
+        if isinstance(kwargs.get("timeout"), int):
+            warnings.warn(
+                "Passing an integer for 'timeout' is deprecated. Please pass a "
+                "bipartite tuple (connect_timeout, read_timeout) e.g., (10.0, 60.0).",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        self.timeout = kwargs.get("timeout", 60)
 
     def __repr__(self) -> str:
         """OWASP Secrets Management: Redact sensitive information from object representation.
 
         Returns:
-            A redacted string representation of the Client instance.
+            A redacted string representation of the Client.
         """
         return f"<{self.__class__.__name__} api_url={self.config.api_url!r}>"
 
@@ -802,7 +913,7 @@ class BaseClient:
         """OWASP Secrets Management: Redact sensitive information from string representation.
 
         Returns:
-            A redacted, human-readable string representation of the Client.
+            A safe human-readable string representation.
         """
         return f"Mailgun {self.__class__.__name__}"
 
@@ -810,7 +921,7 @@ class BaseClient:
         """DX: Expose true config endpoints for IDE Introspection.
 
         Returns:
-            A list of available attributes and endpoint routes.
+            A list of available attributes including dynamic endpoints.
         """
         return list(set(super().__dir__()) | self.config.available_endpoints)
 
@@ -843,23 +954,15 @@ class Client(BaseClient):
             A configured requests.Session instance.
         """
         session = requests.Session()
-
         retry_strategy = Retry(
             total=3,
-            backoff_factor=1,  # 1s, 2s, 4s...
+            backoff_factor=1,
             status_forcelist=[429, 500, 502, 503, 504],
-            # Network Resilience: Restrict automatic retries to idempotent methods to prevent duplicate operations (e.g., sending the same email twice).
             allowed_methods=["GET", "OPTIONS", "HEAD"],
         )
-
-        adapter = HTTPAdapter(
-            max_retries=retry_strategy,
-            pool_connections=100,
-            pool_maxsize=100,
-        )
+        adapter = HTTPAdapter(max_retries=retry_strategy, pool_connections=100, pool_maxsize=100)
         session.mount("https://", adapter)
         session.mount("http://", adapter)
-
         return session
 
     def __getattr__(self, name: str) -> Any:
@@ -875,15 +978,15 @@ class Client(BaseClient):
         """
         url, headers = self.config[name]
         return Endpoint(
-            url=url,
-            headers=headers,
-            auth=self.auth,
-            session=self._session,
+            url=url, headers=headers, auth=self.auth, session=self._session, timeout=self.timeout
         )
 
     def close(self) -> None:
-        """Close the underlying requests.Session connection pool."""
+        """Close the underlying requests.Session connection pool and purge memory."""
+        self._session.auth = None
+        self._session.headers.clear()
         self._session.close()
+        self.auth = None
 
     def __enter__(self) -> Self:
         """Enter the synchronous context manager.
@@ -912,6 +1015,7 @@ class AsyncEndpoint(BaseEndpoint):
         headers: dict[str, str],
         auth: tuple[str, str] | None,
         client: httpx.AsyncClient | None = None,
+        timeout: float | tuple[float, float] | None = None,
     ) -> None:
         """Initialize a new AsyncEndpoint instance for asynchronous API interaction.
 
@@ -921,10 +1025,7 @@ class AsyncEndpoint(BaseEndpoint):
             auth: httpx auth tuple or None.
             client: Optional httpx.AsyncClient instance to reuse.
         """
-        super().__init__(url, headers, auth)
-        self._url = url
-        self.headers = headers
-        self._auth = auth
+        super().__init__(url, headers, auth, timeout=timeout)
         self._client = client or httpx.AsyncClient()
 
     async def api_call(
@@ -961,49 +1062,52 @@ class AsyncEndpoint(BaseEndpoint):
             TimeoutError: If the request times out.
             ApiError: If the server returns a 4xx or 5xx status code or a network error occurs.
         """
-        target_url = self.build_url(url, domain=domain, method=method, **kwargs)
+        # --- ZERO-TRUST GUARDRAILS ---
+        safe_method = SecurityGuard.sanitize_http_method(method)
+        safe_timeout = SecurityGuard.sanitize_timeout(timeout)
+        safe_kwargs = SecurityGuard.filter_safe_kwargs(kwargs)
+        target_domain = SecurityGuard.sanitize_domain(domain)
 
-        # DX Guardrail: Deprecation Interceptor
-        self._warn_if_deprecated(method, target_url)
+        target_url = self.build_url(url, domain=target_domain, method=safe_method, **kwargs)
+        self._warn_if_deprecated(safe_method, target_url)
 
-        # Build basic arguments
         request_kwargs: dict[str, Any] = {
-            "method": method.upper(),
+            "method": safe_method.upper(),
             "url": target_url,
             "params": filters,
             "files": files,
             "headers": headers,
             "auth": auth,
-            "timeout": timeout,
+            "timeout": safe_timeout,
+            "follow_redirects": False,
         }
 
-        # Deprecation Warning for httpx
+        # Safe kwargs passthrough (e.g., allow_redirects)
+        request_kwargs.update(safe_kwargs)
+
         if isinstance(data, (str, bytes)):
             request_kwargs["content"] = data
         else:
             request_kwargs["data"] = data
 
-        logger.debug("Sending Async Request: %s %s", method.upper(), target_url)
+        logger.debug("Sending Async Request: %s %s", safe_method.upper(), target_url)
 
         try:
             response = await self._client.request(**request_kwargs)
 
             status_code = getattr(response, "status_code", 200)
             is_error = isinstance(status_code, int) and status_code >= _HTTP_ERROR_THRESHOLD
-
             if is_error:
-                # Prevent showing huge HTML-pages in logging
                 raw_text = getattr(response, "text", "")
                 error_body = (
                     raw_text[:_MAX_LOG_LENGTH] + "..."
                     if len(raw_text) > _MAX_LOG_LENGTH
                     else raw_text
                 )
-
                 logger.error(
                     "API Error %s | %s %s | Response: %s",
                     status_code,
-                    method.upper(),
+                    safe_method.upper(),
                     target_url,
                     error_body,
                 )
@@ -1011,13 +1115,17 @@ class AsyncEndpoint(BaseEndpoint):
                 logger.debug(
                     "API Success %s | %s %s",
                     getattr(response, "status_code", 200),
-                    method.upper(),
+                    safe_method.upper(),
                     target_url,
                 )
 
         except httpx.TimeoutException as e:
-            logger.exception("Timeout Error: %s %s", method.upper(), target_url)
+            logger.exception("Timeout Error: %s %s", safe_method.upper(), target_url)
             raise TimeoutError from e
+        except httpx.ConnectError as e:
+            logger.critical("Async Connection Failed (DNS/Network): %s | URL: %s", e, target_url)
+            msg = f"Network routing failed: {e}"
+            raise ApiError(msg) from e
         except httpx.RequestError as e:
             logger.critical("Request Exception: %s | URL: %s", e, target_url)
             raise ApiError(e) from e
@@ -1073,7 +1181,6 @@ class AsyncEndpoint(BaseEndpoint):
             The HTTP response object.
         """
         req_headers = self.headers.copy()
-
         if headers and isinstance(headers, dict):
             req_headers.update(headers)
 
@@ -1082,7 +1189,6 @@ class AsyncEndpoint(BaseEndpoint):
             and data is not None
             and not isinstance(data, (str, bytes))
         ):
-            # Payload Minification: Strip structural spaces to reduce network overhead.
             data = json.dumps(data, separators=(",", ":"))
 
         return await self.api_call(
@@ -1098,10 +1204,7 @@ class AsyncEndpoint(BaseEndpoint):
         )
 
     async def put(
-        self,
-        data: Any | None = None,
-        filters: Mapping[str, str | Any] | None = None,
-        **kwargs: Any,
+        self, data: Any | None = None, filters: Mapping[str, str | Any] | None = None, **kwargs: Any
     ) -> httpx.Response:
         """Send an asynchronous PUT request to update or replace a resource.
 
@@ -1114,20 +1217,11 @@ class AsyncEndpoint(BaseEndpoint):
             The HTTP response object.
         """
         return await self.api_call(
-            self._auth,
-            "put",
-            self._url,
-            headers=self.headers,
-            data=data,
-            filters=filters,
-            **kwargs,
+            self._auth, "put", self._url, headers=self.headers, data=data, filters=filters, **kwargs
         )
 
     async def patch(
-        self,
-        data: Any | None = None,
-        filters: Mapping[str, str | Any] | None = None,
-        **kwargs: Any,
+        self, data: Any | None = None, filters: Mapping[str, str | Any] | None = None, **kwargs: Any
     ) -> httpx.Response:
         """Send an asynchronous PATCH request to partially update a resource.
 
@@ -1150,10 +1244,7 @@ class AsyncEndpoint(BaseEndpoint):
         )
 
     async def update(
-        self,
-        data: Any | None,
-        filters: Mapping[str, str | Any] | None = None,
-        **kwargs: Any,
+        self, data: Any | None, filters: Mapping[str, str | Any] | None = None, **kwargs: Any
     ) -> httpx.Response:
         """Send an asynchronous PUT request specifically structured for updating resources with dynamic headers.
 
@@ -1175,17 +1266,10 @@ class AsyncEndpoint(BaseEndpoint):
             and data is not None
             and not isinstance(data, (str, bytes))
         ):
-            # Payload Minification: Strip structural spaces to reduce network overhead.
             data = json.dumps(data, separators=(",", ":"))
 
         return await self.api_call(
-            self._auth,
-            "put",
-            self._url,
-            headers=req_headers,
-            data=data,
-            filters=filters,
-            **kwargs,
+            self._auth, "put", self._url, headers=req_headers, data=data, filters=filters, **kwargs
         )
 
     async def delete(self, domain: str | None = None, **kwargs: Any) -> httpx.Response:
@@ -1199,12 +1283,7 @@ class AsyncEndpoint(BaseEndpoint):
             The HTTP response object.
         """
         return await self.api_call(
-            self._auth,
-            "delete",
-            self._url,
-            headers=self.headers,
-            domain=domain,
-            **kwargs,
+            self._auth, "delete", self._url, headers=self.headers, domain=domain, **kwargs
         )
 
 
@@ -1245,6 +1324,7 @@ class AsyncClient(BaseClient):
             headers=headers,
             auth=self.auth,
             client=self._client,
+            timeout=self.timeout,
         )
 
     @property
@@ -1255,17 +1335,19 @@ class AsyncClient(BaseClient):
             The active httpx.AsyncClient instance.
         """
         if not self._httpx_client or self._httpx_client.is_closed:
-            self._httpx_client = httpx.AsyncClient(**self._client_kwargs)
+            transport = httpx.AsyncHTTPTransport(retries=3)
+
+            self._httpx_client = httpx.AsyncClient(transport=transport, **self._client_kwargs)
         return self._httpx_client
 
     async def aclose(self) -> None:
-        """Close the underlying httpx.AsyncClient.
-
-        Call this when done with the client to properly clean up resources
-        and avoid unclosed socket warnings.
-        """
+        """Close the underlying httpx.AsyncClient and purge memory."""
         if self._httpx_client:
+            # CWE-316: Зачистка асинхронної сесії
+            self._httpx_client.auth = None
+            self._httpx_client.headers.clear()
             await self._httpx_client.aclose()
+        self.auth = None
 
     async def __aenter__(self) -> Self:
         """Enter the asynchronous context manager.

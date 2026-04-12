@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from mailgun.handlers.utils import build_path_from_keys
+from mailgun.handlers.utils import build_path_from_keys, sanitize_path_segment
 
 
 def handle_keys(
@@ -30,5 +30,6 @@ def handle_keys(
     final_keys = build_path_from_keys(url.get("keys", []))
     base_url = url["base"][:-1] + final_keys
     if "key_id" in kwargs:
-        return f"{base_url}/{kwargs['key_id']}"
+        safe_key = sanitize_path_segment(kwargs["key_id"])
+        return f"{base_url}/{safe_key}"
     return base_url

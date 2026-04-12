@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Any
 
 from mailgun.handlers.error_handler import ApiError
-from mailgun.handlers.utils import build_path_from_keys
+from mailgun.handlers.utils import build_path_from_keys, sanitize_path_segment
 
 
 def handle_domainlist(
@@ -57,7 +57,10 @@ def handle_domains(
         keys.remove("domains")
 
     base_url = str(url["base"]).rstrip("/")
-    target_domain = kwargs.get("domain_name", domain)
+
+    # 1. Sanitize the target domain, especially since it can be overridden by kwargs
+    raw_target_domain = kwargs.get("domain_name", domain)
+    target_domain = sanitize_path_segment(raw_target_domain) if raw_target_domain else None
 
     if not target_domain:
         if keys:
@@ -66,16 +69,21 @@ def handle_domains(
 
     # Hierarchical construction: [domain] + [remaining keys from Config]
     path_segments = [target_domain, *keys]
-    domain_path = "/".join(path_segments)
+    domain_path = build_path_from_keys(path_segments).lstrip(
+        "/"
+    )  # Strip the leading slash to match the original behavior
 
-    # Specific terminal logic for special arguments
+    # 2. Sanitize mailbox logins (which often contain special characters like '@' or '.')
     if "login" in kwargs:
-        return f"{base_url}/{domain_path}/{kwargs['login']}"
+        safe_login = sanitize_path_segment(kwargs["login"])
+        return f"{base_url}/{domain_path}/{safe_login}"
 
+    # 3. Sanitize IP addresses
     if "ip" in kwargs:
         # Check if 'ips' segment is already present to prevent domains/ips/ips/1.1.1.1
         prefix = "" if "ips" in keys else "ips/"
-        return f"{base_url}/{domain_path}/{prefix}{kwargs['ip']}"
+        safe_ip = sanitize_path_segment(kwargs["ip"])
+        return f"{base_url}/{domain_path}/{prefix}{safe_ip}"
 
     if "verify" in kwargs:
         if kwargs["verify"]:
@@ -148,7 +156,8 @@ def handle_mailboxes_credentials(
     constructed_url = f"{base_url}/{'/'.join(path_segments)}"
 
     if "login" in kwargs:
-        return f"{constructed_url}/{kwargs['login']}"
+        safe_login = sanitize_path_segment(kwargs["login"])
+        return f"{base_url}/{target_domain}/credentials/{safe_login}"
     return constructed_url
 
 
@@ -199,7 +208,8 @@ def handle_webhooks(
         final_keys = build_path_from_keys(keys)
         path = f"{base_url}{final_keys}"
         if "webhook_id" in kwargs:
-            return f"{path}/{kwargs['webhook_id']}"
+            safe_id = sanitize_path_segment(kwargs["webhook_id"])
+            return f"{path}/{safe_id}"
         return path
 
     # 2. Domain Webhooks (v3 or v4)

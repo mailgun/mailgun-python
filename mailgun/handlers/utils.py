@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+from urllib.parse import quote
 
 
 if TYPE_CHECKING:
@@ -20,3 +21,16 @@ def build_path_from_keys(keys: Iterable[str]) -> str:
     """
     keys_list = list(keys)
     return "/" + "/".join(keys_list) if keys_list else ""
+
+
+def sanitize_path_segment(segment: Any) -> str:
+    """Poka-yoke: URL-encode path segments to prevent Path Traversal (CWE-22).
+
+    Returns:
+        The URL-encoded path segment string.
+    """
+    if segment is None:
+        return ""
+    # safe="@+" ensures email addresses pass through naturally without breaking API contracts,
+    # while still strictly percent-encoding slashes (/) to block Path Traversal.
+    return quote(str(segment), safe="@+")
