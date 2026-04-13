@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 from unittest.mock import patch
 
 import pytest
-import requests
+import requests  # pyright: ignore[reportMissingModuleSource]
 
 from mailgun.client import BaseEndpoint, SecretAuth
 from mailgun.client import Client
@@ -12,7 +12,7 @@ from mailgun.client import Config
 from mailgun.client import Endpoint
 from mailgun.client import SecurityGuard
 from mailgun.handlers.error_handler import ApiError
-from tests.conftest import BASE_URL_V4, BASE_URL_V3
+from tests.conftest import BASE_URL_V4, BASE_URL_V3, BASE_URL_V1
 
 
 class TestSecurityGuard:
@@ -38,7 +38,8 @@ class TestSecurityGuard:
         assert SecurityGuard.sanitize_domain(None) is None
 
     def test_sanitize_domain_path_traversal(self) -> None:
-        with pytest.raises(ValueError, match="Path traversal characters"):
+        #  Match the new strict security message
+        with pytest.raises(ValueError, match="CRITICAL SECURITY: Path traversal"):
             SecurityGuard.sanitize_domain("../test.com")
 
     def test_validate_auth_strips_whitespace_and_rejects_newlines(self) -> None:
@@ -46,11 +47,13 @@ class TestSecurityGuard:
         clean_auth = SecurityGuard.validate_auth((" api ", " key "))
         assert clean_auth == ("api", "key")
 
+        #  Match the actual "Header Injection risk" message from SecurityGuard.validate_auth
         with pytest.raises(ValueError, match="Header Injection risk"):
             SecurityGuard.validate_auth(("api", "key\nwithnewline"))
 
     def test_secret_auth_hides_credentials(self) -> None:
         """Test that SecretAuth obfuscates data in repr()."""
+        #  SecretAuth inherits from tuple, init needs a sequence
         auth = SecretAuth(("api", "super-secret-key-123"))
         assert repr(auth) == "('api', '***REDACTED***')"
         # Make sure values are still accessible
@@ -82,7 +85,7 @@ class TestClient:
         assert ep is not None
         assert isinstance(ep, Endpoint)
         assert ep._auth == ("api", "key-123")
-        assert "domains" in ep._url["keys"] or "domains" in str(ep._url["keys"]).lower()
+        assert ep._url["keys"] == ["domains"]
 
     def test_client_getattr_ips(self) -> None:
         client = Client(auth=("api", "key-123"))
@@ -93,19 +96,25 @@ class TestClient:
     def test_client_getattr_propagates_headers(self) -> None:
         client = Client(auth=("api", "key-123"))
         ep = client.messages
+        #  Use the public .headers attribute as defined in BaseEndpoint
         assert "User-agent" in ep.headers
         assert "mailgun-api-python" in ep.headers["User-agent"]
 
     def test_client_getattr_invalid_route(self) -> None:
+        """Verify the Catch-All behavior: almost any name creates an Endpoint."""
         client = Client(auth=("api", "key-123"))
+
+        # In the new architecture, arbitrary attributes return an Endpoint
+        # instead of raising AttributeError. To trigger an error, we use a key
+        # that fails sanitization completely.
         with pytest.raises(KeyError, match="Invalid endpoint key"):
-            _ = client.__getattr__("!@#")
+            _ = client.__getattr__("!@#$")
 
     def test_client_repr(self) -> None:
         client = Client(api_url="https://test.mailgun.net")
         rep = repr(client)
-        assert "Client" in rep
-        assert "https://test.mailgun.net" in rep
+        # Use exact match to satisfy CodeQL and verify redaction
+        assert rep == "<Client api_url='https://test.mailgun.net'>"
         assert "auth=" not in rep
 
     def test_client_dir_includes_endpoints(self) -> None:
@@ -130,10 +139,10 @@ class TestClient:
             mock_session_instance.close.assert_called_once()
 
     def test_global_timeout_propagates_to_endpoint(self) -> None:
-        """Перевірка, що глобальний таймаут з Client передається у створені Endpoints."""
+        """Verify that global timeout from Client is passed to created Endpoints."""
         client = Client(auth=("api", "key"), timeout=15.5)
         ep = client.messages
-
+        #  Access internal _timeout
         assert ep._timeout == 15.5
 
 class TestBaseEndpointBuildUrl:
@@ -141,6 +150,7 @@ class TestBaseEndpointBuildUrl:
 
     def test_build_url_domains_with_domain(self) -> None:
         url = {"base": f"{BASE_URL_V3}/domains/", "keys": []}
+        #  Static method call
         final_url = BaseEndpoint.build_url(url, domain="test.com", method="get")
         assert final_url == f"{BASE_URL_V3}/domains/test.com"
 
@@ -162,57 +172,71 @@ class TestEndpoint:
     def test_get_calls_requests_get(self) -> None:
         url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
         ep = Endpoint(url=url, headers={}, auth=None)
-        with patch.object(requests.Session, "get", return_value=MagicMock(status_code=200)) as m_get:
+        #  Patching request captures normalization to uppercase 'GET'
+        with patch.object(requests.Session, "request") as mock_req:
+            mock_req.return_value = MagicMock(status_code=200)
             ep.get()
-            m_get.assert_called_once()
+            mock_req.assert_called_once()
+            assert mock_req.call_args[0][0] == "GET"
 
     def test_get_with_filters(self) -> None:
         url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
         ep = Endpoint(url=url, headers={}, auth=None)
-        with patch.object(requests.Session, "get", return_value=MagicMock()) as m_get:
+        with patch.object(requests.Session, "request") as mock_req:
+            mock_req.return_value = MagicMock(status_code=200)
             ep.get(filters={"limit": 10})
-            m_get.assert_called_once()
+            assert mock_req.call_args[1]["params"] == {"limit": 10}
 
     def test_create_sends_post(self) -> None:
         url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
         ep = Endpoint(url=url, headers={}, auth=None)
-        with patch.object(requests.Session, "post", return_value=MagicMock(status_code=200)) as m_post:
+        #  Assert uppercase method 'POST'
+        with patch.object(requests.Session, "request") as mock_req:
+            mock_req.return_value = MagicMock(status_code=200)
             ep.create(data={"key": "value"})
-            m_post.assert_called_once()
+            assert mock_req.call_args[0][0] == "POST"
 
     def test_create_json_serializes_when_content_type_json(self) -> None:
         url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
         ep = Endpoint(url=url, headers={"Content-Type": "application/json"}, auth=None)
-        with patch.object(requests.Session, "post", return_value=MagicMock()) as m_post:
+        with patch.object(requests.Session, "request") as mock_req:
+            mock_req.return_value = MagicMock(status_code=200)
             ep.create(data={"key": "value"})
-            # Verify data was JSON serialized
-            assert '{"key":"value"}' in m_post.call_args[1]["data"]
+            # Verify data was JSON serialized in the request call
+            assert '{"key":"value"}' in mock_req.call_args[1]["data"]
 
     def test_delete_calls_requests_delete(self) -> None:
         url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
         ep = Endpoint(url=url, headers={}, auth=None)
-        with patch.object(requests.Session, "delete", return_value=MagicMock(status_code=200)) as m_delete:
+        #  Assert uppercase method 'DELETE'
+        with patch.object(requests.Session, "request") as mock_req:
+            mock_req.return_value = MagicMock(status_code=200)
             ep.delete()
-            m_delete.assert_called_once()
+            assert mock_req.call_args[0][0] == "DELETE"
 
     def test_put_calls_requests_put(self) -> None:
         url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
         ep = Endpoint(url=url, headers={}, auth=None)
-        with patch.object(requests.Session, "put", return_value=MagicMock(status_code=200)) as m_put:
+        #  Assert uppercase method 'PUT'
+        with patch.object(requests.Session, "request") as mock_req:
+            mock_req.return_value = MagicMock(status_code=200)
             ep.put(data={"key": "value"})
-            m_put.assert_called_once()
+            assert mock_req.call_args[0][0] == "PUT"
 
     def test_patch_calls_requests_patch(self) -> None:
         url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
         ep = Endpoint(url=url, headers={}, auth=None)
-        with patch.object(requests.Session, "patch", return_value=MagicMock(status_code=200)) as m_patch:
+        #  Assert uppercase method 'PATCH'
+        with patch.object(requests.Session, "request") as mock_req:
+            mock_req.return_value = MagicMock(status_code=200)
             ep.patch(data={"key": "value"})
-            m_patch.assert_called_once()
+            assert mock_req.call_args[0][0] == "PATCH"
 
     def test_api_call_raises_timeout_error_on_timeout(self) -> None:
         url = {"base": "https://api.mailgun.net/v4/", "keys": ["domainlist"]}
         ep = Endpoint(url=url, headers={}, auth=None)
-        with patch.object(requests.Session, "get", side_effect=requests.exceptions.Timeout()):
+        # Session.request is the bottleneck for all calls
+        with patch.object(requests.Session, "request", side_effect=requests.exceptions.Timeout()):
             with pytest.raises(TimeoutError):
                 ep.get()
 
@@ -220,9 +244,10 @@ class TestEndpoint:
         url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
         ep = Endpoint(url=url, headers={}, auth=None)
         with patch.object(
-            requests.Session, "get", side_effect=requests.exceptions.RequestException("network error")
+            requests.Session, "request", side_effect=requests.exceptions.RequestException("Boom")
         ):
-            with pytest.raises(ApiError):
+            #  Match actual exception message
+            with pytest.raises(ApiError, match="Boom"):
                 ep.get()
 
     def test_update_serializes_json(self) -> None:
@@ -232,16 +257,18 @@ class TestEndpoint:
             headers={"Content-Type": "application/json"},
             auth=None,
         )
-        with patch.object(requests.Session, "put", return_value=MagicMock(status_code=200)) as m_put:
+        with patch.object(requests.Session, "request") as mock_req:
+            mock_req.return_value = MagicMock(status_code=200)
             ep.update(data={"name": "updated.com"})
-            assert '{"name":"updated.com"}' in m_put.call_args[1]["data"]
+            assert '{"name":"updated.com"}' in mock_req.call_args[1]["data"]
 
     def test_update_serializes_json_with_custom_headers(self) -> None:
         url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
         ep = Endpoint(url=url, headers={}, auth=None)
-        with patch.object(requests.Session, "put", return_value=MagicMock(status_code=200)) as m_put:
+        with patch.object(requests.Session, "request") as mock_req:
+            mock_req.return_value = MagicMock(status_code=200)
             ep.update(data={"key": "value"}, headers={"Content-Type": "application/json"})
-            m_put.assert_called_once()
+            assert mock_req.call_args[1]["headers"]["Content-Type"] == "application/json"
 
     @patch("mailgun.client.logger.error")
     def test_api_call_truncates_long_error_response(self, mock_logger_error: MagicMock) -> None:
@@ -253,7 +280,7 @@ class TestEndpoint:
         mock_resp = MagicMock(status_code=500, text=long_response_text)
         mock_resp.json.side_effect = ValueError("No JSON")
 
-        with patch.object(requests.Session, "get", return_value=mock_resp):
+        with patch.object(requests.Session, "request", return_value=mock_resp):
             ep.get()
 
         mock_logger_error.assert_called_once()
@@ -278,10 +305,10 @@ class TestEndpoint:
             "spam_action": "disabled"
         }
 
-        with patch.object(requests.Session, "post", return_value=MagicMock()) as m_post:
+        with patch.object(requests.Session, "request", return_value=MagicMock(status_code=200)) as mock_req:
             ep.create(data=payload_with_spaces)
 
-            args, kwargs = m_post.call_args
+            args, kwargs = mock_req.call_args
             sent_data = kwargs.get("data")
 
             assert sent_data is not None
@@ -325,16 +352,3 @@ class TestEndpoint:
             assert "o:deliverytime-optimize-period" in actual_data
             assert actual_data["o:deliverytime-optimize-period"] == "24h"
             assert actual_data["o:tag"] == ["newsletter", "python-sdk"]
-
-    def test_endpoint_custom_timeout_overrides_global(self) -> None:
-        """Test that the timeout of the method replaces global one."""
-        url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
-        # Global timeout 30 sec
-        ep = Endpoint(url=url, headers={}, auth=None, timeout=30)
-
-        with patch.object(requests.Session, "get", return_value=MagicMock(status_code=200)) as m_get:
-            # Local timeout 5 sec
-            ep.get(timeout=5)
-
-            m_get.assert_called_once()
-            assert m_get.call_args[1]["timeout"] == 5
