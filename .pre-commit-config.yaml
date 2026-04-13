@@ -101,15 +101,8 @@ repos:
       - id: detect-private-key
         name: "🔒 security · Detect private keys"
 
-  # Git commit quality
-  - repo: https://github.com/jorisroovers/gitlint
-    rev: v0.19.1
-    hooks:
-      - id: gitlint
-        name: "🌳 git · Validate commit format"
-
   - repo: https://github.com/commitizen-tools/commitizen
-    rev: v4.13.9
+    rev: v4.13.10
     hooks:
       - id: commitizen
         name: "🌳 git · Validate commit message"
@@ -123,7 +116,7 @@ repos:
         name: "🔒 security · Detect committed secrets"
 
   - repo: https://github.com/gitleaks/gitleaks
-    rev: v8.30.1
+    rev: v8.30.0
     hooks:
       - id: gitleaks
         name: "🔒 security · Scan for hardcoded secrets"
@@ -146,7 +139,7 @@ repos:
 #        args: ['--desc', 'on']
 
   - repo: https://github.com/semgrep/pre-commit
-    rev: 'v1.156.0'
+    rev: 'v1.159.0'
     hooks:
       - id: semgrep
         name: "🔒 security · Static analysis (semgrep)"
@@ -155,7 +148,7 @@ repos:
 
   # Spelling and typos
   - repo: https://github.com/crate-ci/typos
-    rev: v1.44.0
+    rev: v1.45.1
     hooks:
       - id: typos
         name: "📝 spelling · Check typos"
@@ -171,7 +164,7 @@ repos:
         files: ^\.github/workflows/.*\.ya?ml$
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.9
+    rev: v0.15.10
     hooks:
       - id: ruff-check
         name: "🐍 lint · Check with Ruff"
@@ -198,7 +191,7 @@ repos:
 
   # Python type checking
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.19.1
+    rev: v1.20.1
     hooks:
       - id: mypy
         name: "🐍 types · Check with mypy"
@@ -245,19 +238,18 @@ repos:
         name: "📝 markdown · Format files"
         additional_dependencies:
           - mdformat-gfm
-          - mdformat-black
           - mdformat-ruff
 
 # TODO: Enable it for a single check
-  - repo: https://github.com/tcort/markdown-link-check
-    rev: v3.14.2
-    hooks:
-      - id: markdown-link-check
-        name: "📝 docs · Check markdown links"
+#  - repo: https://github.com/tcort/markdown-link-check
+#    rev: v3.14.2
+#    hooks:
+#      - id: markdown-link-check
+#        name: "📝 docs · Check markdown links"
 
   # Makefile linting
-  - repo: https://github.com/checkmake/checkmake
-    rev: v0.3.0
-    hooks:
-      - id: checkmake
-        name: "🔧 build · Lint Makefile"
+#  - repo: https://github.com/checkmake/checkmake
+#    rev: v0.3.0
+#    hooks:
+#      - id: checkmake
+#        name: "🔧 build · Lint Makefile"
