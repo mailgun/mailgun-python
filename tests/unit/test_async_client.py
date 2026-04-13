@@ -1,5 +1,7 @@
 """Unit tests for mailgun.client (AsyncClient, AsyncEndpoint)."""
 
+import json
+from typing import Any
 from unittest.mock import AsyncMock, patch, MagicMock
 
 import httpx
@@ -36,6 +38,7 @@ class TestAsyncEndpoint:
         ep = AsyncEndpoint(url=url, headers={"User-agent": "test"}, auth=("api", "key"), client=mock_client)
         await ep.get()
         mock_client.request.assert_called_once()
+        # Use kwargs for httpx compatibility
         assert mock_client.request.call_args[1]["method"] == "GET"
 
     @pytest.mark.asyncio
@@ -112,7 +115,8 @@ class TestAsyncEndpoint:
 
         await ep.create(data=payload_with_spaces)
 
-        args, kwargs = mock_client.request.call_args
+        # Minified JSON string is passed via 'content' when Content-Type is json
+        kwargs = mock_client.request.call_args[1]
         sent_data = kwargs.get("content")
 
         assert sent_data is not None
@@ -121,48 +125,50 @@ class TestAsyncEndpoint:
 
 
 class TestAsyncClient:
-    """Tests for AsyncClient."""
+    """Tests for AsyncClient shielding from SSL context issues."""
 
-    def test_async_client_inherits_client(self) -> None:
-        # Mocking AsyncClient init-related side effects
-        with patch("httpx.AsyncClient"):
-            client = AsyncClient(auth=("api", "key-123"))
-            assert client.auth == ("api", "key-123")
-            assert client.config.api_url == Config.DEFAULT_API_URL
-
+    @patch("httpx.AsyncHTTPTransport")
     @patch("httpx.AsyncClient")
-    def test_async_client_getattr_returns_async_endpoint_type(self, mock_httpx: MagicMock) -> None:
+    def test_async_client_inherits_client(self, mock_httpx: MagicMock, mock_transport: MagicMock) -> None:
+        client = AsyncClient(auth=("api", "key-123"))
+        assert client.auth == ("api", "key-123")
+        assert client.config.api_url == Config.DEFAULT_API_URL
+
+    @patch("httpx.AsyncHTTPTransport")
+    @patch("httpx.AsyncClient")
+    def test_async_client_getattr_returns_async_endpoint_type(self, mock_httpx: MagicMock, mock_transport: MagicMock) -> None:
         client = AsyncClient(auth=("api", "key-123"))
         ep = client.domains
         assert isinstance(ep, AsyncEndpoint)
         assert ep._auth == ("api", "key-123")
         assert "domains" in str(ep._url["keys"]).lower()
 
+    @patch("httpx.AsyncHTTPTransport")
+    @patch("httpx.AsyncClient")
     @pytest.mark.asyncio
-    async def test_aclose_closes_httpx_client(self) -> None:
-        # Mocking the client to avoid SSL context creation on Windows
-        with patch("httpx.AsyncClient") as mock_client_class:
-            mock_instance = mock_client_class.return_value
-            mock_instance.aclose = AsyncMock()
+    async def test_aclose_closes_httpx_client(self, mock_client_class: MagicMock, mock_transport: MagicMock) -> None:
+        mock_instance = mock_client_class.return_value
+        mock_instance.aclose = AsyncMock()
 
-            client = AsyncClient()
-            # Force initialization of the client property
+        client = AsyncClient()
+        # Trigger client initialization using the mock
+        _ = client._client
+        await client.aclose()
+        mock_instance.aclose.assert_called_once()
+
+    @patch("httpx.AsyncHTTPTransport")
+    @patch("httpx.AsyncClient")
+    @pytest.mark.asyncio
+    async def test_async_context_manager(self, mock_client_class: MagicMock, mock_transport: MagicMock) -> None:
+        mock_instance = mock_httpx = mock_client_class.return_value
+        mock_httpx.aclose = AsyncMock()
+
+        async with AsyncClient() as client:
+            # Trigger internal client creation
             _ = client._client
-            await client.aclose()
-            mock_instance.aclose.assert_called_once()
+            assert client._httpx_client is mock_instance
 
-    @pytest.mark.asyncio
-    async def test_async_context_manager(self) -> None:
-        with patch("httpx.AsyncClient") as mock_client_class:
-            mock_instance = mock_client_class.return_value
-            mock_instance.aclose = AsyncMock()
-
-            client = AsyncClient()
-            async with client as c:
-                assert c is client
-                # Trigger internal client creation
-                _ = client._client
-            mock_instance.aclose.assert_called_once()
+        mock_httpx.aclose.assert_called_once()
 
     @patch("mailgun.client.logger.error")
     @pytest.mark.asyncio
@@ -188,22 +194,23 @@ class TestAsyncClient:
 
     def test_async_validate_auth_sanitizes_input(self) -> None:
         """Test OWASP Header Injection prevention via SecurityGuard."""
-        # Put the carriage return INSIDE the string so .strip() doesn't remove it
         with pytest.raises(ValueError, match="Header Injection risk"):
             SecurityGuard.validate_auth(("api", "key\rwithnewline"))
 
-    def test_async_client_dir_includes_endpoints(self) -> None:
-        """Test that IDE introspection via __dir__ exposes config endpoints."""
-        with patch("httpx.AsyncClient"):
-            client = AsyncClient()
-            client_dir = dir(client)
-
-            assert "messages" in client_dir
-            assert "bounces" in client_dir
-            assert "domains" in client_dir
-
+    @patch("httpx.AsyncHTTPTransport")
     @patch("httpx.AsyncClient")
-    def test_async_global_timeout_propagates_to_endpoint(self, mock_httpx: MagicMock) -> None:
+    def test_async_client_dir_includes_endpoints(self, mock_httpx: MagicMock, mock_transport: MagicMock) -> None:
+        """Test that IDE introspection via __dir__ exposes config endpoints."""
+        client = AsyncClient()
+        client_dir = dir(client)
+
+        assert "messages" in client_dir
+        assert "bounces" in client_dir
+        assert "domains" in client_dir
+
+    @patch("httpx.AsyncHTTPTransport")
+    @patch("httpx.AsyncClient")
+    def test_async_global_timeout_propagates_to_endpoint(self, mock_httpx: MagicMock, mock_transport: MagicMock) -> None:
         """Test, that timeout of AsyncClient used in AsyncEndpoints."""
         client = AsyncClient(auth=("api", "key"), timeout=25.0)
         ep = client.domains
