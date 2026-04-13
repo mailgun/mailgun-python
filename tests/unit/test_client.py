@@ -1,5 +1,5 @@
 """Unit tests for mailgun.client (Client, Config, Endpoint, SecurityGuard)."""
-
+from typing import cast
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
@@ -129,9 +129,10 @@ class TestClient:
     def test_client_context_manager_closes_session(self) -> None:
         """Verify that the context manager properly closes the underlying requests.Session."""
         with patch("requests.Session") as mock_session_class:
-            mock_session_instance = mock_session_class.return_value
+            mock_session_instance = cast(MagicMock, mock_session_class.return_value)
 
             with Client(auth=("api", "key")) as client:
+                # Type ignore here because Client._session is hinted as requests.Session
                 assert client._session is mock_session_instance
                 mock_session_instance.close.assert_not_called()
 
