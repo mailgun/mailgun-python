@@ -1,15 +1,11 @@
 """Unit tests for mailgun.client (AsyncClient, AsyncEndpoint)."""
 
-from unittest.mock import AsyncMock, patch
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, patch, MagicMock
 
 import httpx
 import pytest
 
-from mailgun.client import AsyncClient
-from mailgun.client import AsyncEndpoint
-from mailgun.client import Config
-from mailgun.client import SecurityGuard
+from mailgun.client import AsyncClient, AsyncEndpoint, Config, SecurityGuard
 from mailgun.handlers.error_handler import ApiError
 from tests.conftest import BASE_URL_V3, BASE_URL_V4
 
@@ -25,6 +21,7 @@ class TestAsyncEndpointPrepareFiles:
             auth=None,
             client=MagicMock(spec=httpx.AsyncClient),
         )
+
 
 class TestAsyncEndpoint:
     """Tests for AsyncEndpoint with mocked httpx."""
@@ -127,11 +124,14 @@ class TestAsyncClient:
     """Tests for AsyncClient."""
 
     def test_async_client_inherits_client(self) -> None:
-        client = AsyncClient(auth=("api", "key-123"))
-        assert client.auth == ("api", "key-123")
-        assert client.config.api_url == Config.DEFAULT_API_URL
+        # Mocking AsyncClient init-related side effects
+        with patch("httpx.AsyncClient"):
+            client = AsyncClient(auth=("api", "key-123"))
+            assert client.auth == ("api", "key-123")
+            assert client.config.api_url == Config.DEFAULT_API_URL
 
-    def test_async_client_getattr_returns_async_endpoint_type(self) -> None:
+    @patch("httpx.AsyncClient")
+    def test_async_client_getattr_returns_async_endpoint_type(self, mock_httpx: MagicMock) -> None:
         client = AsyncClient(auth=("api", "key-123"))
         ep = client.domains
         assert isinstance(ep, AsyncEndpoint)
@@ -140,20 +140,29 @@ class TestAsyncClient:
 
     @pytest.mark.asyncio
     async def test_aclose_closes_httpx_client(self) -> None:
-        client = AsyncClient()
-        # Force initialization of the client property
-        httpx_client = client._client
-        with patch.object(httpx_client, "aclose", new_callable=AsyncMock) as mock_aclose:
+        # Mocking the client to avoid SSL context creation on Windows
+        with patch("httpx.AsyncClient") as mock_client_class:
+            mock_instance = mock_client_class.return_value
+            mock_instance.aclose = AsyncMock()
+
+            client = AsyncClient()
+            # Force initialization of the client property
+            _ = client._client
             await client.aclose()
-            mock_aclose.assert_called_once()
+            mock_instance.aclose.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_async_context_manager(self) -> None:
-        client = AsyncClient()
-        with patch.object(client, "aclose", new_callable=AsyncMock) as mock_aclose:
+        with patch("httpx.AsyncClient") as mock_client_class:
+            mock_instance = mock_client_class.return_value
+            mock_instance.aclose = AsyncMock()
+
+            client = AsyncClient()
             async with client as c:
                 assert c is client
-            mock_aclose.assert_called_once()
+                # Trigger internal client creation
+                _ = client._client
+            mock_instance.aclose.assert_called_once()
 
     @patch("mailgun.client.logger.error")
     @pytest.mark.asyncio
@@ -185,14 +194,16 @@ class TestAsyncClient:
 
     def test_async_client_dir_includes_endpoints(self) -> None:
         """Test that IDE introspection via __dir__ exposes config endpoints."""
-        client = AsyncClient()
-        client_dir = dir(client)
+        with patch("httpx.AsyncClient"):
+            client = AsyncClient()
+            client_dir = dir(client)
 
-        assert "messages" in client_dir
-        assert "bounces" in client_dir
-        assert "domains" in client_dir
+            assert "messages" in client_dir
+            assert "bounces" in client_dir
+            assert "domains" in client_dir
 
-    def test_async_global_timeout_propagates_to_endpoint(self) -> None:
+    @patch("httpx.AsyncClient")
+    def test_async_global_timeout_propagates_to_endpoint(self, mock_httpx: MagicMock) -> None:
         """Test, that timeout of AsyncClient used in AsyncEndpoints."""
         client = AsyncClient(auth=("api", "key"), timeout=25.0)
         ep = client.domains
