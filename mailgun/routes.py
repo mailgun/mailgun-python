@@ -1,89 +1,132 @@
-"""Mailgun API Routes Configuration."""
+"""Mailgun API Routes Configuration.
+
+This module defines the map of routes, prefixes, and deprecated API paths.
+All public dictionaries are immutable (read-only) to prevent accidental
+configuration changes during SDK runtime.
+"""
 
 from __future__ import annotations
 
 import re
+from types import MappingProxyType
+from typing import Final
 
 
-# EXACT_ROUTES map an attribute to an exact API version and path array.
-EXACT_ROUTES: dict[str, list[str | list[str]]] = {
-    "messages": ["v3", ["messages"]],
-    "mimemessage": ["v3", ["messages.mime"]],
-    "resend_message": ["v3", ["resendmessage"]],
-    "ippools": ["v3", ["ip_pools"]],
-    "dkim_keys": ["v1", ["dkim", "keys"]],
-    "dkim": ["v1", ["dkim", "keys"]],
-    "domainlist": ["v4", ["domainlist"]],
-    "analytics": ["v1", ["analytics", "usage", "metrics", "logs", "tags", "limits"]],
-    "bounce_classification": ["v2", ["bounce-classification", "metrics"]],
-    "users": ["v5", ["users", "me"]],
-    "account_templates": ["v4", ["templates"]],
-    "account_webhooks": ["v1", ["webhooks"]],
+# Simplified, scalable, and valid type aliases
+ExactRouteType = dict[str, tuple[str, tuple[str, ...]]]
+PrefixRoutesType = dict[str, tuple[str, str, str | None]]
+DomainsAliasType = dict[str, str]
+DomainsEndpointsType = dict[str, tuple[str, ...]]
+DeprecatedRoutesType = dict[re.Pattern[str], str]
+
+
+# --- EXACT_ROUTES ---
+# Mapping of attributes to an exact API version and path array.
+_EXACT_ROUTES: ExactRouteType = {
+    "messages": ("v3", ("messages",)),
+    "mimemessage": ("v3", ("messages.mime",)),
+    "resend_message": ("v3", ("resendmessage",)),
+    "ippools": ("v3", ("ip_pools",)),
+    "dkim_keys": ("v1", ("dkim", "keys")),
+    "dkim": ("v1", ("dkim", "keys")),
+    "domainlist": ("v4", ("domainlist",)),
+    "bounce_classification": ("v2", ("bounce-classification", "metrics")),
+    "users": ("v5", ("users", "me")),
+    # Account level definitions
+    "account_templates": ("v4", ("templates",)),
+    "account_webhooks": ("v1", ("webhooks",)),
     # Validation Service
-    "addressvalidate": ["v4", ["address", "validate"]],
-    "addressparse": ["v4", ["address", "parse"]],
-    "address": ["v4", ["address", "validate", "bulk"]],
-    # Mailgun Optimize & Previews
-    "inspect": ["v1", ["inspect", "analyze"]],
-    "preview": ["v1", ["preview", "tests"]],
-    "preview_v2": ["v2", ["preview", "tests"]],
-    "alerts": ["v1", ["alerts", "events"]],
-    "dmarc": ["v1", ["dmarc", "records", "{domain}"]],
-    "inboxready": ["v1", ["inboxready", "domains"]],
-    "reputationanalytics": ["v1", ["reputationanalytics", "snds"]],
+    "addressvalidate": ("v4", ("address", "validate")),
+    "addressparse": ("v4", ("address", "parse")),
+    "address_bulk": ("v4", ("address", "validate", "bulk")),
     # Standard Domain Endpoints (Merged paths to avoid handle_domains intercept)
-    "spamtraps": ["v3", ["domains/{domain}/spamtraps"]],
-    "blocklists": ["v3", ["domains/{domain}/blocklists"]],
-    # MTLS and DKIM
-    "x509": ["v2", ["x509", "{domain}"]],
-    "x509_status": ["v2", ["x509", "{domain}", "status"]],
-    "dkim_management_rotation": ["v1", ["dkim_management", "domains", "{domain}", "rotation"]],
-    "dkim_management_rotate": ["v1", ["dkim_management", "domains", "{domain}", "rotate"]],
-    # Subaccounts (FIXED: Added placeholders to match Mailgun V5 requirements)
-    "accounts": ["v5", ["accounts", "subaccounts"]],
-    "subaccount_ip_pools": ["v5", ["accounts", "subaccounts", "{subaccountId}", "ip_pools"]],
-    "subaccount_ip_pool": ["v5", ["accounts", "subaccounts", "{subaccountId}", "ip_pool"]],
+    "spamtraps": ("v2", ("spamtraps",)),
+    "blocklists": ("v3", ("domains", "{domain}", "blocklists")),
+    # MTLS and DKIM Management
+    "x509": ("v2", ("x509", "{domain}")),
+    "x509_status": ("v2", ("x509", "{domain}", "status")),
+    "dkim_management_rotation": ("v1", ("dkim_management", "domains", "{domain}", "rotation")),
+    "dkim_management_rotate": ("v1", ("dkim_management", "domains", "{domain}", "rotate")),
+    # Subaccounts
+    "subaccount_ip_pools": ("v5", ("accounts", "subaccounts", "{subaccountId}", "ip_pools")),
+    "subaccount_ip_pool": ("v5", ("accounts", "subaccounts", "{subaccountId}", "ip_pool")),
 }
 
-# PREFIX_ROUTES map attributes to a base version, path prefix, and optional suffix.
-PREFIX_ROUTES: dict[str, list[str | None]] = {
-    "templates": ["v3", "", None],
-    "analytics": ["v1", "", None],
-    "bounceclassification": ["v2", "", "bounce-classification"],
-    "credentials": ["v3", "domains", None],
-    "domains": ["v3", "domains", None],
-    "webhooks": ["v3", "domains", None],
-    "reputation": ["v3", "", None],
-    "users": ["v5", "", None],
-    "keys": ["v1", "", None],
-    "thresholds": ["v1", "", None],
-    "events": ["v3", "", None],
-    "tags": ["v3", "", None],
-    "bounces": ["v3", "", None],
-    "unsubscribes": ["v3", "", None],
-    "complaints": ["v3", "", None],
-    "whitelists": ["v3", "", None],
-    "routes": ["v3", "", None],
-    "lists": ["v3", "", None],
-    "mailboxes": ["v3", "", None],
-    "stats": ["v3", "", None],
-    "ips": ["v3", "", None],
-    "ip_pools": ["v3", "", None],
-    "ip_whitelist": ["v3", "ip", "whitelist"],
-    "sandbox": ["v5", "", None],
+EXACT_ROUTES: Final = MappingProxyType(_EXACT_ROUTES)
+
+
+# --- PREFIX_ROUTES ---
+# Defines the base version, path suffix, and an optional key override for handlers.
+# Corrected to eliminate suffix duplication and allow clean string joining.
+_PREFIX_ROUTES: PrefixRoutesType = {
+    # Send & Core Services
+    "templates": ("v3", "", None),
+    "credentials": ("v3", "domains", None),
+    "domains": ("v3", "domains", None),
+    "webhooks": ("v3", "domains", None),
+    "events": ("v3", "", None),
+    "tags": ("v3", "", None),
+    "bounces": ("v3", "", None),
+    "unsubscribes": ("v3", "", None),
+    "complaints": ("v3", "", None),
+    "whitelists": ("v3", "", None),
+    "routes": ("v3", "", None),
+    "lists": ("v3", "", None),
+    "mailboxes": ("v3", "", None),
+    "stats": ("v3", "", None),
+    "ips": ("v3", "", None),
+    "ip_pools": ("v3", "", None),
+    "ip_warmups": ("v3", "", None),
+    "ip_whitelist": ("v2", "ip", "whitelist"),
+    "envelopes": ("v3", "", None),
+    # Subaccounts & Limits
+    "accounts": ("v5", "", None),
+    "sandbox": ("v5", "", None),
+    "users": ("v5", "", None),
+    # Analytics, Metrics, & Logs
+    "analytics": ("v1", "", None),
+    "bounceclassification": ("v2", "", "bounce-classification"),
+    "reputation": ("v3", "", None),
+    # Alerts & Thresholds
+    "alerts": ("v1", "", None),
+    "thresholds": ("v1", "", None),
+    # Keys & Security
+    "keys": ("v1", "", None),
+    # Validation Service
+    "address": ("v4", "", None),
+    # InboxReady & Optimize
+    "inbox": ("v4", "", None),
+    "inboxready": ("v1", "", None),
+    "inspect": ("v1", "", None),
+    "preview": ("v1", "", None),
+    "preview_v2": ("v2", "", "preview"),
+    "dmarc": ("v1", "", None),
+    "monitoring": ("v1", "", None),
+    "reputationanalytics": ("v1", "", None),
+    "maverick_score": ("v1", "", "maverick-score"),
 }
 
-DOMAIN_ALIASES: dict[str, str] = {
+PREFIX_ROUTES: Final = MappingProxyType(_PREFIX_ROUTES)
+
+
+# --- DOMAIN_ALIASES ---
+# Mapping of shortened or logical names to physical path segments.
+_DOMAIN_ALIASES: DomainsAliasType = {
     "dkimauthority": "dkim_authority",
     "dkimselector": "dkim_selector",
     "webprefix": "web_prefix",
     "sendingqueues": "sending_queues",
 }
 
-DOMAIN_ENDPOINTS: dict[str, list[str]] = {
-    "v1": ["dkim", "security"],
-    "v4": ["ips", "connections"],
-    "v3": [
+DOMAIN_ALIASES: Final = MappingProxyType(_DOMAIN_ALIASES)
+
+
+# --- DOMAIN_ENDPOINTS ---
+# Grouping endpoints by versions for smart routing.
+_DOMAIN_ENDPOINTS: DomainsEndpointsType = {
+    "v1": ("dkim", "security"),
+    "v4": ("ips", "connections"),
+    "v3": (
         "credentials",
         "verify",
         "messages",
@@ -104,10 +147,15 @@ DOMAIN_ENDPOINTS: dict[str, list[str]] = {
         "open",
         "unsubscribe",
         "webhooks",
-    ],
+    ),
 }
 
-DEPRECATED_ROUTES: dict[re.Pattern[str], str] = {
+DOMAIN_ENDPOINTS: Final = MappingProxyType(_DOMAIN_ENDPOINTS)
+
+
+# --- DEPRECATED_ROUTES ---
+# Regular expressions to identify deprecated paths and their corresponding messages.
+_DEPRECATED_ROUTES: DeprecatedRoutesType = {
     re.compile(
         r"^/v1/bounce-classification/"
     ): "The v1 bounce-classification API is deprecated. Migrate to POST /v2/bounce-classification/metrics.",
@@ -125,3 +173,5 @@ DEPRECATED_ROUTES: dict[re.Pattern[str], str] = {
         r"^/v3/address/(validate|parse|private)"
     ): "The v3 Address Validation/Parsing APIs are deprecated. Migrate to the v4 Validations Service.",
 }
+
+DEPRECATED_ROUTES: Final = MappingProxyType(_DEPRECATED_ROUTES)

@@ -390,7 +390,9 @@ class Config:
     _PREFIX_ROUTES: Final[Mapping[str, Any]] = MappingProxyType(routes.PREFIX_ROUTES)
     _DOMAIN_ALIASES: Final[Mapping[str, str]] = MappingProxyType(routes.DOMAIN_ALIASES)
 
-    _DOMAIN_ENDPOINTS: Final[Mapping[str, list[str]]] = MappingProxyType(routes.DOMAIN_ENDPOINTS)
+    _DOMAIN_ENDPOINTS: Final[Mapping[str, tuple[str, ...]]] = MappingProxyType(
+        routes.DOMAIN_ENDPOINTS
+    )
     _V1_ENDPOINTS: Final[frozenset[str]] = frozenset(routes.DOMAIN_ENDPOINTS["v1"])
     _V3_ENDPOINTS: Final[frozenset[str]] = frozenset(routes.DOMAIN_ENDPOINTS["v3"])
     _V4_ENDPOINTS: Final[frozenset[str]] = frozenset(routes.DOMAIN_ENDPOINTS.get("v4", []))

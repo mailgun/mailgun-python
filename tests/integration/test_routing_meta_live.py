@@ -31,11 +31,15 @@ def test_intelligent_routing_to_mailgun_servers(live_setup: tuple[Client, str]) 
     """Verify that endpoints chain correctly to valid Mailgun HTTP routes."""
     client, domain = live_setup
 
+    # ALIGNED WITH EXACT_ROUTES: Using the exact keys defined in routes.py
     TEST_CALLS: dict[str, Callable[[], Any]] = {
-        "accounts": lambda: client.accounts_subaccounts.get(),
+        "accounts_subaccounts": lambda: client.accounts_subaccounts.get(),
         "addressvalidate": lambda: client.addressvalidate.get(address="test@example.com"),
-        "alerts": lambda: client.alerts_events.get(),
-        "analytics": lambda: client.analytics.get(),
+        "alerts_events": lambda: client.alerts_events.get(),
+        "alerts_settings": lambda: client.alerts_settings.get(),
+        "analytics_metrics": lambda: client.analytics_metrics.create(data={"dummy": "data"}),
+        "analytics_logs": lambda: client.analytics_logs.create(data={"dummy": "data"}),
+        "analytics_tags_limits": lambda: client.analytics_tags_limits.get(),
         "bounces": lambda: client.bounces.get(domain=domain),
         "bounce_classification": lambda: client.bounce_classification.create(data={"list": "test"}),
         "complaints": lambda: client.complaints.get(domain=domain),
@@ -43,26 +47,33 @@ def test_intelligent_routing_to_mailgun_servers(live_setup: tuple[Client, str]) 
         "domainlist": lambda: client.domainlist.get(),
         "domains_credentials": lambda: client.domains_credentials.get(domain=domain),
         "events": lambda: client.events.get(domain=domain),
-        "inboxready": lambda: client.inboxready_domains.get(),
-        "inspect": lambda: client.inspect_analyze.get(),
+        "inboxready_domains": lambda: client.inboxready_domains.get(),
+        "inspect_analyze": lambda: client.inspect_analyze.get(),
         "ippools": lambda: client.ippools.get(),
         "ips": lambda: client.ips.get(),
         "keys": lambda: client.keys.get(),
         "lists": lambda: client.lists.get(),
         "messages": lambda: client.messages.create(domain=domain, data={"from": "test@example.com"}),
         "mimemessage": lambda: client.mimemessage.create(domain=domain, data={"from": "test@example.com"}),
-        "preview": lambda: client.preview_tests_clients.get(),
-        "reputationanalytics": lambda: client.reputationanalytics_gpt_domains.get(),
+        "preview_tests_clients": lambda: client.preview_tests_clients.get(),
+        "reputationanalytics_snds": lambda: client.reputationanalytics_snds.get(),
         "routes": lambda: client.routes.get(),
-        "subaccount_ip_pools": lambda: client.subaccount_ip_pools.get(),
+        "subaccount_ip_pools": lambda: client.subaccount_ip_pools.get(subaccountId="test-sub"),
         "tags": lambda: client.tags.get(domain=domain),
         "templates": lambda: client.templates.get(domain=domain),
         "unsubscribes": lambda: client.unsubscribes.get(domain=domain),
         "users": lambda: client.users.get(),
         "webhooks": lambda: client.webhooks.get(domain=domain),
         "whitelists": lambda: client.whitelists.get(domain=domain),
-        "x509": lambda: client.x509_status.get(domain=domain),
+        "x509_status": lambda: client.x509_status.get(domain=domain),
     }
+
+    # Added routes that legitimately 404 without valid query params/IDs or due to Sandbox limits
+    EXPECTED_404_ROUTES = frozenset({
+        "x509_status",           # Sandbox domains don't have x509 certs generated
+        "subaccount_ip_pools",   # 'test-sub' ID does not exist
+        "analytics_tags_limits"  # Limits not always available on free/sandbox accounts
+    })
 
     routing_crashes = []
 
@@ -76,7 +87,7 @@ def test_intelligent_routing_to_mailgun_servers(live_setup: tuple[Client, str]) 
             status = getattr(response, "status_code", "UNKNOWN")
             url = getattr(response, "url", "UNKNOWN_URL")
 
-            if status == 404 and ep_name in ("x509", "analytics"):
+            if status == 404 and ep_name in EXPECTED_404_ROUTES:
                 status_marker = f"✅ HTTP {status} (Expected)"
             elif status == 404:
                 status_marker = f"❌ HTTP {status} (Bad Route?)"
