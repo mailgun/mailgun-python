@@ -69,6 +69,8 @@ def post_mime() -> None:
     # Because the Content-Length header may be provided for you,
     # and if it does this value will be set to the number of bytes in the file.
     # Errors may occur if you open the file in text mode.
+    # Mailgun requires the MIME string to be uploaded as a file
+    # . Passing 'files' forces multipart/form-data.
     files = {"message": Path("mailgun/doc_tests/files/test_mime.mime").read_bytes()}
 
     req = client.mimemessage.create(data=mime_data, files=files, domain=domain)
@@ -121,7 +123,7 @@ def post_message_tags() -> None:
 
 
 def resend_message() -> None:
-    data = {"to": ["spidlisn@gmail.com", "mailgun@2048.zeefarmer.com"]}
+    data = {"to": ["test1@example.com", "test2@example.com"]}
 
     params = {
         "from": os.environ["MESSAGES_FROM"],

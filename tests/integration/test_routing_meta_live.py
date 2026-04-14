@@ -54,7 +54,14 @@ def test_intelligent_routing_to_mailgun_servers(live_setup: tuple[Client, str]) 
         "keys": lambda: client.keys.get(),
         "lists": lambda: client.lists.get(),
         "messages": lambda: client.messages.create(domain=domain, data={"from": "test@example.com"}),
-        "mimemessage": lambda: client.mimemessage.create(domain=domain, data={"from": "test@example.com"}),
+
+        # Send the MIME string as a file to force multipart/form-data
+        "mimemessage": lambda: client.mimemessage.create(
+            domain=domain,
+            data={"to": "test@example.com"},
+            files={"message": ("test.mime", b"From: test@example.com\nTo: test@example.com\nSubject: Test\n\nMIME Test")}
+        ),
+
         "preview_tests_clients": lambda: client.preview_tests_clients.get(),
         "reputationanalytics_snds": lambda: client.reputationanalytics_snds.get(),
         "routes": lambda: client.routes.get(),

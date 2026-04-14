@@ -505,6 +505,29 @@ def post_scheduled() -> None:
     print(req.json())
 ```
 
+#### Send a MIME message
+
+When using the .mimemessage endpoint, Mailgun strictly requires the payload to be sent as multipart/form-data. In Python, you trigger this by passing the raw MIME string via the files parameter, assigning it to the "message" key.
+
+```python
+mime_string = (
+    "From: sender@example.com\n"
+    "To: recipient@example.com\n"
+    "Subject: MIME Test\n"
+    "Content-Type: text/plain; charset=utf-8\n\n"
+    "This is a raw MIME message."
+).encode("utf-8")
+
+# Force multipart/form-data by passing `files`
+req = client.mimemessage.create(
+    domain=domain,
+    data={"to": "recipient@example.com"},
+    files={"message": ("message.mime", mime_string)},
+)
+
+print(req.json())
+```
+
 ### Domains
 
 #### Get domains
