@@ -31,6 +31,7 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s - %(message)s")
 API_KEY = os.environ.get("APIKEY", "")
 DOMAIN = os.environ.get("DOMAIN", "sandbox.mailgun.org")
 MESSAGES_TO = os.environ.get("MESSAGES_TO", f"success@{DOMAIN}")
+VALIDATION_ADDRESS_1 = os.environ.get("VALIDATION_ADDRESS_1", "")
 
 
 # Initialize clients
@@ -116,7 +117,7 @@ def test_cross_version_routing() -> Any:
     """Test 5: Call a v4 endpoint (Validates cross-API dynamic routing)."""
     # Using addressvalidate (/v4/address/validate).
     # Returns 403 on Free plans, 200 on Paid plans. Both prove successful URL routing.
-    return sync_client.addressvalidate.get(address="test@example.com")
+    return sync_client.addressvalidate.get(filters={"address": VALIDATION_ADDRESS_1})
 
 
 def test_sync_context_manager() -> Any:
@@ -142,7 +143,7 @@ def test_deprecation_warnings() -> Any:
 
         # Trigger the legacy Tag API (client.tag instead of client.tags)
         # We don't care if it returns 200 or 404, we only care about the warning.
-        response = sync_client.tag.get(domain=DOMAIN)
+        response = sync_client.tag.get(domain=DOMAIN, filters={"tag": "my-tag"})
 
         # Validate that our SDK Interceptor successfully fired the warning
         warning_emitted = any(

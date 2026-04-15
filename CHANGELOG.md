@@ -16,6 +16,7 @@ We [keep a changelog.](http://keepachangelog.com/)
 - Added `build_path_from_keys` utility in `mailgun.handlers.utils` to centralize and dry up URL path generation across handlers.
 - Overrode __dir__ in Client and AsyncClient to expose dynamic endpoint routes (e.g., .messages, .domains) directly to IDE autocompletion engines (VS Code, PyCharm).
 - Native dynamic routing support for Mailgun Optimize, Validations Service, and Email Preview APIs without requiring new custom handlers.
+- Explicit support for raw MIME string (`multipart/form-data`) uploads via the `files` parameter in the `.create()` method (essential for `client.mimemessage`).
 - Advanced path interpolation in `handle_default` to automatically inject inline URL parameters (e.g., `/v2/x509/{domain}/status`).
 - Added a new "Logging & Debugging" section to `README.md`.
 - An intelligent live meta-testing suite (`test_routing_meta_live.py`) to strictly verify SDK endpoint aliases against live Mailgun servers.
@@ -52,6 +53,8 @@ We [keep a changelog.](http://keepachangelog.com/)
 - Fixed flaky integration tests failing with `429 Too Many Requests` and `403 Limits Exceeded` by adding proper eventual consistency delays and state teardowns.
 - Fixed DKIM key generation tests to use the `-traditional` OpenSSL flag, ensuring valid PKCS1 format compatibility.
 - Fixed DKIM selector test names to strictly comply with RFC 6376 formatting (replaced underscores with hyphens).
+- Python Data Model Integrity: The Catch-All router (`__getattr__`) now strictly rejects Python magic methods (`__dunder__`), preventing crashes when using `hasattr()`, `pickle`, or `copy.deepcopy()`.
+- Version Drift: Corrected endpoints for `spamtraps` and `ip_whitelist` to route to their modern `v2` Mailgun backends.
 
 ### Security
 

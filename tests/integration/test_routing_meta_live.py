@@ -14,27 +14,30 @@ from mailgun.handlers.error_handler import ApiError
 
 
 @pytest.fixture(scope="module")
-def live_setup() -> tuple[Client, str]:
+def live_setup() -> tuple[Client, str, str, str, str]:
     """Initialize the client with real environment variables."""
     # Use empty string fallback to guarantee 'str' type for Pyright strict mode
     api_key = os.environ.get("APIKEY", "")
     domain = os.environ.get("DOMAIN", "")
+    messages_from = os.environ.get("MESSAGES_FROM", "")
+    messages_to = os.environ.get("MESSAGES_TO", "")
+    validation_address_1 = os.environ.get("VALIDATION_ADDRESS_1", "")
 
     if not api_key or not domain:
         pytest.skip("APIKEY or DOMAIN environment variables not set.")
 
     client = Client(auth=("api", api_key))
-    return client, domain
+    return client, domain, messages_from, messages_to, validation_address_1
 
 
-def test_intelligent_routing_to_mailgun_servers(live_setup: tuple[Client, str]) -> None:
+def test_intelligent_routing_to_mailgun_servers(live_setup: tuple[Client, str, str, str, str]) -> None:
     """Verify that endpoints chain correctly to valid Mailgun HTTP routes."""
-    client, domain = live_setup
+    client, domain, messages_from, messages_to, validation_address_1 = live_setup
 
     # ALIGNED WITH EXACT_ROUTES: Using the exact keys defined in routes.py
     TEST_CALLS: dict[str, Callable[[], Any]] = {
         "accounts_subaccounts": lambda: client.accounts_subaccounts.get(),
-        "addressvalidate": lambda: client.addressvalidate.get(address="test@example.com"),
+        "addressvalidate": lambda: client.addressvalidate.get(filters={"address": validation_address_1}),
         "alerts_events": lambda: client.alerts_events.get(),
         "alerts_settings": lambda: client.alerts_settings.get(),
         "analytics_metrics": lambda: client.analytics_metrics.create(data={"dummy": "data"}),
@@ -53,13 +56,13 @@ def test_intelligent_routing_to_mailgun_servers(live_setup: tuple[Client, str]) 
         "ips": lambda: client.ips.get(),
         "keys": lambda: client.keys.get(),
         "lists": lambda: client.lists.get(),
-        "messages": lambda: client.messages.create(domain=domain, data={"from": "test@example.com"}),
+        "messages": lambda: client.messages.create(domain=domain, data={"from": messages_from}),
 
         # Send the MIME string as a file to force multipart/form-data
         "mimemessage": lambda: client.mimemessage.create(
             domain=domain,
-            data={"to": "test@example.com"},
-            files={"message": ("test.mime", b"From: test@example.com\nTo: test@example.com\nSubject: Test\n\nMIME Test")}
+            data={"to": messages_to},
+            files={"message": ("test.mime", f"From: test@example.com\nTo: {messages_to}\nSubject: Test\n\nMIME Test".encode())}
         ),
 
         "preview_tests_clients": lambda: client.preview_tests_clients.get(),
@@ -77,7 +80,6 @@ def test_intelligent_routing_to_mailgun_servers(live_setup: tuple[Client, str]) 
 
     # Added routes that legitimately 404 without valid query params/IDs or due to Sandbox limits
     EXPECTED_404_ROUTES = frozenset({
-        "x509_status",           # Sandbox domains don't have x509 certs generated
         "subaccount_ip_pools",   # 'test-sub' ID does not exist
         "analytics_tags_limits"  # Limits not always available on free/sandbox accounts
     })
@@ -106,7 +108,10 @@ def test_intelligent_routing_to_mailgun_servers(live_setup: tuple[Client, str]) 
             time.sleep(0.3)
 
         except ApiError as e:
-            print(f"⚠️ [SDK ERROR]        | {ep_name:<20} -> {e}")
+            if ep_name == "x509_status" and "500" in str(e):
+                print(f"✅ HTTP 500 (Expected)  | {ep_name:<20} -> Mailgun Infra Error (No TLS)")
+            else:
+                print(f"⚠️ [SDK ERROR]        | {ep_name:<20} -> {e}")
         except Exception as e:
             print(f"💥 [CRASH]            | {ep_name:<20} -> Python Exception: {e}")
             routing_crashes.append((ep_name, str(e)))

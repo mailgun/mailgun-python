@@ -977,11 +977,28 @@ class Client(BaseClient):
 
         Returns:
             An endpoint instance configured for the requested route.
+
+        Raises:
+            AttributeError: If the requested route is unknown or a magic Python method is invoked.
         """
-        url, headers = self.config[name]
-        return Endpoint(
-            url=url, headers=headers, auth=self.auth, session=self._session, timeout=self.timeout
-        )
+        # Protect Data Model: Ignore magic Python methods
+        if name.startswith("__") and name.endswith("__"):
+            msg = f"'{self.__class__.__name__}' object has no attribute '{name}'"
+            raise AttributeError(msg)
+
+        try:
+            url, headers = self.config[name]
+            return Endpoint(
+                url=url,
+                headers=headers,
+                auth=self.auth,
+                session=self._session,
+                timeout=self.timeout,
+            )
+        except KeyError as e:
+            # __getattr__ must return AttributeError
+            msg = f"'{self.__class__.__name__}' object has no attribute '{name}'"
+            raise AttributeError(msg) from e
 
     def close(self) -> None:
         """Close the underlying requests.Session connection pool and purge memory."""
@@ -1319,15 +1336,26 @@ class AsyncClient(BaseClient):
 
         Returns:
             An endpoint instance configured for the requested route.
+
+        Raises:
+            AttributeError: If the requested route is unknown or a magic Python method is invoked.
         """
-        url, headers = self.config[name]
-        return AsyncEndpoint(
-            url=url,
-            headers=headers,
-            auth=self.auth,
-            client=self._client,
-            timeout=self.timeout,
-        )
+        if name.startswith("__") and name.endswith("__"):
+            msg = f"'{self.__class__.__name__}' object has no attribute '{name}'"
+            raise AttributeError(msg)
+
+        try:
+            url, headers = self.config[name]
+            return AsyncEndpoint(
+                url=url,
+                headers=headers,
+                auth=self.auth,
+                client=self._client,
+                timeout=self.timeout,
+            )
+        except KeyError as e:
+            msg = f"'{self.__class__.__name__}' object has no attribute '{name}'"
+            raise AttributeError(msg) from e
 
     @property
     def _client(self) -> httpx.AsyncClient:

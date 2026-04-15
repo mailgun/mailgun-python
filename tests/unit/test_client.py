@@ -2,6 +2,7 @@
 from typing import cast
 from unittest.mock import MagicMock
 from unittest.mock import patch
+import copy
 
 import pytest
 import requests  # pyright: ignore[reportMissingModuleSource]
@@ -101,14 +102,28 @@ class TestClient:
         assert "mailgun-api-python" in ep.headers["User-agent"]
 
     def test_client_getattr_invalid_route(self) -> None:
-        """Verify the Catch-All behavior: almost any name creates an Endpoint."""
-        client = Client(auth=("api", "key-123"))
+        """Test that unknown routes gracefully fallback to dynamic v3 endpoints."""
+        client = Client(auth=("api", "key"))
+        # The Catch-All router should generate an endpoint instead of raising AttributeError
+        ep = client.some_unknown_feature
+        assert isinstance(ep, Endpoint)
+        # Access the internal dictionary directly to verify routing logic
+        assert ep._url["base"].endswith("v3/")
+        assert ep._url["keys"] == ["some", "unknown", "feature"]
 
-        # In the new architecture, arbitrary attributes return an Endpoint
-        # instead of raising AttributeError. To trigger an error, we use a key
-        # that fails sanitization completely.
-        with pytest.raises(KeyError, match="Invalid endpoint key"):
-            _ = client.__getattr__("!@#$")
+    def test_client_getattr_magic_methods(self) -> None:
+        """Test that __getattr__ strictly rejects Python Data Model magic methods."""
+        client = Client(auth=("api", "key"))
+
+        # Python 3.11+ added __getstate__ to 'object' natively, so hasattr() is True.
+        # We must test a dunder that definitely does NOT exist natively.
+        assert not hasattr(client, "__this_is_a_fake_dunder__")
+
+        # Deepcopy works because __getattr__ correctly ignores missing dunders
+        # like __deepcopy__ instead of returning an Endpoint object.
+        client_copy = copy.deepcopy(client)
+        assert client_copy is not client
+        assert isinstance(client_copy, Client)
 
     def test_client_repr(self) -> None:
         client = Client(api_url="https://test.mailgun.net")

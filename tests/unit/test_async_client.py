@@ -1,6 +1,7 @@
 """Unit tests for mailgun.client (AsyncClient, AsyncEndpoint)."""
 
 import json
+import copy
 from typing import Any
 from unittest.mock import AsyncMock, patch, MagicMock
 
@@ -216,3 +217,24 @@ class TestAsyncClient:
         ep = client.domains
 
         assert ep._timeout == 25.0
+
+    def test_async_client_getattr_invalid_route(self) -> None:
+        """Test that unknown routes in AsyncClient fallback to dynamic v3 endpoints."""
+        client = AsyncClient(auth=("api", "key"))
+        # The Catch-All router should generate an async endpoint
+        ep = client.some_unknown_feature
+        assert isinstance(ep, AsyncEndpoint)
+        assert ep._url["base"].endswith("v3/")
+        assert ep._url["keys"] == ["some", "unknown", "feature"]
+
+    def test_async_client_getattr_magic_methods(self) -> None:
+        """Test that AsyncClient.__getattr__ strictly rejects magic methods."""
+        client = AsyncClient(auth=("api", "key"))
+
+        # Python 3.11+ added __getstate__ to 'object' natively
+        assert not hasattr(client, "__this_is_a_fake_dunder__")
+
+        # Prove the object can be copied safely without returning mock Endpoints for dunders
+        client_copy = copy.deepcopy(client)
+        assert client_copy is not client
+        assert isinstance(client_copy, AsyncClient)
