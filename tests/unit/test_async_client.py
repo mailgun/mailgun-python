@@ -218,11 +218,14 @@ class TestAsyncClient:
 
         assert ep._timeout == 25.0
 
-    def test_async_client_getattr_invalid_route(self) -> None:
+    @patch("httpx.AsyncHTTPTransport")
+    @patch("httpx.AsyncClient")
+    def test_async_client_getattr_invalid_route(self, mock_httpx: MagicMock, mock_transport: MagicMock) -> None:
         """Test that unknown routes in AsyncClient fallback to dynamic v3 endpoints."""
         client = AsyncClient(auth=("api", "key"))
         # The Catch-All router should generate an async endpoint
         ep = client.some_unknown_feature
+
         assert isinstance(ep, AsyncEndpoint)
         assert ep._url["base"].endswith("v3/")
         assert ep._url["keys"] == ["some", "unknown", "feature"]
