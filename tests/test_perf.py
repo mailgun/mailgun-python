@@ -102,8 +102,15 @@ def test_async_client_concurrent_throughput(benchmark: Any) -> None:
 
     mock_transport = httpx.MockTransport(mock_handler)
 
-    # Inject the mock transport via client_kwargs
+    # 1. Attempt modern injection (using client_kwargs dictionary)
     client = AsyncClient(auth=("api", "key"), client_kwargs={"transport": mock_transport})
+
+    try:
+        # Trigger lazy initialization to test compatibility
+        _ = client._client
+    except TypeError:
+        # 2. Fallback for v1.6.0: Inject transport as a direct top-level kwarg
+        client = AsyncClient(auth=("api", "key"), transport=mock_transport)
 
     async def send_one_email(i: int) -> httpx.Response:
         return await client.messages.create(
