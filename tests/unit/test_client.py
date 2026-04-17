@@ -378,7 +378,7 @@ class TestEndpoint:
         }
 
         # Isolate the test from the network layer
-        with patch.object(ep, "api_call") as mock_api_call:
+        with patch("mailgun.client.Endpoint.api_call") as mock_api_call:
             mock_api_call.return_value = MagicMock(status_code=200)
 
             ep.create(
@@ -397,3 +397,12 @@ class TestEndpoint:
             assert "o:deliverytime-optimize-period" in actual_data
             assert actual_data["o:deliverytime-optimize-period"] == "24h"
             assert actual_data["o:tag"] == ["newsletter", "python-sdk"]
+
+    def test_endpoint_slots_usage(self) -> None:
+        """Test that Endpoint uses slots and don't have __dict__."""
+        url = {"base": "http://test", "keys": ["test"]}
+        ep = Endpoint(url=url, headers={}, auth=None)
+        assert not hasattr(ep, "__dict__"), "Endpoint should use __slots__ to save memory."
+
+        with pytest.raises(AttributeError):
+            ep.undefined_attribute = "should_fail"  # type: ignore[attr-defined]

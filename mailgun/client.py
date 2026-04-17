@@ -177,6 +177,7 @@ class SecurityGuard:
     )
     ALLOWED_KWARGS: Final[frozenset[str]] = frozenset({"proxies", "cert"})
     SAFE_KEY_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[a-z0-9_]+$")
+    CRLF_SLASH_PATTERN: Final[re.Pattern[str]] = re.compile(r"[\r\n/\\]+")
 
     @classmethod
     def sanitize_api_url(cls, raw_url: str) -> str:
@@ -277,7 +278,7 @@ class SecurityGuard:
         decoded_domain = unquote(domain)
 
         # Poka-yoke: Actively strip all slashes and newlines (Advanced Traversal & CRLF)
-        safe_domain = re.sub(r"[\r\n/\\]+", "", decoded_domain).strip()
+        safe_domain = cls.CRLF_SLASH_PATTERN.sub("", decoded_domain).strip()
 
         if ".." in safe_domain:
             raise ValueError(
@@ -527,6 +528,8 @@ class Config:
 class BaseEndpoint:
     """Base class for endpoints. Contains methods common for Endpoint and AsyncEndpoint."""
 
+    __slots__ = ("_auth", "_timeout", "_url", "headers")
+
     def __init__(
         self,
         url: dict[str, Any],
@@ -608,6 +611,8 @@ class BaseEndpoint:
 
 class Endpoint(BaseEndpoint):
     """Generate synchronous requests and return responses."""
+
+    __slots__ = ("_session",)
 
     def __init__(
         self,
@@ -1043,6 +1048,8 @@ class Client(BaseClient):
 
 class AsyncEndpoint(BaseEndpoint):
     """Generate async requests and return responses using httpx."""
+
+    __slots__ = ("_client",)
 
     def __init__(
         self,

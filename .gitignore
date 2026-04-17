@@ -305,3 +305,7 @@ pytestdebug.log
 
 # local temp files
 .server.key
+
+
+# Benchmarking
+.benchmarks/
