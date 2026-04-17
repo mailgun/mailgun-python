@@ -163,6 +163,17 @@ repos:
         name: "🔧 ci/cd · Validate GitHub workflows"
         files: ^\.github/workflows/.*\.ya?ml$
 
+  - repo: https://github.com/ariebovenberg/slotscheck
+    rev: v0.19.1
+    hooks:
+      - id: slotscheck
+        name: "🔍 check · slotscheck"
+        additional_dependencies:
+          - requests>=2.32.5
+          - typing-extensions>=4.7.1
+          - httpx>=0.24
+          - pytest>=7.0.0
+
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.10
     hooks:

@@ -241,3 +241,11 @@ class TestAsyncClient:
         client_copy = copy.deepcopy(client)
         assert client_copy is not client
         assert isinstance(client_copy, AsyncClient)
+
+    def test_async_client_connection_pooling_configured(self) -> None:
+        """Verify that AsyncHTTPTransport is configured with expanded limits."""
+        client = AsyncClient(auth=("api", "key"))
+        httpx_client = client._client  # Trigger lazy init
+
+        transport = httpx_client._transport
+        assert transport._pool._max_keepalive_connections == 100

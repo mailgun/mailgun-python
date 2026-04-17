@@ -71,6 +71,11 @@ if sys.version_info >= (3, 11):
 else:
     from typing_extensions import Self
 
+try:
+    from mailgun._version import __version__
+except ImportError:
+    __version__ = "0.0.0-unknown"
+
 
 if TYPE_CHECKING:
     import types
@@ -98,6 +103,7 @@ if not logger.hasHandlers():
 _HTTP_ERROR_THRESHOLD: Final[int] = 400
 _MAX_LOG_LENGTH: Final[int] = 500
 _AUTH_TUPLE_LEN: Final = 2
+_TIMEOUT_TUPLE_LEN: Final[int] = 2
 
 HANDLERS: dict[str, Callable[..., str]] = {  # type: ignore[type-arg]
     "resendmessage": handle_resend_message,
@@ -268,11 +274,14 @@ class SecurityGuard:
 
         decoded_domain = unquote(domain)
 
-        if any(char in decoded_domain for char in ("/", "\\", "..")):
+        # Poka-yoke: Actively strip all slashes and newlines (Advanced Traversal & CRLF)
+        safe_domain = re.sub(r"[\r\n/\\]+", "", decoded_domain).strip()
+
+        if ".." in safe_domain:
             raise ValueError(
                 "CRITICAL SECURITY: Path traversal characters detected in domain parameter."
             )
-        return domain.strip()
+        return safe_domain
 
     @classmethod
     def sanitize_http_method(cls, method: str) -> str:
@@ -296,7 +305,7 @@ class SecurityGuard:
     @classmethod
     def sanitize_timeout(
         cls, timeout: float | tuple[float, float] | None
-    ) -> float | tuple[float, float]:
+    ) -> float | tuple[float, float] | None:
         """Prevent Infinite Timeout Thread Exhaustion (DoS).
 
         Args:
@@ -304,15 +313,20 @@ class SecurityGuard:
 
         Returns:
             The safely verified timeout value.
-
-        Raises:
-            ValueError: If the timeout is None.
         """
         if timeout is None:
-            raise ValueError(
-                "SECURITY RISK: Infinite timeouts (timeout=None) are prohibited to prevent DoS."
-            )
-        return timeout
+            logger.warning("SECURITY RISK: Infinite timeouts (timeout=None) can lead to DoS.")
+            return None
+
+        def _ensure_positive(val: Any) -> float:
+            f_val = float(val)
+            if f_val <= 0:
+                raise ValueError("Timeout values must be strictly positive.")
+            return f_val
+
+        if isinstance(timeout, tuple) and len(timeout) == _TIMEOUT_TUPLE_LEN:
+            return (_ensure_positive(timeout[0]), _ensure_positive(timeout[1]))
+        return _ensure_positive(timeout)
 
     @classmethod
     def filter_safe_kwargs(cls, kwargs: dict[str, Any]) -> dict[str, Any]:
@@ -1365,7 +1379,9 @@ class AsyncClient(BaseClient):
             The active httpx.AsyncClient instance.
         """
         if not self._httpx_client or self._httpx_client.is_closed:
-            transport = httpx.AsyncHTTPTransport(retries=3)
+            # Expand connection pool for async high-throughput batching
+            limits = httpx.Limits(max_keepalive_connections=100, max_connections=100)
+            transport = httpx.AsyncHTTPTransport(retries=3, limits=limits)
 
             self._httpx_client = httpx.AsyncClient(transport=transport, **self._client_kwargs)
         return self._httpx_client

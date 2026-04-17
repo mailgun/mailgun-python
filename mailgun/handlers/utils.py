@@ -19,8 +19,11 @@ def build_path_from_keys(keys: Iterable[str]) -> str:
     Returns:
         A formatted path string starting with a slash, or an empty string if the iterable is empty.
     """
-    keys_list = list(keys)
-    return "/" + "/".join(keys_list) if keys_list else ""
+    if not keys:
+        return ""
+    # Fast path for tuples/lists, fallback to list() for generators
+    keys_seq = keys if isinstance(keys, (list, tuple)) else list(keys)
+    return "/" + "/".join(keys_seq)
 
 
 def sanitize_path_segment(segment: Any) -> str:

@@ -31,8 +31,7 @@ class TestSecurityGuard:
         assert SecurityGuard.sanitize_timeout(10.0) == 10.0
 
     def test_sanitize_timeout_invalid(self) -> None:
-        with pytest.raises(ValueError, match="Infinite timeouts"):
-            SecurityGuard.sanitize_timeout(None)
+        assert SecurityGuard.sanitize_timeout(None) is None
 
     def test_sanitize_domain_valid(self) -> None:
         assert SecurityGuard.sanitize_domain("test.com") == "test.com"
@@ -61,6 +60,27 @@ class TestSecurityGuard:
         assert auth[0] == "api"
         assert auth[1] == "super-secret-key-123"
 
+    def test_sanitize_domain_advanced_traversal_and_crlf(self) -> None:
+        """Test that slashes and newlines are actively stripped."""
+        # CRLF Injection
+        crlf_domain = "mytest.com\r\nInject: Header"
+        sanitized_crlf = SecurityGuard.sanitize_domain(crlf_domain)
+        assert sanitized_crlf == "mytest.comInject: Header"
+
+        # Advanced Traversal Bypass
+        slash_domain = "mytest.com/....//path"
+        # Since it contains '..', the SecurityGuard should raise a hard error
+        # even after the slashes are stripped.
+        with pytest.raises(ValueError, match="Path traversal characters detected"):
+            SecurityGuard.sanitize_domain(slash_domain)
+
+    def test_sanitize_timeout_negative_values(self) -> None:
+        """Test that non-positive timeouts raise ValueError."""
+        with pytest.raises(ValueError, match="strictly positive"):
+            SecurityGuard.sanitize_timeout(0)
+
+        with pytest.raises(ValueError, match="strictly positive"):
+            SecurityGuard.sanitize_timeout(-5.5)
 
 class TestClient:
     """Tests for Client class."""
@@ -160,6 +180,15 @@ class TestClient:
         ep = client.messages
         #  Access internal _timeout
         assert ep._timeout == 15.5
+
+    def test_client_connection_pooling_configured(self) -> None:
+        """Verify that HTTPAdapter is configured for high concurrency."""
+        client = Client(auth=("api", "key"))
+        adapter = client._session.get_adapter("https://")
+
+        assert getattr(adapter, "_pool_connections", 10) == 100
+        assert getattr(adapter, "_pool_maxsize", 10) == 100
+
 
 class TestBaseEndpointBuildUrl:
     """Tests for BaseEndpoint.build_url."""
