@@ -173,6 +173,7 @@ repos:
           - typing-extensions>=4.7.1
           - httpx>=0.24
           - pytest>=7.0.0
+          - responses
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.10

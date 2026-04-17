@@ -105,6 +105,7 @@ optional-dependencies.tests = [
   "pytest-benchmark",
   "pytest-cov",
   "pytest-order",
+  "responses",
 ]
 urls."Documentation" = "https://documentation.mailgun.com"
 urls."Homepage" = "https://www.mailgun.com"

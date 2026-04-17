@@ -22,6 +22,7 @@ dependencies:
   - pytest-benchmark
   - pytest-cov
   - pytest-xdist
+  - responses
   # linters & formatters
   - autopep8
   - black

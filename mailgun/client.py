@@ -28,9 +28,11 @@ from typing import TYPE_CHECKING, Any, Final
 from urllib.parse import unquote, urlparse
 
 import httpx
-import requests
-from requests.adapters import HTTPAdapter
-from requests.exceptions import ConnectionError as RequestsConnectionError
+import requests  # pyright: ignore[reportMissingModuleSource]
+from requests.adapters import HTTPAdapter  # pyright: ignore[reportMissingModuleSource]
+from requests.exceptions import (
+    ConnectionError as RequestsConnectionError,  # pyright: ignore[reportMissingModuleSource]
+)
 from urllib3.util.retry import Retry
 
 from mailgun import routes
@@ -82,7 +84,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
 
     from httpx import Response as HttpxResponse
-    from requests.models import Response
+    from requests.models import Response  # pyright: ignore[reportMissingModuleSource]
 
 
 # Public API of the client module
@@ -1379,11 +1381,14 @@ class AsyncClient(BaseClient):
             The active httpx.AsyncClient instance.
         """
         if not self._httpx_client or self._httpx_client.is_closed:
-            # Expand connection pool for async high-throughput batching
-            limits = httpx.Limits(max_keepalive_connections=100, max_connections=100)
-            transport = httpx.AsyncHTTPTransport(retries=3, limits=limits)
+            # Check if the user already provided a custom transport (e.g. for mocking)
+            if "transport" not in self._client_kwargs:
+                # Expand connection pool for async high-throughput batching
+                limits = httpx.Limits(max_keepalive_connections=100, max_connections=100)
+                transport = httpx.AsyncHTTPTransport(retries=3, limits=limits)
+                self._client_kwargs["transport"] = transport
 
-            self._httpx_client = httpx.AsyncClient(transport=transport, **self._client_kwargs)
+            self._httpx_client = httpx.AsyncClient(**self._client_kwargs)
         return self._httpx_client
 
     async def aclose(self) -> None:
