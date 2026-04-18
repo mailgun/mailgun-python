@@ -37,35 +37,7 @@ from urllib3.util.retry import Retry
 
 from mailgun import routes
 from mailgun._version import __version__
-from mailgun.handlers.bounce_classification_handler import handle_bounce_classification
-from mailgun.handlers.default_handler import handle_default
-from mailgun.handlers.domains_handler import (
-    handle_dkimkeys,
-    handle_domainlist,
-    handle_domains,
-    handle_mailboxes_credentials,
-    handle_sending_queues,
-    handle_webhooks,
-)
-from mailgun.handlers.email_validation_handler import handle_address_validate
 from mailgun.handlers.error_handler import ApiError
-from mailgun.handlers.inbox_placement_handler import handle_inbox
-from mailgun.handlers.ip_pools_handler import handle_ippools
-from mailgun.handlers.ips_handler import handle_ips
-from mailgun.handlers.keys_handler import handle_keys
-from mailgun.handlers.mailinglists_handler import handle_lists
-from mailgun.handlers.messages_handler import handle_resend_message
-from mailgun.handlers.metrics_handler import handle_metrics
-from mailgun.handlers.routes_handler import handle_routes
-from mailgun.handlers.suppressions_handler import (
-    handle_bounces,
-    handle_complaints,
-    handle_unsubscribes,
-    handle_whitelists,
-)
-from mailgun.handlers.tags_handler import handle_tags
-from mailgun.handlers.templates_handler import handle_templates
-from mailgun.handlers.users_handler import handle_users
 
 
 if sys.version_info >= (3, 11):
@@ -96,6 +68,125 @@ __all__ = [
     "Endpoint",
 ]
 
+
+@lru_cache(maxsize=32)
+def _load_handler(endpoint_key: str) -> Callable[..., str]:  # noqa: PLR0911, PLR0912
+    """Lazy load the API URL handler for a specific endpoint using SAST-safe literal imports.
+
+    This maintains zero-I/O startup performance. The lru_cache ensures this branching logic
+    is executed exactly once per route type.
+
+    Returns:
+        Callable: The specific handler function for the requested endpoint.
+    """
+    # Group 1: Domains Handler (Most common aliases grouped for speed)
+    if endpoint_key in {"domains", "dkim_authority", "dkim_selector", "web_prefix"}:
+        from mailgun.handlers.domains_handler import handle_domains  # noqa: PLC0415
+
+        return handle_domains
+    if endpoint_key == "domainlist":
+        from mailgun.handlers.domains_handler import handle_domainlist  # noqa: PLC0415
+
+        return handle_domainlist
+    if endpoint_key == "dkim":
+        from mailgun.handlers.domains_handler import handle_dkimkeys  # noqa: PLC0415
+
+        return handle_dkimkeys
+    if endpoint_key == "sending_queues":
+        from mailgun.handlers.domains_handler import handle_sending_queues  # noqa: PLC0415
+
+        return handle_sending_queues
+    if endpoint_key == "mailboxes":
+        from mailgun.handlers.domains_handler import handle_mailboxes_credentials  # noqa: PLC0415
+
+        return handle_mailboxes_credentials
+    if endpoint_key == "webhooks":
+        from mailgun.handlers.domains_handler import handle_webhooks  # noqa: PLC0415
+
+        return handle_webhooks
+
+    # Group 2: Suppressions
+    if endpoint_key == "bounces":
+        from mailgun.handlers.suppressions_handler import handle_bounces  # noqa: PLC0415
+
+        return handle_bounces
+    if endpoint_key == "unsubscribes":
+        from mailgun.handlers.suppressions_handler import handle_unsubscribes  # noqa: PLC0415
+
+        return handle_unsubscribes
+    if endpoint_key == "whitelists":
+        from mailgun.handlers.suppressions_handler import handle_whitelists  # noqa: PLC0415
+
+        return handle_whitelists
+    if endpoint_key == "complaints":
+        from mailgun.handlers.suppressions_handler import handle_complaints  # noqa: PLC0415
+
+        return handle_complaints
+
+    # Group 3: Specific Services
+    if endpoint_key == "resendmessage":
+        from mailgun.handlers.messages_handler import handle_resend_message  # noqa: PLC0415
+
+        return handle_resend_message
+    if endpoint_key == "ips":
+        from mailgun.handlers.ips_handler import handle_ips  # noqa: PLC0415
+
+        return handle_ips
+    if endpoint_key == "ip_pools":
+        from mailgun.handlers.ip_pools_handler import handle_ippools  # noqa: PLC0415
+
+        return handle_ippools
+    if endpoint_key == "tags":
+        from mailgun.handlers.tags_handler import handle_tags  # noqa: PLC0415
+
+        return handle_tags
+    if endpoint_key == "routes":
+        from mailgun.handlers.routes_handler import handle_routes  # noqa: PLC0415
+
+        return handle_routes
+    if endpoint_key == "lists":
+        from mailgun.handlers.mailinglists_handler import handle_lists  # noqa: PLC0415
+
+        return handle_lists
+    if endpoint_key == "templates":
+        from mailgun.handlers.templates_handler import handle_templates  # noqa: PLC0415
+
+        return handle_templates
+    if endpoint_key == "addressvalidate":
+        from mailgun.handlers.email_validation_handler import (  # noqa: PLC0415
+            handle_address_validate,
+        )
+
+        return handle_address_validate
+    if endpoint_key == "inbox":
+        from mailgun.handlers.inbox_placement_handler import handle_inbox  # noqa: PLC0415
+
+        return handle_inbox
+    if endpoint_key == "analytics":
+        from mailgun.handlers.metrics_handler import handle_metrics  # noqa: PLC0415
+
+        return handle_metrics
+    if endpoint_key == "bounce-classification":
+        from mailgun.handlers.bounce_classification_handler import (  # noqa: PLC0415
+            handle_bounce_classification,
+        )
+
+        return handle_bounce_classification
+    if endpoint_key == "users":
+        from mailgun.handlers.users_handler import handle_users  # noqa: PLC0415
+
+        return handle_users
+    if endpoint_key == "keys":
+        from mailgun.handlers.keys_handler import handle_keys  # noqa: PLC0415
+
+        return handle_keys
+
+    # Group 4: Fallback for "messages", "messages.mime", "events", and unknown routes
+    from mailgun.handlers.default_handler import handle_default  # noqa: PLC0415
+
+    return handle_default
+
+
 logger = logging.getLogger("mailgun.client")
 # Ensure logger doesn't stay silent if the user hasn't configured basicConfig
 if not logger.hasHandlers():
@@ -106,38 +197,6 @@ _HTTP_ERROR_THRESHOLD: Final[int] = 400
 _MAX_LOG_LENGTH: Final[int] = 500
 _AUTH_TUPLE_LEN: Final = 2
 _TIMEOUT_TUPLE_LEN: Final[int] = 2
-
-HANDLERS: dict[str, Callable[..., str]] = {  # type: ignore[type-arg]
-    "resendmessage": handle_resend_message,
-    "domains": handle_domains,
-    "domainlist": handle_domainlist,
-    "dkim": handle_dkimkeys,
-    "dkim_authority": handle_domains,
-    "dkim_selector": handle_domains,
-    "web_prefix": handle_domains,
-    "sending_queues": handle_sending_queues,
-    "mailboxes": handle_mailboxes_credentials,
-    "ips": handle_ips,
-    "ip_pools": handle_ippools,
-    "tags": handle_tags,
-    "bounces": handle_bounces,
-    "unsubscribes": handle_unsubscribes,
-    "whitelists": handle_whitelists,
-    "complaints": handle_complaints,
-    "routes": handle_routes,
-    "lists": handle_lists,
-    "templates": handle_templates,
-    "addressvalidate": handle_address_validate,
-    "inbox": handle_inbox,
-    "webhooks": handle_webhooks,
-    "messages": handle_default,
-    "messages.mime": handle_default,
-    "events": handle_default,
-    "analytics": handle_metrics,
-    "bounce-classification": handle_bounce_classification,
-    "users": handle_users,
-    "keys": handle_keys,
-}
 
 
 class APIVersion(str, Enum):
@@ -605,7 +664,9 @@ class BaseEndpoint:
         if not domain and endpoint_key == "messages":
             raise ApiError("Domain is required")
 
-        handler = HANDLERS.get(endpoint_key, handle_default)
+        # Load the handler function dynamically via the cached lazy loader
+        handler = _load_handler(endpoint_key)
+
         return handler(url, domain, method, **kwargs)  # type: ignore[no-untyped-call]
 
 
