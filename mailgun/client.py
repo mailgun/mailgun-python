@@ -188,7 +188,6 @@ def _load_handler(endpoint_key: str) -> Callable[..., str]:  # noqa: PLR0911, PL
 
 
 logger = logging.getLogger("mailgun.client")
-# Ensure logger doesn't stay silent if the user hasn't configured basicConfig
 if not logger.hasHandlers():
     logger.addHandler(logging.NullHandler())
 
@@ -197,6 +196,7 @@ _HTTP_ERROR_THRESHOLD: Final[int] = 400
 _MAX_LOG_LENGTH: Final[int] = 500
 _AUTH_TUPLE_LEN: Final = 2
 _TIMEOUT_TUPLE_LEN: Final[int] = 2
+_DEFAULT_TIMEOUT = 60.0
 
 
 class APIVersion(str, Enum):
@@ -247,6 +247,9 @@ class SecurityGuard:
 
         Returns:
             The sanitized URL string without a trailing slash.
+
+        Raises:
+            ValueError: If the URL uses prohibited cleartext HTTP (CWE-319).
         """
         raw_url = raw_url.strip().replace("\r", "").replace("\n", "")
         parsed = urlparse(raw_url)
@@ -256,10 +259,10 @@ class SecurityGuard:
             parsed = urlparse(raw_url)
 
         if parsed.scheme == "http" and parsed.hostname not in {"localhost", "127.0.0.1"}:
-            logger.warning(
-                "SECURITY WARNING: Cleartext HTTP transmission detected in API URL. "
-                "Use 'https://' to prevent CWE-319 vulnerabilities."
+            msg = (
+                "CRITICAL SECURITY: Cleartext HTTP transmission is prohibited (CWE-319). Use HTTPS."
             )
+            raise ValueError(msg)  # Fail Closed
 
         hostname = parsed.hostname or ""
         is_valid_host = any(
@@ -377,7 +380,13 @@ class SecurityGuard:
             The safely verified timeout value.
         """
         if timeout is None:
-            logger.warning("SECURITY RISK: Infinite timeouts (timeout=None) can lead to DoS.")
+            # Soft Deprecation
+            warnings.warn(
+                "Passing 'timeout=None' allows infinite socket blocking (CWE-400). "
+                "This will be removed in a future major release. Please provide an explicit timeout.",
+                DeprecationWarning,
+                stacklevel=3,
+            )
             return None
 
         def _ensure_positive(val: Any) -> float:
@@ -447,7 +456,7 @@ class Config:
     Using a data-driven routing approach.
     """
 
-    __slots__ = ("api_url", "ex_handler")
+    __slots__ = ("_baked_urls", "api_url", "ex_handler")
 
     DEFAULT_API_URL: Final[str] = "https://api.mailgun.net"
     USER_AGENT: Final[str] = f"mailgun-api-python/{__version__}"
@@ -483,6 +492,11 @@ class Config:
         base_url_input: str = api_url or self.DEFAULT_API_URL
         self.api_url: str = SecurityGuard.sanitize_api_url(base_url_input)
 
+        # PRE-BAKE: Cache base URLs for all versions at once
+        self._baked_urls: Final[dict[str, str]] = {
+            ver.value: f"{self.api_url}/{ver.value}" for ver in APIVersion
+        }
+
     def _build_base_url(self, version: APIVersion | str, suffix: str = "") -> str:
         """Construct API URL with precise slash control to prevent 404s.
 
@@ -494,7 +508,8 @@ class Config:
             The fully constructed base URL string.
         """
         ver_str: str = version.value if isinstance(version, APIVersion) else version
-        base: str = f"{self.api_url}/{ver_str}"
+        # O(1) access instead of dynamic concatenation
+        base: str = self._baked_urls.get(ver_str, f"{self.api_url}/{ver_str}")
 
         if suffix:
             path: str = f"{suffix}/" if suffix == self._DOMAINS_RESOURCE else suffix
@@ -741,7 +756,10 @@ class Endpoint(BaseEndpoint):
 
         req_method = getattr(self._session, safe_method.lower())
 
-        logger.debug("Sending Request: %s %s", safe_method.upper(), target_url)
+        # PEP 578 and protection against Log Forging (CWE-117)
+        safe_url_for_log = target_url.replace("\n", "_").replace("\r", "_")
+        sys.audit("mailgun.api.request", safe_method.upper(), safe_url_for_log)
+        logger.debug("Sending Request: %s %s", safe_method.upper(), safe_url_for_log)
 
         try:
             response = req_method(
@@ -761,18 +779,8 @@ class Endpoint(BaseEndpoint):
             status_code = getattr(response, "status_code", 200)
             is_error = isinstance(status_code, int) and status_code >= _HTTP_ERROR_THRESHOLD
             if is_error:
-                raw_text = getattr(response, "text", "")
-                error_body = (
-                    raw_text[:_MAX_LOG_LENGTH] + "..."
-                    if len(raw_text) > _MAX_LOG_LENGTH
-                    else raw_text
-                )
                 logger.error(
-                    "API Error %s | %s %s | Response: %s",
-                    status_code,
-                    safe_method.upper(),
-                    target_url,
-                    error_body,
+                    "API Error %s | %s %s", status_code, safe_method.upper(), safe_url_for_log
                 )
             else:
                 logger.debug(
@@ -783,14 +791,14 @@ class Endpoint(BaseEndpoint):
                 )
 
         except requests.exceptions.Timeout as e:
-            logger.exception("Timeout Error: %s %s", safe_method.upper(), target_url)
+            logger.exception("Timeout Error: %s %s", safe_method.upper(), safe_url_for_log)
             raise TimeoutError from e
         except RequestsConnectionError as e:
-            logger.critical("Connection Failed (DNS/Network): %s | URL: %s", e, target_url)
+            logger.critical("Connection Failed (DNS/Network): %s | URL: %s", e, safe_url_for_log)
             msg = f"Network routing failed: {e}"
             raise ApiError(msg) from e
         except requests.RequestException as e:
-            logger.critical("Request Exception: %s | URL: %s", e, target_url)
+            logger.critical("Request Exception: %s | URL: %s", e, safe_url_for_log)
             raise ApiError(e) from e
         else:
             return response
@@ -953,6 +961,8 @@ class Endpoint(BaseEndpoint):
 class BaseClient:
     """Base class for API clients that holds common state and initialization logic."""
 
+    __slots__ = ("auth", "config", "timeout")
+
     def __init__(
         self,
         auth: tuple[str, str] | None = None,
@@ -983,7 +993,7 @@ class BaseClient:
                 DeprecationWarning,
                 stacklevel=2,
             )
-        self.timeout = kwargs.get("timeout", 60)
+        self.timeout = kwargs.get("timeout", _DEFAULT_TIMEOUT)
 
     def __repr__(self) -> str:
         """OWASP Secrets Management: Redact sensitive information from object representation.
@@ -1012,6 +1022,8 @@ class BaseClient:
 
 class Client(BaseClient):
     """Synchronous client class."""
+
+    __slots__ = ("_session",)
 
     def __init__(
         self,
@@ -1193,7 +1205,10 @@ class AsyncEndpoint(BaseEndpoint):
         else:
             request_kwargs["data"] = data
 
-        logger.debug("Sending Async Request: %s %s", safe_method.upper(), target_url)
+        # PEP 578 and protection against Log Forging (CWE-117)
+        safe_url_for_log = target_url.replace("\n", "_").replace("\r", "_")
+        sys.audit("mailgun.api.request", safe_method.upper(), safe_url_for_log)
+        logger.debug("Sending Async Request: %s %s", safe_method.upper(), safe_url_for_log)
 
         try:
             response = await self._client.request(**request_kwargs)
@@ -1201,18 +1216,8 @@ class AsyncEndpoint(BaseEndpoint):
             status_code = getattr(response, "status_code", 200)
             is_error = isinstance(status_code, int) and status_code >= _HTTP_ERROR_THRESHOLD
             if is_error:
-                raw_text = getattr(response, "text", "")
-                error_body = (
-                    raw_text[:_MAX_LOG_LENGTH] + "..."
-                    if len(raw_text) > _MAX_LOG_LENGTH
-                    else raw_text
-                )
                 logger.error(
-                    "API Error %s | %s %s | Response: %s",
-                    status_code,
-                    safe_method.upper(),
-                    target_url,
-                    error_body,
+                    "API Error %s | %s %s", status_code, safe_method.upper(), safe_url_for_log
                 )
             else:
                 logger.debug(
@@ -1223,14 +1228,16 @@ class AsyncEndpoint(BaseEndpoint):
                 )
 
         except httpx.TimeoutException as e:
-            logger.exception("Timeout Error: %s %s", safe_method.upper(), target_url)
+            logger.exception("Timeout Error: %s %s", safe_method.upper(), safe_url_for_log)
             raise TimeoutError from e
         except httpx.ConnectError as e:
-            logger.critical("Async Connection Failed (DNS/Network): %s | URL: %s", e, target_url)
+            logger.critical(
+                "Async Connection Failed (DNS/Network): %s | URL: %s", e, safe_url_for_log
+            )
             msg = f"Network routing failed: {e}"
             raise ApiError(msg) from e
         except httpx.RequestError as e:
-            logger.critical("Request Exception: %s | URL: %s", e, target_url)
+            logger.critical("Request Exception: %s | URL: %s", e, safe_url_for_log)
             raise ApiError(e) from e
         else:
             return response
@@ -1392,6 +1399,8 @@ class AsyncEndpoint(BaseEndpoint):
 
 class AsyncClient(BaseClient):
     """Async client class using httpx."""
+
+    __slots__ = ("_client_kwargs", "_httpx_client")
 
     endpoint_cls = AsyncEndpoint
 

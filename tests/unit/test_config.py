@@ -154,14 +154,17 @@ class TestConfig:
         res = Config()._resolve_domains_route(["domains", "unknown_new_feature"])
         assert "v3/domains" in res["base"]
 
-    @patch("mailgun.client.logger.warning")
-    def test_validate_api_url_warns_on_http(self, mock_warn: MagicMock) -> None:
-        Config(api_url="http://localhost")
-        # Localhost should not trigger a warning
-        mock_warn.assert_not_called()
+    def test_validate_api_url_warns_on_http(self) -> None:
+        """Verify that cleartext HTTP URLs are strictly blocked (Fail Closed)."""
+        from mailgun.client import Config
+        import pytest
 
-        Config(api_url="http://insecure.net")
-        mock_warn.assert_called()
+        # Localhost is allowed
+        Config(api_url="http://localhost")
+
+        # External HTTP is blocked (CWE-319)
+        with pytest.raises(ValueError, match="CWE-319"):
+            Config(api_url="http://insecure.net")
 
     @patch("mailgun.client.logger.warning")
     def test_validate_api_url_no_warning_on_https(self, mock_warn: MagicMock) -> None:

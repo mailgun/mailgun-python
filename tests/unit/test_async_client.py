@@ -176,8 +176,8 @@ class TestAsyncClient:
     async def test_api_call_truncates_long_error_response(
         self, mock_logger_error: MagicMock
     ) -> None:
-        """Test async error responses longer than 500 characters are truncated."""
-        url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
+        """Test that async error responses are NOT logged to prevent secret leakage (CWE-316)."""
+        url = {"base": "https://api.mailgun.net/v4/", "keys": ["domainlist"]}
         mock_client = AsyncMock(spec=httpx.AsyncClient)
 
         long_response_text = "A" * 600
@@ -189,9 +189,8 @@ class TestAsyncClient:
         await ep.get()
 
         mock_logger_error.assert_called_once()
-        logged_text = mock_logger_error.call_args[0][4]
-        assert len(logged_text) == 503
-        assert logged_text.endswith("...")
+        # Verify the error body is completely excluded from the log call
+        assert len(mock_logger_error.call_args[0]) == 4
 
     def test_async_validate_auth_sanitizes_input(self) -> None:
         """Test OWASP Header Injection prevention via SecurityGuard."""

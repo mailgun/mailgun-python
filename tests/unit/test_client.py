@@ -317,8 +317,8 @@ class TestEndpoint:
 
     @patch("mailgun.client.logger.error")
     def test_api_call_truncates_long_error_response(self, mock_logger_error: MagicMock) -> None:
-        """Test that error responses longer than 500 characters are truncated in logs."""
-        url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
+        """Test that error responses are NOT logged to prevent secret leakage (CWE-316)."""
+        url = {"base": "https://api.mailgun.net/v4/", "keys": ["domainlist"]}
         ep = Endpoint(url=url, headers={}, auth=None)
 
         long_response_text = "A" * 600
@@ -329,10 +329,9 @@ class TestEndpoint:
             ep.get()
 
         mock_logger_error.assert_called_once()
-        # Verify the 4th argument (error_body) is truncated to 503 chars (500 + '...')
-        logged_text = mock_logger_error.call_args[0][4]
-        assert len(logged_text) == 503
-        assert logged_text.endswith("...")
+        # Verify logger.error is called with exactly 4 arguments (template, status, method, url)
+        # The raw error body MUST NOT be present in the logging arguments.
+        assert len(mock_logger_error.call_args[0]) == 4
 
     def test_endpoint_repr_formatting(self) -> None:
         """Test that Endpoint __repr__ safely formats the target route."""
