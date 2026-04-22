@@ -46,7 +46,7 @@ classifiers = [
 dynamic = [ "version" ]
 dependencies = [
     "httpx>=0.24",
-    "requests>=2.32.5",
+    "requests>=2.33.0",
     "typing-extensions>=4.7.1; python_version < '3.11'",
 ]
 
@@ -59,9 +59,6 @@ optional-dependencies.linting = [
   "autoflake",
   "autopep8",
   "bandit",
-  "black>=21.7",
-  "flake8>=3.7.8", # the modular source code checker: pep8 pyflakes and co
-  "isort",         # A Python utility / library to sort Python imports.
   # dev tools
   "make",
   "monkeytype",   # It can generate type hints based on the observed behavior of your code.
@@ -74,13 +71,13 @@ optional-dependencies.linting = [
   "pylint",
   "pyright",
   # env variables
-  "python-dotenv>=0.19.2",
+  "python-dotenv>=1.2.2",
   "pytype",                # a static type checker for any type hints you have put in your code
   "pyupgrade",
   "radon",
   "refurb",
   "ruff",                  # An extremely fast Python linter and code formatter, written in Rust.
-  "safety",                # Checks installed dependencies for known vulnerabilities and licenses.
+  "safety>=1.9.0",                # Checks installed dependencies for known vulnerabilities and licenses.
   "toml",
   "types-pyyaml",
   "types-requests",        # mypy requests stub
@@ -95,12 +92,12 @@ optional-dependencies.other = [ "toml" ]
 optional-dependencies.profilers = [ "scalene>=1.3.16", "snakeviz" ]
 optional-dependencies.spelling = [ "typos" ]
 optional-dependencies.tests = [
-  "codecov",
+  "codecov>=2.0.16",
   "coverage>=4.5.4",
   # For a Private key PEM file generated in PKCS1 format.
   "openssl",
   # tests
-  "pytest>=7",
+  "pytest>=9.0.3",
   "pytest-asyncio",
   "pytest-benchmark",
   "pytest-cov",
