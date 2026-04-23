@@ -39,6 +39,9 @@ export PRINT_HELP_PYSCRIPT
 
 BROWSER := python -c "$$BROWSER_PYSCRIPT"
 
+# Point 'all' to whatever you want to happen when someone just types `make`
+all: help
+
 clean:	clean-cov clean-build clean-pyc clean-test clean-temp clean-other ## remove all build, test, coverage and Python artifacts
 
 clean-cov:
@@ -111,22 +114,13 @@ dev-full: clean		## install the package's development version to a fresh environ
 	conda run --name $(CONDA_ENV_NAME)-dev pip install -e .
 	$(CONDA_ACTIVATE) $(CONDA_ENV_NAME)-dev && pre-commit install
 
-
 pre-commit:		## runs pre-commit against files. NOTE: older files are disabled in the pre-commit config.
 	pre-commit run --all-files
 
 check-env:
-	@missing=0; \
-	for v in $(REQUIRED_VARS); do \
-	  if [ -z "$${!v}" ]; then \
-	    echo "Missing required env var: $$v"; \
-	    missing=1; \
-	  fi; \
-	done; \
-	if [ $$missing -ne 0 ]; then \
-	  echo "Aborting tests due to missing env vars."; \
-	  exit 1; \
-	fi
+	@if [ -z "$(ENV_VAR)" ]; then echo "Missing ENV_VAR"; exit 1; fi; \
+	if [ -z "$(OTHER_VAR)" ]; then echo "Missing OTHER_VAR"; exit 1; fi; \
+	echo "Environment checks passed."
 
 test: test-unit
 
@@ -169,11 +163,8 @@ format-black:
 	@black --line-length=100 $(SRC_DIR) $(TEST_DIR) $(SCRIPTS_DIR)
 format-isort:
 	@isort --profile black --line-length=88 $(SRC_DIR) $(TEST_DIR) $(SCRIPTS_DIR)
-format: format-black format-isort
-
-format:			## runs the code auto-formatter
-	isort
-	black
+format:
+	ruff check --fix .
 
 format-docs:	## runs the docstring auto-formatter. Note this requires manually installing `docconvert` with `pip`
 	docconvert --in-place --config .docconvert.json $(SRC_DIR)

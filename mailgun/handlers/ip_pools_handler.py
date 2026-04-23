@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from mailgun.handlers.utils import build_path_from_keys
+from mailgun.handlers.utils import build_path_from_keys, sanitize_path_segment
 
 
 def handle_ippools(
@@ -18,14 +18,14 @@ def handle_ippools(
 ) -> str:
     """Handle IP pools URL construction.
 
-    :param url: Incoming URL dictionary
-    :type url: dict
-    :param _domain: Incoming domain (it's not being used for this handler)
-    :type _domain: str
-    :param _method: Incoming request method (it's not being used for this handler)
-    :type _method: str
-    :param kwargs: kwargs
-    :return: final url for IP pools endpoint
+    Args:
+        url: Incoming URL configuration dictionary.
+        _domain: Target domain name (unused in this handler).
+        _method: Incoming request method (unused in this handler).
+        **kwargs: Additional parameters (e.g., 'pool_id', 'ip').
+
+    Returns:
+        The final URL for the IP pools endpoint.
     """
     final_keys = build_path_from_keys(url.get("keys", []))
     base_url = str(url["base"]).rstrip("/") + final_keys
@@ -33,12 +33,14 @@ def handle_ippools(
     if "pool_id" not in kwargs:
         return base_url
 
-    pool_url = f"{base_url}/{kwargs['pool_id']}"
+    safe_pool = sanitize_path_segment(kwargs["pool_id"])
+    pool_url = f"{base_url}/{safe_pool}"
 
     if "ips.json" in final_keys:
         return pool_url
 
     if "ip" in kwargs:
-        return f"{pool_url}/ips/{kwargs['ip']}"
+        safe_ip = sanitize_path_segment(kwargs["ip"])
+        return f"{pool_url}/ips/{safe_ip}"
 
     return pool_url

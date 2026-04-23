@@ -101,15 +101,8 @@ repos:
       - id: detect-private-key
         name: "🔒 security · Detect private keys"
 
-  # Git commit quality
-  - repo: https://github.com/jorisroovers/gitlint
-    rev: v0.19.1
-    hooks:
-      - id: gitlint
-        name: "🌳 git · Validate commit format"
-
   - repo: https://github.com/commitizen-tools/commitizen
-    rev: v4.13.9
+    rev: v4.13.10
     hooks:
       - id: commitizen
         name: "🌳 git · Validate commit message"
@@ -123,7 +116,7 @@ repos:
         name: "🔒 security · Detect committed secrets"
 
   - repo: https://github.com/gitleaks/gitleaks
-    rev: v8.30.1
+    rev: v8.30.0
     hooks:
       - id: gitleaks
         name: "🔒 security · Scan for hardcoded secrets"
@@ -146,7 +139,7 @@ repos:
 #        args: ['--desc', 'on']
 
   - repo: https://github.com/semgrep/pre-commit
-    rev: 'v1.156.0'
+    rev: 'v1.159.0'
     hooks:
       - id: semgrep
         name: "🔒 security · Static analysis (semgrep)"
@@ -155,7 +148,7 @@ repos:
 
   # Spelling and typos
   - repo: https://github.com/crate-ci/typos
-    rev: v1.44.0
+    rev: v1.45.1
     hooks:
       - id: typos
         name: "📝 spelling · Check typos"
@@ -170,57 +163,26 @@ repos:
         name: "🔧 ci/cd · Validate GitHub workflows"
         files: ^\.github/workflows/.*\.ya?ml$
 
-  # Python code formatting (order matters: autoflake → pyupgrade → darker/ruff)
-  - repo: https://github.com/PyCQA/autoflake
-    rev: v2.3.3
+  - repo: https://github.com/ariebovenberg/slotscheck
+    rev: v0.19.1
     hooks:
-      - id: autoflake
-        name: "🐍 format · Remove unused imports"
-        args:
-          - --in-place
-          - --remove-all-unused-imports
-          - --remove-unused-variable
-          - --ignore-init-module-imports
-
-  - repo: https://github.com/asottile/pyupgrade
-    rev: v3.21.2
-    hooks:
-      - id: pyupgrade
-        name: "🐍 format · Modernize syntax"
-        args: [--py310-plus, --keep-runtime-typing]
-
-  - repo: https://github.com/akaihola/darker
-    rev: v3.0.0
-    hooks:
-      - id: darker
-        name: "🐍 format · Format changed lines"
-        additional_dependencies: [black]
-
-#  - repo: https://github.com/astral-sh/ruff-pre-commit
-#    rev: v0.15.6
-#    hooks:
-#      - id: ruff-check
-#        name: "🐍 lint · Check with Ruff"
-#        args: [--fix, --preview]
-#      - id: ruff-format
-#        name: "🐍 format · Format with Ruff"
-
-  # Python linting (comprehensive checks)
-  - repo: https://github.com/pycqa/flake8
-    rev: 7.3.0
-    hooks:
-      - id: flake8
-        name: "🐍 lint · Check style (Flake8)"
-        args: ["--ignore=E501,C901", --max-complexity=13]  # Sets McCabe complexity limit
+      - id: slotscheck
+        name: "🔍 check · slotscheck"
         additional_dependencies:
-          - radon
-          - flake8-docstrings
-          - Flake8-pyproject
-          - flake8-bugbear
-          - flake8-comprehensions
-          - flake8-tidy-imports
-          - pycodestyle
-        exclude: ^tests
+          - requests>=2.32.5
+          - typing-extensions>=4.7.1
+          - httpx>=0.24
+          - pytest>=7.0.0
+          - responses
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.10
+    hooks:
+      - id: ruff-check
+        name: "🐍 lint · Check with Ruff"
+        args: [--fix, --preview]
+      - id: ruff-format
+        name: "🐍 format · Format with Ruff"
 
   - repo: https://github.com/PyCQA/pylint
     rev: v4.0.5
@@ -229,23 +191,6 @@ repos:
         name: "🐍 lint · Check code quality"
         args:
           - --exit-zero
-
-  - repo: https://github.com/dosisod/refurb
-    rev: v2.3.0
-    hooks:
-      - id: refurb
-        name: "🐍 performance · Suggest modernizations"
-        # TODO: Fix FURB147.
-        args: ["--enable-all", "--ignore", "FURB147"]
-
-  # Python documentation
-  - repo: https://github.com/pycqa/pydocstyle
-    rev: 6.3.0
-    hooks:
-      - id: pydocstyle
-        name: "🐍 docs · Validate docstrings"
-        args: [--select=D200,D213,D400,D415]
-        additional_dependencies: [tomli]
 
   - repo: https://github.com/econchick/interrogate
     rev: 1.7.0
@@ -258,7 +203,7 @@ repos:
 
   # Python type checking
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.19.1
+    rev: v1.20.1
     hooks:
       - id: mypy
         name: "🐍 types · Check with mypy"
@@ -305,8 +250,8 @@ repos:
         name: "📝 markdown · Format files"
         additional_dependencies:
           - mdformat-gfm
-          - mdformat-black
           - mdformat-ruff
+
 # TODO: Enable it for a single check
 #  - repo: https://github.com/tcort/markdown-link-check
 #    rev: v3.14.2
