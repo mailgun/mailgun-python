@@ -90,13 +90,18 @@ def test_sync_client_emits_audit_hook(mock_audit: MagicMock, monkeypatch: pytest
 
 @pytest.mark.asyncio
 @patch("sys.audit")
-async def test_async_client_emits_audit_hook(mock_audit: MagicMock, monkeypatch: pytest.MonkeyPatch) -> None:
+@patch("httpx.AsyncClient")
+async def test_async_client_emits_audit_hook(
+    mock_httpx: MagicMock, mock_audit: MagicMock
+) -> None:
     """Verify that outbound requests from the async client trigger PEP 578 hooks."""
     client = AsyncClient(auth=("api", "key"))
 
-    # Intercept the httpx call
+    mock_instance = mock_httpx.return_value
     mock_response = httpx.Response(200, request=httpx.Request("GET", "https://api.mailgun.net"))
-    monkeypatch.setattr(client._client, "request", AsyncMock(return_value=mock_response))
+    mock_instance.request = AsyncMock(return_value=mock_response)
+    mock_instance.is_closed = False
+    mock_instance.aclose = AsyncMock()
 
     await client.domains.get()
 
@@ -127,12 +132,18 @@ def test_sync_timeout_exception_logs_safely(mock_logger_exc: MagicMock, monkeypa
 
 @pytest.mark.asyncio
 @patch("mailgun.client.logger.critical")
-async def test_async_connection_exception_logs_safely(mock_logger_crit: MagicMock, monkeypatch: pytest.MonkeyPatch) -> None:
+@patch("httpx.AsyncHTTPTransport")
+@patch("httpx.AsyncClient")
+async def test_async_connection_exception_logs_safely(
+    mock_httpx: MagicMock, mock_logger_crit: MagicMock
+) -> None:
     """Verify that when an async network failure occurs, the logger uses safe_url_for_log."""
     client = AsyncClient(auth=("api", "key"))
 
-    # Force a httpx connect error
-    monkeypatch.setattr(client._client, "request", AsyncMock(side_effect=httpx.ConnectError("DNS failure")))
+    mock_instance = mock_httpx.return_value
+    mock_instance.request = AsyncMock(side_effect=httpx.ConnectError("DNS failure"))
+    mock_instance.is_closed = False
+    mock_instance.aclose = AsyncMock()
 
     with pytest.raises(ApiError, match="Network routing failed"):
         await client.domains.get()

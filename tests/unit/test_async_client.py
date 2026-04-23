@@ -241,10 +241,15 @@ class TestAsyncClient:
         assert client_copy is not client
         assert isinstance(client_copy, AsyncClient)
 
-    def test_async_client_connection_pooling_configured(self) -> None:
+    @patch("httpx.AsyncHTTPTransport")
+    @patch("httpx.AsyncClient")
+    def test_async_client_connection_pooling_configured(self, mock_httpx: MagicMock, mock_transport: MagicMock) -> None:
         """Verify that AsyncHTTPTransport is configured with expanded limits."""
         client = AsyncClient(auth=("api", "key"))
-        httpx_client = client._client  # Trigger lazy init
+        _ = client._client  # Trigger lazy init
 
-        transport = httpx_client._transport
-        assert transport._pool._max_keepalive_connections == 100
+        mock_transport.assert_called_once()
+        _, kwargs = mock_transport.call_args
+        assert kwargs["retries"] == 3
+        assert kwargs["limits"].max_keepalive_connections == 100
+        assert kwargs["limits"].max_connections == 100
