@@ -168,7 +168,6 @@ repos:
     hooks:
       - id: slotscheck
         name: "🔍 check · slotscheck"
-        exclude: (?i)[\\/]examples[\\/]
         additional_dependencies:
           - requests>=2.32.5
           - typing-extensions>=4.7.1

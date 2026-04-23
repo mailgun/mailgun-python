@@ -357,3 +357,12 @@ subprocess = [
   "subprocess.check_call",
   "subprocess.check_output",
 ]
+
+[tool.slotscheck]
+strict-imports = false
+require-subclass = false
+exclude-modules = '''
+(
+    ^mailgun\.examples\..*
+)
+'''
