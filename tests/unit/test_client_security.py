@@ -90,9 +90,10 @@ def test_sync_client_emits_audit_hook(mock_audit: MagicMock, monkeypatch: pytest
 
 @pytest.mark.asyncio
 @patch("sys.audit")
+@patch("httpx.AsyncHTTPTransport")
 @patch("httpx.AsyncClient")
 async def test_async_client_emits_audit_hook(
-    mock_httpx: MagicMock, mock_audit: MagicMock
+    mock_httpx: MagicMock, mock_transport: MagicMock, mock_audit: MagicMock
 ) -> None:
     """Verify that outbound requests from the async client trigger PEP 578 hooks."""
     client = AsyncClient(auth=("api", "key"))
