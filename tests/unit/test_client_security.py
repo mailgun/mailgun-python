@@ -135,11 +135,12 @@ def test_sync_timeout_exception_logs_safely(mock_logger_exc: MagicMock, monkeypa
 @patch("httpx.AsyncHTTPTransport")
 @patch("httpx.AsyncClient")
 async def test_async_connection_exception_logs_safely(
-    mock_httpx: MagicMock, mock_logger_crit: MagicMock
+    mock_httpx: MagicMock, mock_transport: MagicMock, mock_logger_crit: MagicMock
 ) -> None:
     """Verify that when an async network failure occurs, the logger uses safe_url_for_log."""
     client = AsyncClient(auth=("api", "key"))
 
+    # Force a httpx connect error using the mock
     mock_instance = mock_httpx.return_value
     mock_instance.request = AsyncMock(side_effect=httpx.ConnectError("DNS failure"))
     mock_instance.is_closed = False

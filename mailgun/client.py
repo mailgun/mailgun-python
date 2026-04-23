@@ -753,6 +753,41 @@ class BaseEndpoint:
 
         return handler(url, domain, method, **kwargs)  # type: ignore[no-untyped-call]
 
+    def _prepare_request(
+        self,
+        method: str,
+        url: dict[str, Any],
+        domain: str | None,
+        timeout: float | tuple[float, float] | None,
+        kwargs: dict[str, Any],
+    ) -> tuple[str, str, str, float | tuple[float, float] | None, dict[str, Any]]:
+        """Security and routing preparation logic.
+
+        Args:
+            method: The requested HTTP method.
+            url: Incoming URL structure containing base and keys.
+            domain: Target domain name to sanitize.
+            timeout: Request timeout duration.
+            kwargs: Additional keyword arguments.
+
+        Returns:
+            A tuple containing safe_method, target_url, safe_url_for_log, safe_timeout, and safe_kwargs.
+        """
+        safe_method = SecurityGuard.sanitize_http_method(method)
+        safe_kwargs = SecurityGuard.filter_safe_kwargs(kwargs)
+        target_domain = SecurityGuard.sanitize_domain(domain)
+
+        actual_timeout = timeout if timeout is not None else self._timeout
+        safe_timeout = SecurityGuard.sanitize_timeout(actual_timeout)
+
+        target_url = self.build_url(url, domain=target_domain, method=safe_method, **kwargs)
+        self._warn_if_deprecated(safe_method, target_url)
+
+        # PEP 578 and protection against Log Forging (CWE-117)
+        safe_url_for_log = target_url.replace("\n", "_").replace("\r", "_")
+
+        return safe_method, target_url, safe_url_for_log, safe_timeout, safe_kwargs
+
 
 # ==============================================================================
 # 5. SYNCHRONOUS IMPLEMENTATION
@@ -916,21 +951,12 @@ class Endpoint(BaseEndpoint):
             TimeoutError: If the request times out.
             ApiError: If the server returns a 4xx or 5xx status code or a network error occurs.
         """
-        # --- ZERO-TRUST GUARDRAILS ---
-        safe_method = SecurityGuard.sanitize_http_method(method)
-        safe_kwargs = SecurityGuard.filter_safe_kwargs(kwargs)
-        target_domain = SecurityGuard.sanitize_domain(domain)
-
-        actual_timeout = timeout if timeout is not None else self._timeout
-        safe_timeout = SecurityGuard.sanitize_timeout(actual_timeout)
-
-        target_url = self.build_url(url, domain=target_domain, method=safe_method, **kwargs)
-        self._warn_if_deprecated(safe_method, target_url)
+        safe_method, target_url, safe_url_for_log, safe_timeout, safe_kwargs = (
+            self._prepare_request(method, url, domain, timeout, kwargs)
+        )
 
         req_method = getattr(self._session, safe_method.lower())
 
-        # PEP 578 and protection against Log Forging (CWE-117)
-        safe_url_for_log = target_url.replace("\n", "_").replace("\r", "_")
         sys.audit("mailgun.api.request", safe_method.upper(), safe_url_for_log)
         logger.debug("Sending Request: %s %s", safe_method.upper(), safe_url_for_log)
 
@@ -1194,14 +1220,9 @@ class AsyncEndpoint(BaseEndpoint):
             TimeoutError: If the request times out.
             ApiError: If the server returns a 4xx or 5xx status code or a network error occurs.
         """
-        # --- ZERO-TRUST GUARDRAILS ---
-        safe_method = SecurityGuard.sanitize_http_method(method)
-        safe_timeout = SecurityGuard.sanitize_timeout(timeout)
-        safe_kwargs = SecurityGuard.filter_safe_kwargs(kwargs)
-        target_domain = SecurityGuard.sanitize_domain(domain)
-
-        target_url = self.build_url(url, domain=target_domain, method=safe_method, **kwargs)
-        self._warn_if_deprecated(safe_method, target_url)
+        safe_method, target_url, safe_url_for_log, safe_timeout, safe_kwargs = (
+            self._prepare_request(method, url, domain, timeout, kwargs)
+        )
 
         request_kwargs: dict[str, Any] = {
             "method": safe_method.upper(),
