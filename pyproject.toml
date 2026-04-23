@@ -1,6 +1,6 @@
 [build-system]
 build-backend = "setuptools.build_meta"
-requires = [ "setuptools>=77", "setuptools-scm" ]
+requires = [ "setuptools>=77.0.0", "setuptools-scm" ]
 
 [project]
 name = "mailgun"
@@ -50,39 +50,24 @@ dependencies = [
     "typing-extensions>=4.7.1; python_version < '3.11'",
 ]
 
-optional-dependencies.conda_build = [ "conda-build" ]
+optional-dependencies.build = [
+    "python-build",
+    "twine",
+    "conda-build",
+]
 optional-dependencies.docs = [
   "docconvert",
   "pyment>=0.3.3", # for generating docstrings
 ]
 optional-dependencies.linting = [
-  "autoflake",
-  "autopep8",
   "bandit",
-  # dev tools
-  "make",
-  "monkeytype",   # It can generate type hints based on the observed behavior of your code.
-  "mypy",         # Optional static typing for Python
-  "pandas-stubs", # mypy pandas stub
-  "pep8-naming",
-  "pre-commit",   # A framework for managing and maintaining multi-language pre-commit hooks.
-  "pycodestyle",
-  "pydocstyle",
-  "pylint",
+  "pre-commit",
+  "ruff",
+  "mypy",
   "pyright",
-  # env variables
-  "python-dotenv>=1.2.2",
-  "pytype",                # a static type checker for any type hints you have put in your code
-  "pyupgrade",
-  "radon",
-  "refurb",
-  "ruff",                  # An extremely fast Python linter and code formatter, written in Rust.
-  "safety>=1.9.0",                # Checks installed dependencies for known vulnerabilities and licenses.
-  "toml",
-  "types-pyyaml",
-  "types-requests",        # mypy requests stub
+  "types-requests",
   "vulture",
-  "yapf",                  # A formatter for Python code
+  "python-dotenv>=1.2.2",
 ]
 optional-dependencies.metrics = [
   "pystra",    # provides functionalities to enable structural reliability analysis
@@ -102,6 +87,8 @@ optional-dependencies.tests = [
   "pytest-benchmark",
   "pytest-cov",
   "pytest-order",
+  "pytest-xdist",
+  "pyfakefs",
   "responses",
 ]
 urls."Documentation" = "https://documentation.mailgun.com"
@@ -126,26 +113,6 @@ git_describe_command = "git describe --tags --match 'v[0-9]*.[0-9]*.[0-9]*'"
 write_to = "mailgun/_version.py"
 write_to_template = '__version__ = "{version}"'
 #fallback_version = "X.Y.ZrcN.postN.devN"  # Explicit fallback
-
-[tool.autopep8]
-max_line_length = 88
-ignore = ""          # or ["E501", "W6"]
-in-place = true
-recursive = true
-aggressive = 3
-
-[tool.black]
-line-length = 100
-target-version = [ "py310", "py311", "py312", "py313", "py314" ]
-skip-string-normalization = false
-skip-magic-trailing-comma = false
-extend-exclude = '''
-/(
-  | docs
-  | setup.py
-  | venv
-)/
-'''
 
 [tool.ruff]
 #indent-width = 4
@@ -258,17 +225,6 @@ lint.pycodestyle.ignore-overlong-task-comments = true
 # Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
 lint.pydocstyle.convention = "google"
 
-[tool.flake8]
-exclude = [ "mailgun/examples/*", "tests" ]
-ignore = [ 'E501' ]
-extend-ignore = "W503"
-per-file-ignores = [
-  '__init__.py:F401',
-]
-max-line-length = 100
-count = true
-max-complexity = 13
-
 [tool.coverage.run]
 source_pkgs = [ "mailgun" ]
 branch = true
@@ -347,11 +303,6 @@ reportMissingImports = false
 
 [tool.typos.default.extend-words]
 requestor = "requestor"
-
-[tool.pydocstyle]
-convention = "google"
-match = ".*.py"
-match_dir = '^examples/'
 
 [tool.ruff.lint.pylint]
 max-args = 9           # Default is 5. SDK endpoints need more (auth, data, headers, files, etc.)
