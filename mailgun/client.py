@@ -59,7 +59,10 @@ if TYPE_CHECKING:
     from requests.models import Response  # pyright: ignore[reportMissingModuleSource]
 
 
-# Public API of the client module
+# ==============================================================================
+# 1. PUBLIC API & GLOBALS
+# ==============================================================================
+
 __all__ = [
     "AsyncClient",
     "AsyncEndpoint",
@@ -67,125 +70,6 @@ __all__ = [
     "Client",
     "Endpoint",
 ]
-
-
-@lru_cache(maxsize=32)
-def _load_handler(endpoint_key: str) -> Callable[..., str]:  # noqa: PLR0911, PLR0912
-    """Lazy load the API URL handler for a specific endpoint using SAST-safe literal imports.
-
-    This maintains zero-I/O startup performance. The lru_cache ensures this branching logic
-    is executed exactly once per route type.
-
-    Returns:
-        Callable: The specific handler function for the requested endpoint.
-    """
-    # Group 1: Domains Handler (Most common aliases grouped for speed)
-    if endpoint_key in {"domains", "dkim_authority", "dkim_selector", "web_prefix"}:
-        from mailgun.handlers.domains_handler import handle_domains  # noqa: PLC0415
-
-        return handle_domains
-    if endpoint_key == "domainlist":
-        from mailgun.handlers.domains_handler import handle_domainlist  # noqa: PLC0415
-
-        return handle_domainlist
-    if endpoint_key == "dkim":
-        from mailgun.handlers.domains_handler import handle_dkimkeys  # noqa: PLC0415
-
-        return handle_dkimkeys
-    if endpoint_key == "sending_queues":
-        from mailgun.handlers.domains_handler import handle_sending_queues  # noqa: PLC0415
-
-        return handle_sending_queues
-    if endpoint_key == "mailboxes":
-        from mailgun.handlers.domains_handler import handle_mailboxes_credentials  # noqa: PLC0415
-
-        return handle_mailboxes_credentials
-    if endpoint_key == "webhooks":
-        from mailgun.handlers.domains_handler import handle_webhooks  # noqa: PLC0415
-
-        return handle_webhooks
-
-    # Group 2: Suppressions
-    if endpoint_key == "bounces":
-        from mailgun.handlers.suppressions_handler import handle_bounces  # noqa: PLC0415
-
-        return handle_bounces
-    if endpoint_key == "unsubscribes":
-        from mailgun.handlers.suppressions_handler import handle_unsubscribes  # noqa: PLC0415
-
-        return handle_unsubscribes
-    if endpoint_key == "whitelists":
-        from mailgun.handlers.suppressions_handler import handle_whitelists  # noqa: PLC0415
-
-        return handle_whitelists
-    if endpoint_key == "complaints":
-        from mailgun.handlers.suppressions_handler import handle_complaints  # noqa: PLC0415
-
-        return handle_complaints
-
-    # Group 3: Specific Services
-    if endpoint_key == "resendmessage":
-        from mailgun.handlers.messages_handler import handle_resend_message  # noqa: PLC0415
-
-        return handle_resend_message
-    if endpoint_key == "ips":
-        from mailgun.handlers.ips_handler import handle_ips  # noqa: PLC0415
-
-        return handle_ips
-    if endpoint_key == "ip_pools":
-        from mailgun.handlers.ip_pools_handler import handle_ippools  # noqa: PLC0415
-
-        return handle_ippools
-    if endpoint_key == "tags":
-        from mailgun.handlers.tags_handler import handle_tags  # noqa: PLC0415
-
-        return handle_tags
-    if endpoint_key == "routes":
-        from mailgun.handlers.routes_handler import handle_routes  # noqa: PLC0415
-
-        return handle_routes
-    if endpoint_key == "lists":
-        from mailgun.handlers.mailinglists_handler import handle_lists  # noqa: PLC0415
-
-        return handle_lists
-    if endpoint_key == "templates":
-        from mailgun.handlers.templates_handler import handle_templates  # noqa: PLC0415
-
-        return handle_templates
-    if endpoint_key == "addressvalidate":
-        from mailgun.handlers.email_validation_handler import (  # noqa: PLC0415
-            handle_address_validate,
-        )
-
-        return handle_address_validate
-    if endpoint_key == "inbox":
-        from mailgun.handlers.inbox_placement_handler import handle_inbox  # noqa: PLC0415
-
-        return handle_inbox
-    if endpoint_key == "analytics":
-        from mailgun.handlers.metrics_handler import handle_metrics  # noqa: PLC0415
-
-        return handle_metrics
-    if endpoint_key == "bounce-classification":
-        from mailgun.handlers.bounce_classification_handler import (  # noqa: PLC0415
-            handle_bounce_classification,
-        )
-
-        return handle_bounce_classification
-    if endpoint_key == "users":
-        from mailgun.handlers.users_handler import handle_users  # noqa: PLC0415
-
-        return handle_users
-    if endpoint_key == "keys":
-        from mailgun.handlers.keys_handler import handle_keys  # noqa: PLC0415
-
-        return handle_keys
-
-    # Group 4: Fallback for "messages", "messages.mime", "events", and unknown routes
-    from mailgun.handlers.default_handler import handle_default  # noqa: PLC0415
-
-    return handle_default
-
 
 logger = logging.getLogger("mailgun.client")
 if not logger.hasHandlers():
@@ -197,6 +81,11 @@ _MAX_LOG_LENGTH: Final[int] = 500
 _AUTH_TUPLE_LEN: Final = 2
 _TIMEOUT_TUPLE_LEN: Final[int] = 2
 _DEFAULT_TIMEOUT = 60.0
+
+
+# ==============================================================================
+# 2. CORE TYPES & SECURITY GUARDRAILS
+# ==============================================================================
 
 
 class APIVersion(str, Enum):
@@ -412,7 +301,125 @@ class SecurityGuard:
         return {k: v for k, v in kwargs.items() if k in cls.ALLOWED_KWARGS}
 
 
-# Static data is accessed directly from the routes module or class constants.
+# ==============================================================================
+# 3. ROUTING ENGINE & CONFIGURATION
+# ==============================================================================
+
+
+@lru_cache(maxsize=32)
+def _load_handler(endpoint_key: str) -> Callable[..., str]:  # noqa: PLR0911, PLR0912
+    """Lazy load the API URL handler for a specific endpoint using SAST-safe literal imports.
+
+    This maintains zero-I/O startup performance. The lru_cache ensures this branching logic
+    is executed exactly once per route type.
+
+    Returns:
+        Callable: The specific handler function for the requested endpoint.
+    """
+    # Group 1: Domains Handler (Most common aliases grouped for speed)
+    if endpoint_key in {"domains", "dkim_authority", "dkim_selector", "web_prefix"}:
+        from mailgun.handlers.domains_handler import handle_domains  # noqa: PLC0415
+
+        return handle_domains
+    if endpoint_key == "domainlist":
+        from mailgun.handlers.domains_handler import handle_domainlist  # noqa: PLC0415
+
+        return handle_domainlist
+    if endpoint_key == "dkim":
+        from mailgun.handlers.domains_handler import handle_dkimkeys  # noqa: PLC0415
+
+        return handle_dkimkeys
+    if endpoint_key == "sending_queues":
+        from mailgun.handlers.domains_handler import handle_sending_queues  # noqa: PLC0415
+
+        return handle_sending_queues
+    if endpoint_key == "mailboxes":
+        from mailgun.handlers.domains_handler import handle_mailboxes_credentials  # noqa: PLC0415
+
+        return handle_mailboxes_credentials
+    if endpoint_key == "webhooks":
+        from mailgun.handlers.domains_handler import handle_webhooks  # noqa: PLC0415
+
+        return handle_webhooks
+
+    # Group 2: Suppressions
+    if endpoint_key == "bounces":
+        from mailgun.handlers.suppressions_handler import handle_bounces  # noqa: PLC0415
+
+        return handle_bounces
+    if endpoint_key == "unsubscribes":
+        from mailgun.handlers.suppressions_handler import handle_unsubscribes  # noqa: PLC0415
+
+        return handle_unsubscribes
+    if endpoint_key == "whitelists":
+        from mailgun.handlers.suppressions_handler import handle_whitelists  # noqa: PLC0415
+
+        return handle_whitelists
+    if endpoint_key == "complaints":
+        from mailgun.handlers.suppressions_handler import handle_complaints  # noqa: PLC0415
+
+        return handle_complaints
+
+    # Group 3: Specific Services
+    if endpoint_key == "resendmessage":
+        from mailgun.handlers.messages_handler import handle_resend_message  # noqa: PLC0415
+
+        return handle_resend_message
+    if endpoint_key == "ips":
+        from mailgun.handlers.ips_handler import handle_ips  # noqa: PLC0415
+
+        return handle_ips
+    if endpoint_key == "ip_pools":
+        from mailgun.handlers.ip_pools_handler import handle_ippools  # noqa: PLC0415
+
+        return handle_ippools
+    if endpoint_key == "tags":
+        from mailgun.handlers.tags_handler import handle_tags  # noqa: PLC0415
+
+        return handle_tags
+    if endpoint_key == "routes":
+        from mailgun.handlers.routes_handler import handle_routes  # noqa: PLC0415
+
+        return handle_routes
+    if endpoint_key == "lists":
+        from mailgun.handlers.mailinglists_handler import handle_lists  # noqa: PLC0415
+
+        return handle_lists
+    if endpoint_key == "templates":
+        from mailgun.handlers.templates_handler import handle_templates  # noqa: PLC0415
+
+        return handle_templates
+    if endpoint_key == "addressvalidate":
+        from mailgun.handlers import email_validation_handler as evh  # noqa: PLC0415
+
+        return evh.handle_address_validate
+    if endpoint_key == "inbox":
+        from mailgun.handlers.inbox_placement_handler import handle_inbox  # noqa: PLC0415
+
+        return handle_inbox
+    if endpoint_key == "analytics":
+        from mailgun.handlers.metrics_handler import handle_metrics  # noqa: PLC0415
+
+        return handle_metrics
+    if endpoint_key == "bounce-classification":
+        from mailgun.handlers import bounce_classification_handler as bch  # noqa: PLC0415
+
+        return bch.handle_bounce_classification
+    if endpoint_key == "users":
+        from mailgun.handlers.users_handler import handle_users  # noqa: PLC0415
+
+        return handle_users
+    if endpoint_key == "keys":
+        from mailgun.handlers.keys_handler import handle_keys  # noqa: PLC0415
+
+        return handle_keys
+
+    # Group 4: Fallback for "messages", "messages.mime", "events", and unknown routes
+    from mailgun.handlers.default_handler import handle_default  # noqa: PLC0415
+
+    return handle_default
+
+
 @lru_cache
 def _get_cached_route_data(clean_key: str) -> dict[str, Any]:
     """Apply internal cached routing logic.
@@ -425,20 +432,16 @@ def _get_cached_route_data(clean_key: str) -> dict[str, Any]:
     Returns:
         A dictionary containing versioning and path data for the route.
     """
-    # 1. Exact Match
     if clean_key in routes.EXACT_ROUTES:
         version, route_keys = routes.EXACT_ROUTES[clean_key]
         return {"version": version, "keys": tuple(route_keys)}
 
-    # 2. Parse resource parts
     route_parts = clean_key.split("_")
     primary_resource = route_parts[0]
 
-    # 3. Domain Logic Trigger
     if primary_resource == "domains":
         return {"type": "domain", "parts": tuple(route_parts)}
 
-    # 4. Prefix Logic
     if primary_resource in routes.PREFIX_ROUTES:
         version, suffix, key_override = routes.PREFIX_ROUTES[primary_resource]
         final_parts = route_parts.copy()
@@ -446,7 +449,6 @@ def _get_cached_route_data(clean_key: str) -> dict[str, Any]:
             final_parts[0] = key_override
         return {"version": version, "suffix": suffix, "keys": tuple(final_parts)}
 
-    # 5. Fallback
     return {"version": APIVersion.V3.value, "keys": tuple(route_parts)}
 
 
@@ -599,6 +601,73 @@ class Config:
         return set(self._EXACT_ROUTES.keys()) | set(self._PREFIX_ROUTES.keys())
 
 
+# ==============================================================================
+# 4. BASE CLASSES (Abstract Interfaces)
+# ==============================================================================
+
+
+class BaseClient:
+    """Base class for API clients that holds common state and initialization logic."""
+
+    __slots__ = ("auth", "config", "timeout")
+
+    def __init__(
+        self,
+        auth: tuple[str, str] | None = None,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize common client configuration and state.
+
+        Args:
+            auth: A tuple containing the API user and API key (e.g., ("api", "key-123")).
+            **kwargs: Additional configuration parameters, such as 'api_url'.
+        """
+        self.auth = SecurityGuard.validate_auth(auth)
+        self.config = Config(api_url=kwargs.get("api_url"))
+
+        # DX Guardrail: Constructor Deprecation Interceptions
+        if "api_version" in kwargs:
+            warnings.warn(
+                "The 'api_version' parameter is deprecated. The SDK now handles "
+                "API versioning (v1, v3, v4, v5) automatically via dynamic routing.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+        if isinstance(kwargs.get("timeout"), int):
+            warnings.warn(
+                "Passing an integer for 'timeout' is deprecated. Please pass a "
+                "bipartite tuple (connect_timeout, read_timeout) e.g., (10.0, 60.0).",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        self.timeout = kwargs.get("timeout", _DEFAULT_TIMEOUT)
+
+    def __repr__(self) -> str:
+        """OWASP Secrets Management: Redact sensitive information from object representation.
+
+        Returns:
+            A redacted string representation of the Client.
+        """
+        return f"<{self.__class__.__name__} api_url={self.config.api_url!r}>"
+
+    def __str__(self) -> str:
+        """OWASP Secrets Management: Redact sensitive information from string representation.
+
+        Returns:
+            A safe human-readable string representation.
+        """
+        return f"Mailgun {self.__class__.__name__}"
+
+    def __dir__(self) -> list[str]:
+        """DX: Expose true config endpoints for IDE Introspection.
+
+        Returns:
+            A list of available attributes including dynamic endpoints.
+        """
+        return list(set(super().__dir__()) | self.config.available_endpoints)
+
+
 class BaseEndpoint:
     """Base class for endpoints. Contains methods common for Endpoint and AsyncEndpoint."""
 
@@ -683,6 +752,110 @@ class BaseEndpoint:
         handler = _load_handler(endpoint_key)
 
         return handler(url, domain, method, **kwargs)  # type: ignore[no-untyped-call]
+
+
+# ==============================================================================
+# 5. SYNCHRONOUS IMPLEMENTATION
+# ==============================================================================
+
+
+class Client(BaseClient):
+    """Synchronous client class."""
+
+    __slots__ = ("_session",)
+
+    def __init__(
+        self,
+        auth: tuple[str, str] | None = None,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize a new Client instance for API interaction.
+
+        This method sets up API authentication, configuration, connection pooling,
+        and automatic network resiliency (retries).
+
+        Args:
+            auth: A tuple containing the API user and API key.
+            **kwargs: Additional configuration parameters.
+        """
+        super().__init__(auth=auth, **kwargs)
+        self._session = self._build_resilient_session()
+
+    @staticmethod
+    def _build_resilient_session() -> requests.Session:
+        """Set up connection pooling and automatic retries for transient failures.
+
+        Returns:
+            A configured requests.Session instance.
+        """
+        session = requests.Session()
+        retry_strategy = Retry(
+            total=3,
+            backoff_factor=1,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["GET", "OPTIONS", "HEAD"],
+        )
+        adapter = HTTPAdapter(max_retries=retry_strategy, pool_connections=100, pool_maxsize=100)
+        session.mount("https://", adapter)
+        session.mount("http://", adapter)
+        return session
+
+    def __getattr__(self, name: str) -> Any:
+        """Resolve and return the requested API endpoint instance.
+
+        Splits the provided attribute name to execute the corresponding endpoint handler.
+
+        Args:
+            name: The endpoint attribute name (e.g., 'domains_ips' maps to ["domains", "ips"]).
+
+        Returns:
+            An endpoint instance configured for the requested route.
+
+        Raises:
+            AttributeError: If the requested route is unknown or a magic Python method is invoked.
+        """
+        # Protect Data Model: Ignore magic Python methods
+        if name.startswith("__") and name.endswith("__"):
+            msg = f"'{self.__class__.__name__}' object has no attribute '{name}'"
+            raise AttributeError(msg)
+
+        try:
+            url, headers = self.config[name]
+            return Endpoint(
+                url=url,
+                headers=headers,
+                auth=self.auth,
+                session=self._session,
+                timeout=self.timeout,
+            )
+        except KeyError as e:
+            # __getattr__ must return AttributeError
+            msg = f"'{self.__class__.__name__}' object has no attribute '{name}'"
+            raise AttributeError(msg) from e
+
+    def close(self) -> None:
+        """Close the underlying requests.Session connection pool and purge memory."""
+        self._session.auth = None
+        self._session.headers.clear()
+        self._session.close()
+        self.auth = None
+
+    def __enter__(self) -> Self:
+        """Enter the synchronous context manager.
+
+        Returns:
+            The Client instance itself.
+        """
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
+    ) -> None:
+        """Exit the synchronous context manager, ensuring connection pools are closed."""
+        self.close()
 
 
 class Endpoint(BaseEndpoint):
@@ -958,165 +1131,9 @@ class Endpoint(BaseEndpoint):
         )
 
 
-class BaseClient:
-    """Base class for API clients that holds common state and initialization logic."""
-
-    __slots__ = ("auth", "config", "timeout")
-
-    def __init__(
-        self,
-        auth: tuple[str, str] | None = None,
-        **kwargs: Any,
-    ) -> None:
-        """Initialize common client configuration and state.
-
-        Args:
-            auth: A tuple containing the API user and API key (e.g., ("api", "key-123")).
-            **kwargs: Additional configuration parameters, such as 'api_url'.
-        """
-        self.auth = SecurityGuard.validate_auth(auth)
-        self.config = Config(api_url=kwargs.get("api_url"))
-
-        # DX Guardrail: Constructor Deprecation Interceptions
-        if "api_version" in kwargs:
-            warnings.warn(
-                "The 'api_version' parameter is deprecated. The SDK now handles "
-                "API versioning (v1, v3, v4, v5) automatically via dynamic routing.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-
-        if isinstance(kwargs.get("timeout"), int):
-            warnings.warn(
-                "Passing an integer for 'timeout' is deprecated. Please pass a "
-                "bipartite tuple (connect_timeout, read_timeout) e.g., (10.0, 60.0).",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-        self.timeout = kwargs.get("timeout", _DEFAULT_TIMEOUT)
-
-    def __repr__(self) -> str:
-        """OWASP Secrets Management: Redact sensitive information from object representation.
-
-        Returns:
-            A redacted string representation of the Client.
-        """
-        return f"<{self.__class__.__name__} api_url={self.config.api_url!r}>"
-
-    def __str__(self) -> str:
-        """OWASP Secrets Management: Redact sensitive information from string representation.
-
-        Returns:
-            A safe human-readable string representation.
-        """
-        return f"Mailgun {self.__class__.__name__}"
-
-    def __dir__(self) -> list[str]:
-        """DX: Expose true config endpoints for IDE Introspection.
-
-        Returns:
-            A list of available attributes including dynamic endpoints.
-        """
-        return list(set(super().__dir__()) | self.config.available_endpoints)
-
-
-class Client(BaseClient):
-    """Synchronous client class."""
-
-    __slots__ = ("_session",)
-
-    def __init__(
-        self,
-        auth: tuple[str, str] | None = None,
-        **kwargs: Any,
-    ) -> None:
-        """Initialize a new Client instance for API interaction.
-
-        This method sets up API authentication, configuration, connection pooling,
-        and automatic network resiliency (retries).
-
-        Args:
-            auth: A tuple containing the API user and API key.
-            **kwargs: Additional configuration parameters.
-        """
-        super().__init__(auth=auth, **kwargs)
-        self._session = self._build_resilient_session()
-
-    @staticmethod
-    def _build_resilient_session() -> requests.Session:
-        """Set up connection pooling and automatic retries for transient failures.
-
-        Returns:
-            A configured requests.Session instance.
-        """
-        session = requests.Session()
-        retry_strategy = Retry(
-            total=3,
-            backoff_factor=1,
-            status_forcelist=[429, 500, 502, 503, 504],
-            allowed_methods=["GET", "OPTIONS", "HEAD"],
-        )
-        adapter = HTTPAdapter(max_retries=retry_strategy, pool_connections=100, pool_maxsize=100)
-        session.mount("https://", adapter)
-        session.mount("http://", adapter)
-        return session
-
-    def __getattr__(self, name: str) -> Any:
-        """Resolve and return the requested API endpoint instance.
-
-        Splits the provided attribute name to execute the corresponding endpoint handler.
-
-        Args:
-            name: The endpoint attribute name (e.g., 'domains_ips' maps to ["domains", "ips"]).
-
-        Returns:
-            An endpoint instance configured for the requested route.
-
-        Raises:
-            AttributeError: If the requested route is unknown or a magic Python method is invoked.
-        """
-        # Protect Data Model: Ignore magic Python methods
-        if name.startswith("__") and name.endswith("__"):
-            msg = f"'{self.__class__.__name__}' object has no attribute '{name}'"
-            raise AttributeError(msg)
-
-        try:
-            url, headers = self.config[name]
-            return Endpoint(
-                url=url,
-                headers=headers,
-                auth=self.auth,
-                session=self._session,
-                timeout=self.timeout,
-            )
-        except KeyError as e:
-            # __getattr__ must return AttributeError
-            msg = f"'{self.__class__.__name__}' object has no attribute '{name}'"
-            raise AttributeError(msg) from e
-
-    def close(self) -> None:
-        """Close the underlying requests.Session connection pool and purge memory."""
-        self._session.auth = None
-        self._session.headers.clear()
-        self._session.close()
-        self.auth = None
-
-    def __enter__(self) -> Self:
-        """Enter the synchronous context manager.
-
-        Returns:
-            The Client instance itself.
-        """
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: types.TracebackType | None,
-    ) -> None:
-        """Exit the synchronous context manager, ensuring connection pools are closed."""
-        self.close()
+# ==============================================================================
+# 6. ASYNCHRONOUS IMPLEMENTATION
+# ==============================================================================
 
 
 class AsyncEndpoint(BaseEndpoint):
@@ -1471,7 +1488,7 @@ class AsyncClient(BaseClient):
     async def aclose(self) -> None:
         """Close the underlying httpx.AsyncClient and purge memory."""
         if self._httpx_client:
-            # CWE-316: Зачистка асинхронної сесії
+            # CWE-316: Clear async session
             self._httpx_client.auth = None
             self._httpx_client.headers.clear()
             await self._httpx_client.aclose()
