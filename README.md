@@ -311,18 +311,38 @@ By default, the SDK routes traffic to the US servers (`https://api.mailgun.net`)
 client = Client(auth=("api", "KEY"), api_url="https://api.eu.mailgun.net")
 ```
 
-The SDK also implements Timeouts by default `read=60.0s` (but can take a tuple with connect/read `(10.0, 60.0)` to ensure your application fails-fast during network partitions but remains patient while Mailgun processes heavy analytical queries.
+The SDK also implements Timeouts by default `read=60.0s` (but can take a tuple with connect/read `(10.0, 60.0)` to ensure your application fails-fast during network partitions but remains patient while Mailgun processes heavy analytical queries).
 
 ### AsyncClient
 
 SDK provides also async version of the client to use in asynchronous applications. The AsyncClient offers the same functionality as the sync client but with non-blocking I/O, making it ideal for concurrent operations and integration with asyncio-based applications.
 
 ```python
-from mailgun.client import AsyncClient
+import asyncio
 import os
+from mailgun.client import AsyncClient
 
 auth = ("api", os.environ["APIKEY"])
-client = AsyncClient(auth=auth)
+
+
+async def main():
+    # BEST PRACTICE: Use the async context manager for safe connection pooling
+    # and automatic socket teardown.
+    async with AsyncClient(auth=("api", "your-api-key")) as client:
+        response = await client.messages.create(
+            domain="your-domain.com",
+            data={
+                "from": "Excited User <mailgun@your-domain.com>",
+                "to": ["bar@example.com"],
+                "subject": "Hello",
+                "text": "Testing some Mailgun awesomeness!",
+            },
+        )
+        print(response.json())
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ## Usage
@@ -612,7 +632,7 @@ def get_dkim_keys() -> None:
 
 Create a domain key.
 Note that once private keys are created or imported they are never exported.
-Alternatively, you can import an existing PEM file containing a RSA private key in PKCS #1, ASn.1 DER format.
+Alternatively, you can import an existing PEM file containing an RSA private key in PKCS #1, ASn.1 DER format.
 Note, the pem can be passed as a file attachment or as a form-string parameter.
 
 ```python

@@ -300,6 +300,25 @@ class SecurityGuard:
         """
         return {k: v for k, v in kwargs.items() if k in cls.ALLOWED_KWARGS}
 
+    @staticmethod
+    def sanitize_headers(headers: dict[str, str] | None) -> dict[str, str] | None:
+        """Poka-yoke: Prevent HTTP Header Injection (CWE-113).
+
+        Returns:
+            The sanitized headers dictionary, or None if no headers were provided.
+
+        Raises:
+            ValueError: If a CRLF injection pattern is detected in any header key or value.
+        """
+        if not headers:
+            return headers
+        for key, value in headers.items():
+            # Check both key and value
+            if "\n" in str(key) or "\r" in str(key) or "\n" in str(value) or "\r" in str(value):
+                msg = f"CRLF injection detected in header: {key}"
+                raise ValueError(msg)
+        return headers
+
 
 # ==============================================================================
 # 3. ROUTING ENGINE & CONFIGURATION
@@ -696,14 +715,16 @@ class BaseEndpoint:
     def _warn_if_deprecated(method: str, target_url: str) -> None:
         """Check the formulated URL against the registry of deprecated endpoints.
 
-        Issues both a standard Python DeprecationWarning and a SDK logger warning.
+        Issues both a standard Python DeprecationWarning and an SDK logger warning.
 
         Args:
             method: Requested HTTP method.
             target_url: Formulated destination URL.
         """
         path = urlparse(target_url).path
-        for pattern, msg in routes.DEPRECATED_ROUTES.items():
+
+        # Iterate over the dynamically compiled, cached regexes
+        for pattern, msg in routes.get_deprecated_regexes().items():
             if pattern.search(path):
                 warning_message = f"DEPRECATED API CALL ({method.upper()} {path}): {msg}"
                 warnings.warn(warning_message, DeprecationWarning, stacklevel=3)
@@ -759,8 +780,9 @@ class BaseEndpoint:
         url: dict[str, Any],
         domain: str | None,
         timeout: float | tuple[float, float] | None,
+        headers: dict[str, str],
         kwargs: dict[str, Any],
-    ) -> tuple[str, str, str, float | tuple[float, float] | None, dict[str, Any]]:
+    ) -> tuple[str, str, str, float | tuple[float, float] | None, dict[str, str], dict[str, Any]]:
         """Security and routing preparation logic.
 
         Args:
@@ -768,13 +790,15 @@ class BaseEndpoint:
             url: Incoming URL structure containing base and keys.
             domain: Target domain name to sanitize.
             timeout: Request timeout duration.
+            headers: Headers dictionary.
             kwargs: Additional keyword arguments.
 
         Returns:
-            A tuple containing safe_method, target_url, safe_url_for_log, safe_timeout, and safe_kwargs.
+            A tuple containing safe_method, target_url, safe_url_for_log, safe_timeout, safe_headers, and safe_kwargs.
         """
         safe_method = SecurityGuard.sanitize_http_method(method)
         safe_kwargs = SecurityGuard.filter_safe_kwargs(kwargs)
+        safe_headers = SecurityGuard.sanitize_headers(headers) or {}
         target_domain = SecurityGuard.sanitize_domain(domain)
 
         actual_timeout = timeout if timeout is not None else self._timeout
@@ -786,7 +810,7 @@ class BaseEndpoint:
         # PEP 578 and protection against Log Forging (CWE-117)
         safe_url_for_log = target_url.replace("\n", "_").replace("\r", "_")
 
-        return safe_method, target_url, safe_url_for_log, safe_timeout, safe_kwargs
+        return safe_method, target_url, safe_url_for_log, safe_timeout, safe_headers, safe_kwargs
 
 
 # ==============================================================================
@@ -951,8 +975,8 @@ class Endpoint(BaseEndpoint):
             TimeoutError: If the request times out.
             ApiError: If the server returns a 4xx or 5xx status code or a network error occurs.
         """
-        safe_method, target_url, safe_url_for_log, safe_timeout, safe_kwargs = (
-            self._prepare_request(method, url, domain, timeout, kwargs)
+        safe_method, target_url, safe_url_for_log, safe_timeout, safe_headers, safe_kwargs = (
+            self._prepare_request(method, url, domain, timeout, headers, kwargs)
         )
 
         req_method = getattr(self._session, safe_method.lower())
@@ -965,7 +989,7 @@ class Endpoint(BaseEndpoint):
                 target_url,
                 data=data,
                 params=filters,
-                headers=headers,
+                headers=safe_headers,
                 auth=auth,
                 timeout=safe_timeout,
                 files=files,
@@ -1220,8 +1244,8 @@ class AsyncEndpoint(BaseEndpoint):
             TimeoutError: If the request times out.
             ApiError: If the server returns a 4xx or 5xx status code or a network error occurs.
         """
-        safe_method, target_url, safe_url_for_log, safe_timeout, safe_kwargs = (
-            self._prepare_request(method, url, domain, timeout, kwargs)
+        safe_method, target_url, safe_url_for_log, safe_timeout, safe_headers, safe_kwargs = (
+            self._prepare_request(method, url, domain, timeout, headers, kwargs)
         )
 
         request_kwargs: dict[str, Any] = {
@@ -1229,7 +1253,7 @@ class AsyncEndpoint(BaseEndpoint):
             "url": target_url,
             "params": filters,
             "files": files,
-            "headers": headers,
+            "headers": safe_headers,
             "auth": auth,
             "timeout": safe_timeout,
             "follow_redirects": False,
@@ -1500,6 +1524,7 @@ class AsyncClient(BaseClient):
             if "transport" not in self._client_kwargs:
                 # Expand connection pool for async high-throughput batching
                 limits = httpx.Limits(max_keepalive_connections=100, max_connections=100)
+                # Note: httpx retries only apply to connection errors, not 5xx HTTP statuses.
                 transport = httpx.AsyncHTTPTransport(retries=3, limits=limits)
                 self._client_kwargs["transport"] = transport
 
@@ -1509,10 +1534,13 @@ class AsyncClient(BaseClient):
     async def aclose(self) -> None:
         """Close the underlying httpx.AsyncClient and purge memory."""
         if self._httpx_client:
-            # CWE-316: Clear async session
-            self._httpx_client.auth = None
-            self._httpx_client.headers.clear()
-            await self._httpx_client.aclose()
+            try:
+                # CWE-316: Clear async session
+                self._httpx_client.auth = None
+                self._httpx_client.headers.clear()
+                await self._httpx_client.aclose()
+            finally:
+                self._httpx_client = None
         self.auth = None
 
     async def __aenter__(self) -> Self:

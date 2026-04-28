@@ -82,6 +82,24 @@ class TestSecurityGuard:
         with pytest.raises(ValueError, match="strictly positive"):
             SecurityGuard.sanitize_timeout(-5.5)
 
+    def test_sanitize_headers_valid(self) -> None:
+        """Verify normal headers pass through unmodified."""
+        headers = {"Authorization": "Basic 123", "User-Agent": "test-agent"}
+        assert SecurityGuard.sanitize_headers(headers) == headers
+
+    def test_sanitize_headers_none(self) -> None:
+        """Verify None is handled gracefully."""
+        assert SecurityGuard.sanitize_headers(None) is None
+
+    def test_sanitize_headers_crlf_injection(self) -> None:
+        """Verify HTTP Header Injection (CWE-113) attempts are blocked."""
+        with pytest.raises(ValueError, match="CRLF injection detected"):
+            SecurityGuard.sanitize_headers({"Evil-Header": "value\r\nInject: bad"})
+
+        with pytest.raises(ValueError, match="CRLF injection detected"):
+            SecurityGuard.sanitize_headers({"Evil-Header": "value\nInject: bad"})
+
+
 class TestClient:
     """Tests for Client class."""
 
@@ -405,3 +423,34 @@ class TestEndpoint:
 
         with pytest.raises(AttributeError):
             ep.undefined_attribute = "should_fail"  # type: ignore[attr-defined]
+
+    @patch("requests.Session.request")
+    def test_api_call_exception_chaining(self, mock_request: MagicMock) -> None:
+        """Verify that PEP 3134 exception chaining preserves the original network error."""
+        original_err = requests.exceptions.ConnectionError("DNS resolution failed")
+        mock_request.side_effect = original_err
+
+        url = {"base": f"{BASE_URL_V3}/", "keys": ["messages"]}
+        ep = Endpoint(url=url, headers={}, auth=("api", "key"))
+
+        with pytest.raises(ApiError) as exc_info:
+            ep.api_call(auth=("api", "key"), method="GET", url=url, headers={}, domain="test.com")
+
+        # Assert that the original error is chained as the cause
+        assert exc_info.value.__cause__ is original_err
+
+    def test_api_call_header_injection_is_blocked(self) -> None:
+        """Verify that explicit headers passed to api_call are strictly sanitized (CWE-113)."""
+        url = {"base": f"{BASE_URL_V3}/", "keys": ["messages"]}
+        ep = Endpoint(url=url, headers={}, auth=("api", "key"))
+
+        malicious_headers = {"Evil-Header\r\nInjection": "value"}
+
+        with pytest.raises(ValueError, match="CRLF injection detected in header"):
+            ep.api_call(
+                auth=("api", "key"),
+                method="GET",
+                url=url,
+                headers=malicious_headers,
+                domain="test.com"
+            )

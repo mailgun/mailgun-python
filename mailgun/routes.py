@@ -7,6 +7,7 @@ configuration changes during SDK runtime.
 
 from __future__ import annotations
 
+import functools
 import re
 from types import MappingProxyType
 from typing import Final
@@ -154,24 +155,25 @@ DOMAIN_ENDPOINTS: Final = MappingProxyType(_DOMAIN_ENDPOINTS)
 
 
 # --- DEPRECATED_ROUTES ---
-# Regular expressions to identify deprecated paths and their corresponding messages.
-_DEPRECATED_ROUTES: DeprecatedRoutesType = {
-    re.compile(
-        r"^/v1/bounce-classification/"
-    ): "The v1 bounce-classification API is deprecated. Migrate to POST /v2/bounce-classification/metrics.",
-    re.compile(
-        r"^/v3/(stats|[^/]+/stats|[^/]+/aggregates)"
-    ): "The v3 Stats API is deprecated. Migrate to the v1 Metrics API.",
-    re.compile(
-        r"^/v3/[^/]+/tag(/|$|\?)"
-    ): "The legacy Tag API is deprecated. Migrate to the new Tags API (/v3/{domain}/tags).",
-    re.compile(r"^/v3/domains/[^/]+/limits/tag"): "The domain tag limits API is deprecated.",
-    re.compile(
-        r"^/v3/lists/[^/]+/validate"
-    ): "The v3 Bulk Validation API is deprecated. Migrate to the v4 Bulk Validations Service.",
-    re.compile(
-        r"^/v3/address/(validate|parse|private)"
-    ): "The v3 Address Validation/Parsing APIs are deprecated. Migrate to the v4 Validations Service.",
+# String patterns to identify deprecated paths and their corresponding messages.
+# Defined as strings to prevent expensive regex compilation on cold boot.
+_DEPRECATED_ROUTES_PATTERNS: Final[dict[str, str]] = {
+    r"^/v1/bounce-classification/": "The v1 bounce-classification API is deprecated. Migrate to POST /v2/bounce-classification/metrics.",
+    r"^/v3/(stats|[^/]+/stats|[^/]+/aggregates)": "The v3 Stats API is deprecated. Migrate to the v1 Metrics API.",
+    r"^/v3/[^/]+/tag(/|$|\?)": "The legacy Tag API is deprecated. Migrate to the new Tags API (/v3/{domain}/tags).",
+    r"^/v3/domains/[^/]+/limits/tag": "The domain tag limits API is deprecated.",
+    r"^/v3/lists/[^/]+/validate": "The v3 Bulk Validation API is deprecated. Migrate to the v4 Bulk Validations Service.",
+    r"^/v3/address/(validate|parse|private)": "The v3 Address Validation/Parsing APIs are deprecated. Migrate to the v4 Validations Service.",
 }
 
-DEPRECATED_ROUTES: Final = MappingProxyType(_DEPRECATED_ROUTES)
+
+@functools.lru_cache(maxsize=1)
+def get_deprecated_regexes() -> MappingProxyType[re.Pattern[str], str]:
+    """Lazy compilation to speed up SDK cold-boot initialization.
+
+    Returns:
+        A read-only mapping of compiled regular expressions to their deprecation messages.
+    """
+    return MappingProxyType(
+        {re.compile(pattern): msg for pattern, msg in _DEPRECATED_ROUTES_PATTERNS.items()}
+    )

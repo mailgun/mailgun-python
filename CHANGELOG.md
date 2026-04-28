@@ -4,6 +4,8 @@ We [keep a changelog.](http://keepachangelog.com/)
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-04-XX
+
 ### Added
 
 - Explicit `__all__` declaration in `mailgun.client` to cleanly isolate the public API namespace.

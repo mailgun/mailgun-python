@@ -124,6 +124,21 @@ class TestAsyncEndpoint:
         assert " " not in sent_data, "Payload was not strictly minified"
         assert sent_data == '{"name":"test.com","spam_action":"disabled"}'
 
+    @pytest.mark.asyncio
+    async def test_api_call_exception_chaining(self) -> None:
+        """Verify that PEP 3134 exception chaining preserves the original httpx network error."""
+        mock_client = AsyncMock(spec=httpx.AsyncClient)
+        original_err = httpx.RequestError("Async DNS resolution failed")
+        mock_client.request.side_effect = original_err
+
+        url = {"base": f"{BASE_URL_V3}/", "keys": ["messages"]}
+        ep = AsyncEndpoint(url=url, headers={}, auth=("api", "key"), client=mock_client)
+
+        with pytest.raises(ApiError) as exc_info:
+            await ep.api_call(auth=("api", "key"), method="GET", url=url, headers={}, domain="test.com")
+
+        # Assert that the original error is chained as the cause
+        assert exc_info.value.__cause__ is original_err
 
 class TestAsyncClient:
     """Tests for AsyncClient shielding from SSL context issues."""
@@ -156,6 +171,23 @@ class TestAsyncClient:
         _ = client._client
         await client.aclose()
         mock_instance.aclose.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_aclose_frees_memory_and_is_idempotent(self) -> None:
+        """Verify that aclose() nullifies the client for GC and is safe to call twice."""
+        client = AsyncClient(auth=("api", "key"))
+
+        _ = client._client
+        assert client._httpx_client is not None
+
+        await client.aclose()
+        assert client._httpx_client is None
+        assert client.auth is None
+
+        try:
+            await client.aclose()
+        except Exception as e:
+            pytest.fail(f"aclose() is not idempotent, raised: {e}")
 
     @patch("httpx.AsyncHTTPTransport")
     @patch("httpx.AsyncClient")

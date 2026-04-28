@@ -1,6 +1,9 @@
 """Unit tests for mailgun.routes configuration."""
 
+import re
 from types import MappingProxyType
+
+import pytest
 
 from mailgun import routes
 
@@ -85,3 +88,37 @@ def test_no_overlapping_keys() -> None:
         "If you added a new route, ensure it's either Exact or Prefix, but not both "
         "(unless intentionally used as a fallback)."
     )
+
+
+def test_get_deprecated_regexes_returns_patterns() -> None:
+    """Verify lazy compilation successfully parses strings into regex patterns."""
+    regexes = routes.get_deprecated_regexes()
+
+    assert isinstance(regexes, MappingProxyType)
+    assert len(regexes) > 0
+    for pattern, msg in regexes.items():
+        assert isinstance(pattern, re.Pattern)
+        assert isinstance(msg, str)
+
+
+def test_get_deprecated_regexes_is_cached() -> None:
+    """Verify that the LRU cache prevents redundant regex compilations."""
+    # First call triggers compilation
+    regexes1 = routes.get_deprecated_regexes()
+
+    # Second call should hit the cache
+    regexes2 = routes.get_deprecated_regexes()
+
+    # Assert they are the exact same object in memory
+    assert regexes1 is regexes2
+
+
+def test_get_deprecated_regexes_is_immutable() -> None:
+    """Verify that the cached regex dictionary is immune to cache poisoning."""
+    regexes = routes.get_deprecated_regexes()
+
+    with pytest.raises(TypeError, match="'mappingproxy' object does not support item assignment"):
+        regexes[re.compile("new")] = "hacked"  # type: ignore[index]
+
+    with pytest.raises(AttributeError, match="'mappingproxy' object has no attribute 'clear'"):
+        regexes.clear()  # type: ignore[attr-defined]
