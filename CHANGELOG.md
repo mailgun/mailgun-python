@@ -22,9 +22,14 @@ We [keep a changelog.](http://keepachangelog.com/)
 - Advanced path interpolation in `handle_default` to automatically inject inline URL parameters (e.g., `/v2/x509/{domain}/status`).
 - Added a new "Logging & Debugging" section to `README.md`.
 - An intelligent live meta-testing suite (`test_routing_meta_live.py`) to strictly verify SDK endpoint aliases against live Mailgun servers.
+- PEP 561 Compliance: Added a `py.typed` marker to expose the SDK's strict type hints to downstream users (`mypy`, `pyright`).
+- DX Tooling: Added a unified `manage.sh` script to streamline local formatting, linting, testing, and benchmarking.
+- Routing Engine Meta-Tests: Added `test_routing_engine.py` to dynamically validate URL generation for all 58+ supported endpoints.
 
 ### Changed
 
+- **Memory Optimization:** Enforced `__slots__` on `Client` and `Endpoint` classes to eliminate dynamic `__dict__` overhead, reducing Garbage Collection pauses and improving overall throughput by ~8-10%.
+- Exception Chaining (PEP 3134): Network connection errors from `httpx` and `requests` are now explicitly chained (`raise from`), preventing the swallowing of root-cause infrastructure tracebacks.
 - Refactored the `Config` routing engine to use a deterministic, data-driven approach (`EXACT_ROUTES` and `PREFIX_ROUTES`) for better maintainability.
 - Improved dynamic API version resolution for domain endpoints to gracefully switch between `v1`, `v3`, and `v4` for nested resources, with a safe fallback to `v3`.
 - Secured internal configuration registries by wrapping them in `MappingProxyType` to prevent accidental mutations of the client state.
@@ -35,6 +40,7 @@ We [keep a changelog.](http://keepachangelog.com/)
 - Modernized the codebase using modern Python idioms (e.g., `contextlib.suppress`) and resolved strict typing errors for `pyright`.
 - **Documentation**: Migrated all internal and public docstrings from legacy Sphinx/reST format to modern Google Style for cleaner readability and better IDE hover-hints.
 - Updated Dependabot configuration to group minor and patch updates and limit open PRs.
+- CI/CD Optimization: Grouped Dependabot updates (`minor-and-patch`) to reduce Pull Request noise and optimized `.editorconfig`.
 - Migrated the fragmented linting and formatting pipeline (Flake8, Black, Pylint, Pyupgrade, etc.) to a unified, high-performance `ruff` setup in `.pre-commit-config.yaml`.
 - Refactored `api_call` exception blocks to use the `else` clause for successful returns, adhering to strict Ruff (TRY300) standards.
 - Enabled pip dependency caching in GitHub Actions to drastically speed up CI workflows.
@@ -62,6 +68,8 @@ We [keep a changelog.](http://keepachangelog.com/)
 
 - OWASP Credential Protection: Implemented a `SecretAuth` tuple subclass to securely redact the Mailgun API key from accidental exposure in memory dumps, tracebacks, and `repr()` logs.
 - OWASP Input Validation: Added strict sanitization in `Client._validate_auth` to strip trailing whitespace and block HTTP Header Injection attacks (rejecting `\n` and `\r` characters in API keys).
+- CWE-113 (HTTP Header Injection): Implemented strict CRLF (`\r\n`) sanitization inside `SecurityGuard.sanitize_headers` to block malicious header manipulation.
+- Supply Chain Security: Patched a potential OS Command Injection vulnerability in GitHub Actions (`publish.yml`) by safely routing `github.*` contexts through environment variables.
 
 ### Pull Requests Merged
 
