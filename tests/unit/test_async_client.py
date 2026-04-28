@@ -177,7 +177,8 @@ class TestAsyncClient:
         """Verify that aclose() nullifies the client for GC and is safe to call twice."""
         client = AsyncClient(auth=("api", "key"))
 
-        _ = client._client
+        mock_httpx = AsyncMock(spec=httpx.AsyncClient)
+        client._httpx_client = mock_httpx
         assert client._httpx_client is not None
 
         await client.aclose()

@@ -148,7 +148,7 @@ repos:
 
   # Spelling and typos
   - repo: https://github.com/crate-ci/typos
-    rev: v1.45.1
+    rev: v1.45.2
     hooks:
       - id: typos
         name: "📝 spelling · Check typos"
@@ -176,7 +176,7 @@ repos:
           - responses
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.10
+    rev: v0.15.12
     hooks:
       - id: ruff-check
         name: "🐍 lint · Check with Ruff"
@@ -203,7 +203,7 @@ repos:
 
   # Python type checking
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.20.1
+    rev: v1.20.2
     hooks:
       - id: mypy
         name: "🐍 types · Check with mypy"
@@ -214,7 +214,7 @@ repos:
         exclude: ^mailgun/examples/
 
   - repo: https://github.com/RobertCraigie/pyright-python
-    rev: v1.1.408
+    rev: v1.1.409
     hooks:
       - id: pyright
         name: "🐍 types · Check with pyright"
