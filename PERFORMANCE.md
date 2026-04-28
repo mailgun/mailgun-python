@@ -1,50 +1,47 @@
 # Mailgun Python SDK: Performance & Architecture
 
-This document outlines the architectural decisions made to ensure the Mailgun Python SDK remains blazingly fast and memory-efficient.
+This document outlines the architectural decisions made to ensure the Mailgun Python SDK remains blazingly fast, memory-efficient, and secure.
 
 If you are contributing to this repository, please review these principles before modifying core routing, transport, or instantiation logic.
 
 ## Core Optimizations
 
-### 1. High-Concurrency Transport Layer (`httpx` & Context Management)
+### 1. Constant-Time (O(1)) Dictionary Dispatch (`routes.py`)
 
-We replaced the legacy `requests` library with `httpx` to modernize network I/O and enforce strict connection pooling.
+String manipulation, dynamic imports (`importlib`), and sequential regex evaluations are historically slow in Python.
 
-- **Native AsyncIO:** The new `AsyncClient` allows for true non-blocking asynchronous throughput, reducing median request latency by effectively eliminating thread context-switching overhead.
-- **Context Manager Enforcement:** The `Client` now implements `__enter__` and `__exit__`. By enforcing `with Client(...) as client:`, we guarantee the connection pool is cleanly closed, preventing OS socket leaks in long-running production environments.
+- **Static Dispatch:** Base API URLs (`/v3`, `/v4`, etc.) and handler functions are pre-mapped in immutable dictionaries (`EXACT_ROUTES`, `PREFIX_ROUTES`).
+- **Impact:** The SDK completely avoids string concatenation and dynamic resolution during high-volume request loops, increasing routing speed by over **12x**.
 
-### 2. Immutable URL Baking & Routing (`routes.py`)
+### 2. High-Concurrency Transport Layer (`httpx` & `__slots__`)
 
-String manipulation and regex compilation are historically slow operations in Python.
+- **Native AsyncIO & Connection Pooling:** The `AsyncClient` allows for true non-blocking throughput. Both clients enforce connection pooling to prevent OS socket exhaustion.
+- **Memory Density (`__slots__`):** By defining `__slots__` on `Endpoint` and `Client` classes, we block Python from creating dynamic `__dict__` hash tables. This drastically reduces the RAM footprint of each instantiated client and lowers *Garbage Collection (GC)* pauses during concurrent workloads.
 
-- **Constant Folding (O(1) Access):** Base API URLs (`/v3`, `/v4`, etc.) are pre-compiled and baked into the client's memory (`__slots__`) upon instantiation. The SDK completely avoids string concatenation during high-volume request loops.
-- **State Machine Pre-Warming:** All API path resolution patterns are defined as pre-compiled `re.Pattern` objects, eliminating per-request compilation overhead.
+### 3. Cold-Boot Initialization & Lazy Loading
 
-### 3. Strict Memory Allocation (`__slots__`)
-
-To prevent memory bloat in high-throughput microservices, the SDK enforces `__slots__` inheritance across the entire class hierarchy (`BaseClient`, `Client`, `AsyncClient`, `Endpoint`).
-
-- **Memory Density:** Removing the dynamic `__dict__` drastically reduces the RAM footprint of each instantiated client and lowers Garbage Collection (GC) pauses during concurrent workloads.
+- **Deferred Regex Compilation:** Legacy SDK versions compiled multiple `re.Pattern` objects upon module import. By wrapping these in `@functools.lru_cache(maxsize=1)` and returning an immutable `MappingProxyType`, the SDK defers expensive AST parsing until the exact moment it is needed, shaving ~15-30ms off the initial application startup time.
 
 ______________________________________________________________________
 
-## Benchmarks (v1.6.0 vs. Current)
+## Benchmarks (v1.6.0 vs. v1.7.0)
 
-Our internal `pytest-benchmark` and `cProfile` suites verify these architectural gains.
+Our internal `pytest-benchmark` and `cProfile` suites verify these architectural gains. Tests were executed on CPython 3.13 (Darwin 64-bit).
 
-| Metric                        | v1.6.0 (Baseline) | Optimized Architecture | Delta           |
-| :---------------------------- | :---------------- | :--------------------- | :-------------- |
-| **Routing Speed (CPU Time)**  | ~17.61 µs         | **~0.84 µs**           | **~21x Faster** |
-| **Async Throughput (Median)** | ~5.91 ms          | **~4.06 ms**           | **~31% Faster** |
-| **Sync Throughput (Median)**  | ~20.2 ms          | **~10.5 ms**           | **~48% Faster** |
+| Metric                      | v1.6.0 (Baseline) | v1.7.0 (Current) | Delta             |
+| :-------------------------- | :---------------- | :--------------- | :---------------- |
+| **Cold Boot Time**          | ~0.232 s          | **~0.201 s**     | **~13% Faster**   |
+| **Routing Speed (Mean)**    | ~17.98 µs         | **~1.39 µs**     | **~12.9x Faster** |
+| **Async Throughput (Mean)** | ~6.49 ms          | **~5.88 ms**     | **~9.4% Faster**  |
+| **Sync Throughput (Mean)**  | ~18.29 ms         | **~16.82 ms**    | **~8.0% Faster**  |
 
-*Note: Benchmarks measure network-isolated internal overhead. Sync throughput showed massive improvements (~48%) after enforcing strict `__slots__` memory isolation.*
+*Note: Benchmarks measure network-isolated internal overhead. Routing operations per second (OPS) jumped from ~55k to over **718k**.*
 
 ______________________________________________________________________
 
 ## Profiling the Codebase
 
-If you are modifying core internal logic, you must verify that you have not introduced I/O regressions or memory leaks.
+If you modify core internal logic, verify that you have not introduced I/O regressions or memory leaks.
 
 **To profile Cold-Boot initialization:**
 
