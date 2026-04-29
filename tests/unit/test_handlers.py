@@ -292,17 +292,24 @@ class TestHandleInbox:
 
 
 class TestHandleResendMessage:
-    """Tests for handle_resend_message."""
+    """Tests for handle_resend_message (SSRF protected)."""
 
     def test_without_storage_url_raises_api_error(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["resendmessage"]}
         with pytest.raises(ApiError, match="Storage url is required"):
             handle_resend_message(url, None, None)
 
-    def test_with_storage_url_returns_str(self) -> None:
+    def test_with_valid_storage_url_returns_str(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["resendmessage"]}
-        result = handle_resend_message(url, None, None, storage_url="https://store/1")
-        assert result == "https://store/1"
+        valid_storage_url = "https://api.mailgun.net/v3/domains/test/messages/123"
+        assert handle_resend_message(url, None, None, storage_url=valid_storage_url) == valid_storage_url
+
+    def test_with_invalid_storage_url_raises_ssrf_error(self) -> None:
+        url = {"base": f"{BASE_URL_V3}/", "keys": ["resendmessage"]}
+        malicious_url = "https://attacker.com/steal-key"
+
+        with pytest.raises(ValueError, match="CWE-918"):
+            handle_resend_message(url, None, None, storage_url=malicious_url)
 
 
 class TestHandleTemplates:

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 
 if TYPE_CHECKING:
@@ -37,3 +37,35 @@ def sanitize_path_segment(segment: Any) -> str:
     # safe="@+" ensures email addresses pass through naturally without breaking API contracts,
     # while still strictly percent-encoding slashes (/) to block Path Traversal.
     return quote(str(segment), safe="@+")
+
+
+def validate_mailgun_url(url: str) -> str:
+    """Poka-yoke: Protection against SSRF and API key leakage (CWE-918).
+
+    Checks whether the specified URL belongs to the trusted Mailgun infrastructure.
+    This is critical for endpoints that accept absolute URLs (e.g. storage_url).
+
+    Returns:
+        The original URL if it passes the security check.
+
+    Raises:
+        ValueError: If the URL's hostname is untrusted or attempts to bypass security.
+    """
+    parsed = urlparse(url)
+    hostname = (parsed.hostname or "").lower()
+
+    allowed_suffixes = (".mailgun.net", ".mailgun.org", ".mailgun.com")
+    allowed_exact = {"mailgun.net", "mailgun.org", "mailgun.com", "localhost", "127.0.0.1"}
+
+    is_safe = hostname in allowed_exact or any(
+        hostname.endswith(suffix) for suffix in allowed_suffixes
+    )
+
+    if not is_safe:
+        msg = (
+            f"Security Alert (CWE-918): Untrusted domain '{hostname}'. "
+            "To prevent the leakage of the API-key requests are allowed to the Mailgun infrastructure only."
+        )
+        raise ValueError(msg)
+
+    return url

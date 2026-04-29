@@ -1073,7 +1073,7 @@ print(req.json())
 
 ```python
 domain: str = os.environ["DOMAIN"]
-req = client.routes.get(domain=domain, route_id="6012d994e8d489e24a127e79")
+req = client.routes.get(domain=domain, route_id="xxxxxxxx")
 print(req.json())
 ```
 

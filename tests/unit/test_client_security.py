@@ -9,6 +9,7 @@ import requests
 from requests.exceptions import ConnectionError as RequestsConnectionError
 
 from mailgun.handlers.error_handler import ApiError
+from mailgun.handlers.utils import validate_mailgun_url
 from mailgun.client import (
     Client,
     AsyncClient,
@@ -155,3 +156,33 @@ async def test_async_connection_exception_logs_safely(
     assert "https://api.mailgun.net/v3/domains" in args[2]
 
     await client.aclose()
+
+
+# ==========================================
+# 6. CWE-918: SSRF Protection for URLs
+# ==========================================
+
+
+def test_validate_mailgun_url_allowed() -> None:
+    """Verify that trusted Mailgun domains and localhost pass SSRF validation."""
+    valid_urls = [
+        "https://api.mailgun.net/v3/domains/test.com/messages/123",
+        "http://localhost:8080/v3",
+        "https://storage.mailgun.org/v3/messages/xyz",
+        "http://127.0.0.1/test",
+        "https://mailgun.com/api"
+    ]
+    for url in valid_urls:
+        assert validate_mailgun_url(url) == url
+
+def test_validate_mailgun_url_blocked() -> None:
+    """Verify that untrusted domains and bypass attempts raise a ValueError (CWE-918)."""
+    invalid_urls = [
+        "https://evil-hacker.com/steal",           # Completely different domain
+        "https://mailgun.net.attacker.com/v3",     # Subdomain trick (ends with attacker.com)
+        "https://attacker-mailgun.net/v3",         # Suffix trick (not a dot boundary)
+        "https://mailgun.com.fake.net/config"      # Another top-level domain hijacking attempt
+    ]
+    for url in invalid_urls:
+        with pytest.raises(ValueError, match="CWE-918"):
+            validate_mailgun_url(url)

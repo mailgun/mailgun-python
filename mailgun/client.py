@@ -684,7 +684,7 @@ class BaseClient:
         Returns:
             A list of available attributes including dynamic endpoints.
         """
-        return list(set(super().__dir__()) | self.config.available_endpoints)
+        return sorted(set(super().__dir__()) | self.config.available_endpoints)
 
 
 class BaseEndpoint:
