@@ -7,7 +7,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from .error_handler import ApiError
+from mailgun.handlers.error_handler import ApiError
+from mailgun.handlers.utils import validate_mailgun_url
 
 
 def handle_resend_message(
@@ -16,17 +17,21 @@ def handle_resend_message(
     _method: str | None,
     **kwargs: Any,
 ) -> str:
-    """Resend message endpoint.
+    """Handle the resend message endpoint URL construction.
 
-    :param _url: Incoming URL dictionary (it's not being used for this handler)
-    :type _url: dict
-    :param _domain: Incoming domain (it's not being used for this handler)
-    :type _domain: str
-    :param _method: Incoming request method (it's not being used for this handler)
-    :type _method: str
-    :param kwargs: kwargs
-    :return: final url for default endpoint
+    Args:
+        _url: Incoming URL configuration dictionary (unused).
+        _domain: Incoming domain (unused in this handler).
+        _method: Incoming request method (unused in this handler).
+        **kwargs: Additional keyword arguments containing the 'storage_url'.
+
+    Returns:
+        The final URL for the resend message endpoint.
+
+    Raises:
+        ApiError: If the storage_url is not provided in kwargs.
     """
-    if "storage_url" in kwargs:
-        return str(kwargs["storage_url"])
-    raise ApiError("Storage url is required")
+    if "storage_url" not in kwargs:
+        raise ApiError("Storage url is required")
+
+    return validate_mailgun_url(str(kwargs["storage_url"]))

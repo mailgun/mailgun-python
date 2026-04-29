@@ -6,8 +6,8 @@ Doc: https://documentation.mailgun.com/en/latest/api-tags.html
 from __future__ import annotations
 
 from typing import Any
-from urllib.parse import quote
-from mailgun.handlers.utils import build_path_from_keys
+
+from mailgun.handlers.utils import build_path_from_keys, sanitize_path_segment
 
 
 def handle_tags(
@@ -16,28 +16,28 @@ def handle_tags(
     _method: str | None,
     **kwargs: Any,
 ) -> str:
-    """Handle Tags.
+    """Handle Tags URL construction.
 
-    :param url: Incoming URL dictionary
-    :type url: dict
-    :param domain: Incoming domain
-    :type domain: str
-    :param _method: Incoming request method (but not used here)
-    :type _method: str
-    :param kwargs: kwargs
-    :return: final url for Tags endpoint
+    Args:
+        url: Incoming URL configuration dictionary.
+        domain: Target domain name.
+        _method: Incoming request method (unused in this handler).
+        **kwargs: Additional keyword arguments (e.g., 'tag_name').
+
+    Returns:
+        The final URL for the Tags endpoint.
     """
     final_keys = build_path_from_keys(url.get("keys", []))
-    base = url["base"] + str(domain) + "/"
-    keys_without_tags = url["keys"][1:]
+    base = f"{url['base']}{domain}/"
+    keys_without_tags = url.get("keys", [])[1:]
 
-    result_url = url["base"] + str(domain) + final_keys
+    result_url = f"{url['base']}{domain}{final_keys}"
 
     if "tag_name" in kwargs:
+        safe_tag = sanitize_path_segment(kwargs["tag_name"])
         if "stats" in final_keys:
-            final_keys_stats = "/" + "/".join(keys_without_tags) if keys_without_tags else ""
-            return f"{base}tags/{quote(kwargs['tag_name'])}{final_keys_stats}"
-        else:
-            return f"{result_url}/{quote(kwargs['tag_name'])}"
+            final_keys_stats = build_path_from_keys(keys_without_tags)
+            return f"{base}tags/{safe_tag}{final_keys_stats}"
+        return f"{result_url}/{safe_tag}"
 
     return result_url

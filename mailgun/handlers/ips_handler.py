@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from mailgun.handlers.utils import build_path_from_keys
+from mailgun.handlers.utils import build_path_from_keys, sanitize_path_segment
 
 
 def handle_ips(
@@ -16,19 +16,20 @@ def handle_ips(
     _method: str | None,
     **kwargs: Any,
 ) -> str:
-    """Handle IPs.
+    """Handle IPs URL construction.
 
-    :param url: Incoming URL dictionary
-    :type url: dict
-    :param _domain: Incoming domain (it's not being used for this handler)
-    :type _domain: str
-    :param _method: Incoming request method (it's not being used for this handler)
-    :type _method: str
-    :param kwargs: kwargs
-    :return: final url for IPs endpoint
+    Args:
+        url: Incoming URL configuration dictionary.
+        _domain: Target domain name (unused in this handler).
+        _method: Incoming request method (unused in this handler).
+        **kwargs: Additional parameters (e.g., 'ip').
+
+    Returns:
+        The final URL for the IPs endpoint.
     """
     final_keys = build_path_from_keys(url.get("keys", []))
     base_url = url["base"][:-1] + final_keys
     if "ip" in kwargs:
-        return f"{base_url}/{kwargs['ip']}"
+        safe_ip = sanitize_path_segment(kwargs["ip"])
+        return f"{base_url}/{safe_ip}"
     return base_url

@@ -1,38 +1,51 @@
 """DEFAULT HANDLER.
 
-Events doc: https://documentation.mailgun.com/en/latest/api-events.html
-Messages doc: https://documentation.mailgun.com/en/latest/api-sending.html
-Stats doc: https://documentation.mailgun.com/en/latest/api-stats.html
+Provides a universal fallback for standard API endpoints.
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from mailgun.handlers.error_handler import ApiError
-from mailgun.handlers.utils import build_path_from_keys
+from mailgun.handlers.utils import build_path_from_keys, sanitize_path_segment
 
 
 def handle_default(
     url: dict[str, Any],
     domain: str | None,
     _method: str | None,
-    **_: Any,
+    **kwargs: Any,
 ) -> str:
-    """Provide default handler for endpoints with single url pattern (events, messages, stats).
+    """Provide a universal fallback handler for endpoint URL construction.
 
-    :param url: Incoming URL dictionary
-    :type url: dict
-    :param domain: Incoming domain
-    :type domain: str
-    :param _method: Incoming request method (it's not being used for this handler)
-    :type _method: str
-    :param kwargs: kwargs
-    :return: final url for default endpoint
-    :raises: ApiError
+    Args:
+        url: Incoming URL configuration dictionary.
+        domain: Target domain name (optional).
+        _method: Incoming request method (unused).
+        **kwargs: Additional keyword arguments for template injection.
+
+    Returns:
+        The final resolved URL for the endpoint.
     """
-    if not domain:
-        raise ApiError("Domain is missing!")
-
     final_keys = build_path_from_keys(url.get("keys", []))
-    return f"{url['base']}{domain}{final_keys}"
+    base_url = str(url["base"]).rstrip("/")
+
+    # Advanced Path Interpolation: Explicitly search for literal "{domain}"
+    if "{domain}" in final_keys and domain:  # noqa: RUF027
+        safe_domain = sanitize_path_segment(domain)
+        final_keys = final_keys.replace("{domain}", safe_domain)  # noqa: RUF027
+        domain = None  # Consume the domain so it isn't prepended later
+
+    # Support other dynamic parameters (e.g., {subaccountId}, {name}) passed via kwargs
+    for key, value in kwargs.items():
+        token = f"{{{key}}}"
+        if token in final_keys:
+            safe_val = sanitize_path_segment(value)
+            final_keys = final_keys.replace(token, safe_val)
+
+    # Traditional prepending for standard endpoints (e.g., /v3/domain.com/blocklists)
+    if domain:
+        safe_domain = sanitize_path_segment(domain)
+        return f"{base_url}/{safe_domain}{final_keys}"
+
+    return f"{base_url}{final_keys}"

@@ -1,6 +1,6 @@
 [build-system]
 build-backend = "setuptools.build_meta"
-requires = [ "setuptools>=77", "setuptools-scm" ]
+requires = [ "setuptools>=77.0.0", "setuptools-scm" ]
 
 [project]
 name = "mailgun"
@@ -46,46 +46,28 @@ classifiers = [
 dynamic = [ "version" ]
 dependencies = [
     "httpx>=0.24",
-    "requests>=2.32.5",
+    "requests>=2.33.0",
     "typing-extensions>=4.7.1; python_version < '3.11'",
 ]
 
-optional-dependencies.conda_build = [ "conda-build" ]
+optional-dependencies.build = [
+    "python-build",
+    "twine",
+    "conda-build",
+]
 optional-dependencies.docs = [
   "docconvert",
   "pyment>=0.3.3", # for generating docstrings
 ]
 optional-dependencies.linting = [
-  "autoflake",
-  "autopep8",
   "bandit",
-  "black>=21.7",
-  "flake8>=3.7.8", # the modular source code checker: pep8 pyflakes and co
-  "isort",         # A Python utility / library to sort Python imports.
-  # dev tools
-  "make",
-  "monkeytype",   # It can generate type hints based on the observed behavior of your code.
-  "mypy",         # Optional static typing for Python
-  "pandas-stubs", # mypy pandas stub
-  "pep8-naming",
-  "pre-commit",   # A framework for managing and maintaining multi-language pre-commit hooks.
-  "pycodestyle",
-  "pydocstyle",
-  "pylint",
+  "pre-commit",
+  "ruff",
+  "mypy",
   "pyright",
-  # env variables
-  "python-dotenv>=0.19.2",
-  "pytype",                # a static type checker for any type hints you have put in your code
-  "pyupgrade",
-  "radon",
-  "refurb",
-  "ruff",                  # An extremely fast Python linter and code formatter, written in Rust.
-  "safety",                # Checks installed dependencies for known vulnerabilities and licenses.
-  "toml",
-  "types-pyyaml",
-  "types-requests",        # mypy requests stub
+  "types-requests",
   "vulture",
-  "yapf",                  # A formatter for Python code
+  "python-dotenv>=1.2.2",
 ]
 optional-dependencies.metrics = [
   "pystra",    # provides functionalities to enable structural reliability analysis
@@ -95,16 +77,19 @@ optional-dependencies.other = [ "toml" ]
 optional-dependencies.profilers = [ "scalene>=1.3.16", "snakeviz" ]
 optional-dependencies.spelling = [ "typos" ]
 optional-dependencies.tests = [
-  "codecov",
+  "codecov>=2.0.16",
   "coverage>=4.5.4",
   # For a Private key PEM file generated in PKCS1 format.
   "openssl",
   # tests
-  "pytest>=7",
+  "pytest>=9.0.3",
   "pytest-asyncio",
   "pytest-benchmark",
   "pytest-cov",
   "pytest-order",
+  "pytest-xdist",
+  "pyfakefs",
+  "responses",
 ]
 urls."Documentation" = "https://documentation.mailgun.com"
 urls."Homepage" = "https://www.mailgun.com"
@@ -128,26 +113,6 @@ git_describe_command = "git describe --tags --match 'v[0-9]*.[0-9]*.[0-9]*'"
 write_to = "mailgun/_version.py"
 write_to_template = '__version__ = "{version}"'
 #fallback_version = "X.Y.ZrcN.postN.devN"  # Explicit fallback
-
-[tool.autopep8]
-max_line_length = 88
-ignore = ""          # or ["E501", "W6"]
-in-place = true
-recursive = true
-aggressive = 3
-
-[tool.black]
-line-length = 100
-target-version = [ "py310", "py311", "py312", "py313", "py314" ]
-skip-string-normalization = false
-skip-magic-trailing-comma = false
-extend-exclude = '''
-/(
-  | docs
-  | setup.py
-  | venv
-)/
-'''
 
 [tool.ruff]
 #indent-width = 4
@@ -219,30 +184,25 @@ lint.select = [ "ALL" ]
 #extend-select = ["W", "N", "UP", "B", "A", "C4", "PT", "SIM", "PD", "PLE", "RUF"]
 # Never enforce `E501` (line length violations).
 lint.ignore = [
-  "ANN401", # ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
-  "ARG001", # ARG001 Unused function argument: `kwargs`
-  "B904",   # Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None`
-  # TODO: Enable C901, TRY201, TRY003, EM101, PTH118, PLR0917 later
-  "C901",
-    # COM812 conflicts with the formatter
-    "COM812",
-    # pycodestyle (E, W)
-  "CPY001", # Missing copyright notice at top of file
-  "DOC201", # DOC201 `return` is not documented in docstring
-  # TODO: Enable DOC501 when the upstream issue is fixed, see https://github.com/astral-sh/ruff/issues/12520
-  "DOC501",  # DOC501 Raised exception `ApiError` missing from docstring
-  "E501",
-  "EM101",
-  "FIX002",
-  "PLR0911", # PLR0911 Too many return statements (9 > 6)
-  "PLR0912",
-  "PLR0913", # PLR0913 Too many arguments in function definition (6 > 5)
-  "PLR0917",
-  "PTH118",
-  "TD002",
-  "TD003",
-  "TRY003",
-  "TRY201",
+    # --- Formatter Conflicts ---
+    "COM812", # Missing trailing comma (Conflicts with ruff-format)
+    "ISC001", # Implicit string concatenation (Conflicts with ruff-format)
+    "D203",   # one-blank-line-before-class (conflicts with D211)
+    "D213",   # multi-line-summary-second-line (conflicts with D212)
+
+    # --- SDK Realities ---
+    "ANN401", # Dynamically typed expressions. (An HTTP SDK REQUIRES `Any` for JSON data, files, and kwargs)
+    "TRY003", # Avoid specifying long messages outside exception classes (Causes massive file bloat)
+    "EM101",  # Exception must not use a string literal (Causes massive file bloat)
+    "E501",   # Line too long (Let the formatter handle wrapping)
+
+    # --- Docstring ---
+    "D417", "D100", "D104",
+
+    # --- Keep your existing TODO ignores ---
+    "C901",
+    "PLR0913",
+    "CPY001",
 ]
 lint.exclude = [ "mailgun/examples/*", "tests" ]
 lint.per-file-ignores."__init__.py" = [ "E402" ]
@@ -257,25 +217,13 @@ lint.flake8-annotations.allow-star-arg-any = false
 lint.flake8-annotations.ignore-fully-untyped = false
 lint.flake8-quotes.docstring-quotes = "double"
 #"path/to/file.py" = ["E402"]
-lint.isort.force-single-line = true
+lint.isort.force-single-line = false
 lint.isort.force-sort-within-sections = false
 lint.isort.lines-after-imports = 2
 lint.mccabe.max-complexity = 13
 lint.pycodestyle.ignore-overlong-task-comments = true
 # Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
-# TODO: Enable the 'sphinx' style when it will be available, see https://github.com/astral-sh/ruff/pull/13286
 lint.pydocstyle.convention = "google"
-
-[tool.flake8]
-exclude = [ "mailgun/examples/*", "tests" ]
-ignore = [ 'E501' ]
-extend-ignore = "W503"
-per-file-ignores = [
-  '__init__.py:F401',
-]
-max-line-length = 100
-count = true
-max-complexity = 13
 
 [tool.coverage.run]
 source_pkgs = [ "mailgun" ]
@@ -306,7 +254,7 @@ namespace_packages = true
 pretty = true
 # 3rd party import
 ignore_missing_imports = true
-# flag to suppress Name <var> already defined on line
+# flag to suppress Name <var> already defined on a line
 allow_redefinition = false
 # Disallow dynamic typing
 disallow_any_unimported = false
@@ -356,21 +304,10 @@ reportMissingImports = false
 [tool.typos.default.extend-words]
 requestor = "requestor"
 
-[tool.pydocstyle]
-convention = "google"
-match = ".*.py"
-match_dir = '^examples/'
-
-[tool.yapf]
-based_on_style = "facebook"
-SPLIT_BEFORE_BITWISE_OPERATOR = true
-SPLIT_BEFORE_ARITHMETIC_OPERATOR = true
-SPLIT_BEFORE_LOGICAL_OPERATOR = true
-SPLIT_BEFORE_DOT = true
-
-[tool.yapfignore]
-ignore_patterns = [
-]
+[tool.ruff.lint.pylint]
+max-args = 9           # Default is 5. SDK endpoints need more (auth, data, headers, files, etc.)
+max-returns = 8        # Default is 6.
+max-branches = 15      # Default is 12.
 
 [tool.bandit]
 # usage: bandit -c pyproject.toml -r .
@@ -420,3 +357,12 @@ subprocess = [
   "subprocess.check_call",
   "subprocess.check_output",
 ]
+
+[tool.slotscheck]
+strict-imports = false
+require-subclass = false
+exclude-modules = '''
+(
+    ^mailgun\.examples\..*
+)
+'''
