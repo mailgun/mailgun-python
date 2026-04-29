@@ -22,10 +22,12 @@ jobs:
 
       - name: Build package
         run: |
-          pip install --upgrade build setuptools wheel setuptools-scm
+          pip install --upgrade build setuptools wheel setuptools-scm twine
           python -m build
+          twine check dist/*
 
       - name: Test installation
         run: |
+          # Install the built wheel to ensure packaging didn't miss files
           pip install dist/*.whl
-          python -c "from importlib.metadata import version; print(version('mailgun'))"
+          python -c "import mailgun; from importlib.metadata import version; print(f'Successfully installed v{version(\"mailgun\")}')"

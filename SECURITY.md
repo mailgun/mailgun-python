@@ -4,8 +4,8 @@
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.x.x   | :white_check_mark: |
-| < 1.0.0 | :x:                |
+| 1.7.x   | :white_check_mark: |
+| < 1.7.0 | :x:                |
 
 # Vulnerability Disclosure
 
@@ -14,7 +14,7 @@ If you think you have found a potential security vulnerability in mailgun, pleas
 coordinate verification and next steps through that secure medium.
 
 If English is not your first language, please try to describe the problem and its impact to the best of your ability.
-For greater detail, please use your native language and we will try our best to translate it using online services.
+For greater detail, please use your native language, and we will try our best to translate it using online services.
 
 Please also include the code you used to find the problem and the shortest amount of code necessary to reproduce it.
 

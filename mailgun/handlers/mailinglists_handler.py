@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from mailgun.handlers.utils import build_path_from_keys
+from mailgun.handlers.utils import build_path_from_keys, sanitize_path_segment
 
 
 def handle_lists(
@@ -16,29 +16,36 @@ def handle_lists(
     _method: str | None,
     **kwargs: Any,
 ) -> str:
-    """Handle Mailing List.
+    """Handle Mailing List URL construction.
 
-    :param url: Incoming URL dictionary
-    :type url: dict
-    :param _domain: Incoming domain (it's not being used for this handler)
-    :type _domain: str
-    :param _method: Incoming request method (it's not being used for this handler)
-    :type _method: str
-    :param kwargs: kwargs
-    :return: final url for mailinglist endpoint
+    Args:
+        url: Incoming URL configuration dictionary.
+        _domain: Incoming domain (unused in this handler).
+        _method: Incoming request method (unused in this handler).
+        **kwargs: Additional keyword arguments (e.g., 'address', 'validate', 'multiple', 'member_address').
+
+    Returns:
+        The final URL for the mailing list endpoint.
     """
     final_keys = build_path_from_keys(url.get("keys", []))
     base = url["base"][:-1]
+
+    if "address" not in kwargs:
+        return f"{base}{final_keys}"
+
+    safe_addr = sanitize_path_segment(kwargs["address"])
+
     if "validate" in kwargs:
-        return f"{base}{final_keys}/{kwargs['address']}/validate"
-    elif "multiple" in kwargs and "address" in kwargs:
-        if kwargs["multiple"]:
-            return f"{base}/lists/{kwargs['address']}/members.json"
-    elif "members" in final_keys and "address" in kwargs:
-        members_keys = "/" + "/".join(url["keys"][1:]) if url["keys"][1:] else ""
+        return f"{base}{final_keys}/{safe_addr}/validate"
+
+    if "multiple" in kwargs and kwargs.get("multiple"):
+        return f"{base}/lists/{safe_addr}/members.json"
+
+    if "members" in final_keys:
+        members_keys = build_path_from_keys(url.get("keys", [])[1:])
         if "member_address" in kwargs:
-            return f"{base}/lists/{kwargs['address']}{members_keys}/{kwargs['member_address']}"
-        return f"{base}/lists/{kwargs['address']}{members_keys}"
-    elif "address" in kwargs and "validate" not in kwargs:
-        return f"{base}{final_keys}/{kwargs['address']}"
-    return f"{base}{final_keys}"
+            safe_member = sanitize_path_segment(kwargs["member_address"])
+            return f"{base}/lists/{safe_addr}{members_keys}/{safe_member}"
+        return f"{base}/lists/{safe_addr}{members_keys}"
+
+    return f"{base}/lists/{safe_addr}"

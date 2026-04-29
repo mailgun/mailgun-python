@@ -1,4 +1,4 @@
-"""ERROR HANDLER.
+"""Provide custom exceptions for API error handling.
 
 Exceptions:
     - ApiError: Base exception for API errors.

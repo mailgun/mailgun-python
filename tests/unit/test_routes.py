@@ -1,34 +1,39 @@
 """Unit tests for mailgun.routes configuration."""
 
+import re
+from types import MappingProxyType
+
+import pytest
+
 from mailgun import routes
 
 
 def test_exact_routes_schema() -> None:
-    """Ensure EXACT_ROUTES matches the schema: dict[str, list[str, list[str]]]."""
-    assert isinstance(routes.EXACT_ROUTES, dict)
+    """Ensure EXACT_ROUTES matches the schema: MappingProxyType[str, tuple[str, tuple[str, ...]]]."""
+    assert isinstance(routes.EXACT_ROUTES, MappingProxyType)
     assert routes.EXACT_ROUTES
 
     for key, value in routes.EXACT_ROUTES.items():
         assert isinstance(key, str)
-        assert isinstance(value, list)
-        assert len(value) == 2, f"Route '{key}' must have exactly [version, keys_list]"
+        assert isinstance(value, tuple)
+        assert len(value) == 2, f"Route '{key}' must have exactly (version, keys_tuple)"
 
-        version, keys_list = value
+        version, keys_tuple = value
         assert isinstance(version, str)
         assert version.startswith("v"), f"Route '{key}' version '{version}' must start with 'v'"
-        assert isinstance(keys_list, list)
-        assert all(isinstance(k, str) for k in keys_list)
+        assert isinstance(keys_tuple, tuple)
+        assert all(isinstance(k, str) for k in keys_tuple)
 
 
 def test_prefix_routes_schema() -> None:
-    """Ensure PREFIX_ROUTES matches the schema: dict[str, list[str, str, str | None]]."""
-    assert isinstance(routes.PREFIX_ROUTES, dict)
+    """Ensure PREFIX_ROUTES matches the schema: MappingProxyType[str, tuple[str, str, str | None]]."""
+    assert isinstance(routes.PREFIX_ROUTES, MappingProxyType)
     assert routes.PREFIX_ROUTES
 
     for key, value in routes.PREFIX_ROUTES.items():
         assert isinstance(key, str)
-        assert isinstance(value, list)
-        assert len(value) == 3, f"Route '{key}' must have exactly [version, suffix, key_override]"
+        assert isinstance(value, tuple)
+        assert len(value) == 3, f"Route '{key}' must have exactly (version, suffix, key_override)"
 
         version, suffix, key_override = value
         assert isinstance(version, str)
@@ -39,7 +44,7 @@ def test_prefix_routes_schema() -> None:
 
 def test_domain_aliases_schema() -> None:
     """Ensure DOMAIN_ALIASES is a flat mapping of strings."""
-    assert isinstance(routes.DOMAIN_ALIASES, dict)
+    assert isinstance(routes.DOMAIN_ALIASES, MappingProxyType)
 
     for alias, real_name in routes.DOMAIN_ALIASES.items():
         assert isinstance(alias, str)
@@ -48,8 +53,8 @@ def test_domain_aliases_schema() -> None:
 
 
 def test_domain_endpoints_schema() -> None:
-    """Ensure DOMAIN_ENDPOINTS maps version strings to lists of endpoint names."""
-    assert isinstance(routes.DOMAIN_ENDPOINTS, dict)
+    """Ensure DOMAIN_ENDPOINTS maps version strings to tuples of endpoint names."""
+    assert isinstance(routes.DOMAIN_ENDPOINTS, MappingProxyType)
 
     # Must contain main versions
     assert "v1" in routes.DOMAIN_ENDPOINTS
@@ -58,7 +63,7 @@ def test_domain_endpoints_schema() -> None:
     for version, endpoints in routes.DOMAIN_ENDPOINTS.items():
         assert isinstance(version, str)
         assert version.startswith("v")
-        assert isinstance(endpoints, list)
+        assert isinstance(endpoints, tuple)
         assert endpoints
         assert all(isinstance(ep, str) for ep in endpoints)
 
@@ -66,8 +71,8 @@ def test_domain_endpoints_schema() -> None:
 def test_no_overlapping_keys() -> None:
     """Ensure overlaps between exact and prefix routes are strictly controlled.
 
-    'analytics' and 'users' are allowed to overlap because they act as both
-    exact endpoints (e.g. client.users) and prefixes for sub-routes
+    'users' is allowed to overlap because it acts as both an
+    exact endpoint (e.g. client.users) and a prefix for sub-routes
     (e.g. client.users_something).
     """
     exact_keys = set(routes.EXACT_ROUTES.keys())
@@ -75,11 +80,45 @@ def test_no_overlapping_keys() -> None:
 
     intersection = exact_keys.intersection(prefix_keys)
 
-    # Явно дозволяємо ці два ключі, оскільки це частина архітектури
-    expected_overlaps = {"analytics", "users"}
+    # Explicitly allow this key, as it is part of the architecture
+    expected_overlaps = {"users"}
 
     assert intersection == expected_overlaps, (
         f"Unexpected overlaps found: {intersection - expected_overlaps}. "
         "If you added a new route, ensure it's either Exact or Prefix, but not both "
         "(unless intentionally used as a fallback)."
     )
+
+
+def test_get_deprecated_regexes_returns_patterns() -> None:
+    """Verify lazy compilation successfully parses strings into regex patterns."""
+    regexes = routes.get_deprecated_regexes()
+
+    assert isinstance(regexes, MappingProxyType)
+    assert len(regexes) > 0
+    for pattern, msg in regexes.items():
+        assert isinstance(pattern, re.Pattern)
+        assert isinstance(msg, str)
+
+
+def test_get_deprecated_regexes_is_cached() -> None:
+    """Verify that the LRU cache prevents redundant regex compilations."""
+    # First call triggers compilation
+    regexes1 = routes.get_deprecated_regexes()
+
+    # Second call should hit the cache
+    regexes2 = routes.get_deprecated_regexes()
+
+    # Assert they are the exact same object in memory
+    assert regexes1 is regexes2
+
+
+def test_get_deprecated_regexes_is_immutable() -> None:
+    """Verify that the cached regex dictionary is immune to cache poisoning."""
+    regexes = routes.get_deprecated_regexes()
+
+    with pytest.raises(TypeError, match="'mappingproxy' object does not support item assignment"):
+        regexes[re.compile("new")] = "hacked"  # type: ignore[index]
+
+    with pytest.raises(AttributeError, match="'mappingproxy' object has no attribute 'clear'"):
+        regexes.clear()  # type: ignore[attr-defined]

@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Any
 
 from mailgun.handlers.error_handler import ApiError
-from mailgun.handlers.utils import build_path_from_keys
+from mailgun.handlers.utils import build_path_from_keys, sanitize_path_segment
 
 
 def handle_inbox(
@@ -17,17 +17,19 @@ def handle_inbox(
     _method: str | None,
     **kwargs: Any,
 ) -> str:
-    """Handle inbox placement.
+    """Handle inbox placement URL construction.
 
-    :param url: Incoming URL dictionary
-    :type url: dict
-    :param _domain: Incoming domain (it's not being used for this handler)
-    :type _domain: str
-    :param _method: Incoming request method (it's not being used for this handler)
-    :type _method: str
-    :param kwargs: kwargs
-    :return: final url for inbox placement endpoint
-    :raises: ApiError
+    Args:
+        url: Incoming URL configuration dictionary.
+        _domain: Target domain name (unused in this handler).
+        _method: Incoming request method (unused in this handler).
+        **kwargs: Additional parameters (e.g., 'test_id', 'counters', 'checks', 'address').
+
+    Returns:
+        The final URL for the inbox placement endpoint.
+
+    Raises:
+        ApiError: If 'counters' or 'checks' options are provided but evaluate to False.
     """
     final_keys = build_path_from_keys(url.get("keys", []))
     base_url = url["base"].rstrip("/")
@@ -36,7 +38,7 @@ def handle_inbox(
     if "test_id" not in kwargs:
         return endpoint_url
 
-    test_id = kwargs["test_id"]
+    test_id = sanitize_path_segment(kwargs["test_id"])
     endpoint_url = f"{endpoint_url}/{test_id}"
 
     if "counters" in kwargs:
@@ -47,7 +49,8 @@ def handle_inbox(
     if "checks" in kwargs:
         if kwargs["checks"]:
             if "address" in kwargs:
-                return f"{endpoint_url}/checks/{kwargs['address']}"
+                safe_address = sanitize_path_segment(kwargs["address"])
+                return f"{endpoint_url}/checks/{safe_address}"
             return f"{endpoint_url}/checks"
         raise ApiError("Checks option should be True or absent")
 
