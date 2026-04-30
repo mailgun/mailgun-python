@@ -73,6 +73,7 @@ We [keep a changelog.](http://keepachangelog.com/)
 
 ### Pull Requests Merged
 
+- [PR_38](https://github.com/mailgun/mailgun-python/pull/38) - build(deps): Bump conda-incubator/setup-miniconda from 3.3.0 to 4.0.1
 - [PR_36](https://github.com/mailgun/mailgun-python/pull/36) - Improve client, update & fix tests
 - [PR_35](https://github.com/mailgun/mailgun-python/pull/35) - Removed \_prepare_files logic
 - [PR_34](https://github.com/mailgun/mailgun-python/pull/34) - Improve the Config class and routes
