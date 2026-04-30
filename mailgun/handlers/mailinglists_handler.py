@@ -28,7 +28,7 @@ def handle_lists(
         The final URL for the mailing list endpoint.
     """
     final_keys = build_path_from_keys(url.get("keys", []))
-    base = url["base"][:-1]
+    base = str(url["base"]).rstrip("/")
 
     if "address" not in kwargs:
         return f"{base}{final_keys}"

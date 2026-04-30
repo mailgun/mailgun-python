@@ -16,6 +16,10 @@ class ApiError(Exception):
     """
 
 
+class MailgunTimeoutError(ApiError, TimeoutError):
+    """Raised when a request to the Mailgun API times out."""
+
+
 class RouteNotFoundError(ApiError):
     """Raised when the requested Mailgun endpoint cannot be resolved."""
 

@@ -6,11 +6,10 @@ import asyncio
 import json
 import os
 import email.utils
-import string
+import logging
+import unittest
 import subprocess
 import time
-import unittest
-import random
 from pathlib import Path
 from typing import Any, Callable
 from datetime import datetime, timedelta
@@ -1512,8 +1511,8 @@ class MailingListsTests(unittest.TestCase):
                 address=self.maillist_address,
                 member_address=self.messages_to
             )
-        except Exception:
-            pass  # If it doesn't exist (404), that's perfectly fine
+        except Exception as e:
+            logging.getLogger(__name__).warning(f"Ignored integration error: {e}")  # If it doesn't exist (404), that's perfectly fine
 
         # 2. Execute the actual creation test
         data = {"address": self.messages_to, "name": "Bob", "subscribed": True}
@@ -2774,7 +2773,8 @@ class NewIntegrationPaidTierTests(unittest.TestCase):
 
         try:
             return req.json()
-        except Exception:
+        except Exception as e:
+            logging.getLogger(__name__).warning(f"Ignored integration error: {e}")
             self.fail(f"API did not return JSON. Route: {req.url}. Response: {req.text}")
 
     # --- SUCCESSFUL ENDPOINTS ---
@@ -2824,7 +2824,8 @@ class NewIntegrationPaidTierTests(unittest.TestCase):
         self._safe_execute(self.client.domains_tracking.get, domain=self.domain)
         try:
             self.client.x509_status.get(domain=self.domain)
-        except Exception:
+        except Exception as e:
+            logging.getLogger(__name__).warning(f"Ignored integration error: {e}")
             self.skipTest("x509 status returns 500 Server Error for accounts without active TLS certs")
 
 
@@ -2928,9 +2929,6 @@ class AsyncDomainTests(unittest.IsolatedAsyncioTestCase):
         )
         self.client: AsyncClient = AsyncClient(auth=self.auth)
         self.domain: str = os.environ["DOMAIN"]
-        random_domain_name = "".join(
-            random.choice(string.ascii_lowercase + string.digits) for _ in range(10)
-        )
         self.test_domain: str = "python.test.com"
         self.post_domain_data: dict[str, str] = {
             "name": self.test_domain,
@@ -4085,8 +4083,8 @@ class AsyncMailingListsTests(unittest.IsolatedAsyncioTestCase):
                 address=self.maillist_address,
                 member_address=self.messages_to
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logging.getLogger(__name__).warning(f"Ignored integration error: {e}")
 
         data = {"address": self.messages_to, "name": "Bob", "subscribed": True}
         req = await self.client.lists_members.create(address=self.maillist_address, data=data)
@@ -5219,7 +5217,8 @@ class AsyncNewIntegrationPaidTierTests(unittest.IsolatedAsyncioTestCase):
 
         try:
             return req.json()
-        except Exception:
+        except Exception as e:
+            logging.getLogger(__name__).warning(f"Ignored integration error: {e}")
             self.fail(f"Async API did not return JSON. Route: {req.url}. Response: {req.text}")
 
     # --- SUCCESSFUL ENDPOINTS ---
@@ -5266,7 +5265,8 @@ class AsyncNewIntegrationPaidTierTests(unittest.IsolatedAsyncioTestCase):
         await self._safe_execute(self.client.domains_tracking.get, domain=self.domain)
         try:
             await self.client.x509_status.get(domain=self.domain)
-        except Exception:
+        except Exception as e:
+            logging.getLogger(__name__).warning(f"Ignored integration error: {e}")
             self.skipTest("x509 status returns 500 Server Error for accounts without active TLS certs")
 
 

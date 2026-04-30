@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from mailgun.handlers.utils import sanitize_path_segment
+from mailgun.handlers.utils import build_path_from_keys, sanitize_path_segment
 
 
 def handle_address_validate(
@@ -27,7 +27,7 @@ def handle_address_validate(
     Returns:
         The final URL for the email validation endpoint.
     """
-    final_keys = "/" + "/".join(url["keys"][1:]) if url["keys"][1:] else ""
+    final_keys = build_path_from_keys(url.get("keys", [])[1:])
     base_url = str(url["base"]).rstrip("/")
 
     if "list_name" in kwargs:

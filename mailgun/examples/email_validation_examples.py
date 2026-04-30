@@ -66,7 +66,7 @@ def post_bulk_list_validate() -> None:
     csv_data = csv_filepath.read_bytes()
 
     if not csv_data.startswith(b"") and not csv_data:
-        ValueError("File is empty.")
+        raise ValueError("File is empty.")
     files = {"file": csv_data}
     req = client.addressvalidate_bulk.create(domain=domain, files=files, list_name="python2_list")
     print(req.json())

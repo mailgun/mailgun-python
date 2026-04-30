@@ -28,10 +28,12 @@ def handle_tags(
         The final URL for the Tags endpoint.
     """
     final_keys = build_path_from_keys(url.get("keys", []))
-    base = f"{url['base']}{domain}/"
+    base_url = str(url.get("base", "")).rstrip("/")
+
+    base = f"{base_url}/{domain}/"
     keys_without_tags = url.get("keys", [])[1:]
 
-    result_url = f"{url['base']}{domain}{final_keys}"
+    result_url = f"{base_url}/{domain}{final_keys}"
 
     if "tag_name" in kwargs:
         safe_tag = sanitize_path_segment(kwargs["tag_name"])

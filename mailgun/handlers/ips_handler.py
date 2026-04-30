@@ -28,7 +28,7 @@ def handle_ips(
         The final URL for the IPs endpoint.
     """
     final_keys = build_path_from_keys(url.get("keys", []))
-    base_url = url["base"][:-1] + final_keys
+    base_url = str(url["base"]).rstrip("/") + final_keys
     if "ip" in kwargs:
         safe_ip = sanitize_path_segment(kwargs["ip"])
         return f"{base_url}/{safe_ip}"

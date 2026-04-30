@@ -1,8 +1,7 @@
 """Unit tests for mailgun.client (AsyncClient, AsyncEndpoint)."""
 
-import json
 import copy
-from typing import Any
+import unittest
 from unittest.mock import AsyncMock, patch, MagicMock
 
 import httpx
@@ -16,7 +15,8 @@ from tests.conftest import BASE_URL_V3, BASE_URL_V4
 class TestAsyncEndpointPrepareFiles:
     """Tests for AsyncEndpoint._prepare_files."""
 
-    def _make_endpoint(self) -> AsyncEndpoint:
+    @staticmethod
+    def _make_endpoint() -> AsyncEndpoint:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["messages"]}
         return AsyncEndpoint(
             url=url,
@@ -286,3 +286,67 @@ class TestAsyncClient:
         assert kwargs["retries"] == 3
         assert kwargs["limits"].max_keepalive_connections == 100
         assert kwargs["limits"].max_connections == 100
+
+    @pytest.mark.asyncio
+    @patch("httpx.AsyncClient.request")
+    async def test_async_client_global_timeout_not_shadowed(self, mock_request: MagicMock) -> None:
+        """Verify that the global timeout is not shadowed by the method's default value."""
+
+        # Set up the mock and create a client with a unique global timeout
+        mock_request.return_value = MagicMock(status_code=200, spec=httpx.Response)
+        client = AsyncClient(auth=("api", "key"), timeout=999.0)
+
+        # Make a request without specifying a timeout at the method level
+        await client.messages.create(domain="test.com", data={"to": "test@test.com"})
+
+        # Verify that the global timeout 999.0 was actually passed to httpx
+        mock_request.assert_called_once()
+        kwargs = mock_request.call_args[1]
+
+        assert "timeout" in kwargs, "Timeout parameter is missing in request kwargs"
+        assert kwargs["timeout"] == 999.0, f"Expected timeout 999.0, got {kwargs['timeout']} (Shadowing bug detected!)"
+
+    def test_async_client_getattr_suppresses_keyerror(self) -> None:
+        """Verify that accessing an invalid attribute raises AttributeError from None.
+
+        This ensures internal KeyErrors from the routing dictionary do not leak
+        into the user's exception traceback (PEP 3134).
+        """
+        client = AsyncClient(auth=("api", "key"))
+
+        # We must use getattr() with illegal characters to bypass the dynamic catch-all router
+        # and forcefully trigger the internal KeyError inside Config/SecurityGuard.
+        with pytest.raises(AttributeError, match="'AsyncClient' object has no attribute '!@#'") as exc_info:
+            _ = getattr(client, "!@#")
+
+        # Assert that 'from None' was used to break the exception chain
+        assert exc_info.value.__cause__ is None
+        assert exc_info.value.__suppress_context__ is True, "Internal KeyError is leaking! Use 'from None'."
+
+
+class TestAsyncClientLifecycle(unittest.IsolatedAsyncioTestCase):
+
+    @patch("httpx.AsyncClient.request")
+    async def test_async_client_context_manager_reuse(self, mock_request: MagicMock) -> None:
+        """Verify that reusing the AsyncClient creates a new transport."""
+
+        # Set up a fake response from the server
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_request.return_value = mock_response
+
+        # Create a single instance of the client
+        client = AsyncClient(auth=("api", "key"))
+
+        # First session (Creates transport, makes request, closes transport)
+        async with client:
+            await client.domains.get(domain_name="test.com")
+
+        # The second session MUST NOT fail with a "Transport is closed" error
+        try:
+            async with client:
+                await client.domains.get(domain_name="test.com")
+        except RuntimeError as e:
+            if "closed" in str(e).lower():
+                self.fail(f"Regression caught: Transport was reused after being closed! {e}")
+            raise  # Re-raise the error if it's a different, unexpected RuntimeError
