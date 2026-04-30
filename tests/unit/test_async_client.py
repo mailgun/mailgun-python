@@ -289,6 +289,7 @@ class TestAsyncClient:
 
     @pytest.mark.asyncio
     @patch("httpx.AsyncClient.request")
+    @patch("httpx.AsyncHTTPTransport")
     async def test_async_client_global_timeout_not_shadowed(self, mock_request: MagicMock) -> None:
         """Verify that the global timeout is not shadowed by the method's default value."""
 
@@ -326,7 +327,9 @@ class TestAsyncClient:
 
 class TestAsyncClientLifecycle(unittest.IsolatedAsyncioTestCase):
 
+    @pytest.mark.asyncio
     @patch("httpx.AsyncClient.request")
+    @patch("httpx.AsyncHTTPTransport")
     async def test_async_client_context_manager_reuse(self, mock_request: MagicMock) -> None:
         """Verify that reusing the AsyncClient creates a new transport."""
 
