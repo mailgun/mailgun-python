@@ -154,6 +154,16 @@ _DOMAIN_ENDPOINTS: DomainsEndpointsType = {
 DOMAIN_ENDPOINTS: Final = MappingProxyType(_DOMAIN_ENDPOINTS)
 
 
+# --- ROUTE_ALIASES ---
+# Maps virtual SDK properties to their actual routing resources.
+# This prevents the greedy 'domains' router from swallowing specialized endpoints
+# that require their own complex handlers (like webhooks).
+_ROUTE_ALIASES: dict[str, str] = {
+    "domains_webhooks": "webhooks",
+}
+ROUTE_ALIASES: Final = MappingProxyType(_ROUTE_ALIASES)
+
+
 # --- DEPRECATED_ROUTES ---
 # String patterns to identify deprecated paths and their corresponding messages.
 # Defined as strings to prevent expensive regex compilation on cold boot.

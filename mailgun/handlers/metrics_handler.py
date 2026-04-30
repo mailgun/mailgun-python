@@ -28,7 +28,7 @@ def handle_metrics(
         The final URL for the Metrics and Tags New endpoints.
     """
     final_keys = build_path_from_keys(url.get("keys", []))
-    base = url["base"][:-1]
+    base = str(url["base"]).rstrip("/")
 
     if "usage" in kwargs:
         safe_usage = sanitize_path_segment(kwargs["usage"])

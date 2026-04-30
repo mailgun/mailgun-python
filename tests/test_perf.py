@@ -1,7 +1,7 @@
 import asyncio
 from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any
+from typing import Any, Coroutine, cast
 
 import httpx
 import pytest
@@ -138,4 +138,5 @@ def test_async_client_concurrent_throughput(benchmark: Any) -> None:
         # Safely close the async client
         aclose_method = getattr(client, "aclose", None)
         if callable(aclose_method):
-            asyncio.run(aclose_method())  # pyright: ignore[reportArgumentType]
+            coro = cast(Coroutine[Any, Any, None], cast(object, aclose_method()))
+            asyncio.run(coro)

@@ -1,12 +1,10 @@
 """Unit tests for the new Security Guardrails and Performance optimizations in client.py."""
 
-import sys
 import pytest
 from unittest.mock import patch, AsyncMock, MagicMock
 
 import httpx
 import requests
-from requests.exceptions import ConnectionError as RequestsConnectionError
 
 from mailgun.handlers.error_handler import ApiError
 from mailgun.handlers.utils import validate_mailgun_url
@@ -186,3 +184,26 @@ def test_validate_mailgun_url_blocked() -> None:
     for url in invalid_urls:
         with pytest.raises(ValueError, match="CWE-918"):
             validate_mailgun_url(url)
+
+# ==========================================
+# 6. CWE-22: Path traversal prevention
+# ==========================================
+
+@patch("requests.Session.request")
+def test_client_webhook_path_traversal_prevention(mock_request: MagicMock) -> None:
+    """Ensure the high-level Client API sanitizes malicious webhook names (CWE-22)."""
+    client = Client(auth=("api", "key"))
+
+    # The user (or an attacker exploiting a user's script) passes a malicious ID
+    client.domains_webhooks.delete(
+        domain="test.com",
+        webhook_name="clicked/../../delete"
+    )
+
+    # Intercept the exact URL about to be sent over the wire
+    mock_request.assert_called_once()
+    target_url = mock_request.call_args[0][1]  # request(method, url, ...)
+
+    # The SDK must neutralize the payload to prevent escaping the /webhooks/ scope
+    assert "clicked%2F..%2F..%2Fdelete" in target_url
+    assert "clicked/../../delete" not in target_url, "Critical CWE-22 Vuln: Unsanitized path segment sent to network!"

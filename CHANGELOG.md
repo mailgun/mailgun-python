@@ -4,7 +4,7 @@ We [keep a changelog.](http://keepachangelog.com/)
 
 ## [Unreleased]
 
-## [1.7.0] - 2026-04-XX
+## [1.7.0] - 2026-05-01
 
 ### Added
 
@@ -20,6 +20,9 @@ We [keep a changelog.](http://keepachangelog.com/)
 - Native dynamic routing support for Mailgun Optimize, Validations Service, and Email Preview APIs without requiring new custom handlers.
 - Explicit support for raw MIME string (`multipart/form-data`) uploads via the `files` parameter in the `.create()` method (essential for `client.mimemessage`).
 - Advanced path interpolation in `handle_default` to automatically inject inline URL parameters (e.g., `/v2/x509/{domain}/status`).
+- Added `MailgunTimeoutError` (inheriting from `ApiError` and `TimeoutError`) to cleanly distinguish API connection timeouts from standard system timeouts.
+- Implemented `ROUTE_ALIASES` in the configuration engine to safely route virtual SDK properties (e.g., `domains_webhooks`) without hardcoding intercept logic.
+- Added `TimeoutType` type alias for cleaner and more robust type hinting across the HTTP client.
 - Added a new "Logging & Debugging" section to `README.md`.
 - An intelligent live meta-testing suite (`test_routing_meta_live.py`) to strictly verify SDK endpoint aliases against live Mailgun servers.
 - PEP 561 Compliance: Added a `py.typed` marker to expose the SDK's strict type hints to downstream users (`mypy`, `pyright`).
@@ -38,6 +41,9 @@ We [keep a changelog.](http://keepachangelog.com/)
 - **Performance**: Memoized internal route resolution logic using `@lru_cache` in `_get_cached_route_data`, eliminating redundant string splitting and dictionary lookups during repeated API calls.
 - Updated `DOMAIN_ENDPOINTS` mapping to reflect Mailgun's latest architecture, officially moving `tracking`, `click`, `open`, `unsubscribe`, and `webhooks` from `v1` to `v3`.
 - Modernized the codebase using modern Python idioms (e.g., `contextlib.suppress`) and resolved strict typing errors for `pyright`.
+- Abstracted HTTP header manipulation into a centralized `_merge_headers` method in `BaseEndpoint`, eliminating DRY violations across all sync and async HTTP verbs.
+- Hardened all URL handlers (`domains`, `ips`, `keys`, `mailinglists`, `metrics`, `routes`, `suppressions`, `tags`) to use `.rstrip("/")` and safe `.get("keys", [])` dictionary lookups, preventing `404 Not Found` and `KeyError` crashes from malformed internal configurations.
+- Replaced `pass` blocks with explicit `logging.warning` in integration tests to surface ignored 404s gracefully.
 - **Documentation**: Migrated all internal and public docstrings from legacy Sphinx/reST format to modern Google Style for cleaner readability and better IDE hover-hints.
 - Updated Dependabot configuration to group minor and patch updates and limit open PRs.
 - CI/CD Optimization: Grouped Dependabot updates (`minor-and-patch`) to reduce Pull Request noise and optimized `.editorconfig`.
@@ -63,6 +69,12 @@ We [keep a changelog.](http://keepachangelog.com/)
 - Fixed DKIM selector test names to strictly comply with RFC 6376 formatting (replaced underscores with hyphens).
 - Python Data Model Integrity: The Catch-All router (`__getattr__`) now strictly rejects Python magic methods (`__dunder__`), preventing crashes when using `hasattr()`, `pickle`, or `copy.deepcopy()`.
 - Version Drift: Corrected endpoints for `spamtraps` and `ip_whitelist` to route to their modern `v2` Mailgun backends.
+- Fixed a `TypeError: got multiple values for keyword argument 'headers'` crash when passing custom headers to `.get()`, `.put()`, `.patch()`, and `.delete()` methods by safely popping headers from `kwargs` before argument unpacking.
+- Fixed a routing bug where the greedy `domains` router swallowed the `domains_webhooks` identifier, causing webhook payload updates to drop the `webhook_name` and hit the wrong API endpoint.
+- Fixed a bug where `AsyncClient` transports were permanently closed after exiting an `async with` context manager, allowing safe client reuse across multiple blocks.
+- Fixed `AttributeError` traceback leakage by strictly suppressing internal `KeyError`s from the dynamic router (`raise ... from None`).
+- Fixed a silent string-concatenation bug that could generate invalid double-slashes (`//`) in base URLs during the `Config` engine initialization.
+- Fixed `email_validation_examples.py` to correctly `raise` the `ValueError` on empty files instead of failing silently.
 
 ### Security
 
@@ -70,9 +82,12 @@ We [keep a changelog.](http://keepachangelog.com/)
 - OWASP Input Validation: Added strict sanitization in `Client._validate_auth` to strip trailing whitespace and block HTTP Header Injection attacks (rejecting `\n` and `\r` characters in API keys).
 - CWE-113 (HTTP Header Injection): Implemented strict CRLF (`\r\n`) sanitization inside `SecurityGuard.sanitize_headers` to block malicious header manipulation.
 - Supply Chain Security: Patched a potential OS Command Injection vulnerability in GitHub Actions (`publish.yml`) by safely routing `github.*` contexts through environment variables.
+- CWE-22 (Path Traversal): Enforced strict URL-encoding via `sanitize_path_segment` on `webhook_name` parameters to neutralize path traversal injection attempts in the `handle_webhooks` router.
 
 ### Pull Requests Merged
 
+- [PR_39](https://github.com/mailgun/mailgun-python/pull/39) - Release 1.7.0
+- [PR_38](https://github.com/mailgun/mailgun-python/pull/38) - build(deps): Bump conda-incubator/setup-miniconda from 3.3.0 to 4.0.1
 - [PR_36](https://github.com/mailgun/mailgun-python/pull/36) - Improve client, update & fix tests
 - [PR_35](https://github.com/mailgun/mailgun-python/pull/35) - Removed \_prepare_files logic
 - [PR_34](https://github.com/mailgun/mailgun-python/pull/34) - Improve the Config class and routes

@@ -13,7 +13,7 @@ from mailgun.client import Config
 from mailgun.client import Endpoint
 from mailgun.client import SecurityGuard
 from mailgun.handlers.error_handler import ApiError
-from tests.conftest import BASE_URL_V4, BASE_URL_V3, BASE_URL_V1
+from tests.conftest import BASE_URL_V4, BASE_URL_V3
 
 
 class TestSecurityGuard:
@@ -31,7 +31,8 @@ class TestSecurityGuard:
         assert SecurityGuard.sanitize_timeout(10.0) == 10.0
 
     def test_sanitize_timeout_invalid(self) -> None:
-        assert SecurityGuard.sanitize_timeout(None) is None
+        with pytest.warns(DeprecationWarning, match="allows infinite socket blocking \\(CWE-400\\)"):
+            assert SecurityGuard.sanitize_timeout(None) is None
 
     def test_sanitize_domain_valid(self) -> None:
         assert SecurityGuard.sanitize_domain("test.com") == "test.com"
@@ -206,6 +207,23 @@ class TestClient:
 
         assert getattr(adapter, "_pool_connections", 10) == 100
         assert getattr(adapter, "_pool_maxsize", 10) == 100
+
+    def test_client_getattr_suppresses_keyerror(self) -> None:
+        """Verify that accessing an invalid attribute raises AttributeError from None.
+
+        This ensures internal KeyErrors from the routing dictionary do not leak
+        into the user's exception traceback (PEP 3134).
+        """
+        client = Client(auth=("api", "key"))
+
+        # We must use getattr() with illegal characters to bypass the dynamic catch-all router
+        # and forcefully trigger the internal KeyError inside Config/SecurityGuard.
+        with pytest.raises(AttributeError, match="'Client' object has no attribute '!@#'") as exc_info:
+            _ = getattr(client, "!@#")
+
+        # Assert that 'from None' was used to break the exception chain
+        assert exc_info.value.__cause__ is None
+        assert exc_info.value.__suppress_context__ is True, "Internal KeyError is leaking! Use 'from None'."
 
 
 class TestBaseEndpointBuildUrl:
@@ -422,7 +440,7 @@ class TestEndpoint:
         assert not hasattr(ep, "__dict__"), "Endpoint should use __slots__ to save memory."
 
         with pytest.raises(AttributeError):
-            ep.undefined_attribute = "should_fail"  # type: ignore[attr-defined]
+            setattr(ep, "undefined_attribute", "should_fail")
 
     @patch("requests.Session.request")
     def test_api_call_exception_chaining(self, mock_request: MagicMock) -> None:

@@ -28,7 +28,7 @@ def handle_routes(
         The final URL for the Routes endpoint.
     """
     final_keys = build_path_from_keys(url.get("keys", []))
-    base_url = url["base"][:-1] + final_keys
+    base_url = str(url["base"]).rstrip("/") + final_keys
 
     if "route_id" in kwargs:
         safe_route = sanitize_path_segment(kwargs["route_id"])

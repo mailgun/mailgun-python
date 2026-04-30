@@ -24,7 +24,7 @@ import warnings
 from enum import Enum
 from functools import lru_cache
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Any, Final
+from typing import TYPE_CHECKING, Any, Final, TypeAlias
 from urllib.parse import unquote, urlparse
 
 import httpx
@@ -36,8 +36,7 @@ from requests.exceptions import (
 from urllib3.util.retry import Retry
 
 from mailgun import routes
-from mailgun._version import __version__
-from mailgun.handlers.error_handler import ApiError
+from mailgun.handlers.error_handler import ApiError, MailgunTimeoutError
 
 
 if sys.version_info >= (3, 11):
@@ -82,6 +81,8 @@ _AUTH_TUPLE_LEN: Final = 2
 _TIMEOUT_TUPLE_LEN: Final[int] = 2
 _DEFAULT_TIMEOUT = 60.0
 
+# Type Aliases for SDK Signatures
+TimeoutType: TypeAlias = float | tuple[float, float] | None
 
 # ==============================================================================
 # 2. CORE TYPES & SECURITY GUARDRAILS
@@ -257,9 +258,7 @@ class SecurityGuard:
         return safe_method
 
     @classmethod
-    def sanitize_timeout(
-        cls, timeout: float | tuple[float, float] | None
-    ) -> float | tuple[float, float] | None:
+    def sanitize_timeout(cls, timeout: TimeoutType) -> TimeoutType:
         """Prevent Infinite Timeout Thread Exhaustion (DoS).
 
         Args:
@@ -285,7 +284,7 @@ class SecurityGuard:
             return f_val
 
         if isinstance(timeout, tuple) and len(timeout) == _TIMEOUT_TUPLE_LEN:
-            return (_ensure_positive(timeout[0]), _ensure_positive(timeout[1]))
+            return _ensure_positive(timeout[0]), _ensure_positive(timeout[1])
         return _ensure_positive(timeout)
 
     @classmethod
@@ -451,6 +450,9 @@ def _get_cached_route_data(clean_key: str) -> dict[str, Any]:
     Returns:
         A dictionary containing versioning and path data for the route.
     """
+    # Resolve virtual property aliases before processing
+    clean_key = routes.ROUTE_ALIASES.get(clean_key, clean_key)
+
     if clean_key in routes.EXACT_ROUTES:
         version, route_keys = routes.EXACT_ROUTES[clean_key]
         return {"version": version, "keys": tuple(route_keys)}
@@ -529,8 +531,8 @@ class Config:
             The fully constructed base URL string.
         """
         ver_str: str = version.value if isinstance(version, APIVersion) else version
-        # O(1) access instead of dynamic concatenation
-        base: str = self._baked_urls.get(ver_str, f"{self.api_url}/{ver_str}")
+        # O(1) access instead of dynamic concatenation, ensuring no trailing slash
+        base: str = self._baked_urls.get(ver_str, f"{self.api_url}/{ver_str}").rstrip("/")
 
         if suffix:
             path: str = f"{suffix}/" if suffix == self._DOMAINS_RESOURCE else suffix
@@ -697,7 +699,7 @@ class BaseEndpoint:
         url: dict[str, Any],
         headers: dict[str, str],
         auth: tuple[str, str] | None,
-        timeout: float | tuple[float, float] | None = 60,
+        timeout: TimeoutType = 60,
     ) -> None:
         """Initialize a new BaseEndpoint instance.
 
@@ -774,15 +776,29 @@ class BaseEndpoint:
 
         return handler(url, domain, method, **kwargs)  # type: ignore[no-untyped-call]
 
+    def _merge_headers(self, kwargs: dict[str, Any]) -> dict[str, str]:
+        """Safely extract and merge custom headers from kwargs.
+
+        Returns:
+            A dictionary containing the safely merged headers.
+        """
+        custom_headers = kwargs.pop("headers", {})
+        req_headers = self.headers.copy()
+
+        if custom_headers and isinstance(custom_headers, dict):
+            req_headers.update(custom_headers)
+
+        return req_headers
+
     def _prepare_request(
         self,
         method: str,
         url: dict[str, Any],
         domain: str | None,
-        timeout: float | tuple[float, float] | None,
+        timeout: TimeoutType,
         headers: dict[str, str],
         kwargs: dict[str, Any],
-    ) -> tuple[str, str, str, float | tuple[float, float] | None, dict[str, str], dict[str, Any]]:
+    ) -> tuple[str, str, str, TimeoutType, dict[str, str], dict[str, Any]]:
         """Security and routing preparation logic.
 
         Args:
@@ -887,10 +903,10 @@ class Client(BaseClient):
                 session=self._session,
                 timeout=self.timeout,
             )
-        except KeyError as e:
+        except KeyError:
             # __getattr__ must return AttributeError
             msg = f"'{self.__class__.__name__}' object has no attribute '{name}'"
-            raise AttributeError(msg) from e
+            raise AttributeError(msg) from None
 
     def close(self) -> None:
         """Close the underlying requests.Session connection pool and purge memory."""
@@ -928,7 +944,7 @@ class Endpoint(BaseEndpoint):
         headers: dict[str, str],
         auth: tuple[str, str] | None = None,
         session: requests.Session | None = None,
-        timeout: float | tuple[float, float] | None = 60,
+        timeout: TimeoutType = 60,
     ) -> None:
         """Initialize a new Endpoint instance for synchronous API interaction.
 
@@ -949,7 +965,7 @@ class Endpoint(BaseEndpoint):
         headers: dict[str, str],
         data: Any | None = None,
         filters: Mapping[str, str | Any] | None = None,
-        timeout: float | tuple[float, float] | None = None,
+        timeout: TimeoutType = None,
         files: Any | None = None,
         domain: str | None = None,
         **kwargs: Any,
@@ -972,12 +988,21 @@ class Endpoint(BaseEndpoint):
             The HTTP response object from the server.
 
         Raises:
-            TimeoutError: If the request times out.
+            MailgunTimeoutError: If the request times out.
             ApiError: If the server returns a 4xx or 5xx status code or a network error occurs.
         """
         safe_method, target_url, safe_url_for_log, safe_timeout, safe_headers, safe_kwargs = (
             self._prepare_request(method, url, domain, timeout, headers, kwargs)
         )
+
+        # Case-insensitive validation for Content-Type to conform with RFC 7230
+        is_json_request = any(
+            k.lower() == "content-type" and "application/json" in str(v).lower()
+            for k, v in safe_headers.items()
+        )
+
+        if is_json_request and data is not None and not isinstance(data, (str, bytes)):
+            data = json.dumps(data, separators=(",", ":"))
 
         req_method = getattr(self._session, safe_method.lower())
 
@@ -1015,7 +1040,7 @@ class Endpoint(BaseEndpoint):
 
         except requests.exceptions.Timeout as e:
             logger.exception("Timeout Error: %s %s", safe_method.upper(), safe_url_for_log)
-            raise TimeoutError from e
+            raise MailgunTimeoutError("Request timed out") from e
         except RequestsConnectionError as e:
             logger.critical("Connection Failed (DNS/Network): %s | URL: %s", e, safe_url_for_log)
             msg = f"Network routing failed: {e}"
@@ -1042,12 +1067,13 @@ class Endpoint(BaseEndpoint):
         Returns:
             The HTTP response object.
         """
+        merged_headers = self._merge_headers(kwargs)
         return self.api_call(
             self._auth,
             "get",
             self._url,
             domain=domain,
-            headers=self.headers,
+            headers=merged_headers,
             filters=filters,
             **kwargs,
         )
@@ -1074,16 +1100,9 @@ class Endpoint(BaseEndpoint):
         Returns:
             The HTTP response object.
         """
-        req_headers = self.headers.copy()
-        if headers and isinstance(headers, dict):
-            req_headers.update(headers)
-
-        if (
-            req_headers.get("Content-Type") == "application/json"
-            and data is not None
-            and not isinstance(data, (str, bytes))
-        ):
-            data = json.dumps(data, separators=(",", ":"))
+        if headers is not None:
+            kwargs["headers"] = headers
+        merged_headers = self._merge_headers(kwargs)
 
         return self.api_call(
             self._auth,
@@ -1091,7 +1110,7 @@ class Endpoint(BaseEndpoint):
             self._url,
             files=files,
             domain=domain,
-            headers=req_headers,
+            headers=merged_headers,
             data=data,
             filters=filters,
             **kwargs,
@@ -1110,8 +1129,15 @@ class Endpoint(BaseEndpoint):
         Returns:
             The HTTP response object.
         """
+        merged_headers = self._merge_headers(kwargs)
         return self.api_call(
-            self._auth, "put", self._url, headers=self.headers, data=data, filters=filters, **kwargs
+            self._auth,
+            "put",
+            self._url,
+            headers=merged_headers,
+            data=data,
+            filters=filters,
+            **kwargs,
         )
 
     def patch(
@@ -1127,12 +1153,13 @@ class Endpoint(BaseEndpoint):
         Returns:
             The HTTP response object.
         """
+        merged_headers = self._merge_headers(kwargs)
         return self.api_call(
             self._auth,
             "patch",
             self._url,
-            headers=self.headers,
             data=data,
+            headers=merged_headers,
             filters=filters,
             **kwargs,
         )
@@ -1150,20 +1177,15 @@ class Endpoint(BaseEndpoint):
         Returns:
             The HTTP response object.
         """
-        custom_headers = kwargs.pop("headers", {})
-        req_headers = self.headers.copy()
-        if custom_headers and isinstance(custom_headers, dict):
-            req_headers.update(custom_headers)
-
-        if (
-            req_headers.get("Content-Type") == "application/json"
-            and data is not None
-            and not isinstance(data, (str, bytes))
-        ):
-            data = json.dumps(data, separators=(",", ":"))
-
+        merged_headers = self._merge_headers(kwargs)
         return self.api_call(
-            self._auth, "put", self._url, headers=req_headers, data=data, filters=filters, **kwargs
+            self._auth,
+            "put",
+            self._url,
+            headers=merged_headers,
+            data=data,
+            filters=filters,
+            **kwargs,
         )
 
     def delete(self, domain: str | None = None, **kwargs: Any) -> Response:
@@ -1176,8 +1198,9 @@ class Endpoint(BaseEndpoint):
         Returns:
             The HTTP response object.
         """
+        merged_headers = self._merge_headers(kwargs)
         return self.api_call(
-            self._auth, "delete", self._url, headers=self.headers, domain=domain, **kwargs
+            self._auth, "delete", self._url, headers=merged_headers, domain=domain, **kwargs
         )
 
 
@@ -1197,7 +1220,7 @@ class AsyncEndpoint(BaseEndpoint):
         headers: dict[str, str],
         auth: tuple[str, str] | None,
         client: httpx.AsyncClient | None = None,
-        timeout: float | tuple[float, float] | None = None,
+        timeout: TimeoutType = 60,
     ) -> None:
         """Initialize a new AsyncEndpoint instance for asynchronous API interaction.
 
@@ -1218,7 +1241,7 @@ class AsyncEndpoint(BaseEndpoint):
         headers: dict[str, str],
         data: Any | None = None,
         filters: Mapping[str, str | Any] | None = None,
-        timeout: float | tuple[float, float] = 60,
+        timeout: TimeoutType = None,
         files: Any | None = None,
         domain: str | None = None,
         **kwargs: Any,
@@ -1241,12 +1264,24 @@ class AsyncEndpoint(BaseEndpoint):
             The HTTP response object from the server.
 
         Raises:
-            TimeoutError: If the request times out.
+            MailgunTimeoutError: If the request times out.
             ApiError: If the server returns a 4xx or 5xx status code or a network error occurs.
         """
         safe_method, target_url, safe_url_for_log, safe_timeout, safe_headers, safe_kwargs = (
             self._prepare_request(method, url, domain, timeout, headers, kwargs)
         )
+
+        if isinstance(safe_timeout, tuple):
+            safe_timeout = httpx.Timeout(safe_timeout[1], connect=safe_timeout[0])
+
+        # Case-insensitive validation for Content-Type to conform with RFC 7230
+        is_json_request = any(
+            k.lower() == "content-type" and "application/json" in str(v).lower()
+            for k, v in safe_headers.items()
+        )
+
+        if is_json_request and data is not None and not isinstance(data, (str, bytes)):
+            data = json.dumps(data, separators=(",", ":"))
 
         request_kwargs: dict[str, Any] = {
             "method": safe_method.upper(),
@@ -1291,7 +1326,7 @@ class AsyncEndpoint(BaseEndpoint):
 
         except httpx.TimeoutException as e:
             logger.exception("Timeout Error: %s %s", safe_method.upper(), safe_url_for_log)
-            raise TimeoutError from e
+            raise MailgunTimeoutError("Request timed out") from e
         except httpx.ConnectError as e:
             logger.critical(
                 "Async Connection Failed (DNS/Network): %s | URL: %s", e, safe_url_for_log
@@ -1320,12 +1355,13 @@ class AsyncEndpoint(BaseEndpoint):
         Returns:
             The HTTP response object.
         """
+        merged_headers = self._merge_headers(kwargs)
         return await self.api_call(
             self._auth,
             "get",
             self._url,
             domain=domain,
-            headers=self.headers,
+            headers=merged_headers,
             filters=filters,
             **kwargs,
         )
@@ -1338,7 +1374,7 @@ class AsyncEndpoint(BaseEndpoint):
         headers: Any = None,
         files: Any | None = None,
         **kwargs: Any,
-    ) -> httpx.Response:
+    ) -> HttpxResponse:
         """Send an asynchronous POST request to create a new resource or execute an action.
 
         Args:
@@ -1352,16 +1388,9 @@ class AsyncEndpoint(BaseEndpoint):
         Returns:
             The HTTP response object.
         """
-        req_headers = self.headers.copy()
-        if headers and isinstance(headers, dict):
-            req_headers.update(headers)
-
-        if (
-            req_headers.get("Content-Type") == "application/json"
-            and data is not None
-            and not isinstance(data, (str, bytes))
-        ):
-            data = json.dumps(data, separators=(",", ":"))
+        if headers is not None:
+            kwargs["headers"] = headers
+        merged_headers = self._merge_headers(kwargs)
 
         return await self.api_call(
             self._auth,
@@ -1369,7 +1398,7 @@ class AsyncEndpoint(BaseEndpoint):
             self._url,
             files=files,
             domain=domain,
-            headers=req_headers,
+            headers=merged_headers,
             data=data,
             filters=filters,
             **kwargs,
@@ -1377,7 +1406,7 @@ class AsyncEndpoint(BaseEndpoint):
 
     async def put(
         self, data: Any | None = None, filters: Mapping[str, str | Any] | None = None, **kwargs: Any
-    ) -> httpx.Response:
+    ) -> HttpxResponse:
         """Send an asynchronous PUT request to update or replace a resource.
 
         Args:
@@ -1388,13 +1417,20 @@ class AsyncEndpoint(BaseEndpoint):
         Returns:
             The HTTP response object.
         """
+        merged_headers = self._merge_headers(kwargs)
         return await self.api_call(
-            self._auth, "put", self._url, headers=self.headers, data=data, filters=filters, **kwargs
+            self._auth,
+            "put",
+            self._url,
+            headers=merged_headers,
+            data=data,
+            filters=filters,
+            **kwargs,
         )
 
     async def patch(
         self, data: Any | None = None, filters: Mapping[str, str | Any] | None = None, **kwargs: Any
-    ) -> httpx.Response:
+    ) -> HttpxResponse:
         """Send an asynchronous PATCH request to partially update a resource.
 
         Args:
@@ -1405,11 +1441,12 @@ class AsyncEndpoint(BaseEndpoint):
         Returns:
             The HTTP response object.
         """
+        merged_headers = self._merge_headers(kwargs)
         return await self.api_call(
             self._auth,
             "patch",
             self._url,
-            headers=self.headers,
+            headers=merged_headers,
             data=data,
             filters=filters,
             **kwargs,
@@ -1417,7 +1454,7 @@ class AsyncEndpoint(BaseEndpoint):
 
     async def update(
         self, data: Any | None, filters: Mapping[str, str | Any] | None = None, **kwargs: Any
-    ) -> httpx.Response:
+    ) -> HttpxResponse:
         """Send an asynchronous PUT request specifically structured for updating resources with dynamic headers.
 
         Args:
@@ -1428,20 +1465,16 @@ class AsyncEndpoint(BaseEndpoint):
         Returns:
             The HTTP response object.
         """
-        custom_headers = kwargs.pop("headers", {})
-        req_headers = self.headers.copy()
-        if custom_headers and isinstance(custom_headers, dict):
-            req_headers.update(custom_headers)
-
-        if (
-            req_headers.get("Content-Type") == "application/json"
-            and data is not None
-            and not isinstance(data, (str, bytes))
-        ):
-            data = json.dumps(data, separators=(",", ":"))
+        merged_headers = self._merge_headers(kwargs)
 
         return await self.api_call(
-            self._auth, "put", self._url, headers=req_headers, data=data, filters=filters, **kwargs
+            self._auth,
+            "put",
+            self._url,
+            headers=merged_headers,
+            data=data,
+            filters=filters,
+            **kwargs,
         )
 
     async def delete(self, domain: str | None = None, **kwargs: Any) -> httpx.Response:
@@ -1454,8 +1487,9 @@ class AsyncEndpoint(BaseEndpoint):
         Returns:
             The HTTP response object.
         """
+        merged_headers = self._merge_headers(kwargs)
         return await self.api_call(
-            self._auth, "delete", self._url, headers=self.headers, domain=domain, **kwargs
+            self._auth, "delete", self._url, headers=merged_headers, domain=domain, **kwargs
         )
 
 
@@ -1508,9 +1542,9 @@ class AsyncClient(BaseClient):
                 client=self._client,
                 timeout=self.timeout,
             )
-        except KeyError as e:
+        except KeyError:
             msg = f"'{self.__class__.__name__}' object has no attribute '{name}'"
-            raise AttributeError(msg) from e
+            raise AttributeError(msg) from None
 
     @property
     def _client(self) -> httpx.AsyncClient:
@@ -1521,14 +1555,12 @@ class AsyncClient(BaseClient):
         """
         if not self._httpx_client or self._httpx_client.is_closed:
             # Check if the user already provided a custom transport (e.g. for mocking)
-            if "transport" not in self._client_kwargs:
-                # Expand connection pool for async high-throughput batching
+            kwargs = self._client_kwargs.copy()
+            if "transport" not in kwargs:
                 limits = httpx.Limits(max_keepalive_connections=100, max_connections=100)
-                # Note: httpx retries only apply to connection errors, not 5xx HTTP statuses.
-                transport = httpx.AsyncHTTPTransport(retries=3, limits=limits)
-                self._client_kwargs["transport"] = transport
+                kwargs["transport"] = httpx.AsyncHTTPTransport(retries=3, limits=limits)
 
-            self._httpx_client = httpx.AsyncClient(**self._client_kwargs)
+            self._httpx_client = httpx.AsyncClient(**kwargs)
         return self._httpx_client
 
     async def aclose(self) -> None:

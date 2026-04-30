@@ -28,7 +28,9 @@ def handle_bounces(
         The final URL for the Bounces endpoint.
     """
     final_keys = build_path_from_keys(url.get("keys", []))
-    base = f"{url['base']}{domain}{final_keys}"
+    base_url = str(url.get("base", "")).rstrip("/")
+    base = f"{base_url}/{domain}{final_keys}"
+
     if "bounce_address" in kwargs:
         safe_addr = sanitize_path_segment(kwargs["bounce_address"])
         return f"{base}/{safe_addr}"
@@ -53,7 +55,9 @@ def handle_unsubscribes(
         The final URL for the Unsubscribes endpoint.
     """
     final_keys = build_path_from_keys(url.get("keys", []))
-    base = f"{url['base']}{domain}{final_keys}"
+    base_url = str(url.get("base", "")).rstrip("/")
+    base = f"{base_url}/{domain}{final_keys}"
+
     if "unsubscribe_address" in kwargs:
         safe_addr = sanitize_path_segment(kwargs["unsubscribe_address"])
         return f"{base}/{safe_addr}"
@@ -78,7 +82,9 @@ def handle_complaints(
         The final URL for the Complaints endpoint.
     """
     final_keys = build_path_from_keys(url.get("keys", []))
-    base = f"{url['base']}{domain}{final_keys}"
+    base_url = str(url.get("base", "")).rstrip("/")
+    base = f"{base_url}/{domain}{final_keys}"
+
     if "complaint_address" in kwargs:
         safe_addr = sanitize_path_segment(kwargs["complaint_address"])
         return f"{base}/{safe_addr}"
@@ -103,7 +109,9 @@ def handle_whitelists(
         The final URL for the Whitelists endpoint.
     """
     final_keys = build_path_from_keys(url.get("keys", []))
-    base = f"{url['base']}{domain}{final_keys}"
+    base_url = str(url.get("base", "")).rstrip("/")
+    base = f"{base_url}/{domain}{final_keys}"
+
     if "whitelist_address" in kwargs:
         safe_addr = sanitize_path_segment(kwargs["whitelist_address"])
         return f"{base}/{safe_addr}"

@@ -176,8 +176,8 @@ clean() {
     find . -type d -name '*.egg-info' -exec rm -rf {} +
     find . -type f -name '*.egg' -exec rm -f {} +
 
-    # Temp logs and profilers
-    rm -f *.prof profile.html profile.json tmp.txt wget-log
+# Temp logs and profilers
+    rm -f ./*.prof ./profile.html ./profile.json ./tmp.txt ./wget-log
 
     success "Workspace cleaned!"
 }

@@ -34,7 +34,6 @@ from mailgun.handlers.routes_handler import handle_routes
 from mailgun.handlers.templates_handler import handle_templates
 from mailgun.handlers.users_handler import handle_users
 from tests.conftest import (
-    parse_domain_name,
     TEST_DOMAIN,
     BASE_URL_V3,
     BASE_URL_V4,
@@ -480,3 +479,16 @@ class TestHandleWebhooks:
     def test_domain_webhooks_v4_delete_bulk(self) -> None:
         url = {"base": f"{BASE_URL_V3}/domains/", "keys": ["webhooks"]}
         assert handle_webhooks(url, TEST_DOMAIN, "delete", filters={"url": "https://hook.com"}) == f"{BASE_URL_V4}/domains/{TEST_DOMAIN}/webhooks"
+
+    def test_domain_webhooks_path_traversal_prevention(self) -> None:
+        """Verify CWE-22 Path Traversal is blocked when a malicious webhook name is passed."""
+        url = {"base": "https://api.mailgun.net/v3/domains/", "keys": ["webhooks"]}
+        malicious_name = "../../../delete_all"
+
+        # Simulate a v3 webhook deletion call
+        result = handle_webhooks(url, "example.com", "delete", webhook_name=malicious_name)
+
+        # The path traversal attempt MUST be URL-encoded, preventing directory escape.
+        # sanitize_path_segment will convert "../../../delete_all" into "..%2F..%2F..%2Fdelete_all"
+        assert result == "https://api.mailgun.net/v3/domains/example.com/webhooks/..%2F..%2F..%2Fdelete_all"
+        assert "../" not in result, "Path traversal characters were not sanitized!"

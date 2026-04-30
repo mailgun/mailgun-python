@@ -193,3 +193,21 @@ class TestConfig:
 
         assert "SECURITY WARNING: Invalid API host 'custom.corporate.proxy'" in warning_msg
         assert "Ensure this is a trusted proxy" in warning_msg
+
+    def test_build_base_url_prevents_double_slash(self) -> None:
+        """Verify that _build_base_url strips trailing slashes to prevent // in paths."""
+        config = Config(api_url="https://api.mailgun.net")
+
+        # Simulate a scenario where the baked URL accidentally has a trailing slash
+        config._baked_urls["v3"] = "https://api.mailgun.net/v3/"
+
+        # Request a URL with a suffix
+        result_with_suffix = config._build_base_url("v3", suffix="domains")
+
+        # Request a URL without a suffix
+        result_no_suffix = config._build_base_url("v3")
+
+        assert result_with_suffix == "https://api.mailgun.net/v3/domains/"
+        assert result_no_suffix == "https://api.mailgun.net/v3/"
+        # The critical check: ensure no double slashes were formed
+        assert "//domains" not in result_with_suffix

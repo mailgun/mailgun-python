@@ -140,11 +140,11 @@ To build the `mailgun` package from the sources you need `setuptools` (as a buil
 
 ### Runtime dependencies
 
-At runtime the package requires only `requests >=2.32.5`. For async support, it uses `httpx` and `typing-extensions >=4.7.1` for Python `<3.11`.
+At runtime the package requires only `requests >=2.33.0`. For async support, it uses `httpx >=0.24` and `typing-extensions >=4.7.1` for Python `<3.11`.
 
 ### Test dependencies
 
-For running test you need `pytest >=7.0.0` at least. Make sure to provide the environment variables from
+For running test you need `pytest >=9.0.3`, `pytest-asyncio`, and `responses` at least. Make sure to provide the environment variables from
 [Authentication](#authentication).
 
 ## Installation

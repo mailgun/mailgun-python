@@ -52,7 +52,7 @@ def handle_domains(
     Raises:
         ApiError: If the domain is missing.
     """
-    keys = list(url["keys"])
+    keys = list(url.get("keys", []))
     if "domains" in keys:
         keys.remove("domains")
 
@@ -110,12 +110,12 @@ def handle_sending_queues(
         url: Incoming URL configuration dictionary.
         domain: Target domain name.
         _method: Incoming request method (unused in this handler).
-        **kwargs: Additional keyword arguments (e.g., 'domain_name').
+        **_kwargs: Additional keyword arguments (e.g., 'domain_name').
 
     Returns:
         The final URL for the sending queues endpoint.
     """
-    keys = url["keys"]
+    keys = url.get("keys", [])
     if "sending_queues" in keys or "sendingqueues" in keys:
         base_clean = str(url["base"]).replace("domains/", "").replace("domains", "").rstrip("/")
         return f"{base_clean}/{domain}/sending_queues"
@@ -142,15 +142,21 @@ def handle_mailboxes_credentials(
     Raises:
         ApiError: If the domain is missing.
     """
-    keys = list(url["keys"])
+    keys = list(url.get("keys", []))
+
     if "domains" in keys:
         keys.remove("domains")
 
     base_url = str(url["base"]).rstrip("/")
-    target_domain = kwargs.get("domain_name", domain)
+
+    # Sanitize the target domain
+    raw_target_domain = kwargs.get("domain_name", domain)
+    target_domain = sanitize_path_segment(raw_target_domain) if raw_target_domain else None
 
     if not target_domain:
-        raise ApiError("Domain is missing!")
+        if keys:
+            raise ApiError("Domain is missing!")
+        return base_url
 
     path_segments = [target_domain, *keys]
     constructed_url = f"{base_url}/{'/'.join(path_segments)}"
@@ -243,6 +249,7 @@ def handle_webhooks(
 
     if not is_v4 and webhook_name:
         # v3 API requires webhook name in the URL
-        return f"{domain_path}/{webhook_name}"
+        safe_webhook_name = sanitize_path_segment(webhook_name)
+        return f"{domain_path}/{safe_webhook_name}"
 
     return domain_path

@@ -6,7 +6,7 @@ def boot_test() -> None:
     # Placing the import INSIDE the profiled function ensures we capture
     # the exact cost of Python crawling the disk to compile the modules.
     import mailgun.client
-    client = mailgun.client.Client(auth=("api", "key"))
+    _client = mailgun.client.Client(auth=("api", "key"))
 
 if __name__ == "__main__":
     profiler = cProfile.Profile()

@@ -28,7 +28,7 @@ def handle_keys(
         The final URL for the Keys endpoint.
     """
     final_keys = build_path_from_keys(url.get("keys", []))
-    base_url = url["base"][:-1] + final_keys
+    base_url = str(url["base"]).rstrip("/") + final_keys
     if "key_id" in kwargs:
         safe_key = sanitize_path_segment(kwargs["key_id"])
         return f"{base_url}/{safe_key}"
