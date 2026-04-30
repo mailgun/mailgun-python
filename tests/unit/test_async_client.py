@@ -330,8 +330,10 @@ class TestAsyncClientLifecycle(unittest.IsolatedAsyncioTestCase):
     @pytest.mark.asyncio
     @patch("httpx.AsyncClient.request")
     @patch("httpx.AsyncHTTPTransport")
-    async def test_async_client_context_manager_reuse(self, mock_transport: MagicMock, mock_request: MagicMock) -> None:
+    async def test_async_client_context_manager_reuse(self, mock_transport_class: MagicMock, mock_request: MagicMock) -> None:
         """Verify that reusing the AsyncClient creates a new transport."""
+        mock_transport_instance = mock_transport_class.return_value
+        mock_transport_instance.aclose = AsyncMock()
 
         # Set up a fake response from the server
         mock_response = MagicMock()
