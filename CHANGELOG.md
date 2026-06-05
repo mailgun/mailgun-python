@@ -4,6 +4,10 @@ We [keep a changelog.](http://keepachangelog.com/)
 
 ## [Unreleased]
 
+### Fixed
+
+- **Config**: Fixed a URL routing regression where explicitly passing a version suffix (like `/v3`) in the `api_url` caused duplicate version paths (`/v3/v3`) resulting in 404s (#40).
+
 ## [1.7.0] - 2026-05-01
 
 ### Added
