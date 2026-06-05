@@ -165,7 +165,12 @@ class SecurityGuard:
             )
             logger.warning(msg)
 
-        return raw_url.rstrip("/")
+        # 1. Strip the trailing slash
+        safe_url = raw_url.rstrip("/")
+
+        # 2. Bug Fix #40: Strip any trailing version segments (e.g., /v3, /v4)
+        # to prevent /vX/vX duplication during f-string concatenation
+        return re.sub(r"/v\d+$", "", safe_url, flags=re.IGNORECASE)
 
     @classmethod
     def validate_auth(cls, auth: tuple[str, str] | None) -> tuple[str, str] | None:
