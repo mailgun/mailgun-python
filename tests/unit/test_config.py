@@ -3,6 +3,7 @@
 import pytest
 from unittest.mock import MagicMock, patch
 
+from mailgun import ApiError
 from mailgun.client import Config
 from mailgun.client import SecurityGuard
 
@@ -211,3 +212,44 @@ class TestConfig:
         assert result_no_suffix == "https://api.mailgun.net/v3/"
         # The critical check: ensure no double slashes were formed
         assert "//domains" not in result_with_suffix
+
+    def test_normalize_api_url_clean_url(self) -> None:
+        """Verify that a clean base URL passes through without modification."""
+        clean_url = "https://api.mailgun.net"
+        result = Config._normalize_api_url(clean_url)
+
+        assert result == "https://api.mailgun.net"
+
+    @patch("mailgun.client.logger.warning")
+    def test_normalize_api_url_strips_trailing_version(self, mock_warn: MagicMock) -> None:
+        """
+        Verify the backward compatibility branch:
+        A trailing version is stripped and a developer warning is logged.
+        """
+        trailing_url = "https://api.mailgun.net/v3/"
+
+        result = Config._normalize_api_url(trailing_url)
+
+        # 1. The suffix should be mathematically stripped
+        assert result == "https://api.mailgun.net"
+
+        # 2. A semantic warning must be emitted for a developer
+        mock_warn.assert_called_once()
+        warning_msg = mock_warn.call_args[0][0]
+        assert "Semantic Configuration Warning" in warning_msg
+        assert "stripped to prevent routing duplication" in warning_msg
+
+    def test_normalize_api_url_raises_on_embedded_version(self) -> None:
+        """
+        Verify the Fail-Fast branch:
+        An embedded version (e.g., /v3/sandbox) raises a strict ApiError.
+        """
+        ambiguous_url = "https://api.mailgun.net/v3/sandbox"
+
+        with pytest.raises(ApiError) as exc_info:
+            Config._normalize_api_url(ambiguous_url)
+
+        error_msg = str(exc_info.value)
+        assert "Ambiguous API URL configuration" in error_msg
+        assert "embedded within your custom path" in error_msg
+        assert "Please provide only the base host" in error_msg
