@@ -100,7 +100,8 @@ urls."Repository" = "https://github.com/mailgun/mailgun-python"
 py-modules = [ "mailgun._version" ]
 
 [tool.setuptools.packages.find]
-include = [ "mailgun", "mailgun.handlers", "mailgun.*", "tests", "tests.*" ]
+include = [ "mailgun", "mailgun.handlers", "mailgun.*" ]
+exclude = [ "tests", "tests.*" ]
 
 [tool.setuptools.package-data]
 mailgun = [ "py.typed", "*.pyi" ]
