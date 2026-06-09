@@ -210,11 +210,9 @@ The Mailgun API is part of the Sinch family and enables you to send, track, and 
 ### Base URL
 
 All API calls referenced in our documentation start with a base URL. Mailgun allows the ability to send and receive
-email in both US and EU regions. Be sure to use the appropriate base URL based on which region you have created for your
-domain.
+email in both US and EU regions.
 
-It is also important to note that Mailgun uses URI versioning for our API endpoints, and some endpoints may have
-different versions than others. Please reference the version stated in the URL for each endpoint.
+If you are using a proxy or a regional endpoint (such as the EU infrastructure), you can configure a custom `api_url` during initialization.
 
 For domains created in our US region the base URL is:
 
@@ -228,11 +226,16 @@ For domains created in our EU region the base URL is:
 https://api.eu.mailgun.net/
 ```
 
-Your Mailgun account may contain multiple sending domains. To avoid passing the domain name as a query parameter, most
-API URLs must include the name of the domain you are interested in:
+**⚠️ Important:** The `api_url` parameter must strictly be the **base host only** (e.g., `https://api.eu.mailgun.net`). Do **not** append API version paths (like `/v3` or `/v4`) to this string. The SDK's data-driven routing engine automatically appends the correct, endpoint-specific API version under the hood.
 
-```sh
-https://api.mailgun.net/v3/mydomain.com
+```python
+import os
+from mailgun.client import Client
+
+# Pass ONLY the base domain
+with Client(auth=("api", os.environ["APIKEY"]), api_url="https://api.eu.mailgun.net") as client:
+    # do someshings
+    pass
 ```
 
 ### Authentication
@@ -266,17 +269,9 @@ Synchronous vs Asynchronous Client.
 
 ### Client
 
-Initialize your [Mailgun](http://www.mailgun.com/) client:
-
-```python
-from mailgun.client import Client
-import os
-
-auth = ("api", os.environ["APIKEY"])
-client = Client(auth=auth)
-```
-
 #### Client Lifecycle & Resource Management
+
+Initialize your [Mailgun](http://www.mailgun.com/) client.
 
 > [!TIP]
 > **New in v1.7.0:** The SDK now utilizes connection pooling (`requests.Session`) under the hood to dramatically improve performance by reusing TLS connections.
@@ -285,7 +280,10 @@ client = Client(auth=auth)
 For simple scripts, lambdas, or single-request apps, you can initialize and use the client directly. Python's garbage collector will eventually clean up the connection.
 
 ```python
-client = Client(auth=("api", "KEY"))
+import os
+from mailgun.client import Client
+
+client = Client(auth=("api", os.environ["APIKEY"]))
 client.messages.create(data={"to": "user@example.com"})
 ```
 
@@ -298,8 +296,11 @@ If you are running long-lived applications (like Celery workers, web servers, or
 For production applications, \**always use the client as a Context Manager* (`with`) or explicitly call `client.close()`. This ensures deterministic release of TCP connection pools.
 
 ```python
+import os
+from mailgun.client import Client
+
 # Sockets are safely managed and closed automatically
-with Client(auth=("api", "KEY")) as client:
+with Client(auth=("api", os.environ["APIKEY"])) as client:
     client.messages.create(data={"to": "user@example.com"})
 ```
 
@@ -308,7 +309,7 @@ with Client(auth=("api", "KEY")) as client:
 By default, the SDK routes traffic to the US servers (`https://api.mailgun.net`). If you are operating in the EU, you can override the base URL during initialization:
 
 ```python
-client = Client(auth=("api", "KEY"), api_url="https://api.eu.mailgun.net")
+client = Client(auth=("api", os.environ["APIKEY"]), api_url="https://api.eu.mailgun.net")
 ```
 
 The SDK also implements Timeouts by default `read=60.0s` (but can take a tuple with connect/read `(10.0, 60.0)` to ensure your application fails-fast during network partitions but remains patient while Mailgun processes heavy analytical queries).
@@ -321,8 +322,6 @@ SDK provides also async version of the client to use in asynchronous application
 import asyncio
 import os
 from mailgun.client import AsyncClient
-
-auth = ("api", os.environ["APIKEY"])
 
 
 async def main():
