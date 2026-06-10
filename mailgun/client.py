@@ -514,9 +514,11 @@ class Config:
         self.ex_handler: bool = True
         base_url_input: str = api_url or self.DEFAULT_API_URL
 
-        self.api_url = self._normalize_api_url(base_url_input)
+        self.api_url: str = self._normalize_api_url(base_url_input)
 
-        self._baked_urls = {ver.value: f"{self.api_url}/{ver.value}" for ver in APIVersion}
+        self._baked_urls: Final[dict[str, str]] = {
+            ver.value: f"{self.api_url}/{ver.value}" for ver in APIVersion
+        }
 
     @staticmethod
     def _normalize_api_url(raw_url: str) -> str:
@@ -534,7 +536,7 @@ class Config:
         Raises:
             ApiError: If an ambiguous API version is found embedded within the custom path.
         """
-        safe_url = SecurityGuard.sanitize_api_url(raw_url)
+        safe_url: str = SecurityGuard.sanitize_api_url(raw_url)
 
         parsed = urlparse(safe_url)
         path_segments = [seg for seg in parsed.path.split("/") if seg]
