@@ -38,7 +38,7 @@ test:
     - mailgun.handlers
     - mailgun.examples
   source_files:
-    - tests/unit/
+    - tests/
   requires:
     - pip
     - pytest

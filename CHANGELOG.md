@@ -4,10 +4,17 @@ We [keep a changelog.](http://keepachangelog.com/)
 
 ## [Unreleased]
 
+## [1.7.1] - 2026-06-10
+
 ### Fixed
 
 - **Config**: Fixed a URL routing regression where explicitly passing a version suffix (like `/v3`) in the `api_url` caused duplicate version paths (`/v3/v3`) resulting in 404s (#40).
 - Fixed the usage's example in `README.md` of the `api_url` parameter that must strictly be the **base host only**.
+
+### Pull Requests Merged
+
+- [PR_41](https://github.com/mailgun/mailgun-python/pull/41) - Fix suffix before baking endpoints.
+- [PR_42](https://github.com/mailgun/mailgun-python/pull/42) - Release 1.7.1
 
 ## [1.7.0] - 2026-05-01
 
@@ -370,4 +377,6 @@ We [keep a changelog.](http://keepachangelog.com/)
 [1.4.0]: https://github.com/mailgun/mailgun-python/releases/tag/v1.4.0
 [1.5.0]: https://github.com/mailgun/mailgun-python/releases/tag/v1.5.0
 [1.6.0]: https://github.com/mailgun/mailgun-python/releases/tag/v1.6.0
-[unreleased]: https://github.com/mailgun/mailgun-python/compare/v1.6.0...HEAD
+[1.7.0]: https://github.com/mailgun/mailgun-python/releases/tag/v1.7.0
+[1.7.1]: https://github.com/mailgun/mailgun-python/releases/tag/v1.7.1
+[unreleased]: https://github.com/mailgun/mailgun-python/compare/v1.7.1...HEAD
