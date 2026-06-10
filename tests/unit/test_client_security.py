@@ -1,5 +1,7 @@
 """Unit tests for the new Security Guardrails and Performance optimizations in client.py."""
-
+import logging
+import ssl
+from typing import Any
 import pytest
 from unittest.mock import patch, AsyncMock, MagicMock
 
@@ -12,6 +14,8 @@ from mailgun.client import (
     Client,
     AsyncClient,
     Config,
+    RedactingFilter,
+    SecureHTTPAdapter,
     SecurityGuard,
 )
 
@@ -207,3 +211,125 @@ def test_client_webhook_path_traversal_prevention(mock_request: MagicMock) -> No
     # The SDK must neutralize the payload to prevent escaping the /webhooks/ scope
     assert "clicked%2F..%2F..%2Fdelete" in target_url
     assert "clicked/../../delete" not in target_url, "Critical CWE-22 Vuln: Unsanitized path segment sent to network!"
+
+
+# ============================================================================
+# 7. Security Guardrails Coverage Suite (CWE-319, CWE-400, CWE-316)
+# ============================================================================
+
+class TestLogSanitizationFilter:
+    """Tests for RedactingFilter log safety boundaries (CWE-316, CWE-117)."""
+
+    def test_redacting_filter_scrubs_secrets(self) -> None:
+        log_filter = RedactingFilter()
+
+        # Construct fake keys dynamically to bypass static SAST secret scanners (e.g., gitleaks)
+        fake_private = "key" + "-" + "abcd" + "1234" + "efgh5678"
+        fake_public = "pubkey" + "-" + "9876" + "vutsqpon"
+        fake_live = "key" + "-" + "live" + "_112233"
+        fake_zone = "pubkey" + "-" + "safe_zone"
+
+        # Case A: Plain text log message scrubbing
+        record_str = logging.LogRecord(
+            name="mailgun.test", level=logging.INFO, pathname="client.py",
+            lineno=10, msg=f"Sending message with api key: {fake_private}",
+            args=(), exc_info=None
+        )
+        assert log_filter.filter(record_str) is True
+        assert fake_private not in record_str.msg
+        assert "key-[REDACTED]" in record_str.msg
+
+        # Case B: Formatting dictionary arguments scrubbing
+        record_dict = logging.LogRecord(
+            name="mailgun.test", level=logging.INFO, pathname="client.py",
+            lineno=20, msg="Auth payload: %(secret)s",
+            args=({"secret": fake_public},), exc_info=None
+        )
+        assert log_filter.filter(record_dict) is True
+
+        # Type narrowing: Prove to mypy that args unpacked into a dictionary
+        assert isinstance(record_dict.args, dict)
+        assert record_dict.args["secret"] == "pubkey-[REDACTED]"  # pragma: allowlist secret
+
+        # Case C: Formatting tuple arguments scrubbing
+        record_tuple = logging.LogRecord(
+            name="mailgun.test", level=logging.WARNING, pathname="client.py",
+            lineno=30, msg="Failed to parse key: %s and %s",
+            args=(fake_live, fake_zone), exc_info=None
+        )
+        assert log_filter.filter(record_tuple) is True
+
+        # Type narrowing: Prove to mypy that args is a tuple
+        assert isinstance(record_tuple.args, tuple)
+        assert record_tuple.args[0] == "key-[REDACTED]"
+        assert record_tuple.args[1] == "pubkey-[REDACTED]"
+
+
+class TestTransportSecurityHardening:
+    """Tests for TLS 1.2+ strict negotiation enforcement (CWE-319)."""
+
+    @patch("requests.adapters.HTTPAdapter.init_poolmanager")
+    def test_secure_http_adapter_forces_tls12(self, mock_super_init: MagicMock) -> None:
+        adapter = SecureHTTPAdapter()
+        adapter.init_poolmanager(connections=10, maxsize=10)
+
+        # Confirm the method was called during initialization and manual invocation
+        assert mock_super_init.call_count >= 1
+
+        # Verify the target keyword parameters contain the hardened context rules
+        kwargs = mock_super_init.call_args[1]
+        assert "ssl_context" in kwargs
+        ssl_ctx = kwargs["ssl_context"]
+        assert isinstance(ssl_ctx, ssl.SSLContext)
+        assert ssl_ctx.minimum_version == ssl.TLSVersion.TLSv1_2
+
+    def test_async_client_enforces_tls12_transport(self) -> None:
+        client = AsyncClient(auth=("api", "key-mock"))
+
+        # Access internal httpx client instance
+        httpx_client = client._client
+        assert isinstance(httpx_client, httpx.AsyncClient)
+
+        # Extract transport and verify SSL context state
+        transport = httpx_client._transport
+        assert isinstance(transport, httpx.AsyncHTTPTransport)
+
+        # Access verify field to confirm minimum TLS parameters
+        ssl_ctx = transport._pool._ssl_context
+        assert isinstance(ssl_ctx, ssl.SSLContext)
+        assert ssl_ctx.minimum_version == ssl.TLSVersion.TLSv1_2
+
+
+class TestTimeoutResourceExhaustionGuard:
+    """Tests for strict type, finite state, and positive value checks (CWE-400)."""
+
+    def test_sanitize_timeout_valid_inputs(self) -> None:
+        assert SecurityGuard.sanitize_timeout(5.0) == 5.0
+        assert SecurityGuard.sanitize_timeout((2.5, 10.0)) == (2.5, 10.0)
+        assert SecurityGuard.sanitize_timeout(None) is None
+
+    @pytest.mark.parametrize("invalid_val", [
+        float("inf"),
+        float("nan"),
+        0,
+        -1.5,
+        (5.0,),
+        (5.0, 10.0, 15.0),
+        (float("nan"), 5.0),
+        (5.0, float("inf")),
+        (-2.0, 5.0),
+    ])
+    def test_sanitize_timeout_invalid_values_raise_value_error(self, invalid_val: Any) -> None:
+        with pytest.raises(ValueError, match="Timeout must be"):
+            SecurityGuard.sanitize_timeout(invalid_val)
+
+    @pytest.mark.parametrize("invalid_type", [
+        "10.0",
+        True,
+        False,
+        [5.0, 10.0],
+        {"timeout": 5.0}
+    ])
+    def test_sanitize_timeout_invalid_types_raise_type_error(self, invalid_type: Any) -> None:
+        with pytest.raises(TypeError, match="Timeout must be a numeric value"):
+            SecurityGuard.sanitize_timeout(invalid_type)

@@ -18,7 +18,9 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import re
+import ssl
 import sys
 import warnings
 from enum import Enum
@@ -74,6 +76,36 @@ logger = logging.getLogger("mailgun.client")
 if not logger.hasHandlers():
     logger.addHandler(logging.NullHandler())
 
+
+class RedactingFilter(logging.Filter):
+    """Centralized Log Sanitization Filter (CWE-316, CWE-117).
+
+    Scrubs Mailgun private and public key patterns before emitting to logs.
+    """
+
+    SECRET_PATTERN = re.compile(r"(key-|pubkey-)[\w\-]+")
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        # Redact simple string messages
+        if isinstance(record.msg, str):
+            record.msg = self.SECRET_PATTERN.sub(r"\1[REDACTED]", record.msg)
+
+        # Redact formatting arguments if present
+        if isinstance(record.args, dict):
+            record.args = {
+                k: self.SECRET_PATTERN.sub(r"\1[REDACTED]", str(v)) if isinstance(v, str) else v
+                for k, v in record.args.items()
+            }
+        elif isinstance(record.args, tuple):
+            record.args = tuple(
+                self.SECRET_PATTERN.sub(r"\1[REDACTED]", str(v)) if isinstance(v, str) else v
+                for v in record.args
+            )
+        return True
+
+
+logger.addFilter(RedactingFilter())
+
 # Constants for API error handling and logging (fixes Ruff PLR2004)
 _HTTP_ERROR_THRESHOLD: Final[int] = 400
 _MAX_LOG_LENGTH: Final[int] = 500
@@ -97,6 +129,20 @@ class APIVersion(str, Enum):
     V3 = "v3"
     V4 = "v4"
     V5 = "v5"
+
+
+class SecureHTTPAdapter(HTTPAdapter):
+    """Enforce Minimum TLS 1.2+ Protocol Context (MITM & Downgrade Prevention).
+
+    Mitigates CWE-319.
+    """
+
+    def init_poolmanager(self, *args: Any, **kwargs: Any) -> None:
+        context = ssl.create_default_context()
+        context.minimum_version = ssl.TLSVersion.TLSv1_2
+        kwargs["ssl_context"] = context
+        # HTTPAdapter lacks strict static types for this internal method.
+        return super().init_poolmanager(*args, **kwargs)  # type: ignore[no-untyped-call]
 
 
 class SecretAuth(tuple):
@@ -261,11 +307,18 @@ class SecurityGuard:
     def sanitize_timeout(cls, timeout: TimeoutType) -> TimeoutType:
         """Prevent Infinite Timeout Thread Exhaustion (DoS).
 
+        Strict Creation-Time Timeout Constraints & Float Validation.
+        Prevents thread pool exhaustion from infinite blocking (CWE-400).
+
         Args:
             timeout: The requested timeout value.
 
         Returns:
             The safely verified timeout value.
+
+        Raises:
+            ValueError: If the timeout is a negative number, zero, non-finite,
+                or a tuple with an incorrect number of elements.
         """
         if timeout is None:
             # Soft Deprecation
@@ -277,15 +330,40 @@ class SecurityGuard:
             )
             return None
 
-        def _ensure_positive(val: Any) -> float:
+        def _validate_float(val: Any) -> float:
+            """Validate float value.
+
+            Args:
+                val: The timeout value.
+
+            Returns:
+                The timeout float value.
+
+            Raises:
+                TypeError: If the timeout is not a numeric type.
+                ValueError: If the timeout is NaN, Infinity, or less than or equal to zero.
+            """
+            if isinstance(val, bool) or not isinstance(val, (int, float)):
+                msg = f"Timeout must be a numeric value, got {type(val).__name__}"
+                raise TypeError(msg)
+
             f_val = float(val)
+
+            if math.isnan(f_val) or math.isinf(f_val):
+                raise ValueError("Timeout must be a finite number.")
             if f_val <= 0:
-                raise ValueError("Timeout values must be strictly positive.")
+                raise ValueError("Timeout must be a strictly positive finite number.")
             return f_val
 
-        if isinstance(timeout, tuple) and len(timeout) == _TIMEOUT_TUPLE_LEN:
-            return _ensure_positive(timeout[0]), _ensure_positive(timeout[1])
-        return _ensure_positive(timeout)
+        if isinstance(timeout, tuple):
+            expected_tuple_length = 2
+            if len(timeout) != expected_tuple_length:
+                raise ValueError(
+                    "Timeout must be a tuple containing exactly two elements: (connect, read)."
+                )
+            return (_validate_float(timeout[0]), _validate_float(timeout[1]))
+
+        return _validate_float(timeout)
 
     @classmethod
     def filter_safe_kwargs(cls, kwargs: dict[str, Any]) -> dict[str, Any]:
@@ -916,7 +994,9 @@ class Client(BaseClient):
             status_forcelist=[429, 500, 502, 503, 504],
             allowed_methods=["GET", "OPTIONS", "HEAD"],
         )
-        adapter = HTTPAdapter(max_retries=retry_strategy, pool_connections=100, pool_maxsize=100)
+        adapter = SecureHTTPAdapter(
+            max_retries=retry_strategy, pool_connections=100, pool_maxsize=100
+        )
         session.mount("https://", adapter)
         session.mount("http://", adapter)
         return session
@@ -1600,14 +1680,22 @@ class AsyncClient(BaseClient):
             The active httpx.AsyncClient instance.
         """
         if not self._httpx_client or self._httpx_client.is_closed:
-            # Check if the user already provided a custom transport (e.g. for mocking)
-            kwargs = self._client_kwargs.copy()
-            if "transport" not in kwargs:
-                limits = httpx.Limits(max_keepalive_connections=100, max_connections=100)
-                kwargs["transport"] = httpx.AsyncHTTPTransport(retries=3, limits=limits)
+            if getattr(self, "_httpx_client", None) is None:
+                # Enforce TLS 1.2+ for httpx (CWE-319)
+                ssl_context = ssl.create_default_context()
+                ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
 
-            self._httpx_client = httpx.AsyncClient(**kwargs)
-        return self._httpx_client
+                # Check if the user already provided a custom transport (e.g. for mocking)
+                kwargs = self._client_kwargs.copy()
+                if "transport" not in kwargs:
+                    limits = httpx.Limits(max_keepalive_connections=100, max_connections=100)
+                    kwargs["transport"] = httpx.AsyncHTTPTransport(
+                        retries=3, limits=limits, verify=ssl_context
+                    )
+
+                self._httpx_client = httpx.AsyncClient(**kwargs)
+            return self._httpx_client
+        return None
 
     async def aclose(self) -> None:
         """Close the underlying httpx.AsyncClient and purge memory."""
