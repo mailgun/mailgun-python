@@ -513,12 +513,58 @@ class Config:
         """
         self.ex_handler: bool = True
         base_url_input: str = api_url or self.DEFAULT_API_URL
-        self.api_url: str = SecurityGuard.sanitize_api_url(base_url_input)
 
-        # PRE-BAKE: Cache base URLs for all versions at once
+        self.api_url: str = self._normalize_api_url(base_url_input)
+
         self._baked_urls: Final[dict[str, str]] = {
             ver.value: f"{self.api_url}/{ver.value}" for ver in APIVersion
         }
+
+    @staticmethod
+    def _normalize_api_url(raw_url: str) -> str:
+        """Validates and normalizes the base API URL.
+
+        Ensures no explicit versions are embedded in the path that would break
+        dynamic f-string routing.
+
+        Args:
+            raw_url: The raw base URL string provided by the user.
+
+        Returns:
+            The sanitized and normalized API URL string.
+
+        Raises:
+            ApiError: If an ambiguous API version is found embedded within the custom path.
+        """
+        safe_url: str = SecurityGuard.sanitize_api_url(raw_url)
+
+        parsed = urlparse(safe_url)
+        path_segments = [seg for seg in parsed.path.split("/") if seg]
+
+        known_versions = {ver.value for ver in APIVersion}
+
+        # Ambiguity & Backward Compatibility Check
+        for i, segment in enumerate(path_segments):
+            if segment in known_versions:
+                is_last_segment = i == len(path_segments) - 1
+
+                if is_last_segment:
+                    safe_url = safe_url.removesuffix(f"/{segment}")
+                    logger.warning(
+                        "Semantic Configuration Warning: 'api_url' should be the base domain. The trailing '%s' was stripped to prevent routing duplication.",
+                        segment,
+                    )
+                else:
+                    # Fail-Fast: The version is trapped inside a complex path
+                    msg = (
+                        f"Ambiguous API URL configuration: '{raw_url}'.\n"
+                        f"The SDK automatically handles version routing, but an explicit "
+                        f"version ('{segment}') was found embedded within your custom path. "
+                        f"Please provide only the base host (e.g., 'https://api.mailgun.net')."
+                    )
+                    raise ApiError(msg)
+
+        return safe_url
 
     def _build_base_url(self, version: APIVersion | str, suffix: str = "") -> str:
         """Construct API URL with precise slash control to prevent 404s.
