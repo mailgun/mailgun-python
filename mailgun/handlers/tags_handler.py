@@ -7,7 +7,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from mailgun.handlers.utils import build_path_from_keys, sanitize_path_segment
+from mailgun.endpoints import build_path_from_keys
+from mailgun.security import SecurityGuard
 
 
 def handle_tags(
@@ -30,14 +31,19 @@ def handle_tags(
     final_keys = build_path_from_keys(url.get("keys", []))
     base_url = str(url.get("base", "")).rstrip("/")
 
-    base = f"{base_url}/{domain}/"
-    keys_without_tags = url.get("keys", [])[1:]
+    # Sanitize the domain boundary (CWE-20/CWE-22 prevention)
+    safe_domain = SecurityGuard.sanitize_path_segment(domain) if domain else ""
 
-    result_url = f"{base_url}/{domain}{final_keys}"
+    # Safely build the URLs avoiding double-slashes if domain is somehow None
+    base = f"{base_url}/{safe_domain}/" if safe_domain else f"{base_url}/"
+    result_url = (
+        f"{base_url}/{safe_domain}{final_keys}" if safe_domain else f"{base_url}{final_keys}"
+    )
 
     if "tag_name" in kwargs:
-        safe_tag = sanitize_path_segment(kwargs["tag_name"])
+        safe_tag = SecurityGuard.sanitize_path_segment(kwargs["tag_name"])
         if "stats" in final_keys:
+            keys_without_tags = url.get("keys", [])[1:]
             final_keys_stats = build_path_from_keys(keys_without_tags)
             return f"{base}tags/{safe_tag}{final_keys_stats}"
         return f"{result_url}/{safe_tag}"

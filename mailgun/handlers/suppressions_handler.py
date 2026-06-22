@@ -7,7 +7,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from mailgun.handlers.utils import build_path_from_keys, sanitize_path_segment
+from mailgun.endpoints import build_path_from_keys
+from mailgun.security import SecurityGuard
 
 
 def handle_bounces(
@@ -29,10 +30,13 @@ def handle_bounces(
     """
     final_keys = build_path_from_keys(url.get("keys", []))
     base_url = str(url.get("base", "")).rstrip("/")
-    base = f"{base_url}/{domain}{final_keys}"
+
+    # CWE-20/22: Sanitize domain boundary
+    safe_domain = SecurityGuard.sanitize_path_segment(domain) if domain else ""
+    base = f"{base_url}/{safe_domain}{final_keys}" if safe_domain else f"{base_url}{final_keys}"
 
     if "bounce_address" in kwargs:
-        safe_addr = sanitize_path_segment(kwargs["bounce_address"])
+        safe_addr = SecurityGuard.sanitize_path_segment(kwargs["bounce_address"])
         return f"{base}/{safe_addr}"
     return base
 
@@ -56,10 +60,13 @@ def handle_unsubscribes(
     """
     final_keys = build_path_from_keys(url.get("keys", []))
     base_url = str(url.get("base", "")).rstrip("/")
-    base = f"{base_url}/{domain}{final_keys}"
+
+    # CWE-20/22: Sanitize domain boundary
+    safe_domain = SecurityGuard.sanitize_path_segment(domain) if domain else ""
+    base = f"{base_url}/{safe_domain}{final_keys}" if safe_domain else f"{base_url}{final_keys}"
 
     if "unsubscribe_address" in kwargs:
-        safe_addr = sanitize_path_segment(kwargs["unsubscribe_address"])
+        safe_addr = SecurityGuard.sanitize_path_segment(kwargs["unsubscribe_address"])
         return f"{base}/{safe_addr}"
     return base
 
@@ -83,10 +90,13 @@ def handle_complaints(
     """
     final_keys = build_path_from_keys(url.get("keys", []))
     base_url = str(url.get("base", "")).rstrip("/")
-    base = f"{base_url}/{domain}{final_keys}"
+
+    # CWE-20/22: Sanitize domain boundary
+    safe_domain = SecurityGuard.sanitize_path_segment(domain) if domain else ""
+    base = f"{base_url}/{safe_domain}{final_keys}" if safe_domain else f"{base_url}{final_keys}"
 
     if "complaint_address" in kwargs:
-        safe_addr = sanitize_path_segment(kwargs["complaint_address"])
+        safe_addr = SecurityGuard.sanitize_path_segment(kwargs["complaint_address"])
         return f"{base}/{safe_addr}"
     return base
 
@@ -110,9 +120,12 @@ def handle_whitelists(
     """
     final_keys = build_path_from_keys(url.get("keys", []))
     base_url = str(url.get("base", "")).rstrip("/")
-    base = f"{base_url}/{domain}{final_keys}"
+
+    # CWE-20/22: Sanitize domain boundary
+    safe_domain = SecurityGuard.sanitize_path_segment(domain) if domain else ""
+    base = f"{base_url}/{safe_domain}{final_keys}" if safe_domain else f"{base_url}{final_keys}"
 
     if "whitelist_address" in kwargs:
-        safe_addr = sanitize_path_segment(kwargs["whitelist_address"])
+        safe_addr = SecurityGuard.sanitize_path_segment(kwargs["whitelist_address"])
         return f"{base}/{safe_addr}"
     return base

@@ -7,7 +7,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from mailgun.handlers.utils import build_path_from_keys, sanitize_path_segment
+from mailgun.endpoints import build_path_from_keys
+from mailgun.security import SecurityGuard
 
 
 def handle_ippools(
@@ -33,14 +34,14 @@ def handle_ippools(
     if "pool_id" not in kwargs:
         return base_url
 
-    safe_pool = sanitize_path_segment(kwargs["pool_id"])
+    safe_pool = SecurityGuard.sanitize_path_segment(kwargs["pool_id"])
     pool_url = f"{base_url}/{safe_pool}"
 
     if "ips.json" in final_keys:
         return pool_url
 
     if "ip" in kwargs:
-        safe_ip = sanitize_path_segment(kwargs["ip"])
+        safe_ip = SecurityGuard.sanitize_path_segment(kwargs["ip"])
         return f"{pool_url}/ips/{safe_ip}"
 
     return pool_url

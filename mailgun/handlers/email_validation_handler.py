@@ -7,7 +7,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from mailgun.handlers.utils import build_path_from_keys, sanitize_path_segment
+from mailgun.endpoints import build_path_from_keys
+from mailgun.security import SecurityGuard
 
 
 def handle_address_validate(
@@ -31,6 +32,6 @@ def handle_address_validate(
     base_url = str(url["base"]).rstrip("/")
 
     if "list_name" in kwargs:
-        safe_list = sanitize_path_segment(kwargs["list_name"])
+        safe_list = SecurityGuard.sanitize_path_segment(kwargs["list_name"])
         return f"{base_url}{final_keys}/{safe_list}"
     return f"{base_url}{final_keys}"

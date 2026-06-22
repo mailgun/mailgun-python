@@ -7,7 +7,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from mailgun.handlers.utils import build_path_from_keys, sanitize_path_segment
+from mailgun.endpoints import build_path_from_keys
+from mailgun.security import SecurityGuard
 
 
 def handle_lists(
@@ -33,7 +34,7 @@ def handle_lists(
     if "address" not in kwargs:
         return f"{base}{final_keys}"
 
-    safe_addr = sanitize_path_segment(kwargs["address"])
+    safe_addr = SecurityGuard.sanitize_path_segment(kwargs["address"])
 
     if "validate" in kwargs:
         return f"{base}{final_keys}/{safe_addr}/validate"
@@ -44,7 +45,7 @@ def handle_lists(
     if "members" in final_keys:
         members_keys = build_path_from_keys(url.get("keys", [])[1:])
         if "member_address" in kwargs:
-            safe_member = sanitize_path_segment(kwargs["member_address"])
+            safe_member = SecurityGuard.sanitize_path_segment(kwargs["member_address"])
             return f"{base}/lists/{safe_addr}{members_keys}/{safe_member}"
         return f"{base}/lists/{safe_addr}{members_keys}"
 

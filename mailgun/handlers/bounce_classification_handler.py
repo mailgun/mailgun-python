@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from mailgun.handlers.utils import build_path_from_keys
+from mailgun.endpoints import build_path_from_keys
 
 
 def handle_bounce_classification(

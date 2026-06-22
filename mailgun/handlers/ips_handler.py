@@ -7,7 +7,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from mailgun.handlers.utils import build_path_from_keys, sanitize_path_segment
+from mailgun.endpoints import build_path_from_keys
+from mailgun.security import SecurityGuard
 
 
 def handle_ips(
@@ -30,6 +31,6 @@ def handle_ips(
     final_keys = build_path_from_keys(url.get("keys", []))
     base_url = str(url["base"]).rstrip("/") + final_keys
     if "ip" in kwargs:
-        safe_ip = sanitize_path_segment(kwargs["ip"])
+        safe_ip = SecurityGuard.sanitize_path_segment(kwargs["ip"])
         return f"{base_url}/{safe_ip}"
     return base_url
