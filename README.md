@@ -31,8 +31,16 @@ Check out all the resources and Python code examples in the official
     - [AsyncClient](#asyncclient)
   - [Usage](#usage)
     - [Logging & Debugging](#logging--debugging)
-    - [IDE Autocompletion & DX](#ide-autocompletion--dx)
+    - [Logging & Secure Redaction](#logging--secure-redaction)
+    - [Timeout Configuration](#timeout-configuration)
     - [API Response Codes](#api-response-codes)
+    - [IDE Autocompletion & DX](#ide-autocompletion--dx)
+    - [Zero-Leak Sandbox Mode](#zero-leak-sandbox-mode)
+    - [API Response Codes](#api-response-codes)
+    - [Context Managers (Safe Resource Teardown)](#context-managers-safe-resource-teardown)
+    - [Fluent Message Builder](#fluent-message-builder)
+    - [Streaming Pagination](#streaming-pagination)
+    - [Strict Payload Schemas](#strict-payload-schemas)
   - [Request examples](#request-examples)
     - [Full list of supported endpoints](#full-list-of-supported-endpoints)
     - [Messages](#messages)
@@ -401,17 +409,18 @@ asyncio.run(main())
 
 For detailed examples of all available methods, parameters, and use cases, refer to the [mailgun/examples](mailgun/examples) section. All examples can be adapted to async by using `AsyncClient` and adding `await` to method calls.
 
-### Logging & Debugging
+### Logging, Debugging & Secure Redaction
 
-The Mailgun SDK includes built-in logging to help you troubleshoot API requests, inspect generated URLs, and read server error messages (like `400 Bad Request` or `404 Not Found`).
+The Mailgun SDK uses standard Python logging. To aid in debugging, you can enable `DEBUG` or `INFO` logs.
 
-The SDK uses the standard Python `logging` module under the namespace `mailgun.client`.
+**Built-in Security:** The SDK includes a native `RedactingFilter`.
+You can stream these logs to your centralized monitoring systems (Splunk, Datadog, ELK) knowing that all private `api-keys`, `pubkeys`, and webhook signing secrets are automatically scrubbed and replaced with `[REDACTED]`.
 
 To enable detailed logging in your application, configure the logger before initializing the client:
 
 ```python
 import logging
-from mailgun.client import Client
+from mailgun import Client
 
 # Enable DEBUG level for the Mailgun SDK logger
 logging.getLogger("mailgun.client").setLevel(logging.DEBUG)
@@ -420,8 +429,24 @@ logging.getLogger("mailgun.client").setLevel(logging.DEBUG)
 logging.basicConfig(format="%(levelname)s - %(name)s - %(message)s")
 
 # Now, any API errors or requests will be printed to your console
-client = Client(auth=("api", "YOUR_API_KEY"))
+client = Client(auth=("api", "key-super-secret-12345"))
+# API keys will be redacted:
+# "Sending request to https://api.mailgun.net/v3/messages with auth ('api', 'key-[REDACTED]')"
 client.domains.get()
+client.close()
+```
+
+### Timeout Configuration
+
+By default, the SDK relies on the underlying HTTP client's standard timeouts. To prevent uncontrolled resource consumption (CWE-400) in high-throughput production environments, you can enforce strict global timeouts.
+
+Timeouts can be passed as a single `float` (seconds for both connect and read) or a tuple (connect_timeout, read_timeout):
+
+```python
+from mailgun import Client
+
+# 3.5 seconds to connect, 15 seconds to wait for the server response
+client = Client(auth=("api", "your-key"), timeout=(3.5, 15.0))
 ```
 
 ### IDE Autocompletion & DX
@@ -431,6 +456,44 @@ The `Client` utilizes a dynamic routing engine but is heavily optimized for mode
 - **Introspection**: Calling `dir(client)` or using autocomplete in IDEs like VS Code or PyCharm will automatically expose all available API endpoints (e.g., `client.messages`, `client.domains`, `client.bounces`).
 - **Security Guardrails**: If you accidentally print the client instance or an exception traceback occurs in your CI/CD logs, your API key is strictly redacted from memory dumps: (`'api', '***REDACTED***'`).
 - **Performance**: JSON payloads are automatically minified before transit to save bandwidth on large batch requests, and internal route resolution is heavily cached in memory.
+
+### Zero-Leak Sandbox Mode
+
+For local development and CI/CD pipelines, the Mailgun SDK offers a native **Zero-Leak Sandbox Mode**. By initializing the client with `dry_run=True`, the SDK will safely intercept all network traffic locally.
+
+This allows you to fully validate your SDK initialization, dynamic routing, and payload building without dispatching real HTTP requests to Mailgun servers. This prevents accidental spam, list mutations, or billing charges during testing.
+
+```python
+from mailgun.client import Client
+
+# 1. Initialize the client in strict Sandbox Mode
+client = Client(auth=("api", "your-api-key"), dry_run=True)
+
+# 2. Execute a state-changing API call
+response = client.messages.create(
+    domain="yourdomain.com",
+    data={
+        "from": "sender@example.com",
+        "to": "test@example.com",
+        "subject": "Testing Sandbox",
+        "text": "This will not actually send!",
+    },
+)
+
+# 3. The SDK intercepts the I/O layer and returns a mock 200 OK response
+print(response.status_code)
+# Outputs: 200
+
+print(response.json())
+# Outputs: {"message": "Dry run successful - request intercepted", "id": "<dry-run-mock-id>"}
+```
+
+Key Behaviors in `dry_run` Mode:
+
+- Local payload checks (like strict minification and JSON serialization) still execute.
+- Security sanitization and path segment rules still execute.
+- Deprecation warnings will still be raised if you use an outdated endpoint.
+- `sys.audit` events and standard `logging` messages are still emitted, clearly marked with `DRY RUN: Intercepting request...`.
 
 ### API Response Codes
 
@@ -451,6 +514,90 @@ request, such as a non-existing endpoint.
 
 **500/502/503** - Internal Error on the Mailgun side. The SDK automatically retries these using Exponential Backoff.
 If the issue persists, please reach out to our support team.
+
+### Context Managers (Safe Resource Teardown)
+
+Always use the `Client` or `AsyncClient` inside a `with` statement. This ensures that underlying TCP connection pools are safely closed and sensitive API keys are immediately purged from memory once the block exits, preventing resource leaks.
+
+**Synchronous:**
+
+```python
+from mailgun import Client
+
+with Client(auth=("api", "your-api-key")) as client:
+    response = client.domains.get()
+    print(response.json())
+# Connection pool is closed and credentials are wiped from memory here.
+```
+
+**Asynchronous:**
+
+```
+import asyncio
+from mailgun import AsyncClient
+
+async def main():
+    async with AsyncClient(auth=("api", "your-api-key")) as client:
+        response = await client.domains.get()
+        print(response.json())
+
+asyncio.run(main())
+```
+
+### Fluent Message Builder
+
+Constructing complex multipart emails with custom variables (v:), custom headers (h:), and tracking options (o:) can be error-prone. The MailgunMessageBuilder abstracts this away while providing automatic security guardrails against massive file attachments (OOM) and Path Traversal (CWE-22).
+
+```python
+from mailgun import Client
+from mailgun.builders import MailgunMessageBuilder
+
+with Client(auth=("api", "your-api-key")) as client:
+    payload, files = (
+        MailgunMessageBuilder("support@yourdomain.com")
+        .add_recipient("customer@example.com")
+        .set_subject("Your Invoice")
+        .set_text("Please find your invoice attached.")
+        .add_custom_variable("invoice_id", 1234)  # Translates to "v:invoice_id"
+        .add_custom_header("Reply-To", "billing@...")  # Translates to "h:Reply-To"
+        .attach_file("/tmp/invoice_1234.pdf", safe_base_dir="/tmp/")  # Path Traversal guardrail
+        .build()
+    )
+
+    client.messages.create(domain="yourdomain.com", data=payload, files=files)
+```
+
+### Streaming Pagination
+
+For endpoints that return massive datasets (like Events, Bounces, or Suppressions), loading all pages into memory can crash your application.
+The `.stream()` method handles cursor-based pagination invisibly under the hood, yielding one item at a time.
+
+```python
+from mailgun import Client
+
+with Client(auth=("api", "key")) as client:
+    # Safely iterate through millions of events with a flat memory footprint
+    for event in client.events.stream(domain="yourdomain.com", filters={"event": "bounced"}):
+        print(f"Bounced: {event['recipient']}")
+```
+
+### Strict Payload Schemas
+
+If you prefer to build your own dictionaries instead of using the builder, you can opt-in to `TypedDict` schemas for full IDE autocomplete and `mypy` compile-time safety.
+
+```python
+from mailgun import Client
+from mailgun.types import SendMessagePayload
+
+my_data: SendMessagePayload = {
+    "from": "admin@domain.com",
+    "to": ["user@example.com"],
+    "subject": "Strictly Typed Request",
+}
+
+with Client(auth=("api", "key")) as client:
+    client.messages.create(domain="domain.com", data=my_data)
+```
 
 ## Request examples
 
@@ -1358,7 +1505,36 @@ See for details [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## Security
 
-See for details [SECURITY.md](SECURITY.md)
+See [SECURITY.md](SECURITY.md) for vulnerability reporting and our security policies.
+
+### Enterprise Security Audit Hooks (PEP 578)
+
+For Enterprise and SecOps environments, the Mailgun SDK acts as a security sensor. It emits native Python audit events (`sys.audit`) for Zero-Trust monitoring, including:
+
+- Outbound network requests (Egress tracking)
+- CRLF Header Injection attempts
+- Control Character Injection attempts (CWE-20)
+- Server-Side Request Forgery (SSRF) bypass attempts (CWE-918)
+
+You can globally **opt-in** to have the SDK automatically listen to these events and pipe them to your standard `logging` infrastructure for SIEM integration:
+
+```python
+import logging
+from mailgun.client import Client
+from mailgun.config import Config
+
+logging.basicConfig(level=logging.INFO)
+
+# Activate the PEP 578 Audit Listener globally during app startup
+Config.enable_security_audit()
+
+# Initialize the client normally
+client = Client(auth=("api", "your-api-key"))
+
+# The audit hook will now automatically intercept and log events like:
+# "SECURITY AUDIT: Outbound API call tracked - GET https://api.mailgun.net/v3/domains"
+response = client.domains.get()
+```
 
 ## Contributors
 
