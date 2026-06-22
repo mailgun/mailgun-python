@@ -2,39 +2,51 @@
 
 We [keep a changelog.](http://keepachangelog.com/)
 
-## [Unreleased]
+## [Unreleased] (v1.8.0)
 
-## [Unreleased]
+### 🌟 Top Highlights (The "Big Wins")
+
+- **Decoupled Architecture:** The monolithic `client.py` has been split into highly cohesive, single-responsibility modules (`builders.py`, `config.py`, `endpoints.py`, `security.py`, etc.), making the codebase vastly easier to maintain and contribute to.
+- **Fluent Payload Builders:** Developers no longer have to manually memorize API prefixes (`v:`, `h:`, `o:`). The new `MailgunMessageBuilder` provides an intuitive, autocomplete-friendly way to construct complex emails.
+- **Leak-Free Context Managers:** Native support for `with` and `async with` statements guarantees that underlying TCP connection pools (`requests.Session` and `httpx.AsyncClient`) are cleanly closed, eliminating memory/socket leaks.
+- **Enterprise-Grade Security:** Addition of `sys.audit` hooks, automatic log redaction for API keys (CWE-316), and strict TLS 1.2+ minimums (CWE-319) makes this SDK compliant with strict enterprise security postures.
 
 ### Added
 
 - **Fluent Payload Builders:** Introduced `MailgunMessageBuilder` in `mailgun.builders` to intuitively construct complex multipart emails (handling `v:`, `h:`, and `o:` prefixes automatically).
-- **Streaming Pagination:** Added a `.stream()` generator to `Endpoint` and `AsyncEndpoint` for automatic, memory-safe traversal of cursor-based pagination URLs.
-- **Zero-Leak Sandbox Mode:** Added `dry_run=True` to Client configuration to safely intercept and mock network requests during local development and CI pipelines.
-- **Enterprise Security Audit Hooks:** Implemented native Python PEP 578 `sys.audit` events (e.g., `mailgun.api.request`) for Zero-Trust enterprise observability.
-- **Strict Payload Schemas:** Added `TypedDict` contracts (e.g., `SendMessagePayload`) to `mailgun.types` to enable IDE autocomplete and compile-time validation via `mypy`.
 - **Context Managers:** Implemented `__enter__`/`__exit__` for `Client` and `AsyncClient` to support the `with` statement, ensuring TCP connection pools are gracefully closed.
+- **Strict Payload Schemas:** Added `TypedDict` contracts (e.g., `SendMessagePayload`) to `mailgun.types` to enable IDE autocomplete and compile-time validation via `mypy`.
+- **Streaming Pagination:** Added a `.stream()` generator to `Endpoint` and `AsyncEndpoint` for automatic, memory-safe traversal of cursor-based pagination URLs.
+- **Enterprise Security Audit Hooks:** Implemented native Python PEP 578 `sys.audit` events (e.g., `mailgun.api.request`) for Zero-Trust enterprise observability.
+- **Zero-Leak Sandbox Mode:** Added `dry_run=True` to Client configuration to safely intercept and mock network requests during local development and CI pipelines.
 - **Defense-in-Depth Testing Suite:** Vastly expanded SDK test coverage by introducing rigorous unit, integration, regression, Hypothesis (property-based), and Atheris fuzzing tests.
 - **Automated Security Scanning:** Integrated `osv-scanner`, CodeQL, and `pip-audit` into GitHub actions to block insecure transitive dependencies.
 
 ### Changed
 
 - **Architectural Refactoring:** Completely decoupled the monolithic `client.py` into highly cohesive, single-responsibility modules (`builders.py`, `client.py`, `config.py`, `endpoints.py`, `filters.py`, `logger.py`, `routes.py`, `security.py`, `types.py`), massively reducing technical debt.
-- Resource Management: Added explicit `.close()` and `.aclose()` methods to the sync and async clients to cleanly terminate internal `requests.Session` and `httpx.AsyncClient` instances.
+- **Resource Management:** Added explicit `.close()` and `.aclose()` methods to the sync and async clients to cleanly terminate internal `requests.Session` and `httpx.AsyncClient` instances.
+- **O(1) Dynamic Routing:** Replaced the legacy hardcoded if/else endpoint resolution with a high-performance, immutable O(1) prefix-routing dictionary (`PREFIX_ROUTES`).
+- **Modernized Examples:** Completely refactored the `mailgun/examples/` directory. Examples now group synchronous and asynchronous equivalents side-by-side and strictly utilize context managers (`with` / `async with`) to demonstrate leak-free execution.
+
+### Security
+
+- **CWE-319 (Protocol Downgrade):** Enforced a strict minimum TLS 1.2+ protocol context via `SecureHTTPAdapter` to prevent Man-in-the-Middle (MITM) downgrade attacks.
+- **CWE-316 (Cleartext Storage of Sensitive Information):** Integrated a centralized `RedactingFilter` to automatically scrub Mailgun API credentials and secrets from all standard log outputs.
+- **Path Segment Sanitization:** Hardened `SecurityGuard.sanitize_path_segment()` to strictly canonicalize and URL-encode inputs, effectively neutralizing edge-case Path Traversal and Injection attacks during dynamic route building.
+- **CWE-22 & CWE-400 (Path Traversal & Resource Exhaustion):** Implemented strict local attachment guardrails (`SecurityGuard.validate_attachment_path` and `check_file_size`) to block LFI attempts and fail-fast on files exceeding Mailgun's 25MB limit.
+- **CWE-400 (Uncontrolled Resource Consumption):** Hardened `sanitize_timeout` to strictly enforce finite, positive integer/float boundaries against malicious timeout injection.
+- **CWE-316 (Cleartext Memory Purging):** The `Client.close()` and `AsyncClient.aclose()` methods now explicitly zero-out the `auth` tuples and HTTP headers in memory upon teardown.
 
 ### Fixed
 
 - **Routing Regression (Bug #40):** Fixed a critical v1.7.0 regression where custom `api_url` configurations containing trailing versions (e.g., `/v3/`) triggered 404 errors. The SDK now safely sanitizes and strips trailing version segments before evaluating the `O(1)` routing dictionary (PR #41).
-- Fixed internal bugs with request data formatting and dynamic routing resolution across various API handlers.
+- **Request Data Formatting:** Fixed internal bugs with request data formatting and dynamic routing resolution across various API handlers.
+- **Type Hinting & Linting:** Resolved outstanding strict-mode MyPy errors and Ruff violations (e.g., `F401`, `PLC0415`) across the core package and test suites.
 
-### Security
+### Removed
 
-- Path Segment Sanitization: Hardened `SecurityGuard.sanitize_path_segment()` to strictly canonicalize and URL-encode inputs, effectively neutralizing edge-case Path Traversal and Injection attacks during dynamic route building.
-- **CWE-319 (Protocol Downgrade):** Enforced a strict minimum TLS 1.2+ protocol context via `SecureHTTPAdapter` to prevent Man-in-the-Middle (MITM) downgrade attacks.
-- **CWE-316 (Cleartext Storage of Sensitive Information):** Integrated a centralized `RedactingFilter` to automatically scrub Mailgun API credentials and secrets from all standard log outputs.
-- **CWE-22 & CWE-400 (Path Traversal & Resource Exhaustion):** Implemented strict local attachment guardrails (`SecurityGuard.validate_attachment_path` and `check_file_size`) to block LFI attempts and fail-fast on files exceeding Mailgun's 25MB limit.
-- **CWE-400 (Uncontrolled Resource Consumption):** Hardened `sanitize_timeout` to strictly enforce finite, positive integer/float boundaries against malicious timeout injection.
-- CWE-316 (Cleartext Memory Purging): The `Client.close()` and `AsyncClient.aclose()` methods now explicitly zero-out the `auth` tuples and HTTP headers in memory upon teardown.
+- **Legacy Utilities:** Deleted `mailgun/handlers/utils.py`. All path sanitization and validation logic has been strictly centralized into the `SecurityGuard` class in `mailgun/security.py`.
 
 ## [1.7.1] - 2026-06-10
 

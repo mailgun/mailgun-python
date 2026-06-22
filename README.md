@@ -217,22 +217,15 @@ The Mailgun API is part of the Sinch family and enables you to send, track, and 
 
 ### Base URL
 
-All API calls referenced in our documentation start with a base URL. Mailgun allows the ability to send and receive
-email in both US and EU regions.
+All API calls referenced in our documentation start with a base URL. The Mailgun API has regional endpoints.
 
 If you are using a proxy or a regional endpoint (such as the EU infrastructure), you can configure a custom `api_url` during initialization.
 
-For domains created in our US region the base URL is:
+Ensure you pass the correct Base URL to your client configuration:
 
-```sh
-https://api.mailgun.net/
-```
+US: `https://api.mailgun.net` (Default)
 
-For domains created in our EU region the base URL is:
-
-```sh
-https://api.eu.mailgun.net/
-```
+EU: `https://api.eu.mailgun.net`
 
 **⚠️ Important:** The `api_url` parameter must strictly be the **base host only** (e.g., `https://api.eu.mailgun.net`). Do **not** append API version paths (like `/v3` or `/v4`) to this string. The SDK's data-driven routing engine automatically appends the correct, endpoint-specific API version under the hood.
 
@@ -248,8 +241,7 @@ with Client(auth=("api", os.environ["APIKEY"]), api_url="https://api.eu.mailgun.
 
 ### Authentication
 
-The Mailgun Send API uses your API key for authentication. [Grab](https://app.mailgun.com/settings/api_security) and
-save your Mailgun API credentials.
+Authenticate your Client using a tuple of ("api", "YOUR_API_KEY"). Find your API key in the [Mailgun Control Panel](https://app.mailgun.com/settings/api_security).
 
 To run tests and examples please use virtualenv or conda environment with next environment variables:
 
@@ -257,12 +249,12 @@ To run tests and examples please use virtualenv or conda environment with next e
 export APIKEY="API_KEY"  # pragma: allowlist secret
 export DOMAIN="DOMAIN_NAME"
 export MESSAGES_FROM="Name Surname <mailgun@domain_name>"
-export MESSAGES_TO="Name Surname <username@gmail.com>"
-export MESSAGES_CC="Name Surname <username2@gmail.com>"
+export MESSAGES_TO="Name Surname <username@example.com>"
+export MESSAGES_CC="Name Surname <username2@example.com>"
 export DOMAINS_DEDICATED_IP="127.0.0.1"
 export MAILLIST_ADDRESS="everyone@mailgun.domain.com"
-export VALIDATION_ADDRESS_1="test1@i.ua"
-export VALIDATION_ADDRESS_2="test2@gmail.com"
+export VALIDATION_ADDRESS_1="test1@example.com"
+export VALIDATION_ADDRESS_2="test2@example"
 export MAILGUN_EMAIL="username@example.com"
 export USER_ID="123456789012345678901234"
 export USER_NAME="Name Surname"
@@ -270,8 +262,6 @@ export ROLE="admin"
 ```
 
 ## Quick Start
-
-The Mailgun Send API uses your API key for authentication.
 
 Synchronous vs Asynchronous Client.
 
@@ -314,13 +304,7 @@ with Client(auth=("api", os.environ["APIKEY"])) as client:
 
 #### Advanced Configuration
 
-By default, the SDK routes traffic to the US servers (`https://api.mailgun.net`). If you are operating in the EU, you can override the base URL during initialization:
-
-```python
-client = Client(auth=("api", os.environ["APIKEY"]), api_url="https://api.eu.mailgun.net")
-```
-
-The SDK also implements Timeouts by default `read=60.0s` (but can take a tuple with connect/read `(10.0, 60.0)` to ensure your application fails-fast during network partitions but remains patient while Mailgun processes heavy analytical queries).
+The SDK implements Timeouts by default `read=60.0s` (but can take a tuple with connect/read `(10.0, 60.0)` to ensure your application fails-fast during network partitions but remains patient while Mailgun processes heavy analytical queries).
 
 ### AsyncClient
 
@@ -337,12 +321,12 @@ async def main():
     # and automatic socket teardown.
     async with AsyncClient(auth=("api", "your-api-key")) as client:
         response = await client.messages.create(
-            domain="your-domain.com",
+            domain="YOUR_DOMAIN_NAME",
             data={
-                "from": "Excited User <mailgun@your-domain.com>",
+                "from": "Excited User <mailgun@YOUR_DOMAIN_NAME>",
                 "to": ["bar@example.com"],
-                "subject": "Hello",
-                "text": "Testing some Mailgun awesomeness!",
+                "subject": "Hello from Async!",
+                "text": "Testing Mailgun asynchronously!",
             },
         )
         print(response.json())
@@ -387,24 +371,6 @@ result = client.domainlist.get()
 # Async version
 client = AsyncClient(auth=auth)
 result = await client.domainlist.get()
-```
-
-Additionally `AsyncClient` can be used as async context manager to automatically close connection when execution is finished:
-
-```python
-import asyncio
-import os
-from mailgun.client import AsyncClient
-
-
-async def main():
-    auth = ("api", os.environ["APIKEY"])
-    async with AsyncClient(auth=auth) as client:
-        result = await client.domainlist.get()
-        print(result)
-
-
-asyncio.run(main())
 ```
 
 For detailed examples of all available methods, parameters, and use cases, refer to the [mailgun/examples](mailgun/examples) section. All examples can be adapted to async by using `AsyncClient` and adding `await` to method calls.
