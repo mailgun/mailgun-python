@@ -10,9 +10,6 @@ import responses
 
 from mailgun.client import AsyncClient, Client
 
-# ------------------------------------------------------------------------
-# FIXTURES
-# ------------------------------------------------------------------------
 
 @pytest.fixture
 def mocked_mailgun() -> Generator[responses.RequestsMock, None, None]:
@@ -30,113 +27,102 @@ def mocked_mailgun() -> Generator[responses.RequestsMock, None, None]:
         yield rsps
 
 
-# ------------------------------------------------------------------------
-# BENCHMARK 1: ROUTING OVERHEAD (PURE CPU)
-# ------------------------------------------------------------------------
+class TestClientPerformance:
+    def test_async_client_concurrent_throughput(self, benchmark: Any) -> None:
+        """
+        Measures how fast the AsyncClient can dispatch concurrent requests.
+        This proves that httpx.Limits(max_connections=100) prevents asyncio bottlenecks.
+        """
+        BATCH_SIZE = 50
 
-def test_client_routing_speed(benchmark: Any) -> None:
-    """
-    Measures the pure CPU overhead of the __getattr__ dynamic router.
-    This proves the efficiency of the lru_cache and magic-method short-circuits.
-    """
-    client = Client(auth=("api", "key"))
+        async def mock_handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(200, json={"id": "<test-id>", "message": "Queued."})
 
-    def route_messages() -> Any:
-        # Accessing a dynamic attribute triggers __getattr__ and URL building
-        return client.messages
+        mock_transport = httpx.MockTransport(mock_handler)
 
-    # Call benchmark as a function instead
-    benchmark(route_messages)
+        try:
+            # Attempt modern injection (using client_kwargs dictionary)
+            client = AsyncClient(
+                auth=("api", "key"), client_kwargs={"transport": mock_transport}
+            )
+            # Trigger lazy initialization to test compatibility
+            _ = client._client
+        except TypeError:
+            # Fallback for v1.6.0: Inject transport as a direct top-level kwarg
+            client = AsyncClient(auth=("api", "key"), transport=mock_transport)
 
+        async def send_one_email(i: int) -> httpx.Response:
+            return await client.messages.create(
+                domain="test.com",
+                data={
+                    "from": "sender@test.com",
+                    "to": f"recipient_{i}@test.com",
+                    "subject": "Load Test",
+                    "text": "Testing async pooling.",
+                },
+            )
 
-# ------------------------------------------------------------------------
-# BENCHMARK 2: SYNCHRONOUS CONNECTION POOLING (THREADING)
-# ------------------------------------------------------------------------
+        async def dispatch_batch_async() -> None:
+            # Gather executes all 50 coroutines concurrently on the event loop
+            tasks = [send_one_email(i) for i in range(BATCH_SIZE)]
+            await asyncio.gather(*tasks)
 
-def test_sync_client_concurrent_throughput(benchmark: Any, mocked_mailgun: responses.RequestsMock) -> None:
-    """
-    Measures how fast the synchronous Client can dispatch concurrent requests.
-    This proves that pool_maxsize=100 prevents ThreadPoolExecutor bottlenecks.
-    """
-    BATCH_SIZE = 50
-    client = Client(auth=("api", "key"))
+        def dispatch_batch() -> None:
+            # Helper to run the async batch inside the synchronous benchmark runner
+            asyncio.run(dispatch_batch_async())
 
-    def send_one_email(i: int) -> requests.Response:
-        return client.messages.create(
-            domain="test.com",
-            data={
-                "from": "sender@test.com",
-                "to": f"recipient_{i}@test.com",
-                "subject": "Load Test",
-                "text": "Testing connection pooling."
-            }
-        )
+        try:
+            benchmark.pedantic(dispatch_batch, rounds=10, iterations=5)
+        finally:
+            # Safely close the async client
+            aclose_method = getattr(client, "aclose", None)
+            if callable(aclose_method):
+                coro = cast(Coroutine[Any, Any, None], cast(object, aclose_method()))
+                asyncio.run(coro)
 
-    def dispatch_batch() -> None:
-        with ThreadPoolExecutor(max_workers=BATCH_SIZE) as executor:
-            list(executor.map(send_one_email, range(BATCH_SIZE)))
+    def test_client_routing_speed(self, benchmark: Any) -> None:
+        """
+        Measures the pure CPU overhead of the __getattr__ dynamic router.
+        This proves the efficiency of the lru_cache and magic-method short-circuits.
+        """
+        client = Client(auth=("api", "key"))
 
-    try:
-        # Run the benchmark (lower rounds because thread pools are heavy)
-        benchmark.pedantic(dispatch_batch, rounds=10, iterations=5)
-    finally:
-        # Safely close if the method exists (for backwards compatibility with v1.6.0)
-        close_method = getattr(client, "close", None)
-        if callable(close_method):
-            close_method()
+        def route_messages() -> Any:
+            # Accessing a dynamic attribute triggers __getattr__ and URL building
+            return client.messages
 
+        benchmark(route_messages)
 
-# ------------------------------------------------------------------------
-# BENCHMARK 3: ASYNCHRONOUS CONNECTION POOLING (EVENT LOOP)
-# ------------------------------------------------------------------------
+    def test_sync_client_concurrent_throughput(
+        self, benchmark: Any, mocked_mailgun: responses.RequestsMock
+    ) -> None:
+        """
+        Measures how fast the synchronous Client can dispatch concurrent requests.
+        This proves that pool_maxsize=100 prevents ThreadPoolExecutor bottlenecks.
+        """
+        BATCH_SIZE = 50
+        client = Client(auth=("api", "key"))
 
-def test_async_client_concurrent_throughput(benchmark: Any) -> None:
-    """
-    Measures how fast the AsyncClient can dispatch concurrent requests.
-    This proves that httpx.Limits(max_connections=100) prevents asyncio bottlenecks.
-    """
-    BATCH_SIZE = 50
+        def send_one_email(i: int) -> requests.Response:
+            return client.messages.create(
+                domain="test.com",
+                data={
+                    "from": "sender@test.com",
+                    "to": f"recipient_{i}@test.com",
+                    "subject": "Load Test",
+                    "text": "Testing connection pooling.",
+                },
+            )
 
-    async def mock_handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, json={"id": "<test-id>", "message": "Queued."})
+        def dispatch_batch() -> None:
+            with ThreadPoolExecutor(max_workers=BATCH_SIZE) as executor:
+                list(executor.map(send_one_email, range(BATCH_SIZE)))
 
-    mock_transport = httpx.MockTransport(mock_handler)
-
-    # 1. Attempt modern injection (using client_kwargs dictionary)
-    client = AsyncClient(auth=("api", "key"), client_kwargs={"transport": mock_transport})
-
-    try:
-        # Trigger lazy initialization to test compatibility
-        _ = client._client
-    except TypeError:
-        # 2. Fallback for v1.6.0: Inject transport as a direct top-level kwarg
-        client = AsyncClient(auth=("api", "key"), transport=mock_transport)
-
-    async def send_one_email(i: int) -> httpx.Response:
-        return await client.messages.create(
-            domain="test.com",
-            data={
-                "from": "sender@test.com",
-                "to": f"recipient_{i}@test.com",
-                "subject": "Load Test",
-                "text": "Testing async pooling."
-            }
-        )
-
-    async def dispatch_batch_async() -> None:
-        # Gather executes all 50 coroutines concurrently on the event loop
-        tasks = [send_one_email(i) for i in range(BATCH_SIZE)]
-        await asyncio.gather(*tasks)
-
-    def dispatch_batch() -> None:
-        # Helper to run the async batch inside the synchronous benchmark runner
-        asyncio.run(dispatch_batch_async())
-
-    try:
-        benchmark.pedantic(dispatch_batch, rounds=10, iterations=5)
-    finally:
-        # Safely close the async client
-        aclose_method = getattr(client, "aclose", None)
-        if callable(aclose_method):
-            coro = cast(Coroutine[Any, Any, None], cast(object, aclose_method()))
-            asyncio.run(coro)
+        try:
+            # Run the benchmark (lower rounds because thread pools are heavy)
+            benchmark.pedantic(dispatch_batch, rounds=10, iterations=5)
+        finally:
+            # Safely close if the method exists (for backwards compatibility with v1.6.0)
+            close_method = getattr(client, "close", None)
+            if callable(close_method):
+                close_method()
