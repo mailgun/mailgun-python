@@ -16,11 +16,12 @@ dependencies:
   # tests
   - conda-forge::pyfakefs
   - coverage >=4.5.4
+  - hypothesis
   - openssl
   - pytest >=9.0.3
   - pytest-asyncio
   - pytest-benchmark
-  - pytest-cov
+  - pytest-cov >=5.0.0
   - pytest-xdist
   - responses
   # linters, formatters & typing
@@ -37,6 +38,7 @@ dependencies:
   - python-dotenv >=0.19.2
   - types-jsonschema
   - pip:
+      - atheris >=2.3.0
       - bandit
       - codecov >=2.0.16
       - docconvert

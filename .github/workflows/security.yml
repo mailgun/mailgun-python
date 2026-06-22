@@ -1,0 +1,64 @@
+name: Continuous Security Verification
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  schedule:
+    - cron: '37 3 * * 0' # Run weekly on Sundays to catch newly published CVEs
+
+jobs:
+  static-analysis:
+    name: Semgrep & Bandit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run Bandit
+        run: |
+          pip install bandit
+          bandit -r mailgun/ -ll -ii -c pyproject.toml
+
+      - name: Run Semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: "p/python"
+          generateSarif: "1"
+
+  supply-chain-audit:
+    name: PIP Audit & OSV Scanner
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Pip Audit (PEP 770/CVS Check)
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-audit
+          pip-audit --desc on --strict
+
+      - name: OSV Scanner (Google Open Source Vulnerabilities)
+        uses: google/osv-scanner-action/osv-scanner-action@v1.9.0
+        with:
+          scan-args: |-
+            -r
+            ./

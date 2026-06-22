@@ -102,7 +102,7 @@ repos:
         name: "🔒 security · Detect private keys"
 
   - repo: https://github.com/commitizen-tools/commitizen
-    rev: v4.13.10
+    rev: v4.16.4
     hooks:
       - id: commitizen
         name: "🌳 git · Validate commit message"
@@ -130,16 +130,8 @@ repos:
         exclude: ^tests/
         additional_dependencies: [".[toml]"]
 
-# TODO: Enable it for a single check
-#  - repo: https://github.com/pypa/pip-audit
-#    rev: v2.10.0
-#    hooks:
-#      - id: pip-audit
-#        name: "🔒 security · Audit Python dependencies"
-#        args: ['--desc', 'on']
-
   - repo: https://github.com/semgrep/pre-commit
-    rev: 'v1.159.0'
+    rev: 'v1.167.0'
     hooks:
       - id: semgrep
         name: "🔒 security · Static analysis (semgrep)"
@@ -148,14 +140,14 @@ repos:
 
   # Spelling and typos
   - repo: https://github.com/crate-ci/typos
-    rev: v1.45.2
+    rev: v1.47.2
     hooks:
       - id: typos
         name: "📝 spelling · Check typos"
 
   # CI/CD validation
   - repo: https://github.com/python-jsonschema/check-jsonschema
-    rev: 0.37.1
+    rev: 0.37.3
     hooks:
       - id: check-dependabot
         name: "🔧 ci/cd · Validate Dependabot config"
@@ -164,7 +156,7 @@ repos:
         files: ^\.github/workflows/.*\.ya?ml$
 
   - repo: https://github.com/ariebovenberg/slotscheck
-    rev: v0.19.1
+    rev: v0.20.0
     hooks:
       - id: slotscheck
         name: "🔍 check · slotscheck"
@@ -172,25 +164,17 @@ repos:
           - requests>=2.32.5
           - typing-extensions>=4.7.1
           - httpx>=0.24
-          - pytest>=7.0.0
+          - pytest>=9.0.3
           - responses
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.12
+    rev: v0.15.18
     hooks:
       - id: ruff-check
         name: "🐍 lint · Check with Ruff"
         args: [--fix, --preview]
       - id: ruff-format
         name: "🐍 format · Format with Ruff"
-
-  - repo: https://github.com/PyCQA/pylint
-    rev: v4.0.5
-    hooks:
-      - id: pylint
-        name: "🐍 lint · Check code quality"
-        args:
-          - --exit-zero
 
   - repo: https://github.com/econchick/interrogate
     rev: 1.7.0
@@ -203,7 +187,7 @@ repos:
 
   # Python type checking
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.20.2
+    rev: v2.1.0
     hooks:
       - id: mypy
         name: "🐍 types · Check with mypy"
@@ -214,7 +198,7 @@ repos:
         exclude: ^mailgun/examples/
 
   - repo: https://github.com/RobertCraigie/pyright-python
-    rev: v1.1.409
+    rev: v1.1.410
     hooks:
       - id: pyright
         name: "🐍 types · Check with pyright"
@@ -252,16 +236,16 @@ repos:
           - mdformat-gfm
           - mdformat-ruff
 
+  # Makefile linting
+  - repo: https://github.com/checkmake/checkmake
+    rev: v0.3.0
+    hooks:
+      - id: checkmake
+        name: "🔧 build · Lint Makefile"
+
 # TODO: Enable it for a single check
 #  - repo: https://github.com/tcort/markdown-link-check
 #    rev: v3.14.2
 #    hooks:
 #      - id: markdown-link-check
 #        name: "📝 docs · Check markdown links"
-
-  # Makefile linting
-#  - repo: https://github.com/checkmake/checkmake
-#    rev: v0.3.0
-#    hooks:
-#      - id: checkmake
-#        name: "🔧 build · Lint Makefile"
