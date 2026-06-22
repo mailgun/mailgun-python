@@ -1,225 +1,249 @@
+"""Examples for managing Mailgun Domains, Connections, Tracking, and DKIM."""
+
 from __future__ import annotations
 
+import asyncio
 import os
 import re
 import subprocess
 from pathlib import Path
+from typing import Any
 
-from mailgun.client import Client
+from mailgun.client import AsyncClient, Client
 
-
-key: str = os.environ["APIKEY"]
-domain: str = os.environ["DOMAIN"]
-secret_key_filename: str = os.environ["SECRET_KEY_FILENAME"]
-secret_key_path: Path = Path(secret_key_filename)
 ALLOWED_FILENAME_RE = re.compile(r"^[a-zA-Z0-9._-]{1,255}$")
 
-client: Client = Client(auth=("api", key))
+
+# ==============================================================================
+# Domain Management (Synchronous)
+# ==============================================================================
 
 
-def get_domains() -> None:
+def get_domains_sync(api_key: str) -> None:
     """
     GET /domains
-    :return:
+    :return: None
     """
-    data = client.domainlist.get()
-    print(data.json())
+    with Client(auth=("api", api_key)) as client:
+        response = client.domainlist.get()
+        print("GET Domains:", response.json())
 
 
-def add_domain() -> None:
+def add_domain_sync(api_key: str, domain_name: str) -> None:
     """
     POST /domains
-    :return:
+    :return: None
     """
-    # Post domain
-    data = {
-        "name": "python.test.com",
+    data: dict[str, str] = {
+        "name": domain_name,
     }
-    # Problem with smtp_password!!!!
 
-    request = client.domains.create(data=data)
-    print(request.json())
-    print(request.status_code)
-
-
-# Get domain
+    with Client(auth=("api", api_key)) as client:
+        response = client.domains.create(data=data)
+        print("POST Domain:", response.json())
+        print("Status Code:", response.status_code)
 
 
-def get_simple_domain() -> None:
+def get_simple_domain_sync(api_key: str, domain_name: str) -> None:
     """
     GET /domains/<domain>
-    :return:
+    :return: None
     """
-    domain_name = "python.test.com"
-    request = client.domains.get(domain_name=domain_name)
-    print(request.json())
+    with Client(auth=("api", api_key)) as client:
+        response = client.domains.get(domain_name=domain_name)
+        print("GET Simple Domain:", response.json())
 
 
-def update_simple_domain() -> None:
+def update_simple_domain_sync(api_key: str, domain_name: str) -> None:
     """
     PUT /domains/<domain>
-    :return:
+    :return: None
     """
-    domain_name = "python.test.com"
-    data = {"name": domain_name, "spam_action": "disabled"}
-    request = client.domains.put(data=data, domain=domain_name)
-    print(request.json())
+    data: dict[str, str] = {"name": domain_name, "spam_action": "disabled"}
+    with Client(auth=("api", api_key)) as client:
+        response = client.domains.put(data=data, domain=domain_name)
+        print("PUT Simple Domain:", response.json())
 
 
-def verify_domain() -> None:
+def verify_domain_sync(api_key: str, domain_name: str) -> None:
     """
     PUT /domains/<domain>/verify
-    :return:
+    :return: None
     """
-    domain_name = "python.test.com"
-    request = client.domains.put(domain=domain_name, verify=True)
-    print(request.json())
+    with Client(auth=("api", api_key)) as client:
+        response = client.domains.put(domain=domain_name, verify=True)
+        print("PUT Verify Domain:", response.json())
 
 
-def delete_domain() -> None:
+def delete_domain_sync(api_key: str, domain_name: str) -> None:
     """
     DELETE /domains/<domain>
-    :return:
+    :return: None
     """
     # Delete domain
-    request = client.domains.delete(domain="python.test.com")
-    print(request.text)
-    print(request.status_code)
+    with Client(auth=("api", api_key)) as client:
+        response = client.domains.delete(domain=domain_name)
+        print("DELETE Domain:", response.text)
+        print("Status Code:", response.status_code)
 
 
-def get_connections() -> None:
+# ==============================================================================
+# Connection Settings (Synchronous)
+# ==============================================================================
+
+
+def get_connections_sync(api_key: str, domain_name: str) -> None:
     """
     GET /domains/<domain>/connection
-    :return:
+    :return: None
     """
-    request = client.domains_connection.get(domain=domain)
-    print(request.json())
+    with Client(auth=("api", api_key)) as client:
+        response = client.domains_connection.get(domain=domain_name)
+        print("GET Connections:", response.json())
 
 
-def put_connections() -> None:
+def put_connections_sync(api_key: str, domain_name: str) -> None:
     """
     PUT /domains/<domain>/connection
-    :return:
+    :return: None
     """
-    data = {"require_tls": "true", "skip_verification": "false"}
-    request = client.domains_connection.put(domain=domain, data=data)
-    print(request.json())
+    data: dict[str, str] = {"require_tls": "true", "skip_verification": "false"}
+    with Client(auth=("api", api_key)) as client:
+        response = client.domains_connection.put(domain=domain_name, data=data)
+        print("PUT Connections:", response.json())
 
 
-def get_tracking() -> None:
+# ==============================================================================
+# Tracking Settings (Synchronous)
+# ==============================================================================
+
+
+def get_tracking_sync(api_key: str, domain_name: str) -> None:
     """
     GET /domains/<domain>/tracking
-    :return:
+    :return: None
     """
-    request = client.domains_tracking.get(domain=domain)
-    print(request.json())
+    with Client(auth=("api", api_key)) as client:
+        response = client.domains_tracking.get(domain=domain_name)
+        print("GET Tracking:", response.json())
 
 
-def put_open_tracking() -> None:
+def put_open_tracking_sync(api_key: str, domain_name: str) -> None:
     """
     PUT /domains/<domain>/tracking/open
-    :return:
+    :return: None
     """
-    data = {"active": "yes", "skip_verification": "false"}
-    request = client.domains_tracking_open.put(domain=domain, data=data)
-    print(request.json())
+    data: dict[str, str] = {"active": "yes", "skip_verification": "false"}
+    with Client(auth=("api", api_key)) as client:
+        response = client.domains_tracking_open.put(domain=domain_name, data=data)
+        print("PUT Open Tracking:", response.json())
 
 
-def put_click_tracking() -> None:
+def put_click_tracking_sync(api_key: str, domain_name: str) -> None:
     """
     PUT /domains/<domain>/tracking/click
-    :return:
+    :return: None
     """
-    data = {
-        "active": "yes",
-    }
-    request = client.domains_tracking_click.put(domain=domain, data=data)
-    print(request.json())
+    data: dict[str, str] = {"active": "yes"}
+    with Client(auth=("api", api_key)) as client:
+        response = client.domains_tracking_click.put(domain=domain_name, data=data)
+        print("PUT Click Tracking:", response.json())
 
 
-def put_unsub_tracking() -> None:
+def put_unsub_tracking_sync(api_key: str, domain_name: str) -> None:
     """
     PUT /domains/<domain>/tracking/unsubscribe
-    :return:
+    :return: None
     """
     # fmt: off
-    data = {
+    data: dict[str, str] = {
         "active": "yes",
         "html_footer": "\n<br>\n<p><a href=\"%unsubscribe_url%\">UnSuBsCrIbE</a></p>\n",
         "text_footer": "\n\nTo unsubscribe here click: <%unsubscribe_url%>\n\n"
     }
     # fmt: on
-    request = client.domains_tracking_unsubscribe.put(domain=domain, data=data)
-    print(request.json())
+    with Client(auth=("api", api_key)) as client:
+        response = client.domains_tracking_unsubscribe.put(domain=domain_name, data=data)
+        print("PUT Unsub Tracking:", response.json())
 
 
-def put_dkim_authority() -> None:
+# ==============================================================================
+# DKIM & Web Prefix (Synchronous)
+# ==============================================================================
+
+
+def put_dkim_authority_sync(api_key: str, domain_name: str) -> None:
     """
     PUT /domains/<domain>/dkim_authority
-    :return:
+    :return: None
     """
-    data = {"self": "true"}
-    request = client.domains_dkimauthority.put(domain=domain, data=data)
-    print(request.json())
+    data: dict[str, str] = {"self": "true"}
+    with Client(auth=("api", api_key)) as client:
+        response = client.domains_dkimauthority.put(domain=domain_name, data=data)
+        print("PUT DKIM Authority:", response.json())
 
 
-def put_dkim_selector() -> None:
+def put_dkim_selector_sync(api_key: str, domain_name: str) -> None:
     """
     PUT /domains/<domain>/dkim_selector
-    :return:
+    :return: None
     """
-    data = {"dkim_selector": "s"}
-    request = client.domains_dkimselector.put(domain="python.test.com", data=data)
-    print(request.json())
+    data: dict[str, str] = {"dkim_selector": "s"}
+    with Client(auth=("api", api_key)) as client:
+        response = client.domains_dkimselector.put(domain=domain_name, data=data)
+        print("PUT DKIM Selector:", response.json())
 
 
-def put_web_prefix() -> None:
+def put_web_prefix_sync(api_key: str, domain_name: str) -> None:
     """
     PUT /domains/<domain>/web_prefix
-    :return:
+    :return: None
     """
-    data = {"web_prefix": "python"}
-    request = client.domains_webprefix.put(domain="python.test.com", data=data)
-    print(request.json())
+    data: dict[str, str] = {"web_prefix": "python"}
+    with Client(auth=("api", api_key)) as client:
+        response = client.domains_webprefix.put(domain=domain_name, data=data)
+        print("PUT Web Prefix:", response.json())
 
 
-def get_sending_queues() -> None:
+def get_sending_queues_sync(api_key: str, domain_name: str) -> None:
     """
     GET /domains/<domain>/sending_queues
-    :return:
+    :return: None
     """
-    request = client.domains_sendingqueues.get(domain="python.test.com")
-    print(request.json())
-    print(request.status_code)
+    with Client(auth=("api", api_key)) as client:
+        response = client.domains_sendingqueues.get(domain=domain_name)
+        print("GET Sending Queues:", response.json())
+        print("Status Code:", response.status_code)
 
 
-def get_dkim_keys() -> None:
+def get_dkim_keys_sync(api_key: str, domain_name: str) -> None:
     """
     GET /v1/dkim/keys
-    :return:
+    :return: None
     """
-    data = {
+    data: dict[str, str] = {
         "page": "string",
         "limit": "0",
-        "signing_domain": "python.test.com",
+        "signing_domain": domain_name,
         "selector": "smtp",
     }
+    with Client(auth=("api", api_key)) as client:
+        response = client.dkim_keys.get(data=data)
+        print("GET DKIM Keys:", response.json())
 
-    request = client.dkim_keys.get(data=data)
-    print(request.json())
 
-
-def post_dkim_keys() -> None:
+def post_dkim_keys_sync(api_key: str, domain_name: str, secret_key_filename: str) -> None:
     """
     POST /v1/dkim/keys
-    :return:
+    :return: None
     """
-
     # Private key PEM file must be generated in PKCS1 format. You need 'openssl' on your machine
     # example:
     # openssl genrsa -traditional -out .server.key 2048
     if not ALLOWED_FILENAME_RE.match(secret_key_filename):
         raise ValueError(f"Invalid filename: {secret_key_filename!r}")
+
+    secret_key_path = Path(secret_key_filename)
     subprocess.run(
         ["openssl", "genrsa", "-traditional", "-out", secret_key_filename, "--", "2048"], check=True
     )
@@ -231,52 +255,95 @@ def post_dkim_keys() -> None:
         )
     ]
 
-    data = {
-        "signing_domain": "python.test.com",
+    data: dict[str, Any] = {
+        "signing_domain": domain_name,
         "selector": "smtp",
         "bits": "2048",
-        "pem": files,
     }
 
-    headers = {"Content-Type": "multipart/form-data"}
+    # Note: Explicitly providing {"Content-Type": "multipart/form-data"} here breaks `requests`
+    # and `httpx` because they auto-generate the necessary multipart boundary string.
+    with Client(auth=("api", api_key)) as client:
+        response = client.dkim_keys.create(data=data, files=files)
+        print("POST DKIM Keys:", response.json())
 
-    request = client.dkim_keys.create(data=data, headers=headers, files=files)
-    print(request.json())
+    # Safely clean up the generated key
+    if secret_key_path.exists():
+        secret_key_path.unlink()
 
 
-def delete_dkim_keys() -> None:
+def delete_dkim_keys_sync(api_key: str, domain_name: str) -> None:
     """
-    GET /v1/dkim/keys
-    :return:
+    DELETE /v1/dkim/keys
+    :return: None
     """
-    query = {"signing_domain": "python.test.com", "selector": "smtp"}
+    query: dict[str, str] = {"signing_domain": domain_name, "selector": "smtp"}
+    with Client(auth=("api", api_key)) as client:
+        response = client.dkim_keys.delete(filters=query)
+        print("DELETE DKIM Keys:", response.json())
 
-    request = client.dkim_keys.delete(filters=query)
-    print(request.json())
 
+# ==============================================================================
+# Domain Management (Asynchronous Example)
+# ==============================================================================
+
+
+async def get_domains_async(api_key: str) -> None:
+    """
+    GET /domains (Asynchronous)
+    :return: None
+    """
+    async with AsyncClient(auth=("api", api_key)) as client:
+        response = await client.domainlist.get()
+        print("GET Domains (Async):", response.json())
+
+
+# ==============================================================================
+# Execution
+# ==============================================================================
 
 if __name__ == "__main__":
-    add_domain()
-    get_domains()
-    get_simple_domain()
-    update_simple_domain()
-    verify_domain()
-    delete_domain()
+    # Securely load environment variables at runtime
+    API_KEY: str = os.environ.get("APIKEY", "")
+    DOMAIN: str = os.environ.get("DOMAIN", "")
+    TARGET_DOMAIN: str = "python.test.com"
+    SECRET_KEY_FILE: str = os.environ.get("SECRET_KEY_FILENAME", "server.key")
 
-    get_connections()
-    put_connections()
-    get_tracking()
-    put_open_tracking()
-    put_click_tracking()
-    put_unsub_tracking()
+    if not API_KEY or not DOMAIN:
+        print("Please set the 'APIKEY' and 'DOMAIN' environment variables to run examples.")
+    else:
+        # Domain Management
+        add_domain_sync(api_key=API_KEY, domain_name=TARGET_DOMAIN)
+        get_domains_sync(api_key=API_KEY)
+        get_simple_domain_sync(api_key=API_KEY, domain_name=TARGET_DOMAIN)
+        update_simple_domain_sync(api_key=API_KEY, domain_name=TARGET_DOMAIN)
+        verify_domain_sync(api_key=API_KEY, domain_name=TARGET_DOMAIN)
+        delete_domain_sync(api_key=API_KEY, domain_name=TARGET_DOMAIN)
 
-    put_dkim_authority()
+        # Connection Settings
+        get_connections_sync(api_key=API_KEY, domain_name=DOMAIN)
+        put_connections_sync(api_key=API_KEY, domain_name=DOMAIN)
 
-    put_dkim_selector()
-    put_web_prefix()
+        # Tracking Settings
+        get_tracking_sync(api_key=API_KEY, domain_name=DOMAIN)
+        put_open_tracking_sync(api_key=API_KEY, domain_name=DOMAIN)
+        put_click_tracking_sync(api_key=API_KEY, domain_name=DOMAIN)
+        put_unsub_tracking_sync(api_key=API_KEY, domain_name=DOMAIN)
 
-    get_sending_queues()
+        # DKIM & Web Prefix
+        put_dkim_authority_sync(api_key=API_KEY, domain_name=DOMAIN)
+        put_dkim_selector_sync(api_key=API_KEY, domain_name=TARGET_DOMAIN)
+        put_web_prefix_sync(api_key=API_KEY, domain_name=TARGET_DOMAIN)
 
-    post_dkim_keys()
-    get_dkim_keys()
-    delete_dkim_keys()
+        # Sending Queues
+        get_sending_queues_sync(api_key=API_KEY, domain_name=TARGET_DOMAIN)
+
+        # DKIM Keys Lifecycle
+        post_dkim_keys_sync(
+            api_key=API_KEY, domain_name=TARGET_DOMAIN, secret_key_filename=SECRET_KEY_FILE
+        )
+        get_dkim_keys_sync(api_key=API_KEY, domain_name=TARGET_DOMAIN)
+        delete_dkim_keys_sync(api_key=API_KEY, domain_name=TARGET_DOMAIN)
+
+        # Run Async Example
+        asyncio.run(get_domains_async(api_key=API_KEY))

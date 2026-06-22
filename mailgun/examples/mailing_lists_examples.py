@@ -1,209 +1,482 @@
+"""Examples for managing Mailgun Mailing Lists and their Members."""
+
+from __future__ import annotations
+
+import asyncio
 import os
+from typing import Any
 
-from mailgun.client import Client
-
-
-key: str = os.environ["APIKEY"]
-domain: str = os.environ["DOMAIN"]
-mailing_list_address: str = os.environ["MAILLIST_ADDRESS"]
-
-client: Client = Client(auth=("api", key))
+from mailgun.client import AsyncClient, Client
 
 
-def post_lists() -> None:
+# ==============================================================================
+# Mailing Lists Management (Synchronous)
+# ==============================================================================
+
+
+def delete_list_sync(api_key: str, domain: str, list_address: str) -> None:
     """
-    POST /lists
-    :return:
+    DELETE /lists/<address>
+    :return: None
     """
-    data = {
-        "address": f"python_sdk2@{domain}",
-        "description": "Mailgun developers list",
-    }
-
-    req = client.lists.create(domain=domain, data=data)
-    print(req.json())
+    with Client(auth=("api", api_key)) as client:
+        response = client.lists.delete(domain=domain, address=list_address)
+        print("DELETE List (Sync):", response.json())
 
 
-def get_pages() -> None:
+def get_list_pages_sync(api_key: str, domain: str) -> None:
     """
     GET /lists/pages
-    :return:
+    :return: None
     """
-    req = client.lists_pages.get(domain=domain)
-    print(req.json())
+    with Client(auth=("api", api_key)) as client:
+        response = client.lists_pages.get(domain=domain)
+        print("GET List Pages (Sync):", response.json())
 
 
-def put_lists() -> None:
+def get_list_sync(api_key: str, domain: str, list_address: str) -> None:
+    """
+    GET /lists/<address>
+    :return: None
+    """
+    with Client(auth=("api", api_key)) as client:
+        response = client.lists.get(domain=domain, address=list_address)
+        print("GET List (Sync):", response.json())
+
+
+def post_list_sync(api_key: str, domain: str, list_address: str) -> None:
+    """
+    POST /lists
+    :return: None
+    """
+    data: dict[str, str] = {
+        "address": list_address,
+        "description": "Mailgun developers list",
+    }
+    with Client(auth=("api", api_key)) as client:
+        response = client.lists.create(domain=domain, data=data)
+        print("POST List (Sync):", response.json())
+
+
+def put_list_sync(api_key: str, domain: str, list_address: str) -> None:
     """
     PUT /lists/<address>
-    :return:
+    :return: None
     """
-    data = {"description": "Mailgun developers list 121212"}
-
-    req = client.lists.put(domain=domain, data=data, address=f"python_sdk2@{domain}")
-    print(req.json())
-
-
-def get_lists() -> None:
-    """
-    GEt /lists
-    :return:
-    """
-    req = client.lists.get(domain=domain, address=f"python_sdk2@{domain}")
-    print(req.json())
+    data: dict[str, str] = {"description": "Mailgun developers list 121212"}
+    with Client(auth=("api", api_key)) as client:
+        response = client.lists.put(domain=domain, data=data, address=list_address)
+        print("PUT List (Sync):", response.json())
 
 
-# Email Validations are only available for paid accounts.
-def post_address_validate() -> None:
-    """
-    POST /lists/<address>/validate
-    :return:
-    """
-    req = client.lists.create(domain=domain, address=f"python_sdk2@{domain}", validate=True)
-    print(req.json())
+# ==============================================================================
+# Mailing List Validation (Synchronous)
+# ==============================================================================
+# Note: Email Validations are only available for paid accounts.
 
 
-# Email Validations are only available for paid accounts.
-def get_validate_address() -> None:
-    """
-    GET /lists/<address>/validate
-    :return:
-    """
-    req = client.lists.get(domain=domain, address=f"python_sdk2@{domain}", validate=True)
-    print(req.json())
-
-
-# Email Validations are only available for paid accounts.
-def delete_validate_job() -> None:
+def delete_list_validation_sync(api_key: str, domain: str, list_address: str) -> None:
     """
     DELETE /lists/<address>/validate
-    :return:
+    :return: None
     """
-    req = client.lists.delete(domain=domain, address=f"python_sdk2@{domain}", validate=True)
-    print(req.json())
+    with Client(auth=("api", api_key)) as client:
+        response = client.lists.delete(domain=domain, address=list_address, validate=True)
+        print("DELETE List Validation (Sync):", response.json())
 
 
-def post_member_list() -> None:
+def get_list_validation_sync(api_key: str, domain: str, list_address: str) -> None:
+    """
+    GET /lists/<address>/validate
+    :return: None
+    """
+    with Client(auth=("api", api_key)) as client:
+        response = client.lists.get(domain=domain, address=list_address, validate=True)
+        print("GET List Validation (Sync):", response.json())
+
+
+def post_list_validation_sync(api_key: str, domain: str, list_address: str) -> None:
+    """
+    POST /lists/<address>/validate
+    :return: None
+    """
+    with Client(auth=("api", api_key)) as client:
+        response = client.lists.create(domain=domain, address=list_address, validate=True)
+        print("POST List Validation (Sync):", response.json())
+
+
+# ==============================================================================
+# Mailing List Members Management (Synchronous)
+# ==============================================================================
+
+
+def delete_list_member_sync(
+    api_key: str, domain: str, list_address: str, member_address: str
+) -> None:
+    """
+    DELETE /lists/<address>/members/<member_address>
+    :return: None
+    """
+    with Client(auth=("api", api_key)) as client:
+        response = client.lists_members.delete(
+            domain=domain,
+            address=list_address,
+            member_address=member_address,
+        )
+        print("DELETE List Member (Sync):", response.json())
+
+
+def get_list_member_sync(api_key: str, domain: str, list_address: str, member_address: str) -> None:
+    """
+    GET /lists/<address>/members/<member_address>
+    :return: None
+    """
+    with Client(auth=("api", api_key)) as client:
+        response = client.lists_members.get(
+            domain=domain,
+            address=list_address,
+            member_address=member_address,
+        )
+        print("GET List Member (Sync):", response.json())
+
+
+def get_list_members_pages_sync(api_key: str, domain: str, list_address: str) -> None:
+    """
+    GET /lists/<address>/members/pages
+    :return: None
+    """
+    with Client(auth=("api", api_key)) as client:
+        response = client.lists_members_pages.get(domain=domain, address=list_address)
+        print("GET List Members Pages (Sync):", response.json())
+
+
+def get_list_members_sync(api_key: str, domain: str, list_address: str) -> None:
+    """
+    GET /lists/<address>/members
+    :return: None
+    """
+    with Client(auth=("api", api_key)) as client:
+        response = client.lists_members.get(domain=domain, address=list_address)
+        print("GET List Members (Sync):", response.json())
+
+
+def post_list_member_sync(
+    api_key: str, domain: str, list_address: str, member_address: str
+) -> None:
     """
     POST /lists/<address>/members
-    :return:
+    :return: None
     """
-    data = {
+    data: dict[str, Any] = {
         "subscribed": True,
-        "address": "bar2@example.com",
+        "address": member_address,
         "name": "Bob Bar",
         "description": "Developer",
         "vars": '{"age": 26}',
     }
-    req = client.lists_members.create(domain=domain, address=mailing_list_address, data=data)
-    print(req.json())
+    with Client(auth=("api", api_key)) as client:
+        response = client.lists_members.create(domain=domain, address=list_address, data=data)
+        print("POST List Member (Sync):", response.json())
 
 
-def get_member_list() -> None:
-    """
-    GET /lists/<address>/members
-    :return:
-    """
-    req = client.lists_members.get(domain=domain, address=mailing_list_address)
-    print(req.json())
-
-
-def get_lists_address() -> None:
-    """
-    GET /lists/<address>
-    :return:
-    """
-    req = client.lists.get(domain=domain, address=f"python_sdk2@{domain}")
-    print(req.json())
-
-
-def get_lists_members() -> None:
-    """
-    GET /lists/<address>/members/pages
-    :return:
-    """
-    req = client.lists_members_pages.get(domain=domain, address=mailing_list_address)
-    print(req.json())
-
-
-def get_member_from_list() -> None:
-    """
-    GET /lists/<address>/members/<member_address>
-    :return:
-    """
-    req = client.lists_members.get(
-        domain=domain,
-        address=mailing_list_address,
-        member_address="bar2@example.com",
-    )
-
-    print(req.json())
-
-
-def put_member_list() -> None:
-    """
-    PUT /lists/<address>/members/<member_address>
-    :return:
-    """
-    data = {
-        "subscribed": True,
-        "address": "bar2@example.com",
-        "name": "Bob Bar 2",
-        "description": "Developer",
-        "vars": '{"age": 28}',
-    }
-
-    req = client.lists_members.put(
-        domain=domain,
-        address=mailing_list_address,
-        data=data,
-        member_address="bar2@example.com",
-    )
-
-    print(req.json())
-
-
-def post_members_json() -> None:
+def post_list_members_json_sync(api_key: str, domain: str, list_address: str) -> None:
     """
     POST /lists/<address>/members.json
-    :return:
+    :return: None
     """
-    data = {
+    data: dict[str, Any] = {
         "upsert": True,
         "members": '[{"address": "Alice <alice@example.com>", "vars": {"age": 26}},'
         '{"name": "Bob1", "address": "bob2@example.com", "vars": {"age": 34}}]',
     }
+    with Client(auth=("api", api_key)) as client:
+        response = client.lists_members.create(
+            domain=domain,
+            address=list_address,
+            data=data,
+            multiple=True,
+        )
+        print("POST List Members JSON (Sync):", response.json())
 
-    req = client.lists_members.create(
-        domain=domain,
-        address=mailing_list_address,
-        data=data,
-        multiple=True,
-    )
-    print(req.json())
 
-
-def delete_mailing_list_member() -> None:
+def put_list_member_sync(api_key: str, domain: str, list_address: str, member_address: str) -> None:
     """
-    DELETE /lists/<address>/members/<member_address>
-    :return:
+    PUT /lists/<address>/members/<member_address>
+    :return: None
     """
-    req = client.lists_members.delete(
-        domain=domain,
-        address=mailing_list_address,
-        member_address="bob2@example.com",
-    )
-    print(req.json())
+    data: dict[str, Any] = {
+        "subscribed": True,
+        "address": member_address,
+        "name": "Bob Bar 2",
+        "description": "Developer",
+        "vars": '{"age": 28}',
+    }
+    with Client(auth=("api", api_key)) as client:
+        response = client.lists_members.put(
+            domain=domain,
+            address=list_address,
+            data=data,
+            member_address=member_address,
+        )
+        print("PUT List Member (Sync):", response.json())
 
 
-def delete_lists_address() -> None:
-    """
-    DELETE /lists/<address>
-    :return:
-    """
-    req = client.lists.delete(domain=domain, address=f"python_sdk2@{domain}")
-    print(req.json())
+# ==============================================================================
+# Mailing Lists Management (Asynchronous)
+# ==============================================================================
 
+
+async def delete_list_async(api_key: str, domain: str, list_address: str) -> None:
+    """
+    DELETE /lists/<address> (Asynchronous)
+    :return: None
+    """
+    async with AsyncClient(auth=("api", api_key)) as client:
+        response = await client.lists.delete(domain=domain, address=list_address)
+        print("DELETE List (Async):", response.json())
+
+
+async def get_list_async(api_key: str, domain: str, list_address: str) -> None:
+    """
+    GET /lists/<address> (Asynchronous)
+    :return: None
+    """
+    async with AsyncClient(auth=("api", api_key)) as client:
+        response = await client.lists.get(domain=domain, address=list_address)
+        print("GET List (Async):", response.json())
+
+
+async def get_list_pages_async(api_key: str, domain: str) -> None:
+    """
+    GET /lists/pages (Asynchronous)
+    :return: None
+    """
+    async with AsyncClient(auth=("api", api_key)) as client:
+        response = await client.lists_pages.get(domain=domain)
+        print("GET List Pages (Async):", response.json())
+
+
+async def post_list_async(api_key: str, domain: str, list_address: str) -> None:
+    """
+    POST /lists (Asynchronous)
+    :return: None
+    """
+    data: dict[str, str] = {
+        "address": list_address,
+        "description": "Mailgun developers list",
+    }
+    async with AsyncClient(auth=("api", api_key)) as client:
+        response = await client.lists.create(domain=domain, data=data)
+        print("POST List (Async):", response.json())
+
+
+async def put_list_async(api_key: str, domain: str, list_address: str) -> None:
+    """
+    PUT /lists/<address> (Asynchronous)
+    :return: None
+    """
+    data: dict[str, str] = {"description": "Mailgun developers list 121212"}
+    async with AsyncClient(auth=("api", api_key)) as client:
+        response = await client.lists.put(domain=domain, data=data, address=list_address)
+        print("PUT List (Async):", response.json())
+
+
+# ==============================================================================
+# Mailing List Validation (Asynchronous)
+# ==============================================================================
+
+
+async def delete_list_validation_async(api_key: str, domain: str, list_address: str) -> None:
+    """
+    DELETE /lists/<address>/validate (Asynchronous)
+    :return: None
+    """
+    async with AsyncClient(auth=("api", api_key)) as client:
+        response = await client.lists.delete(domain=domain, address=list_address, validate=True)
+        print("DELETE List Validation (Async):", response.json())
+
+
+async def get_list_validation_async(api_key: str, domain: str, list_address: str) -> None:
+    """
+    GET /lists/<address>/validate (Asynchronous)
+    :return: None
+    """
+    async with AsyncClient(auth=("api", api_key)) as client:
+        response = await client.lists.get(domain=domain, address=list_address, validate=True)
+        print("GET List Validation (Async):", response.json())
+
+
+async def post_list_validation_async(api_key: str, domain: str, list_address: str) -> None:
+    """
+    POST /lists/<address>/validate (Asynchronous)
+    :return: None
+    """
+    async with AsyncClient(auth=("api", api_key)) as client:
+        response = await client.lists.create(domain=domain, address=list_address, validate=True)
+        print("POST List Validation (Async):", response.json())
+
+
+# ==============================================================================
+# Mailing List Members Management (Asynchronous)
+# ==============================================================================
+
+
+async def delete_list_member_async(
+    api_key: str, domain: str, list_address: str, member_address: str
+) -> None:
+    """
+    DELETE /lists/<address>/members/<member_address> (Asynchronous)
+    :return: None
+    """
+    async with AsyncClient(auth=("api", api_key)) as client:
+        response = await client.lists_members.delete(
+            domain=domain,
+            address=list_address,
+            member_address=member_address,
+        )
+        print("DELETE List Member (Async):", response.json())
+
+
+async def get_list_member_async(
+    api_key: str, domain: str, list_address: str, member_address: str
+) -> None:
+    """
+    GET /lists/<address>/members/<member_address> (Asynchronous)
+    :return: None
+    """
+    async with AsyncClient(auth=("api", api_key)) as client:
+        response = await client.lists_members.get(
+            domain=domain,
+            address=list_address,
+            member_address=member_address,
+        )
+        print("GET List Member (Async):", response.json())
+
+
+async def get_list_members_async(api_key: str, domain: str, list_address: str) -> None:
+    """
+    GET /lists/<address>/members (Asynchronous)
+    :return: None
+    """
+    async with AsyncClient(auth=("api", api_key)) as client:
+        response = await client.lists_members.get(domain=domain, address=list_address)
+        print("GET List Members (Async):", response.json())
+
+
+async def get_list_members_pages_async(api_key: str, domain: str, list_address: str) -> None:
+    """
+    GET /lists/<address>/members/pages (Asynchronous)
+    :return: None
+    """
+    async with AsyncClient(auth=("api", api_key)) as client:
+        response = await client.lists_members_pages.get(domain=domain, address=list_address)
+        print("GET List Members Pages (Async):", response.json())
+
+
+async def post_list_member_async(
+    api_key: str, domain: str, list_address: str, member_address: str
+) -> None:
+    """
+    POST /lists/<address>/members (Asynchronous)
+    :return: None
+    """
+    data: dict[str, Any] = {
+        "subscribed": True,
+        "address": member_address,
+        "name": "Bob Bar",
+        "description": "Developer",
+        "vars": '{"age": 26}',
+    }
+    async with AsyncClient(auth=("api", api_key)) as client:
+        response = await client.lists_members.create(domain=domain, address=list_address, data=data)
+        print("POST List Member (Async):", response.json())
+
+
+async def post_list_members_json_async(api_key: str, domain: str, list_address: str) -> None:
+    """
+    POST /lists/<address>/members.json (Asynchronous)
+    :return: None
+    """
+    data: dict[str, Any] = {
+        "upsert": True,
+        "members": '[{"address": "Alice <alice@example.com>", "vars": {"age": 26}},'
+        '{"name": "Bob1", "address": "bob2@example.com", "vars": {"age": 34}}]',
+    }
+    async with AsyncClient(auth=("api", api_key)) as client:
+        response = await client.lists_members.create(
+            domain=domain,
+            address=list_address,
+            data=data,
+            multiple=True,
+        )
+        print("POST List Members JSON (Async):", response.json())
+
+
+async def put_list_member_async(
+    api_key: str, domain: str, list_address: str, member_address: str
+) -> None:
+    """
+    PUT /lists/<address>/members/<member_address> (Asynchronous)
+    :return: None
+    """
+    data: dict[str, Any] = {
+        "subscribed": True,
+        "address": member_address,
+        "name": "Bob Bar 2",
+        "description": "Developer",
+        "vars": '{"age": 28}',
+    }
+    async with AsyncClient(auth=("api", api_key)) as client:
+        response = await client.lists_members.put(
+            domain=domain,
+            address=list_address,
+            data=data,
+            member_address=member_address,
+        )
+        print("PUT List Member (Async):", response.json())
+
+
+# ==============================================================================
+# Execution
+# ==============================================================================
 
 if __name__ == "__main__":
-    delete_lists_address()
+    # Securely load environment variables at runtime
+    API_KEY: str = os.environ.get("APIKEY", "")
+    DOMAIN: str = os.environ.get("DOMAIN", "")
+
+    # Identifiers mapping to your original business logic
+    LIST_ADDRESS_1: str = f"python_sdk2@{DOMAIN}"
+    LIST_ADDRESS_2: str = os.environ.get("MAILLIST_ADDRESS", f"my_list@{DOMAIN}")
+
+    MEMBER_ADDRESS_1: str = "bar2@example.com"
+    MEMBER_ADDRESS_2: str = "bob2@example.com"
+
+    if not API_KEY or not DOMAIN:
+        print("Please set the 'APIKEY' and 'DOMAIN' environment variables to run examples.")
+    else:
+        print("--- Running Synchronous Examples ---")
+        # Lists Management
+        # post_list_sync(api_key=API_KEY, domain=DOMAIN, list_address=LIST_ADDRESS_1)
+        # put_list_sync(api_key=API_KEY, domain=DOMAIN, list_address=LIST_ADDRESS_1)
+        # get_list_sync(api_key=API_KEY, domain=DOMAIN, list_address=LIST_ADDRESS_1)
+        # get_list_pages_sync(api_key=API_KEY, domain=DOMAIN)
+        delete_list_sync(api_key=API_KEY, domain=DOMAIN, list_address=LIST_ADDRESS_1)
+
+        # Lists Validation
+        # post_list_validation_sync(api_key=API_KEY, domain=DOMAIN, list_address=LIST_ADDRESS_1)
+        # get_list_validation_sync(api_key=API_KEY, domain=DOMAIN, list_address=LIST_ADDRESS_1)
+        # delete_list_validation_sync(api_key=API_KEY, domain=DOMAIN, list_address=LIST_ADDRESS_1)
+
+        # Members Management
+        # post_list_member_sync(api_key=API_KEY, domain=DOMAIN, list_address=LIST_ADDRESS_2, member_address=MEMBER_ADDRESS_1)
+        # post_list_members_json_sync(api_key=API_KEY, domain=DOMAIN, list_address=LIST_ADDRESS_2)
+        # put_list_member_sync(api_key=API_KEY, domain=DOMAIN, list_address=LIST_ADDRESS_2, member_address=MEMBER_ADDRESS_1)
+        # get_list_member_sync(api_key=API_KEY, domain=DOMAIN, list_address=LIST_ADDRESS_2, member_address=MEMBER_ADDRESS_1)
+        # get_list_members_sync(api_key=API_KEY, domain=DOMAIN, list_address=LIST_ADDRESS_2)
+        # get_list_members_pages_sync(api_key=API_KEY, domain=DOMAIN, list_address=LIST_ADDRESS_2)
+        # delete_list_member_sync(api_key=API_KEY, domain=DOMAIN, list_address=LIST_ADDRESS_2, member_address=MEMBER_ADDRESS_2)
+
+        print("\n--- Running Asynchronous Examples ---")
+        # asyncio.run(delete_list_async(api_key=API_KEY, domain=DOMAIN, list_address=LIST_ADDRESS_1))
+        # asyncio.run(get_list_member_async(api_key=API_KEY, domain=DOMAIN, list_address=LIST_ADDRESS_2, member_address=MEMBER_ADDRESS_1))
