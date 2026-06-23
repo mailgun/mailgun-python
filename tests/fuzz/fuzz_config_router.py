@@ -39,6 +39,7 @@ def TestOneInput(data: bytes) -> None:
             raise RuntimeError("CRASH: Config base URL is not a string.")
 
     except (ApiError, TypeError, ValueError):
+        # Expected for malformed fuzz input; ignore and continue fuzzing.
         pass
     except KeyError as e:
         if "Invalid endpoint key" in str(e):
