@@ -102,15 +102,43 @@ def test_async_client_concurrent_throughput(benchmark: Any) -> None:
 
     mock_transport = httpx.MockTransport(mock_handler)
 
-    # 1. Attempt modern injection (using client_kwargs dictionary)
-    client = AsyncClient(auth=("api", "key"), client_kwargs={"transport": mock_transport})
-
     try:
-        # Trigger lazy initialization to test compatibility
-        _ = client._client
+        # 1. Attempt modern injection (using client_kwargs dictionary)
+        client = AsyncClient(auth=("api", "key"), client_kwargs={"transport": mock_transport})
     except TypeError:
         # 2. Fallback for v1.6.0: Inject transport as a direct top-level kwarg
         client = AsyncClient(auth=("api", "key"), transport=mock_transport)
+
+    # --- THE ULTIMATE FAILSAFE ---
+    # Ensures the mock transport is forcibly applied even if the SDK's SecureHTTPAdapter
+    # tries to overwrite it with a real ssl.SSLContext during lazy initialization.
+    existing = getattr(client, "_client", None)
+
+    if existing is None or getattr(existing, "_transport", None) != mock_transport:
+        auth = getattr(existing, "auth", getattr(client, "auth", ("api", "key")))
+        limits = getattr(existing, "_limits", httpx.Limits(max_connections=100))
+
+        kwargs: dict[str, Any] = {"transport": mock_transport, "auth": auth, "limits": limits}
+
+        headers = getattr(existing, "headers", None)
+        if headers:
+            kwargs["headers"] = headers
+
+        timeout = getattr(existing, "timeout", None)
+        if timeout:
+            kwargs["timeout"] = timeout
+
+        new_httpx_client = httpx.AsyncClient(**kwargs)
+
+        try:
+            # Use setattr to bypass static read-only property restrictions
+            setattr(client, "_client", new_httpx_client)
+        except AttributeError:
+            pass
+
+        # Always attempt to set the underlying v1.7.0+ private variable just in case
+        setattr(client, "_httpx_client", new_httpx_client)
+    # -------------------------------
 
     async def send_one_email(i: int) -> httpx.Response:
         return await client.messages.create(
