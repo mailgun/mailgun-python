@@ -48,6 +48,7 @@ async def _async_fuzz_target(data: bytes) -> None:
         ValueError,
         httpx.RequestError,
     ):
+        # Expected under fuzzed inputs: ignore and continue exploring execution paths.
         pass
 
 
