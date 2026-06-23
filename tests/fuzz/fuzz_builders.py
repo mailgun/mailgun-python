@@ -112,6 +112,7 @@ def TestOneInput(data: bytes) -> None:
                             fdp.ConsumeUnicodeNoSurrogates(500)
                         )
                     except ValueError:
+                        # Expected for some fuzz inputs; ignore and continue exploring.
                         pass
                 elif op_code == 7:
                     t_builder.set_version_comment(fdp.ConsumeUnicodeNoSurrogates(100))
