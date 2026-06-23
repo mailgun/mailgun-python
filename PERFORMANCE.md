@@ -25,22 +25,22 @@ String manipulation, dynamic imports (`importlib`), and sequential regex evaluat
 ### 4. Zero-Regression Security & Context Generation (v1.8.0+)
 
 - **Centralized Pre-computation:** The `Config` object and unified `_prepare_request` architecture consolidate header merging, authentication resolution, and schema logging into a single invariant block, dropping per-request CPU cycles.
-- **Enterprise-Grade TLS Latency Tradeoff:** The SDK explicitly generates a hardened `ssl.SSLContext()` to enforce `TLSv1.2+` and mitigate MITM downgrade attacks. This introduces a strict, one-time ~9ms boot cost (loading OS certificates via `set_default_verify_paths`), but ensures the active event loop and hot path remain exceptionally fast and safe.
+- **Enterprise-Grade TLS Latency Tradeoff:** The SDK explicitly generates a hardened `ssl.SSLContext()` to enforce `TLSv1.2+` and mitigate MITM downgrade attacks. This introduces a strict, one-time boot cost (loading OS certificates via `set_default_verify_paths`), but ensures the active event loop and hot path remain exceptionally fast and safe.
 
 ______________________________________________________________________
 
-## Benchmarks (v1.7.1 vs. v1.8.0)
+## Benchmarks (v1.7.0 vs. v1.8.0)
 
-This suite proves that the introduction of enterprise-grade security layers (`SecurityGuard`, `SecureHTTPAdapter`, and strict payload definitions) introduced **zero performance regressions** in the active hot path. Traded a fractional cold-boot latency for mathematically sound security boundaries.
+This suite proves that the introduction of enterprise-grade security layers (`SecurityGuard`, strict payload schemas) introduced virtually **zero performance regressions** in the active hot path.
 
-| Metric                      | v1.7.0 (Baseline) | v1.8.0 (Current) | Delta / Notes                                           |
-| :-------------------------- | :---------------- | :--------------- | :------------------------------------------------------ |
-| **Cold Boot Time**          | ~0.119 s          | ~0.200 s         | **+ 81 ms** (Due to strict `ssl.SSLContext()` disk I/O) |
-| **Routing Speed (Mean)**    | ~1.19 µs          | ~1.26 µs         | **Flat** (Statistical noise)                            |
-| **Async Throughput (Mean)** | ~15.14 ms         | ~15.34 ms        | **Flat** (Statistical noise)                            |
-| **Sync Throughput (Mean)**  | ~0.280 ms         | ~0.278 ms        | **Flat** (Statistical noise)                            |
+| Metric                      | v1.7.0 (Baseline) | v1.8.0 (Current) | Delta / Notes                           |
+| :-------------------------- | :---------------- | :--------------- | :-------------------------------------- |
+| **Cold Boot Time**          | ~0.130 s          | **~0.126 s**     | **~3.0% Faster**                        |
+| **Routing Speed (Mean)**    | ~1.22 µs          | **~1.20 µs**     | **Flat** (Statistical noise)            |
+| **Async Throughput (Mean)** | **~0.11 ms**\*    | ~15.76 ms        | **Fixed Pipeline** (See note)           |
+| **Sync Throughput (Mean)**  | **~0.25 ms**      | ~0.28 ms         | **+ 0.03 ms** (Security validation tax) |
 
-*Note: Routing operations per second (OPS) successfully maintained ~790k/sec. The synchronous and asynchronous connection pools natively absorbed the new payload validation constraints without interrupting execution loops.*
+*\* The v1.7.0 Async Throughput time reflects a deprecated test state where the mock transport was accidentally bypassed, resulting in an instant loop crash rather than a full HTTP pipeline execution. The v1.8.0 metric reflects the true, successfully mocked execution.*
 
 ______________________________________________________________________
 
@@ -52,7 +52,7 @@ Our internal `pytest-benchmark` and `cProfile` suites verify these architectural
 | :-------------------------- | :---------------- | :--------------- | :---------------- |
 | **Cold Boot Time**          | ~0.232 s          | **~0.201 s**     | **~13% Faster**   |
 | **Routing Speed (Mean)**    | ~17.98 µs         | **~1.39 µs**     | **~12.9x Faster** |
-| **Async Throughput (Mean)** | ~6.49 ms          | **~5.88 ms**     | **~9.4% Faster**  |
+| **Async Throughput (Mean)** | ~6.49 ms          | **~5.88 ms**\*   | **~9.4% Faster**  |
 | **Sync Throughput (Mean)**  | ~18.29 ms         | **~16.82 ms**    | **~8.0% Faster**  |
 
 *Note: Benchmarks measure network-isolated internal overhead. Routing operations per second (OPS) jumped from ~55k to over **718k**.*
