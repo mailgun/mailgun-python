@@ -94,6 +94,8 @@ def TestOneInput(data: bytes) -> None:
         json.JSONDecodeError,
         requests.RequestException,
     ):
+        # Expected for malformed fuzz inputs; ignore to keep fuzzing and let
+        # only unexpected exceptions fail via the generic handler below.
         pass
     except Exception as e:
         raise RuntimeError(f"UNHANDLED CRASH in Client Multipart execution: {e}") from e
