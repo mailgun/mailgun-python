@@ -58,6 +58,8 @@ def TestOneInput(data: bytes) -> None:
                             fdp.ConsumeUnicodeNoSurrogates(30), rec_type
                         )
                     except ValueError:
+                        # Fuzz input can generate invalid recipient types/values.
+                        # Ignore expected ValueError here and continue exploring.
                         pass
                 elif op_code == 4:
                     builder.set_html(fdp.ConsumeUnicodeNoSurrogates(500))
