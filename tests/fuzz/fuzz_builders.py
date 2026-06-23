@@ -120,6 +120,7 @@ def TestOneInput(data: bytes) -> None:
             try:
                 t_builder.build()
             except ValueError:
+                # Expected for some fuzzed inputs; ignore so fuzzing can continue.
                 pass
 
     except ValueError as e:
