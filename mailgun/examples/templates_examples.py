@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import sys
 import uuid
 from typing import Any
 
@@ -252,7 +253,7 @@ if __name__ == "__main__":
 
     if not API_KEY or not DOMAIN:
         print("Please set the 'APIKEY' and 'DOMAIN' environment variables.")
-        exit(1)
+        sys.exit(1)
 
     # Use UUIDs to prevent '400 Duplicate Template' errors across multiple test runs
     uid = uuid.uuid4().hex[:6]
