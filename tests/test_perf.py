@@ -41,15 +41,47 @@ class TestClientPerformance:
         mock_transport = httpx.MockTransport(mock_handler)
 
         try:
-            # Attempt modern injection (using client_kwargs dictionary)
+            # v1.7.0+ Architecture with Config object
+            from mailgun.config import Config
+            config = Config()
             client = AsyncClient(
-                auth=("api", "key"), client_kwargs={"transport": mock_transport}
+                auth=("api", "key"),
+                config=config,
+                client_kwargs={"transport": mock_transport}
             )
-            # Trigger lazy initialization to test compatibility
-            _ = client._client
-        except TypeError:
-            # Fallback for v1.6.0: Inject transport as a direct top-level kwarg
-            client = AsyncClient(auth=("api", "key"), transport=mock_transport)
+        except Exception:
+            try:
+                # Attempt modern injection (using client_kwargs dictionary)
+                client = AsyncClient(
+                    auth=("api", "key"), client_kwargs={"transport": mock_transport}
+                )
+            except TypeError:
+                # Fallback for v1.6.0: Inject transport as a direct top-level kwarg
+                client = AsyncClient(auth=("api", "key"), transport=mock_transport)
+
+        # Ultimate Failsafe: Ensure mock transport is forcibly applied if silently swallowed
+        existing = getattr(client, "_client", None)
+
+        if existing is None or getattr(existing, "_transport", None) != mock_transport:
+            # Extract safe defaults if the client hasn't fully booted its internal httpx layer
+            auth = getattr(existing, "auth", getattr(client, "auth", ("api", "key")))
+            headers = getattr(existing, "headers", None)
+            limits = getattr(existing, "_limits", httpx.Limits(max_connections=100))
+            timeout = getattr(existing, "timeout", None)
+
+            # Assemble kwargs without injecting None into strict httpx fields
+            kwargs = {"transport": mock_transport, "auth": auth, "limits": limits}
+            if headers is not None: kwargs["headers"] = headers
+            if timeout is not None: kwargs["timeout"] = timeout
+
+            new_httpx_client = httpx.AsyncClient(**kwargs)
+
+            try:
+                # Use setattr to bypass Pyright's static read-only property warnings
+                setattr(client, "_client", new_httpx_client)
+            except AttributeError:
+                # If _client is a read-only property (v1.7.0+), target the underlying variable
+                setattr(client, "_httpx_client", new_httpx_client)
 
         async def send_one_email(i: int) -> httpx.Response:
             return await client.messages.create(
