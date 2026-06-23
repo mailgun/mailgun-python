@@ -67,9 +67,12 @@ def TestOneInput(data: bytes) -> None:
                 ValueError,
                 httpx.RequestError,
             ):
-                pass
+                # Expected under fuzzed transport/inputs: keep exploring inputs
+                # and only fail on truly unexpected exceptions below.
+                return
             except json.JSONDecodeError:
-                pass
+                # Malformed fuzzed payloads are expected in this harness.
+                return
             except Exception as e:
                 raise RuntimeError(
                     f"SDK crashed handling Async Evil Server response: {e}"
