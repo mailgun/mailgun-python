@@ -8,6 +8,9 @@ on:
   schedule:
     - cron: '37 3 * * 0' # Run weekly on Sundays to catch newly published CVEs
 
+permissions:
+  contents: read
+
 jobs:
   static-analysis:
     name: Semgrep & Bandit
