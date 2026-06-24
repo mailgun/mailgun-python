@@ -80,6 +80,7 @@ def TestOneInput(data: bytes) -> None:
             UnicodeEncodeError,
             ValueError,
     ):
+        # Expected during fuzzing: keep exploring inputs without failing the harness.
         pass
 
 

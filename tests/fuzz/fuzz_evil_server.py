@@ -78,9 +78,10 @@ def TestOneInput(data: bytes) -> None:
                 TypeError,
                 ValueError,
                 httpx.RequestError,
+                json.JSONDecodeError,
             ):
-                pass
-            except json.JSONDecodeError:
+                # Expected during fuzzing: malformed inputs and injected network faults.
+                # Intentionally ignored so the harness can continue exploring inputs.
                 pass
             finally:
                 httpx.AsyncClient.send = original_send  # type: ignore[method-assign]

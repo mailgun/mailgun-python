@@ -66,6 +66,7 @@ def TestOneInput(data: bytes) -> None:
         if "Attempt to overwrite" not in str(e):
             raise RuntimeError(f"CRASH: Unexpected KeyError in logger: {e}") from e
     except (TypeError, UnicodeEncodeError, ValueError):
+        # Expected for malformed fuzz inputs; input rejection is acceptable and not a crash.
         pass
     except Exception as e:
         raise RuntimeError(f"CRASH: Logger failed to handle input securely: {e}") from e

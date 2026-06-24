@@ -133,5 +133,7 @@ class AsyncCoverageIntegrationTests(unittest.IsolatedAsyncioTestCase):
                 items.append(item)
                 break
         except ApiError:
+            # Integration coverage test: API calls may fail due to tier/network limits.
+            # We only need to exercise async stream control flow here.
             pass
         self.assertTrue(True)

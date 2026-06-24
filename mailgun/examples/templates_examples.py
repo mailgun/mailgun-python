@@ -306,14 +306,14 @@ if __name__ == "__main__":
         # Clean up V3 Domain artifacts
         try:
             delete_domain_template_sync(API_KEY, DOMAIN, V3_DOMAIN_TMPL)
-        except Exception:
-            pass
+        except Exception as exc:
+            print(f"WARNING: Failed to delete domain template {V3_DOMAIN_TMPL}: {exc}")
 
         # Clean up V4 Account artifacts
         try:
             delete_account_template_sync(API_KEY, V4_ACCOUNT_TMPL)
-        except Exception:
-            pass
+        except Exception as exc:
+            print(f"WARNING: Failed to delete account template {V4_ACCOUNT_TMPL}: {exc}")
 
         # Note: delete_all_templates_sync(API_KEY, DOMAIN) is intentionally omitted
         # from the finally block to prevent accidentally wiping out production templates!

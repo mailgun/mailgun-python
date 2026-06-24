@@ -92,6 +92,7 @@ def TestOneInput(data: bytes) -> None:
         # Target: Does the redactor crash on nested lists, ints, or ReDoS?
         filter_instance.filter(record)
     except (TypeError, ValueError):
+        # Expected for malformed fuzz-generated inputs; not treated as security crashes.
         pass
     except Exception as e:
         # Any other exception (AttributeError, RecursionError) is a security failure

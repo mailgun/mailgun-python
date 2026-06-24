@@ -46,7 +46,8 @@ def TestOneInput(data: bytes) -> None:
         # ValueError and TypeError are expected security rejections.
         SecurityGuard.sanitize_headers(headers)
     except (TypeError, ValueError):
-        pass
+        # Expected during fuzzing when malformed headers are rejected.
+        return
 
 
 if __name__ == "__main__":

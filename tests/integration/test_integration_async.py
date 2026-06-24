@@ -1220,8 +1220,11 @@ class AsyncMailingListsTests(unittest.IsolatedAsyncioTestCase):
         # Pre-emptive async cleanup block
         try:
             await self.client.lists.delete(domain=self.domain, address=target_address)
-        except Exception:
-            pass
+        except Exception as exc:
+            # Best-effort cleanup: ignore "not found"/already absent list cases only.
+            status_code = getattr(getattr(exc, "response", None), "status_code", None)
+            if status_code not in {400, 404}:
+                raise
 
         # Execute creation on the dedicated isolated path
         create_req = await self.client.lists.create(domain=self.domain, data=self.mailing_lists_data)
