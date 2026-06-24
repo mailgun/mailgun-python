@@ -8,14 +8,13 @@ This file demonstrates the strict API separation between:
 
 from __future__ import annotations
 
-import asyncio
 import os
 import sys
 import uuid
 from typing import Any
 
 from mailgun.builders import MailgunTemplateBuilder
-from mailgun.client import AsyncClient, Client
+from mailgun.client import Client
 
 # ==============================================================================
 # HELPER FUNCTIONS

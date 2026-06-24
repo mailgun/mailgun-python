@@ -28,7 +28,6 @@ from urllib3.util.retry import Retry
 from mailgun.config import Config
 from mailgun.endpoints import AsyncEndpoint, BaseEndpoint, Endpoint
 from mailgun.filters import RedactingFilter
-from mailgun.logger import get_logger
 from mailgun.security import SecretAuth, SecureHTTPAdapter, SecurityGuard
 
 
@@ -58,8 +57,6 @@ __all__ = [
     "SecureHTTPAdapter",
     "SecurityGuard",
 ]
-
-logger = get_logger(__name__)
 
 
 # Constants for API error handling and logging (fixes Ruff PLR2004)

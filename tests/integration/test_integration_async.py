@@ -2426,7 +2426,9 @@ class AsyncNewIntegrationPaidTierTests(unittest.IsolatedAsyncioTestCase):
             return req.json()
         except Exception as e:
             logging.getLogger(__name__).warning(f"Ignored integration error: {e}")
-            self.fail(f"Async API did not return JSON. Route: {req.url}. Response: {req.text}")
+            raise AssertionError(
+                f"Async API did not return JSON. Route: {req.url}. Response: {req.text}"
+            ) from e
 
     # --- SUCCESSFUL ENDPOINTS ---
     async def test_optimize_alerts(self) -> None:

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import logging
 import unittest
 from typing import Any
 
@@ -28,7 +27,7 @@ class CoverageIntegrationTests(unittest.TestCase):
         except ApiError:
             # We care about SDK routing logic executing successfully,
             # not whether the Mailgun free tier accepts the request.
-            pass
+            return None
         except Exception as e:
             # Re-raise actual SDK crashes (TypeError, KeyError, etc.)
             raise e
