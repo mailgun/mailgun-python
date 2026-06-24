@@ -45,7 +45,6 @@ jobs:
           channels: defaults
           show-channel-urls: true
           environment-file: environment-dev.yaml
-          cache: 'pip'  # Drastically speeds up CI by caching pip dependencies
 
       - name: Install package
         run: |
