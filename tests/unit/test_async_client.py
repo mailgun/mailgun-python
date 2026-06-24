@@ -53,7 +53,7 @@ class TestAsyncClient:
         """Ensures that calling `.aclose()` repeatedly does not crash the client."""
         client = AsyncClient(auth=("api", "key"))
 
-        client._httpx_client = httpx.AsyncClient()
+        client._httpx_client = AsyncMock(spec=httpx.AsyncClient)
         assert client._httpx_client is not None
 
         await client.aclose()
@@ -82,13 +82,17 @@ class TestAsyncClient:
         """Ensures the async context manager correctly initializes and closes the client."""
         async with AsyncClient(auth=("api", "key")) as client:
             assert client.auth == ("api", "key")
-            client._httpx_client = httpx.AsyncClient()
+            client._httpx_client = AsyncMock(spec=httpx.AsyncClient)
             assert client._httpx_client is not None
 
         assert client._httpx_client is None
 
+    @patch("httpx.AsyncHTTPTransport")
+    @patch("httpx.AsyncClient")
     @pytest.mark.asyncio
-    async def test_async_client_context_manager_clean_exit(self) -> None:
+    async def test_async_client_context_manager_clean_exit(
+        self, _mock_httpx: MagicMock, _mock_transport: MagicMock
+    ) -> None:
         """Cover clean AsyncClient __aexit__."""
         client = AsyncClient(auth=("api", "key"))
         async with client:
@@ -161,7 +165,11 @@ class TestAsyncClient:
         assert "bounces" in client_dir
         assert "domains" in client_dir
 
-    def test_async_client_getattr_caching_and_dir(self) -> None:
+    @patch("httpx.AsyncHTTPTransport")
+    @patch("httpx.AsyncClient")
+    def test_async_client_getattr_caching_and_dir(
+        self, _mock_httpx: MagicMock, _mock_transport: MagicMock
+    ) -> None:
         """Ensures that dynamic endpoints are correctly instantiated."""
         client = AsyncClient(auth=("api", "key"))
 

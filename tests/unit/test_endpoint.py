@@ -84,19 +84,22 @@ class TestEndpointDryRun:
 
     def test_async_api_call_dry_run_intercepts_request(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["messages"]}
-        ep = AsyncEndpoint(url=url, headers={}, auth=("api", "key"), dry_run=True)
+
+        mock_client = AsyncMock(spec=httpx.AsyncClient)
+        ep = AsyncEndpoint(
+            url=url, headers={}, auth=("api", "key"), dry_run=True, client=mock_client
+        )
 
         async def run_test() -> None:
-            with patch.object(httpx.AsyncClient, "request") as mock_req:
-                resp = await ep.create(
-                    domain="test.com", data={"to": "test@example.com"}
-                )
-                mock_req.assert_not_called()
-                assert resp.status_code == 200
-                assert "Dry run successful" in resp.json()["message"]
+            # We don't need to patch.object because ep uses mock_client natively now
+            resp = await ep.create(
+                domain="test.com", data={"to": "test@example.com"}
+            )
+            mock_client.request.assert_not_called()
+            assert resp.status_code == 200
+            assert "Dry run successful" in resp.json()["message"]
 
         asyncio.run(run_test())
-
 
 class TestEndpointEdgeCases:
     def test_build_path_from_keys_empty_and_iterables(self) -> None:
@@ -190,7 +193,9 @@ class TestEndpointHTTPMethods:
         Covers the direct method proxy functions for put and delete edge cases.
         """
         url = {"base": "https://api.mailgun.net/v3/", "keys": ["domains"]}
-        ep = AsyncEndpoint(url=url, headers={}, auth=("api", "key"))
+
+        mock_client = AsyncMock(spec=httpx.AsyncClient)
+        ep = AsyncEndpoint(url=url, headers={}, auth=("api", "key"), client=mock_client)
 
         with patch(
             "mailgun.endpoints.AsyncEndpoint.api_call", new_callable=AsyncMock
