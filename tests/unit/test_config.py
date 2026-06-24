@@ -341,12 +341,12 @@ class TestConfigURLValidation:
         assert "Semantic Configuration Warning" in warning_msg
         assert "stripped to prevent routing duplication" in warning_msg
 
-    @patch("mailgun.client.logger.warning")
+    @patch("mailgun.config.logger.warning")
     def test_validate_api_url_no_warning_on_https(self, mock_warn: MagicMock) -> None:
         Config(api_url="https://api.mailgun.net")
         mock_warn.assert_not_called()
 
-    @patch("mailgun.client.logger.warning")
+    @patch("mailgun.config.logger.warning")
     def test_validate_api_url_no_warning_on_localhost(
         self, mock_warn: MagicMock
     ) -> None:
