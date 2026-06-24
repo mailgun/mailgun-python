@@ -38,7 +38,8 @@ dependencies:
   - python-dotenv >=0.19.2
   - types-jsonschema
   - pip:
-      - atheris >=2.3.0
+      # Requires llvm; disabled on CI
+      #- atheris >=2.3.0
       - bandit
       - codecov >=2.0.16
       - docconvert
