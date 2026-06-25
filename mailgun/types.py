@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, TypeAlias, Union
 
 
 if TYPE_CHECKING:
-    import httpx
+    from httpx import Timeout as HttpxTimeout
 
 
 if sys.version_info >= (3, 11):
@@ -19,7 +19,7 @@ else:
 # ---------------------------------------------------------
 # Security & Client Types
 # ---------------------------------------------------------
-TimeoutType: TypeAlias = Union[float, tuple[float, float], "httpx.Timeout", None]
+TimeoutType: TypeAlias = Union[float, tuple[float, float], "HttpxTimeout", None]
 
 # ---------------------------------------------------------
 # Routing Types
