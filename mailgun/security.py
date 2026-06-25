@@ -44,7 +44,7 @@ class SecureHTTPAdapter(HTTPAdapter):
         context.minimum_version = ssl.TLSVersion.TLSv1_2
         kwargs["ssl_context"] = context
         # HTTPAdapter lacks strict static types for this internal method.
-        super().init_poolmanager(*args, **kwargs)  # type: ignore[no-untyped-call]
+        super().init_poolmanager(*args, **kwargs)
 
 
 class SecretAuth(tuple):  # type: ignore[type-arg]
