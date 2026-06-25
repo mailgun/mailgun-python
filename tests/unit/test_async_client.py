@@ -94,6 +94,9 @@ class TestAsyncClient:
         self, _mock_httpx: MagicMock, _mock_transport: MagicMock
     ) -> None:
         """Cover clean AsyncClient __aexit__."""
+
+        _mock_httpx.return_value.aclose = AsyncMock()
+
         client = AsyncClient(auth=("api", "key"))
         async with client:
             _ = client._client
