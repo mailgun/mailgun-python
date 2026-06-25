@@ -252,7 +252,7 @@ class BaseEndpoint:
         # Load the handler function dynamically via the cached lazy loader
         handler = _load_handler(endpoint_key)
 
-        return handler(url, domain, method, **kwargs)  # type: ignore[no-untyped-call]
+        return handler(url, domain, method, **kwargs)
 
     def _merge_headers(self, kwargs: dict[str, Any]) -> dict[str, str]:
         """Safely extract and merge custom headers from kwargs.

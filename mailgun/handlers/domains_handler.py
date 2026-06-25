@@ -30,7 +30,7 @@ def handle_domainlist(
         The final URL for the domainlist endpoint.
     """
     # Ensure base ends with slash before appending
-    return url["base"].rstrip("/") + "/domains"
+    return str(url["base"]).rstrip("/") + "/domains"
 
 
 def handle_domains(

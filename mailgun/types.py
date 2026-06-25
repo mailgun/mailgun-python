@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import re
 import sys
-from typing import TypeAlias
+from typing import TYPE_CHECKING, TypeAlias, Union
+
+
+if TYPE_CHECKING:
+    import httpx
 
 
 if sys.version_info >= (3, 11):
@@ -15,7 +19,7 @@ else:
 # ---------------------------------------------------------
 # Security & Client Types
 # ---------------------------------------------------------
-TimeoutType: TypeAlias = float | tuple[float, float] | None
+TimeoutType: TypeAlias = Union[float, tuple[float, float], "httpx.Timeout", None]
 
 # ---------------------------------------------------------
 # Routing Types

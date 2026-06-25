@@ -44,10 +44,10 @@ class SecureHTTPAdapter(HTTPAdapter):
         context.minimum_version = ssl.TLSVersion.TLSv1_2
         kwargs["ssl_context"] = context
         # HTTPAdapter lacks strict static types for this internal method.
-        return super().init_poolmanager(*args, **kwargs)  # type: ignore[no-untyped-call]
+        super().init_poolmanager(*args, **kwargs)  # type: ignore[no-untyped-call]
 
 
-class SecretAuth(tuple):
+class SecretAuth(tuple):  # type: ignore[type-arg]
     """OWASP: Obfuscate credentials in memory dumps and tracebacks."""
 
     __slots__ = ()  # DX & Performance: Prevent __dict__ creation to optimize memory usage.

@@ -208,8 +208,7 @@ lint.ignore = [
     "C901",
     "PLR0913",
     "CPY001",
-    # too-many-statements-in-try-clause (PLW0717)
-    "PLW0717",
+    "PLW0717", # too-many-statements-in-try-clause (PLW0717)
 ]
 lint.exclude = [ "mailgun/examples/*", "tests" ]
 lint.per-file-ignores."__init__.py" = [ "E402" ]
