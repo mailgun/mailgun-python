@@ -30,7 +30,7 @@ dependencies:
   - pyright
   - ruff
   - toml
-  - types-requests
+  - types-requests >=2.33.0
   # other
   - conda
   - jsonschema

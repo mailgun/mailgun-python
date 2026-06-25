@@ -65,7 +65,7 @@ optional-dependencies.linting = [
   "ruff",
   "mypy",
   "pyright",
-  "types-requests",
+  "types-requests>=2.33.0",
   "vulture",
   "python-dotenv>=1.2.2",
 ]
