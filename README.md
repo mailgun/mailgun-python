@@ -1,11 +1,10 @@
+````markdown
 # Mailgun Python SDK
 
 Welcome to the official Python SDK for [Mailgun](http://www.mailgun.com/)!
 
 Check out all the resources and Python code examples in the official
 [Mailgun Documentation](https://documentation.mailgun.com).
-
-## Table of contents
 
 ## Table of contents
 
@@ -26,8 +25,7 @@ Check out all the resources and Python code examples in the official
     - [Base URL](#base-url)
     - [Authentication](#authentication)
   - [Quick Start](#quick-start)
-    - [Client](#client)
-      - [Advanced Configuration](#advanced-configuration)
+    - [Synchronous Client](#client)
     - [AsyncClient](#asyncclient)
   - [Usage](#usage)
     - [Logging & Debugging](#logging--debugging)
@@ -41,7 +39,7 @@ Check out all the resources and Python code examples in the official
     - [Fluent Message Builder](#fluent-message-builder)
     - [Streaming Pagination](#streaming-pagination)
     - [Strict Payload Schemas](#strict-payload-schemas)
-  - [Request examples](#request-examples)
+  - [API Reference](#request-examples)
     - [Full list of supported endpoints](#full-list-of-supported-endpoints)
     - [Messages](#messages)
       - [Send an email](#send-an-email)
@@ -139,6 +137,8 @@ This library `mailgun` officially supports the following Python versions:
 - python >=3.10,\<3.15
 
 It's tested up to 3.14 (including).
+It guarantees cross-platform compatibility across Linux, macOS, and Windows.
+
 
 ## Requirements
 
@@ -148,22 +148,21 @@ To build the `mailgun` package from the sources you need `setuptools` (as a buil
 
 ### Runtime dependencies
 
-At runtime the package requires only `requests >=2.33.0`. For async support, it uses `httpx >=0.24` and `typing-extensions >=4.7.1` for Python `<3.11`.
+At runtime the package requires `requests >=2.33.0`. For async support, it uses `httpx >=0.24` and `typing-extensions >=4.7.1` (for pre-3.11 backward compatibility).
 
 ### Test dependencies
 
-For running test you need `pytest >=9.0.3`, `pytest-asyncio`, and `responses` at least. Make sure to provide the environment variables from
-[Authentication](#authentication).
+For running test you need `pytest >=9.0.3`, `pytest-asyncio`, and `responses` at least. Make sure to provide the environment variables from [Authentication](#authentication).
 
 ## Installation
 
 ### pip install
 
-Use the below code to install the Mailgun SDK for Python:
+Use the below command to install the Mailgun SDK for Python:  
 
 ```bash
 pip install mailgun
-```
+````
 
 #### git clone & pip install locally
 
@@ -229,16 +228,6 @@ EU: `https://api.eu.mailgun.net`
 
 **⚠️ Important:** The `api_url` parameter must strictly be the **base host only** (e.g., `https://api.eu.mailgun.net`). Do **not** append API version paths (like `/v3` or `/v4`) to this string. The SDK's data-driven routing engine automatically appends the correct, endpoint-specific API version under the hood.
 
-```python
-import os
-from mailgun.client import Client
-
-# Pass ONLY the base domain
-with Client(auth=("api", os.environ["APIKEY"]), api_url="https://api.eu.mailgun.net") as client:
-    # do someshings
-    pass
-```
-
 ### Authentication
 
 Authenticate your Client using a tuple of ("api", "YOUR_API_KEY"). Find your API key in the [Mailgun Control Panel](https://app.mailgun.com/settings/api_security).
@@ -263,9 +252,9 @@ export ROLE="admin"
 
 ## Quick Start
 
-Synchronous vs Asynchronous Client.
+Synchronous and Asynchronous Clients.
 
-### Client
+### Synchronous Client
 
 #### Client Lifecycle & Resource Management
 
@@ -285,13 +274,11 @@ client = Client(auth=("api", os.environ["APIKEY"]))
 client.messages.create(data={"to": "user@example.com"})
 ```
 
+> [!WARNING]
+> If you are running long-lived applications (like Celery workers, web servers, or high-volume loops), repeatedly initializing the `Client` without closing it can lead to socket leaks (`Too many open files`).
+> For production applications, \**always use the client as a Context Manager* (`with`) or explicitly call `client.close()`. This ensures deterministic release of TCP connection pools.
+
 **The Recommended Variant (Context Manager)**
-
-[!WARNING]
-
-If you are running long-lived applications (like Celery workers, web servers, or high-volume loops), repeatedly initializing the `Client` without closing it can lead to socket leaks (`Too many open files`).
-
-For production applications, \**always use the client as a Context Manager* (`with`) or explicitly call `client.close()`. This ensures deterministic release of TCP connection pools.
 
 ```python
 import os
@@ -302,13 +289,9 @@ with Client(auth=("api", os.environ["APIKEY"])) as client:
     client.messages.create(data={"to": "user@example.com"})
 ```
 
-#### Advanced Configuration
-
-The SDK implements Timeouts by default `read=60.0s` (but can take a tuple with connect/read `(10.0, 60.0)` to ensure your application fails-fast during network partitions but remains patient while Mailgun processes heavy analytical queries).
-
 ### AsyncClient
 
-SDK provides also async version of the client to use in asynchronous applications. The AsyncClient offers the same functionality as the sync client but with non-blocking I/O, making it ideal for concurrent operations and integration with asyncio-based applications.
+SDK provides native async version of the client to use in asynchronous applications. The AsyncClient offers the same functionality as the sync client but with non-blocking I/O, making it ideal for concurrent operations and integration with asyncio-based applications.
 
 ```python
 import asyncio
@@ -338,39 +321,37 @@ if __name__ == "__main__":
 
 ## Usage
 
-Send a message with a Synchronous Client.
+Send a message with a Synchronous Client safely inside a context manager.
 
 ```python
 import os
 from mailgun.client import Client
 
-# Initialize the client
-client = Client(auth=("api", os.environ["APIKEY"]))
+# Send an email using context manager
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    response = client.messages.create(
+        data={
+            "from": "Excited User <mailgun@sandbox.mailgun.org>",
+            "to": ["recipient@example.com"],
+            "subject": "Hello from Mailgun Python SDK",
+            "text": "Testing some Mailgun awesomeness!",
+        }
+    )
 
-# Send an email
-response = client.messages.create(
-    data={
-        "from": "Excited User <mailgun@sandbox.mailgun.org>",
-        "to": ["recipient@example.com"],
-        "subject": "Hello from Mailgun Python SDK",
-        "text": "Testing some Mailgun awesomeness!",
-    }
-)
-
-print(response.status_code)
-print(response.json())
+    print(response.status_code)
+    print(response.json())
 ```
 
 The `AsyncClient` provides async equivalents for all methods available in the sync `Client`. The method signatures and parameters are identical - simply add `await` when calling methods:
 
 ```python
 # Sync version
-client = Client(auth=auth)
-result = client.domainlist.get()
+with Client(auth=auth) as client:
+    result = client.domainlist.get()
 
 # Async version
-client = AsyncClient(auth=auth)
-result = await client.domainlist.get()
+async with AsyncClient(auth=auth) as client:
+    result = await client.domainlist.get()
 ```
 
 For detailed examples of all available methods, parameters, and use cases, refer to the [mailgun/examples](mailgun/examples) section. All examples can be adapted to async by using `AsyncClient` and adding `await` to method calls.
@@ -395,11 +376,10 @@ logging.getLogger("mailgun.client").setLevel(logging.DEBUG)
 logging.basicConfig(format="%(levelname)s - %(name)s - %(message)s")
 
 # Now, any API errors or requests will be printed to your console
-client = Client(auth=("api", "key-super-secret-12345"))
-# API keys will be redacted:
-# "Sending request to https://api.mailgun.net/v3/messages with auth ('api', 'key-[REDACTED]')"
-client.domains.get()
-client.close()
+with Client(auth=("api", "key-super-secret-12345")) as client:
+    # API keys will be redacted:
+    # "Sending request to https://api.mailgun.net/v3/messages with auth ('api', 'key-[REDACTED]')"
+    client.domains.get()
 ```
 
 ### Timeout Configuration
@@ -412,7 +392,9 @@ Timeouts can be passed as a single `float` (seconds for both connect and read) o
 from mailgun import Client
 
 # 3.5 seconds to connect, 15 seconds to wait for the server response
-client = Client(auth=("api", "your-key"), timeout=(3.5, 15.0))
+with Client(auth=("api", "your-key"), timeout=(3.5, 15.0)) as client:
+    # Execute safely timed API calls here
+    pass
 ```
 
 ### IDE Autocompletion & DX
@@ -433,25 +415,24 @@ This allows you to fully validate your SDK initialization, dynamic routing, and 
 from mailgun.client import Client
 
 # 1. Initialize the client in strict Sandbox Mode
-client = Client(auth=("api", "your-api-key"), dry_run=True)
+with Client(auth=("api", "your-api-key"), dry_run=True) as client:
+    # 2. Execute a state-changing API call
+    response = client.messages.create(
+        domain="yourdomain.com",
+        data={
+            "from": "sender@example.com",
+            "to": "test@example.com",
+            "subject": "Testing Sandbox",
+            "text": "This will not actually send!",
+        },
+    )
 
-# 2. Execute a state-changing API call
-response = client.messages.create(
-    domain="yourdomain.com",
-    data={
-        "from": "sender@example.com",
-        "to": "test@example.com",
-        "subject": "Testing Sandbox",
-        "text": "This will not actually send!",
-    },
-)
+    # 3. The SDK intercepts the I/O layer and returns a mock 200 OK response
+    print(response.status_code)
+    # Outputs: 200
 
-# 3. The SDK intercepts the I/O layer and returns a mock 200 OK response
-print(response.status_code)
-# Outputs: 200
-
-print(response.json())
-# Outputs: {"message": "Dry run successful - request intercepted", "id": "<dry-run-mock-id>"}
+    print(response.json())
+    # Outputs: {"message": "Dry run successful - request intercepted", "id": "<dry-run-mock-id>"}
 ```
 
 Key Behaviors in `dry_run` Mode:
@@ -498,14 +479,16 @@ with Client(auth=("api", "your-api-key")) as client:
 
 **Asynchronous:**
 
-```
+```python
 import asyncio
 from mailgun import AsyncClient
+
 
 async def main():
     async with AsyncClient(auth=("api", "your-api-key")) as client:
         response = await client.domains.get()
         print(response.json())
+
 
 asyncio.run(main())
 ```
@@ -569,7 +552,7 @@ with Client(auth=("api", "key")) as client:
 
 ### Full list of supported endpoints
 
-> [!IMPORTANT]\
+> [!IMPORTANT]
 > This is a full list of supported endpoints this SDK provides [mailgun/examples](mailgun/examples)
 
 ### Messages
@@ -581,13 +564,18 @@ a MIME representation of the message and send it. Note: In order to send you mus
 parameters: 'text', 'html', 'amp-html' or 'template'
 
 ```python
+import os
+from mailgun import Client
+
 data = {
     "from": "test@test.com",
     "to": "recipient@example.com",
     "subject": "Hello from python!",
     "text": "Hello world!",
 }
-req = client.messages.create(data=data)
+
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.messages.create(data=data)
 ```
 
 #### Send an email with advanced parameters (Tags, Testmode, STO)
@@ -595,6 +583,9 @@ req = client.messages.create(data=data)
 Because the SDK maps kwargs directly to the payload, it inherently supports all advanced Mailgun features without needing SDK updates. You can easily add custom variables (`v:`), options (`o:`), and Send Time Optimization (STO) directly to your data dictionary.
 
 ```python
+import os
+from mailgun import Client
+
 data = {
     "from": "Excited User <mailgun@my-domain.com>",
     "to": ["recipient1@example.com", "recipient2@example.com"],
@@ -605,7 +596,9 @@ data = {
     "o:deliverytime-optimize-period": "24h",  # Send Time Optimization
     "v:my-custom-id": "USER-12345",  # Custom user-defined variable
 }
-req = client.messages.create(data=data)
+
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.messages.create(data=data)
 ```
 
 #### Send an email with attachments
@@ -613,28 +606,38 @@ req = client.messages.create(data=data)
 It is strongly recommended that you open files in binary mode (`read_bytes()`).
 
 ```python
+import os
 from pathlib import Path
+from mailgun import Client
 
-files = [("attachment", ("report.pdf", Path("report.pdf").read_bytes()))]
-req = client.messages.create(data=data, files=files)
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    files = [("attachment", ("report.pdf", Path("report.pdf").read_bytes()))]
+    # Assuming `data` is predefined like in the previous example
+    req = client.messages.create(data=data, files=files)
 ```
 
 #### Send a scheduled message
 
 ```python
+import os
+from mailgun import Client
+
+
 def post_scheduled() -> None:
     # Scheduled message
+    domain: str = os.environ["DOMAIN"]
     data = {
         "from": os.environ["MESSAGES_FROM"],
         "to": os.environ["MESSAGES_TO"],
         "cc": os.environ["MESSAGES_CC"],
         "subject": "Hello Vasyl Bodaj",
-        "html": html,
+        "html": "<html><body>Hello!</body></html>",
         "o:deliverytime": "Thu Jan 28 2021 14:00:03 EST",
     }
 
-    req = client.messages.create(data=data, domain=domain)
-    print(req.json())
+    with Client(auth=("api", os.environ["APIKEY"])) as client:
+        req = client.messages.create(data=data, domain=domain)
+        print(req.json())
 ```
 
 #### Send a MIME message
@@ -642,6 +645,11 @@ def post_scheduled() -> None:
 When using the .mimemessage endpoint, Mailgun strictly requires the payload to be sent as multipart/form-data. In Python, you trigger this by passing the raw MIME string via the files parameter, assigning it to the "message" key.
 
 ```python
+import os
+from mailgun import Client
+
+domain: str = os.environ["DOMAIN"]
+
 mime_string = (
     "From: sender@example.com\n"
     "To: recipient@example.com\n"
@@ -651,13 +659,13 @@ mime_string = (
 ).encode("utf-8")
 
 # Force multipart/form-data by passing `files`
-req = client.mimemessage.create(
-    domain=domain,
-    data={"to": "recipient@example.com"},
-    files={"message": ("message.mime", mime_string)},
-)
-
-print(req.json())
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.mimemessage.create(
+        domain=domain,
+        data={"to": "recipient@example.com"},
+        files={"message": ("message.mime", mime_string)},
+    )
+    print(req.json())
 ```
 
 ### Domains
@@ -665,35 +673,57 @@ print(req.json())
 #### Get domains
 
 ```python
-data = client.domainlist.get()
-print(data.json())
+import os
+from mailgun import Client
+
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    data = client.domainlist.get()
+    print(data.json())
 ```
 
 #### Get domains with filters
 
 ```python
-data = client.domainlist.get(filters={"skip": 0, "limit": 10})
-print(data.json())
+import os
+from mailgun import Client
+
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    data = client.domainlist.get(filters={"skip": 0, "limit": 10})
+    print(data.json())
 ```
 
 #### Get domains details
 
 ```python
+import os
+from mailgun import Client
+
 domain_name = "python.test.com"
-data = client.domains.get(domain_name=domain_name)
-print(data.json())
+
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    data = client.domains.get(domain_name=domain_name)
+    print(data.json())
 ```
 
 #### Create a domain
 
 ```python
+import os
+from mailgun import Client
+
 data = {"name": "new.domain.com"}
-req = client.domains.create(data=data)
+
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.domains.create(data=data)
 ```
 
 #### Update a domain
 
 ```python
+import os
+from mailgun import Client
+
+
 def update_simple_domain() -> None:
     """
     PUT /domains/<domain>
@@ -701,20 +731,29 @@ def update_simple_domain() -> None:
     """
     domain_name = "python.test.domain5"
     data = {"name": domain_name, "spam_action": "disabled"}
-    request = client.domains.put(data=data, domain=domain_name)
-    print(request.json())
+
+    with Client(auth=("api", os.environ["APIKEY"])) as client:
+        request = client.domains.put(data=data, domain=domain_name)
+        print(request.json())
 ```
 
 #### Domain connections
 
 ```python
+import os
+from mailgun import Client
+
+
 def get_connections() -> None:
     """
     GET /domains/<domain>/connection
     :return:
     """
-    request = client.domains_connection.get(domain=domain)
-    print(request.json())
+    domain: str = os.environ["DOMAIN"]
+
+    with Client(auth=("api", os.environ["APIKEY"])) as client:
+        request = client.domains_connection.get(domain=domain)
+        print(request.json())
 ```
 
 ### Domain keys
@@ -724,6 +763,10 @@ def get_connections() -> None:
 List domain keys, and optionally filter by signing domain or selector. The page & limit data is only required when paging through the data.
 
 ```python
+import os
+from mailgun import Client
+
+
 def get_dkim_keys() -> None:
     """
     GET /v1/dkim/keys
@@ -736,8 +779,9 @@ def get_dkim_keys() -> None:
         "selector": "smtp",
     }
 
-    request = client.dkim_keys.get(data=data)
-    print(request.json())
+    with Client(auth=("api", os.environ["APIKEY"])) as client:
+        request = client.dkim_keys.get(data=data)
+        print(request.json())
 ```
 
 #### Create a domain key
@@ -748,16 +792,18 @@ Alternatively, you can import an existing PEM file containing an RSA private key
 Note, the pem can be passed as a file attachment or as a form-string parameter.
 
 ```python
+import os
+import re
+import subprocess
+from pathlib import Path
+from mailgun import Client
+
+
 def post_dkim_keys() -> None:
     """
     POST /v1/dkim/keys
     :return:
     """
-    import os
-    import re
-    import subprocess
-    from pathlib import Path
-
     secret_key_filename: str = os.environ["SECRET_KEY_FILENAME"]
     secret_key_path: Path = Path(secret_key_filename)
     ALLOWED_FILENAME_RE = re.compile(r"^[a-zA-Z0-9._-]{1,255}$")
@@ -787,21 +833,29 @@ def post_dkim_keys() -> None:
 
     headers = {"Content-Type": "multipart/form-data"}
 
-    request = client.dkim_keys.create(data=data, headers=headers, files=files)
-    print(request.json())
+    with Client(auth=("api", os.environ["APIKEY"])) as client:
+        request = client.dkim_keys.create(data=data, headers=headers, files=files)
+        print(request.json())
 ```
 
 ##### Update DKIM authority
 
 ```python
+import os
+from mailgun import Client
+
+
 def put_dkim_authority() -> None:
     """
     PUT /domains/<domain>/dkim_authority
     :return:
     """
+    domain: str = os.environ["DOMAIN"]
     data = {"self": "false"}
-    request = client.domains_dkimauthority.put(domain=domain, data=data)
-    print(request.json())
+
+    with Client(auth=("api", os.environ["APIKEY"])) as client:
+        request = client.domains_dkimauthority.put(domain=domain, data=data)
+        print(request.json())
 ```
 
 #### Domain Tracking
@@ -809,13 +863,20 @@ def put_dkim_authority() -> None:
 ##### Get tracking settings
 
 ```python
+import os
+from mailgun import Client
+
+
 def get_tracking() -> None:
     """
     GET /domains/<domain>/tracking
     :return:
     """
-    request = client.domains_tracking.get(domain=domain)
-    print(request.json())
+    domain: str = os.environ["DOMAIN"]
+
+    with Client(auth=("api", os.environ["APIKEY"])) as client:
+        request = client.domains_tracking.get(domain=domain)
+        print(request.json())
 ```
 
 ### Webhooks
@@ -826,24 +887,38 @@ Simply use `client.domains_webhooks` and the SDK will automatically analyze your
 #### Create a webhook (v4 Multi-Event)
 
 ```python
+import os
+from mailgun import Client
+
 data = {
     "event_types": "clicked,opened,delivered",  # Triggers v4 routing
-    "url": "[https://my-server.com/webhook](https://my-server.com/webhook)",
+    "url": "https://my-server.com/webhook",
 }
-req = client.domains_webhooks.create(data=data)
+
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.domains_webhooks.create(data=data)
 ```
 
 #### Get all webhooks
 
 ```python
-req = client.domains_webhooks.get()
+import os
+from mailgun import Client
+
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.domains_webhooks.get()
 ```
 
 #### Create Account-Level Webhooks (v1)
 
 ```python
+import os
+from mailgun import Client
+
 data = {"id": "clicked", "url": ["https://my-server.com/webhook"]}
-req = client.account_webhooks.create(data=data)
+
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.account_webhooks.create(data=data)
 ```
 
 ### Events
@@ -851,21 +926,30 @@ req = client.account_webhooks.create(data=data)
 #### Retrieves a paginated list of events
 
 ```python
+import os
+from mailgun import Client
+
 domain: str = os.environ["DOMAIN"]
 
-req = client.events.get(domain=domain)
-print(req.json())
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.events.get(domain=domain)
+    print(req.json())
 ```
 
 #### Get events by recipient
 
 ```python
+import os
+from mailgun import Client
+
 params = {
     "begin": "Tue, 24 Nov 2025 09:00:00 -0000",
     "limit": 10,
     "recipient": "user@example.com",
 }
-req = client.events.get(filters=params)
+
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.events.get(filters=params)
 ```
 
 ### Bounce Classification
@@ -877,6 +961,9 @@ req = client.events.get(filters=params)
 Items that have no bounces and no delays(classified_failures_count==0) are not returned.
 
 ```python
+import os
+from mailgun import Client
+
 domain: str = os.environ["DOMAIN"]
 
 payload = {
@@ -912,8 +999,9 @@ payload = {
 
 headers = {"Content-Type": "application/json"}
 
-req = client.bounceclassification_metrics.create(data=payload, headers=headers)
-print(req.json())
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.bounceclassification_metrics.create(data=payload, headers=headers)
+    print(req.json())
 ```
 
 ### Tags New
@@ -924,8 +1012,13 @@ Mailgun allows you to tag your email with unique identifiers. Tags are visible v
 #### Get account tags
 
 ```python
+import os
+from mailgun import Client
+
 data = {"pagination": {"sort": "lastseen:desc", "limit": 10}}
-req = client.analytics_tags.create(data=data)
+
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.analytics_tags.create(data=data)
 ```
 
 #### Update account tag
@@ -933,13 +1026,17 @@ req = client.analytics_tags.create(data=data)
 Updates the tag description for an account.
 
 ```python
+import os
+from mailgun import Client
+
 data = {
     "tag": "name-of-tag-to-update",
     "description": "updated tag description",
 }
 
-req = client.analytics_tags.update(data=data)
-print(req.json())
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.analytics_tags.update(data=data)
+    print(req.json())
 ```
 
 #### Post query to list account tags or search for single tag
@@ -947,13 +1044,17 @@ print(req.json())
 Gets the list of all tags, or filtered by tag prefix, for an account.
 
 ```python
+import os
+from mailgun import Client
+
 data = {
     "pagination": {"sort": "lastseen:desc", "limit": 10},
     "include_subaccounts": True,
 }
 
-req = client.analytics_tags.create(data=data)
-print(req.json())
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.analytics_tags.create(data=data)
+    print(req.json())
 ```
 
 #### Delete account tag
@@ -961,10 +1062,14 @@ print(req.json())
 Deletes the tag for an account.
 
 ```python
+import os
+from mailgun import Client
+
 data = {"tag": "name-of-tag-to-delete"}
 
-req = client.analytics_tags.delete(data=data)
-print(req.json())
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.analytics_tags.delete(data=data)
+    print(req.json())
 ```
 
 #### Get account tag limit information
@@ -972,8 +1077,12 @@ print(req.json())
 Gets the tag limit and current number of unique tags for an account.
 
 ```python
-req = client.analytics_tags_limits.get()
-print(req.json())
+import os
+from mailgun import Client
+
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.analytics_tags_limits.get()
+    print(req.json())
 ```
 
 ### Metrics & Logs
@@ -987,12 +1096,17 @@ filtered to provide insights into the health of your email infrastructure
 Gets customer event logs for an account.
 
 ```python
+import os
+from mailgun import Client
+
+
 def post_analytics_logs() -> None:
     """
     # Metrics
     # POST /analytics/logs
     :return:
     """
+    domain: str = os.environ["DOMAIN"]
 
     data = {
         "start": "Wed, 24 Sep 2025 00:00:00 +0000",
@@ -1013,8 +1127,9 @@ def post_analytics_logs() -> None:
         },
     }
 
-    req = client.analytics_logs.create(data=data)
-    print(req.json())
+    with Client(auth=("api", os.environ["APIKEY"])) as client:
+        req = client.analytics_logs.create(data=data)
+        print(req.json())
 ```
 
 #### Get account metrics
@@ -1026,6 +1141,11 @@ is also available via our analytics metrics
 Get filtered metrics for an account
 
 ```python
+import os
+from mailgun import Client
+
+domain: str = os.environ["DOMAIN"]
+
 data = {
     "start": "Sun, 08 Jun 2025 00:00:00 +0000",
     "end": "Tue, 08 Jul 2025 00:00:00 +0000",
@@ -1046,13 +1166,18 @@ data = {
     "include_aggregates": True,
 }
 
-req = client.analytics_metrics.create(data=data)
-print(req.json())
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.analytics_metrics.create(data=data)
+    print(req.json())
 ```
 
 #### Get account usage metrics
 
 ```python
+import os
+from mailgun import Client
+
+
 def post_analytics_usage_metrics() -> None:
     """
     # Usage Metrics
@@ -1091,8 +1216,9 @@ def post_analytics_usage_metrics() -> None:
         "include_aggregates": True,
     }
 
-    req = client.analytics_usage_metrics.create(data=data)
-    print(req.json())
+    with Client(auth=("api", os.environ["APIKEY"])) as client:
+        req = client.analytics_usage_metrics.create(data=data)
+        print(req.json())
 ```
 
 ### Suppressions
@@ -1102,8 +1228,13 @@ def post_analytics_usage_metrics() -> None:
 ##### Create bounces
 
 ```python
+import os
+from mailgun import Client
+
 data = {"address": "test120@gmail.com", "code": 550, "error": "Test error"}
-req = client.bounces.create(data=data)
+
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.bounces.create(data=data)
 ```
 
 #### Unsubscribe
@@ -1111,10 +1242,14 @@ req = client.bounces.create(data=data)
 ##### View all unsubscribes
 
 ```python
+import os
+from mailgun import Client
+
 domain: str = os.environ["DOMAIN"]
 
-req = client.unsubscribes.get(domain=domain)
-print(req.json())
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.unsubscribes.get(domain=domain)
+    print(req.json())
 ```
 
 ##### Import list of unsubscribes
@@ -1124,9 +1259,18 @@ print(req.json())
 > open the file in text mode.
 
 ```python
-files = {"unsubscribe2_csv": Path("mailgun/doc_tests/files/mailgun_unsubscribes.csv").read_bytes()}
-req = client.unsubscribes_import.create(domain=domain, files=files)
-print(req.json())
+import os
+from pathlib import Path
+from mailgun import Client
+
+domain: str = os.environ["DOMAIN"]
+
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    files = {
+        "unsubscribe2_csv": Path("mailgun/doc_tests/files/mailgun_unsubscribes.csv").read_bytes()
+    }
+    req = client.unsubscribes_import.create(domain=domain, files=files)
+    print(req.json())
 ```
 
 #### Complaints
@@ -1134,11 +1278,15 @@ print(req.json())
 ##### Add complaints
 
 ```python
-domain: str = os.environ["DOMAIN"]
+import os
+from mailgun import Client
 
+domain: str = os.environ["DOMAIN"]
 data = {"address": "bob@gmail.com", "tag": "compl_test_tag"}
-req = client.complaints.create(data=data, domain=domain)
-print(req.json())
+
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.complaints.create(data=data, domain=domain)
+    print(req.json())
 ```
 
 ##### Import list of complaints
@@ -1148,11 +1296,16 @@ print(req.json())
 > open the file in text mode.
 
 ```python
+import os
+from pathlib import Path
+from mailgun import Client
+
 domain: str = os.environ["DOMAIN"]
 
-files = {"complaints_csv": Path("mailgun/doc_tests/files/mailgun_complaints.csv").read_bytes()}
-req = client.complaints_import.create(domain=domain, files=files)
-print(req.json())
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    files = {"complaints_csv": Path("mailgun/doc_tests/files/mailgun_complaints.csv").read_bytes()}
+    req = client.complaints_import.create(domain=domain, files=files)
+    print(req.json())
 ```
 
 #### Whitelists
@@ -1160,9 +1313,14 @@ print(req.json())
 ##### Delete all whitelists
 
 ```python
+import os
+from mailgun import Client
+
 domain: str = os.environ["DOMAIN"]
-req = client.whitelists.delete(domain=domain)
-print(req.json())
+
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.whitelists.delete(domain=domain)
+    print(req.json())
 ```
 
 ### Routes
@@ -1170,6 +1328,9 @@ print(req.json())
 #### Create a route
 
 ```python
+import os
+from mailgun import Client
+
 domain: str = os.environ["DOMAIN"]
 data = {
     "priority": 0,
@@ -1177,16 +1338,23 @@ data = {
     "expression": f"match_recipient('.*@{domain}')",
     "action": ["forward('http://myhost.com/messages/')", "stop()"],
 }
-req = client.routes.create(domain=domain, data=data)
-print(req.json())
+
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.routes.create(domain=domain, data=data)
+    print(req.json())
 ```
 
 #### Get a route by id
 
 ```python
+import os
+from mailgun import Client
+
 domain: str = os.environ["DOMAIN"]
-req = client.routes.get(domain=domain, route_id="xxxxxxxx")
-print(req.json())
+
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.routes.get(domain=domain, route_id="xxxxxxxx")
+    print(req.json())
 ```
 
 ### Mailing Lists
@@ -1194,27 +1362,42 @@ print(req.json())
 #### Create a mailing list
 
 ```python
+import os
+from mailgun import Client
+
 data = {
     "address": "developers@my-domain.com",
     "description": "Mailgun developers list",
 }
-req = client.lists.create(data=data)
+
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.lists.create(data=data)
 ```
 
 #### Get mailing lists members
 
 ```python
+import os
+from mailgun import Client
+
 domain: str = os.environ["DOMAIN"]
-req = client.lists_members_pages.get(domain=domain, address=mailing_list_address)
-print(req.json())
+
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.lists_members_pages.get(domain=domain, address="developers@my-domain.com")
+    print(req.json())
 ```
 
 #### Delete mailing lists address
 
 ```python
+import os
+from mailgun import Client
+
 domain: str = os.environ["DOMAIN"]
-req = client.lists.delete(domain=domain, address=f"python_sdk2@{domain}")
-print(req.json())
+
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.lists.delete(domain=domain, address=f"python_sdk2@{domain}")
+    print(req.json())
 ```
 
 ### Templates
@@ -1222,39 +1405,59 @@ print(req.json())
 #### Get templates
 
 ```python
+import os
+from mailgun import Client
+
 domain: str = os.environ["DOMAIN"]
 params = {"limit": 1}
-req = client.templates.get(domain=domain, filters=params)
-print(req.json())
+
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.templates.get(domain=domain, filters=params)
+    print(req.json())
 ```
 
 #### Update a template
 
 ```python
+import os
+from mailgun import Client
+
 domain: str = os.environ["DOMAIN"]
 data = {"description": "new template description"}
 
-req = client.templates.put(data=data, domain=domain, template_name="template.name1")
-print(req.json())
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.templates.put(data=data, domain=domain, template_name="template.name1")
+    print(req.json())
 ```
 
 #### Create a new template version
 
 ```python
+import os
+from mailgun import Client
+
 data = {
     "tag": "v1",
     "template": "{{fname}} {{lname}}",
     "engine": "handlebars",
     "active": "yes",
 }
-req = client.templates.create(data=data, template_name="welcome.email", versions=True)
+
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.templates.create(data=data, template_name="welcome.email", versions=True)
 ```
 
 #### Get all template's versions
 
 ```python
-req = client.templates.get(domain=domain, template_name="template.name1", versions=True)
-print(req.json())
+import os
+from mailgun import Client
+
+domain: str = os.environ["DOMAIN"]
+
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.templates.get(domain=domain, template_name="template.name1", versions=True)
+    print(req.json())
 ```
 
 ### IP Pools
@@ -1262,22 +1465,33 @@ print(req.json())
 #### Edit DIPP
 
 ```python
+import os
+from mailgun import Client
+
 domain: str = os.environ["DOMAIN"]
 
 data = {
     "name": "test_pool3",
     "description": "Test3",
 }
-req = client.ippools.patch(domain=domain, data=data, pool_id="60140bc1fee3e84dec5abeeb")
-print(req.json())
+
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.ippools.patch(domain=domain, data=data, pool_id="1234567890")
+    print(req.json())
 ```
 
 #### Link an IP pool
 
 ```python
+import os
+from mailgun import Client
+
+domain: str = os.environ["DOMAIN"]
 data = {"pool_id": "60140d220859fda7bab8bb6c"}
-req = client.domains_ips.create(domain=domain, data=data)
-print(req.json())
+
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.domains_ips.create(domain=domain, data=data)
+    print(req.json())
 ```
 
 ### IPs
@@ -1285,16 +1499,27 @@ print(req.json())
 #### List account IPs
 
 ```python
+import os
+from mailgun import Client
+
 domain: str = os.environ["DOMAIN"]
-req = client.ips.get(domain=domain, filters={"dedicated": "true"})
-print(req.json())
+
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.ips.get(domain=domain, filters={"dedicated": "true"})
+    print(req.json())
 ```
 
 #### Delete a domain's IP
 
 ```python
-request = client.domains_ips.delete(domain=domain, ip="161.38.194.10")
-print(request.json())
+import os
+from mailgun import Client
+
+domain: str = os.environ["DOMAIN"]
+
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    request = client.domains_ips.delete(domain=domain, ip="100.111.222.222")
+    print(request.json())
 ```
 
 ### Keys
@@ -1304,27 +1529,21 @@ The Keys API lets you view and manage api keys.
 #### List Mailgun API keys
 
 ```python
+import os
+from mailgun import Client
+
 query = {"domain_name": "python.test.domain5", "kind": "web"}
-req = client.keys.get(filters=query)
-print(req.json())
+
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.keys.get(filters=query)
+    print(req.json())
 ```
 
 #### Create Mailgun API key
 
 ```python
 import os
-
 from mailgun.client import Client
-
-
-key: str = os.environ["APIKEY"]
-domain: str = os.environ["DOMAIN"]
-mailgun_email = os.environ["MAILGUN_EMAIL"]
-role = os.environ["ROLE"]
-user_id = os.environ["USER_ID"]
-user_name = os.environ["USER_NAME"]
-
-client: Client = Client(auth=("api", key))
 
 
 def post_keys() -> None:
@@ -1344,6 +1563,11 @@ def post_keys() -> None:
 
     :return:
     """
+    key: str = os.environ["APIKEY"]
+    mailgun_email = os.environ["MAILGUN_EMAIL"]
+    role = os.environ["ROLE"]
+    user_id = os.environ["USER_ID"]
+    user_name = os.environ["USER_NAME"]
 
     data = {
         "email": mailgun_email,
@@ -1358,8 +1582,9 @@ def post_keys() -> None:
 
     headers = {"Content-Type": "multipart/form-data"}
 
-    req = client.keys.create(data=data, headers=headers)
-    print(req.json())
+    with Client(auth=("api", key)) as client:
+        req = client.keys.create(data=data, headers=headers)
+        print(req.json())
 ```
 
 ### Credentials
@@ -1367,19 +1592,31 @@ def post_keys() -> None:
 #### List Mailgun SMTP credential metadata for a given domain
 
 ```python
-request = client.domains_credentials.get(domain=domain)
-print(request.json())
+import os
+from mailgun import Client
+
+domain: str = os.environ["DOMAIN"]
+
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    request = client.domains_credentials.get(domain=domain)
+    print(request.json())
 ```
 
 #### Create Mailgun SMTP credentials for a given domain
 
 ```python
+import os
+from mailgun import Client
+
+domain: str = os.environ["DOMAIN"]
 data = {
     "login": f"alice_bob@{domain}",
     "password": "test_new_creds123",  # pragma: allowlist secret
 }
-request = client.domains_credentials.create(domain=domain, data=data)
-print(request.json())
+
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    request = client.domains_credentials.create(domain=domain, data=data)
+    print(request.json())
 ```
 
 ### Users
@@ -1387,26 +1624,35 @@ print(request.json())
 #### Get users on an account
 
 ```python
+import os
+from mailgun import Client
+
 query = {"role": "admin", "limit": "0", "skip": "0"}
-req = client.users.get(filters=query)
-print(req.json())
+
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.users.get(filters=query)
+    print(req.json())
 ```
 
 #### Get a user's details
 
 ```python
+import os
+from mailgun import Client
+
 mailgun_email = os.environ["MAILGUN_EMAIL"]
 role = os.environ["ROLE"]
-user_name = os.environ["USER_NAME"]
 
 query = {"role": role, "limit": "0", "skip": "0"}
-req1 = client.users.get(filters=query)
-users = req1.json()["users"]
 
-for user in users:
-    if mailgun_email == user["email"]:
-        req2 = client.users.get(user_id=user["id"])
-        print(req2.json())
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req1 = client.users.get(filters=query)
+    users = req1.json()["users"]
+
+    for user in users:
+        if mailgun_email == user["email"]:
+            req2 = client.users.get(user_id=user["id"])
+            print(req2.json())
 ```
 
 ### Validations & Optimize APIs
@@ -1418,17 +1664,27 @@ Thanks to the dynamic routing engine, the SDK natively supports Mailgun's supple
 ##### Create a single validation
 
 ```python
+import os
+from mailgun import Client
+
+domain: str = os.environ["DOMAIN"]
 data = {"address": "test2@gmail.com"}
 params = {"provider_lookup": "false"}
-req = client.addressvalidate.create(domain=domain, data=data, filters=params)
-print(req.json())
+
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.addressvalidate.create(domain=domain, data=data, filters=params)
+    print(req.json())
 ```
 
 ##### Validate an email address
 
 ```python
+import os
+from mailgun import Client
+
 # Note: Requires a paid Mailgun plan.
-req = client.addressvalidate.get(address="suspicious@example.com")
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.addressvalidate.get(address="suspicious@example.com")
 ```
 
 #### Inbox placement
@@ -1436,15 +1692,25 @@ req = client.addressvalidate.get(address="suspicious@example.com")
 ##### Get all inbox
 
 ```python
-req = client.inbox_tests.get(domain=domain)
-print(req.json())
+import os
+from mailgun import Client
+
+domain: str = os.environ["DOMAIN"]
+
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.inbox_tests.get(domain=domain)
+    print(req.json())
 ```
 
 ##### Fetch InboxReady placement tests
 
 ```python
-req = client.inboxready_domains.get()
-print(req.json())
+import os
+from mailgun import Client
+
+with Client(auth=("api", os.environ["APIKEY"])) as client:
+    req = client.inboxready_domains.get()
+    print(req.json())
 ```
 
 ## Deprecation Warnings
@@ -1486,6 +1752,7 @@ You can globally **opt-in** to have the SDK automatically listen to these events
 
 ```python
 import logging
+import os
 from mailgun.client import Client
 from mailgun.config import Config
 
@@ -1494,12 +1761,11 @@ logging.basicConfig(level=logging.INFO)
 # Activate the PEP 578 Audit Listener globally during app startup
 Config.enable_security_audit()
 
-# Initialize the client normally
-client = Client(auth=("api", "your-api-key"))
-
-# The audit hook will now automatically intercept and log events like:
-# "SECURITY AUDIT: Outbound API call tracked - GET https://api.mailgun.net/v3/domains"
-response = client.domains.get()
+# Initialize the client safely
+with Client(auth=("api", os.environ.get("APIKEY", "your-api-key"))) as client:
+    # The audit hook will now automatically intercept and log events like:
+    # "SECURITY AUDIT: Outbound API call tracked - GET https://api.mailgun.net/v3/domains"
+    response = client.domains.get()
 ```
 
 ## Contributors
