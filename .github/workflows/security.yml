@@ -15,8 +15,8 @@ jobs:
   static-analysis:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v7
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v6
         with:
           python-version: "3.13"
           cache: 'pip'
@@ -30,8 +30,8 @@ jobs:
   semgrep:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: returntocorp/semgrep-action@v1
+      - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v7
+      - uses: returntocorp/semgrep-action@1213f56ce0ea45e9fca2127163f45dc25fb51296 # v1
         with:
           config: >-
             p/python
@@ -44,8 +44,8 @@ jobs:
   pip-audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v7
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v6
         with: { python-version: "3.13" }
       - run: python -m pip install --upgrade pip
       - run: pip install pip-audit

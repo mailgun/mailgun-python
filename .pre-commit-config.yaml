@@ -131,7 +131,7 @@ repos:
         additional_dependencies: [".[toml]"]
 
   - repo: https://github.com/semgrep/pre-commit
-    rev: 'v1.167.0'
+    rev: 'v1.168.0'
     hooks:
       - id: semgrep
         name: "🔒 security · Static analysis (semgrep)"
@@ -140,14 +140,14 @@ repos:
 
   # Spelling and typos
   - repo: https://github.com/crate-ci/typos
-    rev: v1.47.2
+    rev: v1.48.0
     hooks:
       - id: typos
         name: "📝 spelling · Check typos"
 
   # CI/CD validation
   - repo: https://github.com/python-jsonschema/check-jsonschema
-    rev: 0.37.3
+    rev: 0.37.4
     hooks:
       - id: check-dependabot
         name: "🔧 ci/cd · Validate Dependabot config"
@@ -168,7 +168,7 @@ repos:
           - responses
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.18
+    rev: v0.15.20
     hooks:
       - id: ruff-check
         name: "🐍 lint · Check with Ruff"
@@ -198,7 +198,7 @@ repos:
         exclude: ^mailgun/examples/
 
   - repo: https://github.com/RobertCraigie/pyright-python
-    rev: v1.1.410
+    rev: v1.1.411
     hooks:
       - id: pyright
         name: "🐍 types · Check with pyright"
@@ -244,8 +244,8 @@ repos:
         name: "🔧 build · Lint Makefile"
 
 # TODO: Enable it for a single check
-#  - repo: https://github.com/tcort/markdown-link-check
-#    rev: v3.14.2
-#    hooks:
-#      - id: markdown-link-check
-#        name: "📝 docs · Check markdown links"
+  - repo: https://github.com/tcort/markdown-link-check
+    rev: v3.14.2
+    hooks:
+      - id: markdown-link-check
+        name: "📝 docs · Check markdown links"
