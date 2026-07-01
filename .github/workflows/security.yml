@@ -15,8 +15,8 @@ jobs:
   static-analysis:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v7
-      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v6
+      - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5
         with:
           python-version: "3.13"
           cache: 'pip'
@@ -29,23 +29,28 @@ jobs:
 
   semgrep:
     runs-on: ubuntu-latest
+    container:
+      # Official Semgrep Docker image
+      image: semgrep/semgrep
+    # Skip any PR created by dependabot to avoid permission issues (Per Semgrep docs)
+    if: (github.actor != 'dependabot[bot]')
     steps:
-      - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v7
-      - uses: returntocorp/semgrep-action@1213f56ce0ea45e9fca2127163f45dc25fb51296 # v1
-        with:
-          config: >-
-            p/python
-            p/owasp-top-ten
-            p/supply-chain
-            p/command-injection
-            p/insecure-transport
-          error: true # Fails CI if issues found
+      - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
+      - name: Run Semgrep CE scan
+        run: >-
+          semgrep scan
+          --config "p/python"
+          --config "p/owasp-top-ten"
+          --config "p/supply-chain"
+          --config "p/command-injection"
+          --config "p/insecure-transport"
+          --error
 
   pip-audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v7
-      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v6
+      - uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608 # v4
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5
         with: { python-version: "3.13" }
       - run: python -m pip install --upgrade pip
       - run: pip install pip-audit
