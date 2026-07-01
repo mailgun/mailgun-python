@@ -325,7 +325,7 @@ Send a message with a Synchronous Client safely inside a context manager.
 
 ```python
 import os
-from mailgun.client import Client
+from mailgun import Client
 
 # Send an email using context manager
 with Client(auth=("api", os.environ["APIKEY"])) as client:
@@ -345,12 +345,15 @@ with Client(auth=("api", os.environ["APIKEY"])) as client:
 The `AsyncClient` provides async equivalents for all methods available in the sync `Client`. The method signatures and parameters are identical - simply add `await` when calling methods:
 
 ```python
+import os
+from mailgun import Client, AsyncClient
+
 # Sync version
-with Client(auth=auth) as client:
+with Client(auth=("api", os.environ["APIKEY"])) as client:
     result = client.domainlist.get()
 
 # Async version
-async with AsyncClient(auth=auth) as client:
+async with AsyncClient(auth=("api", os.environ["APIKEY"])) as client:
     result = await client.domainlist.get()
 ```
 
