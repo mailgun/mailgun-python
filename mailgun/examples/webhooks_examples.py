@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 from typing import Any
 
 from mailgun.client import AsyncClient, Client
-
 
 # ==============================================================================
 # Webhooks Management (Synchronous)
@@ -15,7 +15,7 @@ from mailgun.client import AsyncClient, Client
 
 def create_webhook_sync(api_key: str, domain: str) -> None:
     """
-    POST /domains/<domain>/webhooks
+    POST /v3/domains/<domain>/webhooks
     :return: None
     """
     data: dict[str, Any] = {"id": "clicked", "url": ["https://facebook.com"]}
@@ -26,27 +26,28 @@ def create_webhook_sync(api_key: str, domain: str) -> None:
 
 def delete_webhook_sync(api_key: str, domain: str) -> None:
     """
-    DELETE /domains/<domain>/webhooks/<webhookname>
+    DELETE /v3/domains/<domain>/webhooks/<webhook_name>
     :return: None
     """
     with Client(auth=("api", api_key)) as client:
-        response = client.domains_webhooks_clicked.delete(domain=domain)
+        # Use webhook_name kwarg for safe path interpolation
+        response = client.domains_webhooks.delete(domain=domain, webhook_name="clicked")
         print("DELETE Webhook (Sync):", response.json())
 
 
 def get_webhook_sync(api_key: str, domain: str) -> None:
     """
-    GET /domains/<domain>/webhooks/<webhookname>
+    GET /v3/domains/<domain>/webhooks/<webhook_name>
     :return: None
     """
     with Client(auth=("api", api_key)) as client:
-        response = client.domains_webhooks_clicked.get(domain=domain)
+        response = client.domains_webhooks.get(domain=domain, webhook_name="clicked")
         print("GET Single Webhook (Sync):", response.json())
 
 
 def get_webhooks_sync(api_key: str, domain: str) -> None:
     """
-    GET /domains/<domain>/webhooks
+    GET /v3/domains/<domain>/webhooks
     :return: None
     """
     with Client(auth=("api", api_key)) as client:
@@ -56,15 +57,14 @@ def get_webhooks_sync(api_key: str, domain: str) -> None:
 
 def put_webhook_sync(api_key: str, domain: str) -> None:
     """
-    PUT /domains/<domain>/webhooks/<webhookname>
+    PUT /v3/domains/<domain>/webhooks/<webhook_name>
     :return: None
     """
     data: dict[str, Any] = {
-        "id": "clicked",
         "url": ["https://facebook.com", "https://google.com"],
     }
     with Client(auth=("api", api_key)) as client:
-        response = client.domains_webhooks_clicked.put(domain=domain, data=data)
+        response = client.domains_webhooks.put(domain=domain, webhook_name="clicked", data=data)
         print("PUT Webhook (Sync):", response.json())
 
 
@@ -75,7 +75,7 @@ def put_webhook_sync(api_key: str, domain: str) -> None:
 
 async def create_webhook_async(api_key: str, domain: str) -> None:
     """
-    POST /domains/<domain>/webhooks (Asynchronous)
+    POST /v3/domains/<domain>/webhooks (Asynchronous)
     :return: None
     """
     data: dict[str, Any] = {"id": "clicked", "url": ["https://facebook.com"]}
@@ -86,27 +86,27 @@ async def create_webhook_async(api_key: str, domain: str) -> None:
 
 async def delete_webhook_async(api_key: str, domain: str) -> None:
     """
-    DELETE /domains/<domain>/webhooks/<webhookname> (Asynchronous)
+    DELETE /v3/domains/<domain>/webhooks/<webhook_name> (Asynchronous)
     :return: None
     """
     async with AsyncClient(auth=("api", api_key)) as client:
-        response = await client.domains_webhooks_clicked.delete(domain=domain)
+        response = await client.domains_webhooks.delete(domain=domain, webhook_name="clicked")
         print("DELETE Webhook (Async):", response.json())
 
 
 async def get_webhook_async(api_key: str, domain: str) -> None:
     """
-    GET /domains/<domain>/webhooks/<webhookname> (Asynchronous)
+    GET /v3/domains/<domain>/webhooks/<webhook_name> (Asynchronous)
     :return: None
     """
     async with AsyncClient(auth=("api", api_key)) as client:
-        response = await client.domains_webhooks_clicked.get(domain=domain)
+        response = await client.domains_webhooks.get(domain=domain, webhook_name="clicked")
         print("GET Single Webhook (Async):", response.json())
 
 
 async def get_webhooks_async(api_key: str, domain: str) -> None:
     """
-    GET /domains/<domain>/webhooks (Asynchronous)
+    GET /v3/domains/<domain>/webhooks (Asynchronous)
     :return: None
     """
     async with AsyncClient(auth=("api", api_key)) as client:
@@ -116,15 +116,16 @@ async def get_webhooks_async(api_key: str, domain: str) -> None:
 
 async def put_webhook_async(api_key: str, domain: str) -> None:
     """
-    PUT /domains/<domain>/webhooks/<webhookname> (Asynchronous)
+    PUT /v3/domains/<domain>/webhooks/<webhook_name> (Asynchronous)
     :return: None
     """
     data: dict[str, Any] = {
-        "id": "clicked",
         "url": ["https://facebook.com", "https://google.com"],
     }
     async with AsyncClient(auth=("api", api_key)) as client:
-        response = await client.domains_webhooks_clicked.put(domain=domain, data=data)
+        response = await client.domains_webhooks.put(
+            domain=domain, webhook_name="clicked", data=data
+        )
         print("PUT Webhook (Async):", response.json())
 
 
@@ -150,6 +151,5 @@ if __name__ == "__main__":
         # delete_webhook_sync(api_key=API_KEY, domain=DOMAIN)
 
         print("\n--- Running Asynchronous Examples ---")
-        # Ensure we run async counterparts to maintain parity
-        # asyncio.run(create_webhook_async(api_key=API_KEY, domain=DOMAIN))
-        # asyncio.run(get_webhooks_async(api_key=API_KEY, domain=DOMAIN))
+        asyncio.run(create_webhook_async(api_key=API_KEY, domain=DOMAIN))
+        asyncio.run(get_webhooks_async(api_key=API_KEY, domain=DOMAIN))

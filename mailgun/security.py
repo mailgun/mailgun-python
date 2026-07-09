@@ -1,3 +1,5 @@
+import hashlib
+import hmac
 import math
 import re
 import ssl
@@ -473,3 +475,47 @@ class SecurityGuard:
         safe_str = str(value)
         # _PATH_CONTROL_CHAR_RE is already defined in your security.py
         return _PATH_CONTROL_CHAR_RE.sub("_", safe_str)
+
+    @staticmethod
+    def verify_webhook(signing_key: str, token: str, timestamp: str, signature: str) -> bool:
+        """Cryptographically verify a Mailgun webhook signature.
+
+        Protects against CWE-347 (Improper Verification) and CWE-208 (Timing Attacks).
+
+        Args:
+            signing_key: The Mailgun webhook signing key from the dashboard.
+            token: The token provided in the webhook payload.
+            timestamp: The timestamp provided in the webhook payload.
+            signature: The signature provided in the webhook payload.
+
+        Returns:
+            True if the signature mathematically matches the payload, False otherwise.
+
+        Raises:
+            TypeError: If any of the signature components are not strictly strings.
+            ValueError: If the cryptographic payload is malformed or undecodable.
+        """
+        # 1. Type Guard: Prevent AttributeError if a developer or attacker
+        # passes None, an int, or a list instead of a string.
+        if (
+            not isinstance(signing_key, str)
+            or not isinstance(token, str)
+            or not isinstance(timestamp, str)
+            or not isinstance(signature, str)
+        ):
+            raise TypeError("Webhook signature components must be strictly strings.")
+
+        try:
+            # 2. Canonicalization: Encode strings to bytes safely
+            msg = f"{timestamp}{token}".encode()
+            key = signing_key.encode("utf-8")
+
+            # 3. Cryptographic Hashing
+            expected_mac = hmac.new(key, msg, hashlib.sha256).hexdigest()
+
+            # 4. Timing Attack Prevention: NEVER use '==' for crypto comparisons.
+            return hmac.compare_digest(expected_mac, signature)
+
+        except AttributeError as e:
+            # Fail-closed if underlying C-extensions reject malformed encodings
+            raise ValueError("Malformed cryptographic payload.") from e
