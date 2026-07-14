@@ -6,7 +6,7 @@ import atheris
 
 with atheris.instrument_imports():
     # Replace with the actual module where your audit emissions happen
-    from mailgun.client import Client
+    import mailgun.client
 
 def TestOneInput(data: bytes) -> None:
     if len(data) < 5:

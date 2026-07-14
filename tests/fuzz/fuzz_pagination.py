@@ -3,12 +3,11 @@
 
 import sys
 import urllib.parse
-from typing import Any
 
 import atheris
 
 with atheris.instrument_imports():
-    from mailgun.client import Client
+    import mailgun.client
 
 def TestOneInput(data: bytes) -> None:
     if len(data) < 5:
@@ -25,7 +24,7 @@ def TestOneInput(data: bytes) -> None:
         parsed = urllib.parse.urlparse(fuzzed_next_url)
 
         # Guard against memory exhaustion from maliciously deep query params
-        query_params = urllib.parse.parse_qs(parsed.query, strict_parsing=True)
+        urllib.parse.parse_qs(parsed.query, strict_parsing=True)
 
         # If the SDK has a specific pagination fetcher, you would invoke it here:
         # client._extract_pagination_cursor(fuzzed_next_url)

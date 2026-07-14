@@ -11,11 +11,9 @@ import atheris
 with atheris.instrument_imports():
     import requests
     import httpx
-    # Use your internal builder/request preparation logic if accessible
-    from mailgun.client import AsyncClient, Client
+
 
 logging.disable(logging.CRITICAL)
-_FUZZ_LOOP = asyncio.new_event_loop()
 
 def TestOneInput(data: bytes) -> None:
     if len(data) < 10:
@@ -53,14 +51,14 @@ def TestOneInput(data: bytes) -> None:
     # 1. Test Sync Serialization
     try:
         prepared_sync = sync_req.prepare()
-        sync_body = prepared_sync.body
+        _ = prepared_sync.body
     except Exception as e:
         sync_error = type(e).__name__
 
     # 2. Test Async Serialization
     try:
         # Read the async byte stream
-        async_body = b"".join([chunk for chunk in async_req.stream])
+        _ = b"".join([chunk for chunk in async_req.stream])
     except Exception as e:
         async_error = type(e).__name__
 
