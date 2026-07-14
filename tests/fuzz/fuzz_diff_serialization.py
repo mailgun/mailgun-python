@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Differential Fuzzer for Requests (Sync) vs HTTPX (Async) Multipart Serialization."""
 
-import asyncio
 import logging
 import sys
 from typing import Any

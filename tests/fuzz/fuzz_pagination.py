@@ -6,8 +6,6 @@ import urllib.parse
 
 import atheris
 
-with atheris.instrument_imports():
-    import mailgun.client
 
 def TestOneInput(data: bytes) -> None:
     if len(data) < 5:
