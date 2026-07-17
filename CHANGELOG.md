@@ -2,7 +2,9 @@
 
 We [keep a changelog.](http://keepachangelog.com/)
 
-## [Unreleased] (v1.8.0)
+## [Unreleased]
+
+## v1.8.0 - 2026-07-XX
 
 ### 🌟 Top Highlights (The "Big Wins")
 
@@ -47,6 +49,14 @@ We [keep a changelog.](http://keepachangelog.com/)
 ### Removed
 
 - **Legacy Utilities:** Deleted `mailgun/handlers/utils.py`. All path sanitization and validation logic has been strictly centralized into the `SecurityGuard` class in `mailgun/security.py`.
+
+### Pull Requests Merged
+
+- [PR_44](https://github.com/mailgun/mailgun-python/pull/44) - Refactor SDK architecture and harden security guardrails.
+- [PR_46](https://github.com/mailgun/mailgun-python/pull/46) - build(deps): Bump actions/github-script from 7.0.1 to 9.0.0.
+- [PR_47](https://github.com/mailgun/mailgun-python/pull/47) - build(deps): Bump actions/setup-python from 5.3.0 to 6.3.0.
+- [PR_48](https://github.com/mailgun/mailgun-python/pull/48) - build(deps): Bump actions/checkout from 4.1.0 to 7.0.0.
+- [PR_49](https://github.com/mailgun/mailgun-python/pull/49) - Release 1.8.0.
 
 ## [1.7.1] - 2026-06-10
 
@@ -423,4 +433,4 @@ We [keep a changelog.](http://keepachangelog.com/)
 [1.6.0]: https://github.com/mailgun/mailgun-python/releases/tag/v1.6.0
 [1.7.0]: https://github.com/mailgun/mailgun-python/releases/tag/v1.7.0
 [1.7.1]: https://github.com/mailgun/mailgun-python/releases/tag/v1.7.1
-[unreleased]: https://github.com/mailgun/mailgun-python/compare/v1.7.1...HEAD
+[unreleased]: https://github.com/mailgun/mailgun-python/compare/v1.8.0...HEAD
