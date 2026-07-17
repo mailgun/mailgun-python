@@ -324,8 +324,7 @@ class AsyncClient(BaseClient):
                     )
 
                 self._httpx_client = httpx.AsyncClient(**kwargs)
-            return self._httpx_client
-        return None
+        return self._httpx_client
 
     async def aclose(self) -> None:
         """Close the underlying httpx.AsyncClient and purge memory."""
