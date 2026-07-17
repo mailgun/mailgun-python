@@ -2,9 +2,20 @@
 
 Exceptions:
     - ApiError: Base exception for API errors.
+    - MailgunTimeoutError: Raised when a request to the Mailgun API times out.
     - RouteNotFoundError: Raised when the requested endpoint cannot be resolved.
     - UploadError: Raised when the maximum message size is greater than 25 MB.
 """
+
+from __future__ import annotations
+
+
+__all__ = [
+    "ApiError",
+    "MailgunTimeoutError",
+    "RouteNotFoundError",
+    "UploadError",
+]
 
 
 class ApiError(Exception):

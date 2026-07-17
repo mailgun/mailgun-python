@@ -4,8 +4,8 @@
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.7.x   | :white_check_mark: |
-| < 1.7.0 | :x:                |
+| 1.8.x   | :white_check_mark: |
+| < 1.8.0 | :x:                |
 
 # Vulnerability Disclosure
 

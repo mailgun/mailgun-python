@@ -7,8 +7,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from mailgun.endpoints import build_path_from_keys
 from mailgun.handlers.error_handler import ApiError
-from mailgun.handlers.utils import build_path_from_keys, sanitize_path_segment
+from mailgun.security import SecurityGuard
 
 
 def handle_inbox(
@@ -38,7 +39,7 @@ def handle_inbox(
     if "test_id" not in kwargs:
         return endpoint_url
 
-    test_id = sanitize_path_segment(kwargs["test_id"])
+    test_id = SecurityGuard.sanitize_path_segment(kwargs["test_id"])
     endpoint_url = f"{endpoint_url}/{test_id}"
 
     if "counters" in kwargs:
@@ -49,7 +50,7 @@ def handle_inbox(
     if "checks" in kwargs:
         if kwargs["checks"]:
             if "address" in kwargs:
-                safe_address = sanitize_path_segment(kwargs["address"])
+                safe_address = SecurityGuard.sanitize_path_segment(kwargs["address"])
                 return f"{endpoint_url}/checks/{safe_address}"
             return f"{endpoint_url}/checks"
         raise ApiError("Checks option should be True or absent")

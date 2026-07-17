@@ -10,15 +10,16 @@ from __future__ import annotations
 import functools
 import re
 from types import MappingProxyType
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
 
-# Simplified, scalable, and valid type aliases
-ExactRouteType = dict[str, tuple[str, tuple[str, ...]]]
-PrefixRoutesType = dict[str, tuple[str, str, str | None]]
-DomainsAliasType = dict[str, str]
-DomainsEndpointsType = dict[str, tuple[str, ...]]
-DeprecatedRoutesType = dict[re.Pattern[str], str]
+if TYPE_CHECKING:
+    from mailgun.types import (
+        DomainsAliasType,
+        DomainsEndpointsType,
+        ExactRouteType,
+        PrefixRoutesType,
+    )
 
 
 # --- EXACT_ROUTES ---
@@ -40,6 +41,8 @@ _EXACT_ROUTES: ExactRouteType = {
     "addressvalidate": ("v4", ("address", "validate")),
     "addressparse": ("v4", ("address", "parse")),
     "address_bulk": ("v4", ("address", "validate", "bulk")),
+    # List Health Preview
+    "address_preview": ("v4", ("address", "validate", "preview")),
     # Standard Domain Endpoints (Merged paths to avoid handle_domains intercept)
     "spamtraps": ("v2", ("spamtraps",)),
     "blocklists": ("v3", ("domains", "{domain}", "blocklists")),
@@ -61,25 +64,27 @@ EXACT_ROUTES: Final = MappingProxyType(_EXACT_ROUTES)
 # Corrected to eliminate suffix duplication and allow clean string joining.
 _PREFIX_ROUTES: PrefixRoutesType = {
     # Send & Core Services
-    "templates": ("v3", "", None),
+    "bounces": ("v3", "", None),
+    "complaints": ("v3", "", None),
     "credentials": ("v3", "domains", None),
     "domains": ("v3", "domains", None),
-    "webhooks": ("v3", "domains", None),
+    "dynamic_pools": ("v3", "", None),
+    "envelopes": ("v3", "", None),
     "events": ("v3", "", None),
-    "tags": ("v3", "", None),
-    "bounces": ("v3", "", None),
-    "unsubscribes": ("v3", "", None),
-    "complaints": ("v3", "", None),
-    "whitelists": ("v3", "", None),
-    "routes": ("v3", "", None),
-    "lists": ("v3", "", None),
-    "mailboxes": ("v3", "", None),
-    "stats": ("v3", "", None),
-    "ips": ("v3", "", None),
+    "forwards": ("v3", "", None),
     "ip_pools": ("v3", "", None),
     "ip_warmups": ("v3", "", None),
     "ip_whitelist": ("v2", "ip", "whitelist"),
-    "envelopes": ("v3", "", None),
+    "ips": ("v3", "", None),
+    "lists": ("v3", "", None),
+    "mailboxes": ("v3", "", None),
+    "routes": ("v3", "", None),
+    "stats": ("v3", "", None),
+    "tags": ("v3", "", None),
+    "templates": ("v3", "", None),
+    "unsubscribes": ("v3", "", None),
+    "webhooks": ("v3", "domains", None),
+    "whitelists": ("v3", "", None),
     # Subaccounts & Limits
     "accounts": ("v5", "", None),
     "sandbox": ("v5", "", None),
@@ -96,15 +101,15 @@ _PREFIX_ROUTES: PrefixRoutesType = {
     # Validation Service
     "address": ("v4", "", None),
     # InboxReady & Optimize
+    "dmarc": ("v1", "", None),
     "inbox": ("v4", "", None),
     "inboxready": ("v1", "", None),
     "inspect": ("v1", "", None),
+    "maverick_score": ("v1", "", "maverick-score"),
+    "monitoring": ("v1", "", None),
     "preview": ("v1", "", None),
     "preview_v2": ("v2", "", "preview"),
-    "dmarc": ("v1", "", None),
-    "monitoring": ("v1", "", None),
     "reputationanalytics": ("v1", "", None),
-    "maverick_score": ("v1", "", "maverick-score"),
 }
 
 PREFIX_ROUTES: Final = MappingProxyType(_PREFIX_ROUTES)
@@ -128,26 +133,27 @@ _DOMAIN_ENDPOINTS: DomainsEndpointsType = {
     "v1": ("dkim", "security"),
     "v4": ("ips", "connections"),
     "v3": (
-        "credentials",
-        "verify",
-        "messages",
-        "tags",
         "bounces",
-        "unsubscribes",
+        "click",
         "complaints",
-        "whitelists",
-        "stats",
+        "credentials",
+        "dynamic_pools",
         "events",
-        "routes",
+        "ip_pools",
         "lists",
         "mailboxes",
-        "ip_pools",
-        "sending_queues",
-        "tracking",
-        "click",
+        "messages",
         "open",
+        "routes",
+        "sending_queues",
+        "stats",
+        "tags",
+        "tracking",
         "unsubscribe",
+        "unsubscribes",
+        "verify",
         "webhooks",
+        "whitelists",
     ),
 }
 

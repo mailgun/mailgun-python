@@ -65,7 +65,7 @@ optional-dependencies.linting = [
   "ruff",
   "mypy",
   "pyright",
-  "types-requests",
+  "types-requests>=2.33.0",
   "vulture",
   "python-dotenv>=1.2.2",
 ]
@@ -79,18 +79,22 @@ optional-dependencies.spelling = [ "typos" ]
 optional-dependencies.tests = [
   "codecov>=2.0.16",
   "coverage>=4.5.4",
+    "hypothesis",
   # For a Private key PEM file generated in PKCS1 format.
   "openssl",
   # tests
   "pytest>=9.0.3",
   "pytest-asyncio",
   "pytest-benchmark",
-  "pytest-cov",
+  "pytest-cov>=5.0.0",
   "pytest-order",
   "pytest-xdist",
   "pyfakefs",
   "responses",
 ]
+# llvm is required
+optional-dependencies.fuzzing = ["atheris"]
+
 urls."Documentation" = "https://documentation.mailgun.com"
 urls."Homepage" = "https://www.mailgun.com"
 urls."Issue Tracker" = "https://github.com/mailgun/mailgun-python/issues"
@@ -200,10 +204,11 @@ lint.ignore = [
     # --- Docstring ---
     "D417", "D100", "D104",
 
-    # --- Keep your existing TODO ignores ---
+    # --- Keep existing TODO ignores ---
     "C901",
     "PLR0913",
     "CPY001",
+    "PLW0717", # too-many-statements-in-try-clause (PLW0717)
 ]
 lint.exclude = [ "mailgun/examples/*", "tests" ]
 lint.per-file-ignores."__init__.py" = [ "E402" ]

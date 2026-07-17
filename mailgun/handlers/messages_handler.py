@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Any
 
 from mailgun.handlers.error_handler import ApiError
-from mailgun.handlers.utils import validate_mailgun_url
+from mailgun.security import SecurityGuard
 
 
 def handle_resend_message(
@@ -34,4 +34,4 @@ def handle_resend_message(
     if "storage_url" not in kwargs:
         raise ApiError("Storage url is required")
 
-    return validate_mailgun_url(str(kwargs["storage_url"]))
+    return SecurityGuard.validate_mailgun_url(str(kwargs["storage_url"]))

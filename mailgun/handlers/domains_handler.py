@@ -7,8 +7,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from mailgun.endpoints import build_path_from_keys
 from mailgun.handlers.error_handler import ApiError
-from mailgun.handlers.utils import build_path_from_keys, sanitize_path_segment
+from mailgun.security import SecurityGuard
 
 
 def handle_domainlist(
@@ -29,7 +30,7 @@ def handle_domainlist(
         The final URL for the domainlist endpoint.
     """
     # Ensure base ends with slash before appending
-    return url["base"].rstrip("/") + "/domains"
+    return str(url["base"]).rstrip("/") + "/domains"
 
 
 def handle_domains(
@@ -60,7 +61,9 @@ def handle_domains(
 
     # 1. Sanitize the target domain, especially since it can be overridden by kwargs
     raw_target_domain = kwargs.get("domain_name", domain)
-    target_domain = sanitize_path_segment(raw_target_domain) if raw_target_domain else None
+    target_domain = (
+        SecurityGuard.sanitize_path_segment(raw_target_domain) if raw_target_domain else None
+    )
 
     if not target_domain:
         if keys:
@@ -75,14 +78,14 @@ def handle_domains(
 
     # 2. Sanitize mailbox logins (which often contain special characters like '@' or '.')
     if "login" in kwargs:
-        safe_login = sanitize_path_segment(kwargs["login"])
+        safe_login = SecurityGuard.sanitize_path_segment(kwargs["login"])
         return f"{base_url}/{domain_path}/{safe_login}"
 
     # 3. Sanitize IP addresses
     if "ip" in kwargs:
         # Check if 'ips' segment is already present to prevent domains/ips/ips/1.1.1.1
         prefix = "" if "ips" in keys else "ips/"
-        safe_ip = sanitize_path_segment(kwargs["ip"])
+        safe_ip = SecurityGuard.sanitize_path_segment(kwargs["ip"])
         return f"{base_url}/{domain_path}/{prefix}{safe_ip}"
 
     if "verify" in kwargs:
@@ -118,7 +121,8 @@ def handle_sending_queues(
     keys = url.get("keys", [])
     if "sending_queues" in keys or "sendingqueues" in keys:
         base_clean = str(url["base"]).replace("domains/", "").replace("domains", "").rstrip("/")
-        return f"{base_clean}/{domain}/sending_queues"
+        safe_domain = SecurityGuard.sanitize_path_segment(domain) if domain else ""
+        return f"{base_clean}/{safe_domain}/sending_queues"
     return str(url["base"])
 
 
@@ -151,7 +155,9 @@ def handle_mailboxes_credentials(
 
     # Sanitize the target domain
     raw_target_domain = kwargs.get("domain_name", domain)
-    target_domain = sanitize_path_segment(raw_target_domain) if raw_target_domain else None
+    target_domain = (
+        SecurityGuard.sanitize_path_segment(raw_target_domain) if raw_target_domain else None
+    )
 
     if not target_domain:
         if keys:
@@ -162,7 +168,7 @@ def handle_mailboxes_credentials(
     constructed_url = f"{base_url}/{'/'.join(path_segments)}"
 
     if "login" in kwargs:
-        safe_login = sanitize_path_segment(kwargs["login"])
+        safe_login = SecurityGuard.sanitize_path_segment(kwargs["login"])
         return f"{base_url}/{target_domain}/credentials/{safe_login}"
     return constructed_url
 
@@ -189,7 +195,7 @@ def handle_dkimkeys(
     return f"{base_url}{final_keys}"
 
 
-def handle_webhooks(
+def handle_webhooks(  # noqa: PLR0914
     url: dict[str, Any],
     domain: str | None,
     method: str | None,
@@ -214,7 +220,7 @@ def handle_webhooks(
         final_keys = build_path_from_keys(keys)
         path = f"{base_url}{final_keys}"
         if "webhook_id" in kwargs:
-            safe_id = sanitize_path_segment(kwargs["webhook_id"])
+            safe_id = SecurityGuard.sanitize_path_segment(kwargs["webhook_id"])
             return f"{path}/{safe_id}"
         return path
 
@@ -245,11 +251,14 @@ def handle_webhooks(
         base_url = base_url.replace("/v3/", "/v4/")
 
     final_keys_str = build_path_from_keys(keys)
-    domain_path = f"{base_url}/{domain}{final_keys_str}"
+
+    # CWE-20/22: Sanitize domain boundary
+    safe_domain = SecurityGuard.sanitize_path_segment(domain) if domain else ""
+    domain_path = f"{base_url}/{safe_domain}{final_keys_str}"
 
     if not is_v4 and webhook_name:
         # v3 API requires webhook name in the URL
-        safe_webhook_name = sanitize_path_segment(webhook_name)
+        safe_webhook_name = SecurityGuard.sanitize_path_segment(webhook_name)
         return f"{domain_path}/{safe_webhook_name}"
 
     return domain_path

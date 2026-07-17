@@ -7,7 +7,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from mailgun.handlers.utils import build_path_from_keys, sanitize_path_segment
+from mailgun.endpoints import build_path_from_keys
+from mailgun.security import SecurityGuard
 
 
 def handle_routes(
@@ -31,7 +32,7 @@ def handle_routes(
     base_url = str(url["base"]).rstrip("/") + final_keys
 
     if "route_id" in kwargs:
-        safe_route = sanitize_path_segment(kwargs["route_id"])
+        safe_route = SecurityGuard.sanitize_path_segment(kwargs["route_id"])
         return f"{base_url}/{safe_route}"
 
     return base_url

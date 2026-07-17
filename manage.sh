@@ -64,12 +64,15 @@ lint() {
 
 test_all() {
     # Example: ./manage.sh test_all
+    # Example with flags: ./manage.sh test_all -vvv -s
     info "Running ALL tests (Unit + Integration)..."
     pytest -n auto "${TEST_DIR}" "$@"
 }
 
 test_unit() {
     # Example: ./manage.sh test_unit
+    # Example specific test: ./manage.sh test_unit tests/unit/test_client.py::test_get_version
+    # Example specific class: ./manage.sh test_unit -k "TestClientAuth"
     info "Running UNIT tests..."
     pytest "${TEST_DIR}/unit" "$@"
 }
@@ -89,6 +92,7 @@ test_cov() {
 
 test_no_warnings() {
     # Example: ./manage.sh test_no_warnings
+    # Example for specific group: ./manage.sh test_no_warnings tests/unit/
     info "Running tests and SUPPRESSING all DeprecationWarnings..."
     pytest -W "ignore::DeprecationWarning" "$@"
 }
@@ -99,11 +103,95 @@ test_strict_warnings() {
     pytest -W "error::DeprecationWarning" "$@"
 }
 
+test_examples() {
+    GREEN='\033[0;32m'
+    BLUE='\033[0;34m'
+    NC='\033[0m'
+
+    if [[ -z "$APIKEY" || -z "$DOMAIN" ]]; then
+        echo "Warning: APIKEY or DOMAIN environment variables are not set."
+        echo "Many examples may fail without them."
+        echo ""
+    fi
+
+    # Ensure python finds the local mailgun module
+    export PYTHONPATH="$(pwd):$PYTHONPATH"
+
+    echo -e "${BLUE}Starting Mailgun Examples Test Suite...${NC}\n"
+
+    for script in mailgun/examples/*.py; do
+        if [[ "$(basename "$script")" == "__init__.py" ]]; then
+            continue
+        fi
+
+        echo -e "${GREEN}Running: ${script}...${NC}"
+
+        python "$script"
+
+        echo "---------------------------------------------------"
+    done
+
+    echo -e "${BLUE}✅ All examples executed successfully!${NC}"
+}
+
+# ==============================================================================
+# SECURITY & FUZZING
+# ==============================================================================
+fuzz_all() {
+    local duration=${1:-30}
+    if [ $# -gt 0 ]; then shift; fi
+
+    local fuzzer_dir="tests/fuzz"
+    local corpus_dir="tests/fuzz/corpus"
+    local log_dir="logs"
+    local python_bin="$(which python)"
+
+    mkdir -p "$log_dir"
+
+    # Find all fuzzers
+    shopt -s nullglob
+    local fuzzers=("$fuzzer_dir"/fuzz_*.py)
+    shopt -u nullglob
+
+    info "🚀 Starting security fuzzing suite..."
+
+    for fuzzer in "${fuzzers[@]}"; do
+        local fuzzer_name=$(basename "$fuzzer" .py)
+        # Create a dedicated directory for THIS specific fuzzer
+        local fuzzer_work_dir="$log_dir/$fuzzer_name"
+        local fuzzer_corpus="$(pwd)/$corpus_dir/$fuzzer_name"
+
+        mkdir -p "$fuzzer_work_dir"
+        mkdir -p "$fuzzer_corpus"
+
+        echo "🔍 Running fuzzer: $fuzzer_name (Dir: $fuzzer_work_dir)"
+
+        # Isolate execution:
+        # 1. Change directory into the specific log folder for this fuzzer
+        # 2. Run the python script from there
+        # 3. Use absolute paths for the script, dictionary, and corpus
+        (
+            cd "$fuzzer_work_dir"
+            "$python_bin" "$(pwd)/../../$fuzzer" \
+                -dict="$(pwd)/../../tests/fuzz/fuzz.dict" \
+                -max_total_time="$duration" \
+                -artifact_prefix="./" \
+                "$fuzzer_corpus" \
+                "$@" > "fuzz_output.log" 2>&1
+        ) &
+    done
+
+    echo "⏳ All fuzzers launched in isolation. Waiting for completion..."
+    wait
+    success "✅ All fuzz tests finished."
+}
+
 # ==============================================================================
 # PERFORMANCE & BENCHMARKING
 # ==============================================================================
 perf_bench() {
     # Example: ./manage.sh perf_bench
+    # Example compare: ./manage.sh perf_bench --benchmark-compare
     info "Running pytest-benchmark performance tests..."
     pytest "${TEST_DIR}/unit/test_perf.py" "$@"
 }
@@ -176,8 +264,8 @@ clean() {
     find . -type d -name '*.egg-info' -exec rm -rf {} +
     find . -type f -name '*.egg' -exec rm -f {} +
 
-# Temp logs and profilers
-    rm -f ./*.prof ./profile.html ./profile.json ./tmp.txt ./wget-log
+    # Temp logs and profilers
+    rm -f *.prof profile.html profile.json tmp.txt wget-log
 
     success "Workspace cleaned!"
 }
@@ -190,34 +278,38 @@ help() {
     echo "Usage: ./manage.sh <command> [extra_arguments...]"
     echo ""
     echo -e "${YELLOW}Development & Code Quality:${NC}"
-    echo "  env_setup        - Create/update conda dev env and install pre-commit"
-    echo "  format           - Format code (Ruff)"
-    echo "  lint             - Run linters and type checkers (Ruff, MyPy)"
-    echo "  run_hooks        - Run all pre-commit hooks manually (slotscheck, etc.)"
+    echo "  env_setup         - Create/update conda dev env and install pre-commit"
+    echo "  format            - Format code (Ruff)"
+    echo "  lint              - Run linters and type checkers (Ruff, MyPy)"
+    echo "  run_hooks         - Run all pre-commit hooks manually (slotscheck, etc.)"
     echo ""
     echo -e "${YELLOW}Testing (Any pytest flags like '-s', '-vvv', '-k' can be added at the end):${NC}"
-    echo "  test_all         - Run all tests"
-    echo "  test_unit        - Run only unit tests"
-    echo "  test_integration - Run only integration tests"
-    echo "  test_cov         - Run tests with HTML coverage report"
-    echo "  test_no_warnings - Run tests and hide all DeprecationWarnings"
+    echo "  test_all          - Run all tests"
+    echo "  test_unit         - Run only unit tests"
+    echo "  test_integration  - Run only integration tests"
+    echo "  test_cov          - Run tests with HTML coverage report"
+    echo "  test_no_warnings  - Run tests and hide all DeprecationWarnings"
     echo "  test_strict_warnings - Run tests and fail on any DeprecationWarning"
+    echo "  test_examples     - Run all enable mailgun examples in the mailgun/examples folder"
+    echo ""
+    echo -e "${YELLOW}Security & Fuzzing:${NC}"
+    echo "  fuzz_all          - Run all fuzz tests (pass duration in seconds as first arg)"
     echo ""
     echo -e "${YELLOW}Performance & Security:${NC}"
-    echo "  perf_bench       - Run pytest-benchmark suite"
-    echo "  perf_profile     - Run cProfile on cold boot"
-    echo "  audit_deps       - Run pip-audit and osv-scanner"
+    echo "  perf_bench        - Run pytest-benchmark suite"
+    echo "  perf_profile      - Run cProfile on cold boot"
+    echo "  audit_deps        - Run pip-audit and osv-scanner"
     echo ""
     echo -e "${YELLOW}Build & Maintenance:${NC}"
-    echo "  clean            - Remove all build, test, and cache artifacts"
-    echo "  build_pkg        - Build source and wheel package"
-    echo "  release          - Build and upload release to PyPI"
-    echo "  help             - Show this menu"
+    echo "  clean             - Remove all build, test, and cache artifacts"
+    echo "  build_pkg         - Build source and wheel package"
+    echo "  release           - Build and upload release to PyPI"
+    echo "  help              - Show this menu"
     echo ""
     echo -e "${GREEN}Examples:${NC}"
     echo "  ./manage.sh test_unit -vvv -s"
     echo "  ./manage.sh test_unit -k \"test_api_call_exception_chaining\""
-    echo "  ./manage.sh test_no_warnings tests/unit/test_client.py"
+    echo "  ./manage.sh fuzz_all 15"
 }
 
 # Check if at least one argument is provided
@@ -230,7 +322,7 @@ COMMAND=$1
 shift # Remove the command from the arguments list, leaving only extra flags
 
 case "$COMMAND" in
-    env_setup|format|lint|test_all|test_unit|test_integration|test_cov|test_no_warnings|test_strict_warnings|perf_bench|perf_profile|audit_deps|run_hooks|build_pkg|release|clean|help)
+    env_setup|format|lint|test_all|test_unit|test_integration|test_cov|test_no_warnings|test_strict_warnings|test_examples|perf_bench|perf_profile|audit_deps|run_hooks|build_pkg|release|clean|fuzz_all|help)
         "$COMMAND" "$@" # Execute the function with any remaining arguments
         ;;
     *)

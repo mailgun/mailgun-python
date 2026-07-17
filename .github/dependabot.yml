@@ -12,6 +12,8 @@ updates:
       python-packages:
         patterns:
           - "*"
+    cooldown:
+      default-days: 7
 
   # Enable version updates for GitHub Actions
   - package-ecosystem: 'github-actions'
@@ -23,3 +25,5 @@ updates:
     groups:
       minor-and-patch:
         update-types: [ "minor", "patch" ]
+    cooldown:
+      default-days: 7
