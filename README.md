@@ -1,4 +1,3 @@
-````markdown
 # Mailgun Python SDK
 
 Welcome to the official Python SDK for [Mailgun](http://www.mailgun.com/)!
@@ -25,11 +24,10 @@ Check out all the resources and Python code examples in the official
     - [Base URL](#base-url)
     - [Authentication](#authentication)
   - [Quick Start](#quick-start)
-    - [Synchronous Client](#client)
+    - [Synchronous Client](#synchronous-client)
     - [AsyncClient](#asyncclient)
   - [Usage](#usage)
-    - [Logging & Debugging](#logging--debugging)
-    - [Logging & Secure Redaction](#logging--secure-redaction)
+    - [Logging Debugging and Secure Redaction](#logging-debugging-and-secure-redaction)
     - [Timeout Configuration](#timeout-configuration)
     - [API Response Codes](#api-response-codes)
     - [IDE Autocompletion & DX](#ide-autocompletion--dx)
@@ -139,7 +137,6 @@ This library `mailgun` officially supports the following Python versions:
 It's tested up to 3.14 (including).
 It guarantees cross-platform compatibility across Linux, macOS, and Windows.
 
-
 ## Requirements
 
 ### Build backend dependencies
@@ -158,11 +155,11 @@ For running test you need `pytest >=9.0.3`, `pytest-asyncio`, and `responses` at
 
 ### pip install
 
-Use the below command to install the Mailgun SDK for Python:  
+Use the below command to install the Mailgun SDK for Python:
 
 ```bash
 pip install mailgun
-````
+```
 
 #### git clone & pip install locally
 
@@ -359,7 +356,7 @@ async with AsyncClient(auth=("api", os.environ["APIKEY"])) as client:
 
 For detailed examples of all available methods, parameters, and use cases, refer to the [mailgun/examples](mailgun/examples) section. All examples can be adapted to async by using `AsyncClient` and adding `await` to method calls.
 
-### Logging, Debugging & Secure Redaction
+### Logging, Debugging, and Secure Redaction
 
 The Mailgun SDK uses standard Python logging. To aid in debugging, you can enable `DEBUG` or `INFO` logs.
 
@@ -450,7 +447,7 @@ Key Behaviors in `dry_run` Mode:
 All of Mailgun's HTTP response codes follow standard HTTP definitions. For some additional information and
 troubleshooting steps, please see below.
 
-**400** - Bad Request (e.g., missing parameter). Will typically contain a JSON response with a "message" key which contains a human readable message / action
+**400** - Bad Request (e.g., missing parameter). Will typically contain a JSON response with a "message" key which contains a human-readable message / action
 to interpret.
 
 **401/403** - Auth error or access denied. Please ensure your API key is correct and that you are part of a group that has
@@ -535,7 +532,7 @@ with Client(auth=("api", "key")) as client:
 
 ### Strict Payload Schemas
 
-If you prefer to build your own dictionaries instead of using the builder, you can opt-in to `TypedDict` schemas for full IDE autocomplete and `mypy` compile-time safety.
+If you prefer to build your own dictionaries instead of using the builder, you can opt in to `TypedDict` schemas for full IDE autocomplete and `mypy` compile-time safety.
 
 ```python
 from mailgun import Client
@@ -1751,7 +1748,7 @@ For Enterprise and SecOps environments, the Mailgun SDK acts as a security senso
 - Control Character Injection attempts (CWE-20)
 - Server-Side Request Forgery (SSRF) bypass attempts (CWE-918)
 
-You can globally **opt-in** to have the SDK automatically listen to these events and pipe them to your standard `logging` infrastructure for SIEM integration:
+You can globally **opt in** to have the SDK automatically listen to these events and pipe them to your standard `logging` infrastructure for SIEM integration:
 
 ```python
 import logging
