@@ -303,29 +303,32 @@ class AsyncClient(BaseClient):
             raise AttributeError(msg) from None
 
     @property
-    def _client(self) -> httpx.AsyncClient | None:
+    def _client(self) -> httpx.AsyncClient:
         """Provide lazy initialization for the underlying httpx.AsyncClient.
 
         Returns:
             The active httpx.AsyncClient instance.
         """
-        if not self._httpx_client or self._httpx_client.is_closed:
-            if getattr(self, "_httpx_client", None) is None:
-                # Enforce TLS 1.2+ for httpx (CWE-319)
-                ssl_context = ssl.create_default_context()
-                ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
+        # Assign to a local variable so Pyright can properly narrow the type
+        current_client: httpx.AsyncClient | None = getattr(self, "_httpx_client", None)
 
-                # Check if the user already provided a custom transport (e.g. for mocking)
-                kwargs = self._client_kwargs.copy()
-                if "transport" not in kwargs:
-                    limits = httpx.Limits(max_keepalive_connections=100, max_connections=100)
-                    kwargs["transport"] = httpx.AsyncHTTPTransport(
-                        retries=3, limits=limits, verify=ssl_context
-                    )
+        if current_client is None or current_client.is_closed:
+            # Enforce TLS 1.2+ for httpx (CWE-319)
+            ssl_context = ssl.create_default_context()
+            ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
 
-                self._httpx_client = httpx.AsyncClient(**kwargs)
+            # Check if the user already provided a custom transport (e.g. for mocking)
+            kwargs = self._client_kwargs.copy()
+            if "transport" not in kwargs:
+                limits = httpx.Limits(max_keepalive_connections=100, max_connections=100)
+                kwargs["transport"] = httpx.AsyncHTTPTransport(
+                    retries=3, limits=limits, verify=ssl_context
+                )
+
+            self._httpx_client = httpx.AsyncClient(**kwargs)
             return self._httpx_client
-        return None
+
+        return current_client
 
     async def aclose(self) -> None:
         """Close the underlying httpx.AsyncClient and purge memory."""

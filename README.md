@@ -1,4 +1,3 @@
-````markdown
 # Mailgun Python SDK
 
 Welcome to the official Python SDK for [Mailgun](http://www.mailgun.com/)!
@@ -25,11 +24,10 @@ Check out all the resources and Python code examples in the official
     - [Base URL](#base-url)
     - [Authentication](#authentication)
   - [Quick Start](#quick-start)
-    - [Synchronous Client](#client)
+    - [Synchronous Client](#synchronous-client)
     - [AsyncClient](#asyncclient)
   - [Usage](#usage)
-    - [Logging & Debugging](#logging--debugging)
-    - [Logging & Secure Redaction](#logging--secure-redaction)
+    - [Logging Debugging and Secure Redaction](#logging-debugging-and-secure-redaction)
     - [Timeout Configuration](#timeout-configuration)
     - [API Response Codes](#api-response-codes)
     - [IDE Autocompletion & DX](#ide-autocompletion--dx)
@@ -139,7 +137,6 @@ This library `mailgun` officially supports the following Python versions:
 It's tested up to 3.14 (including).
 It guarantees cross-platform compatibility across Linux, macOS, and Windows.
 
-
 ## Requirements
 
 ### Build backend dependencies
@@ -158,11 +155,11 @@ For running test you need `pytest >=9.0.3`, `pytest-asyncio`, and `responses` at
 
 ### pip install
 
-Use the below command to install the Mailgun SDK for Python:  
+Use the below command to install the Mailgun SDK for Python:
 
 ```bash
 pip install mailgun
-````
+```
 
 #### git clone & pip install locally
 
@@ -222,15 +219,15 @@ If you are using a proxy or a regional endpoint (such as the EU infrastructure),
 
 Ensure you pass the correct Base URL to your client configuration:
 
-US: `https://api.mailgun.net` (Default)
+**US**: `https://api.mailgun.net` (**Default**)
 
-EU: `https://api.eu.mailgun.net`
+**EU**: `https://api.eu.mailgun.net`
 
 **⚠️ Important:** The `api_url` parameter must strictly be the **base host only** (e.g., `https://api.eu.mailgun.net`). Do **not** append API version paths (like `/v3` or `/v4`) to this string. The SDK's data-driven routing engine automatically appends the correct, endpoint-specific API version under the hood.
 
 ### Authentication
 
-Authenticate your Client using a tuple of ("api", "YOUR_API_KEY"). Find your API key in the [Mailgun Control Panel](https://app.mailgun.com/settings/api_security).
+Authenticate your Client using a tuple of `("api", "YOUR_API_KEY")`. Find your API key in the [Mailgun Control Panel](https://app.mailgun.com/settings/api_security).
 
 To run tests and examples please use virtualenv or conda environment with next environment variables:
 
@@ -276,7 +273,7 @@ client.messages.create(data={"to": "user@example.com"})
 
 > [!WARNING]
 > If you are running long-lived applications (like Celery workers, web servers, or high-volume loops), repeatedly initializing the `Client` without closing it can lead to socket leaks (`Too many open files`).
-> For production applications, \**always use the client as a Context Manager* (`with`) or explicitly call `client.close()`. This ensures deterministic release of TCP connection pools.
+> For production applications, *always use the client as a Context Manager* (`with`) or explicitly call `client.close()`. This ensures deterministic release of TCP connection pools.
 
 **The Recommended Variant (Context Manager)**
 
@@ -291,7 +288,7 @@ with Client(auth=("api", os.environ["APIKEY"])) as client:
 
 ### AsyncClient
 
-SDK provides native async version of the client to use in asynchronous applications. The AsyncClient offers the same functionality as the sync client but with non-blocking I/O, making it ideal for concurrent operations and integration with asyncio-based applications.
+SDK provides native async version of the client to use in asynchronous applications. The `AsyncClient` offers the same functionality as the sync client but with non-blocking I/O, making it ideal for concurrent operations and integration with asyncio-based applications.
 
 ```python
 import asyncio
@@ -359,7 +356,7 @@ async with AsyncClient(auth=("api", os.environ["APIKEY"])) as client:
 
 For detailed examples of all available methods, parameters, and use cases, refer to the [mailgun/examples](mailgun/examples) section. All examples can be adapted to async by using `AsyncClient` and adding `await` to method calls.
 
-### Logging, Debugging & Secure Redaction
+### Logging, Debugging, and Secure Redaction
 
 The Mailgun SDK uses standard Python logging. To aid in debugging, you can enable `DEBUG` or `INFO` logs.
 
@@ -450,7 +447,7 @@ Key Behaviors in `dry_run` Mode:
 All of Mailgun's HTTP response codes follow standard HTTP definitions. For some additional information and
 troubleshooting steps, please see below.
 
-**400** - Bad Request (e.g., missing parameter). Will typically contain a JSON response with a "message" key which contains a human readable message / action
+**400** - Bad Request (e.g., missing parameter). Will typically contain a JSON response with a "message" key which contains a human-readable message / action
 to interpret.
 
 **401/403** - Auth error or access denied. Please ensure your API key is correct and that you are part of a group that has
@@ -498,7 +495,7 @@ asyncio.run(main())
 
 ### Fluent Message Builder
 
-Constructing complex multipart emails with custom variables (v:), custom headers (h:), and tracking options (o:) can be error-prone. The MailgunMessageBuilder abstracts this away while providing automatic security guardrails against massive file attachments (OOM) and Path Traversal (CWE-22).
+Constructing complex multipart emails with custom variables (`v:`), custom headers (`h:`), and tracking options (`o:`) can be error-prone. The `MailgunMessageBuilder` abstracts this away while providing automatic security guardrails against massive file attachments (OOM) and Path Traversal (CWE-22).
 
 ```python
 from mailgun import Client
@@ -535,7 +532,7 @@ with Client(auth=("api", "key")) as client:
 
 ### Strict Payload Schemas
 
-If you prefer to build your own dictionaries instead of using the builder, you can opt-in to `TypedDict` schemas for full IDE autocomplete and `mypy` compile-time safety.
+If you prefer to build your own dictionaries instead of using the builder, you can opt in to `TypedDict` schemas for full IDE autocomplete and `mypy` compile-time safety.
 
 ```python
 from mailgun import Client
@@ -562,9 +559,9 @@ with Client(auth=("api", "key")) as client:
 
 #### Send an email
 
-Pass the components of the messages such as To, From, Subject, HTML and text parts, attachments, etc. Mailgun will build
+Pass the components of the messages such as `To`, `From`, `Subject`, `HTML` and text parts, attachments, etc. Mailgun will build
 a MIME representation of the message and send it. Note: In order to send you must provide one of the following
-parameters: 'text', 'html', 'amp-html' or 'template'
+parameters: `'text'`, `'html'`, `'amp-html'` or `'template'`.
 
 ```python
 import os
@@ -645,7 +642,7 @@ def post_scheduled() -> None:
 
 #### Send a MIME message
 
-When using the .mimemessage endpoint, Mailgun strictly requires the payload to be sent as multipart/form-data. In Python, you trigger this by passing the raw MIME string via the files parameter, assigning it to the "message" key.
+When using the `.mimemessage` endpoint, Mailgun strictly requires the payload to be sent as `multipart/form-data`. In Python, you trigger this by passing the raw MIME string via the files parameter, assigning it to the `"message"` key.
 
 ```python
 import os
@@ -791,7 +788,7 @@ def get_dkim_keys() -> None:
 
 Create a domain key.
 Note that once private keys are created or imported they are never exported.
-Alternatively, you can import an existing PEM file containing an RSA private key in PKCS #1, ASn.1 DER format.
+Alternatively, you can import an existing PEM file containing an RSA private key in `PKCS #1`, `ASn.1 DER` format.
 Note, the pem can be passed as a file attachment or as a form-string parameter.
 
 ```python
@@ -961,7 +958,7 @@ with Client(auth=("api", os.environ["APIKEY"])) as client:
 
 #### List statistic v2
 
-Items that have no bounces and no delays(classified_failures_count==0) are not returned.
+Items that have no bounces and no delays (`classified_failures_count==0`) are not returned.
 
 ```python
 import os
@@ -1257,7 +1254,8 @@ with Client(auth=("api", os.environ["APIKEY"])) as client:
 
 ##### Import list of unsubscribes
 
-> [!IMPORTANT] It is strongly recommended that you open files in binary mode. Because the Content-Length header may be
+> [!IMPORTANT]
+> It is strongly recommended that you open files in binary mode. Because the Content-Length header may be
 > provided for you, and if it does this value will be set to the number of bytes in the file. Errors may occur if you
 > open the file in text mode.
 
@@ -1294,7 +1292,8 @@ with Client(auth=("api", os.environ["APIKEY"])) as client:
 
 ##### Import list of complaints
 
-> [!IMPORTANT] It is strongly recommended that you open files in binary mode. Because the Content-Length header may be
+> [!IMPORTANT]
+> It is strongly recommended that you open files in binary mode. Because the Content-Length header may be
 > provided for you, and if it does this value will be set to the number of bytes in the file. Errors may occur if you
 > open the file in text mode.
 
@@ -1490,7 +1489,7 @@ import os
 from mailgun import Client
 
 domain: str = os.environ["DOMAIN"]
-data = {"pool_id": "60140d220859fda7bab8bb6c"}
+data = {"pool_id": "111222333444555666777"}
 
 with Client(auth=("api", os.environ["APIKEY"])) as client:
     req = client.domains_ips.create(domain=domain, data=data)
@@ -1660,7 +1659,7 @@ with Client(auth=("api", os.environ["APIKEY"])) as client:
 
 ### Validations & Optimize APIs
 
-Thanks to the dynamic routing engine, the SDK natively supports Mailgun's supplementary APIs (like Email Validation, InboxReady, and Send Time Optimization) out of the box, automatically handling the versioning (v4, v5, etc.).
+Thanks to the dynamic routing engine, the SDK natively supports Mailgun's supplementary APIs (like Email Validation, InboxReady, and Send Time Optimization) out of the box, automatically handling the versioning (`v4`, `v5`, etc.).
 
 #### Email validation
 
@@ -1751,7 +1750,7 @@ For Enterprise and SecOps environments, the Mailgun SDK acts as a security senso
 - Control Character Injection attempts (CWE-20)
 - Server-Side Request Forgery (SSRF) bypass attempts (CWE-918)
 
-You can globally **opt-in** to have the SDK automatically listen to these events and pipe them to your standard `logging` infrastructure for SIEM integration:
+You can globally **opt in** to have the SDK automatically listen to these events and pipe them to your standard `logging` infrastructure for SIEM integration:
 
 ```python
 import logging
