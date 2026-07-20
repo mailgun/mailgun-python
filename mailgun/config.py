@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import random
 import sys
-from enum import Enum
+from enum import StrEnum
 from functools import lru_cache
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Final
@@ -61,7 +61,7 @@ def _get_cached_route_data(clean_key: str) -> dict[str, Any]:
     return {"version": APIVersion.V3.value, "keys": tuple(route_parts)}
 
 
-class APIVersion(str, Enum):
+class APIVersion(StrEnum):
     """Constants for Mailgun API versions."""
 
     V1 = "v1"
