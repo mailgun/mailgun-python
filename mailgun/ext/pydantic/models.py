@@ -41,8 +41,11 @@ class SendMessageSchema(BaseModel):
 
     model_config = ConfigDict(
         populate_by_name=True,
-        extra="allow",  # Allow dynamic Mailgun variables (v:, h:, o:)
+        # 'allow' is risky. We switch to 'forbid' for top-level fields
+        # and handle dynamic keys explicitly in the model validator.
+        extra="forbid",
         str_strip_whitespace=True,
+        strict=True,  # Prevents type coercion (e.g., bool -> int)
     )
 
     # Required fields
@@ -60,6 +63,33 @@ class SendMessageSchema(BaseModel):
     amp_html: str | None = Field(default=None)
     template: str | None = Field(default=None)
 
+    # The strict container for dynamic parameters
+    # This prevents Mass Assignment while supporting Mailgun's dynamic schema
+    custom_params: dict[str, str] = Field(default_factory=dict)
+
+    @field_validator("custom_params")  # type: ignore[untyped-decorator]
+    @classmethod
+    def validate_prefixes(cls, v: dict[str, str]) -> dict[str, str]:
+        """Validates that custom parameter keys start with allowed Mailgun prefixes.
+
+        Args:
+            v: The dictionary of custom parameters to validate.
+
+        Returns:
+            The validated dictionary of custom parameters.
+
+        Raises:
+            ValueError: If a key does not start with 'v:', 'h:', or 'o:'.
+        """
+        for key in v:
+            if not key.startswith(("v:", "h:", "o:")):
+                msg = (
+                    f"Unknown custom parameter '{key}'. "
+                    "Mailgun specific options must start with 'v:', 'h:', or 'o:'"
+                )
+                raise ValueError(msg)
+        return v
+
     @field_validator("to", "from_", "cc", "bcc", mode="after")  # type: ignore[untyped-decorator]
     @classmethod
     def check_email_formats(cls, v: Any) -> Any:
@@ -73,8 +103,8 @@ class SendMessageSchema(BaseModel):
         return v
 
     @model_validator(mode="after")  # type: ignore[untyped-decorator]
-    def validate_content_and_extras(self) -> "SendMessageSchema":
-        """Cross-validation of content and Mailgun prefixes.
+    def validate_body(self) -> "SendMessageSchema":
+        """Cross-validation of body content.
 
         Returns:
             The validated schema instance.
@@ -82,22 +112,25 @@ class SendMessageSchema(BaseModel):
         Raises:
             ValueError: If no body parts are provided or invalid prefixes are used.
         """
-        # 1. Ensure the presence of the email body
+        # Ensure the presence of the email body
         if not any([self.text, self.html, self.template, self.amp_html]):
             raise ValueError(
                 "A Mailgun message must contain at least one body part: "
                 "'text', 'html', 'amp_html', or 'template'."
             )
 
-        # 2. Protection against prefix errors (v:, h:, o:)
-        if self.model_extra:
-            for key in self.model_extra:
-                if not (key.startswith(("v:", "h:", "o:"))):
-                    msg = (
-                        f"Unknown custom parameter '{key}'. "
-                        f"Mailgun specific options must start with 'v:' (variables), "
-                        f"'h:' (headers), or 'o:' (options)."
-                    )
-                    raise ValueError(msg)
-
         return self
+
+    def to_mailgun_payload(self) -> dict[str, Any]:
+        """SERIALIZER: Flattens custom_params into the top-level payload.
+
+        This is the method the SDK should call before sending.
+
+        Returns:
+            Standard fields as a dict
+        """
+        # Get standard fields as a dict
+        data = self.model_dump(by_alias=True, exclude_none=True, exclude={"custom_params"})
+        # Flatten custom_params into the root
+        data.update(self.custom_params)
+        return data
