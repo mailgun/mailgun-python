@@ -8,6 +8,7 @@ import pytest
 
 import mailgun.config
 from mailgun.client import Config, SecurityGuard
+from mailgun.config import RetryPolicy
 
 
 class TestConfigAuditHook:
@@ -369,3 +370,43 @@ class TestConfigURLValidation:
 
         assert "Ensure this is a trusted proxy" in warning_msg
         assert "SECURITY WARNING: Invalid API host 'custom.corporate.proxy'" in warning_msg
+
+
+class TestRetryPolicy:
+    """Verifies the mathematical and logical boundaries of the network backoff engine."""
+
+    def test_retry_policy_initialization_and_slots(self) -> None:
+        """Verify immutable properties and memory-efficient __slots__ usage."""
+        policy = RetryPolicy(max_retries=5, base_delay=2.0, max_delay=20.0, respect_retry_after=False)
+        assert policy.max_retries == 5
+        assert policy.base_delay == 2.0
+        assert policy.max_delay == 20.0
+        assert policy.respect_retry_after is False
+
+        # Prove __slots__ prevents dynamic dict allocation
+        with pytest.raises(AttributeError):
+            policy.new_attr = "leak" # type: ignore[attr-defined]
+
+    @patch("random.uniform")
+    def test_calculate_delay_applies_full_jitter(self, mock_uniform: MagicMock) -> None:
+        """Coverage: Verifies random.uniform is called precisely between 0 and the exponential bound."""
+        mock_uniform.return_value = 1.5
+        policy = RetryPolicy(base_delay=1.0, max_delay=10.0)
+
+        delay = policy.calculate_delay(attempt=1)
+
+        # attempt = 1 -> base(1.0) * 2^1 = 2.0.
+        mock_uniform.assert_called_once_with(0, 2.0)
+        assert delay == 1.5
+
+    @patch("random.uniform")
+    def test_calculate_delay_respects_max_delay_ceiling(self, mock_uniform: MagicMock) -> None:
+        """Coverage: Ensure exponential growth never breaches the `max_delay` cap."""
+        mock_uniform.return_value = 10.0
+        policy = RetryPolicy(base_delay=1.0, max_delay=10.0)
+
+        # attempt = 5 -> base(1.0) * 2^5 = 32.0. Math should cap it safely at max_delay (10.0).
+        delay = policy.calculate_delay(attempt=5)
+
+        mock_uniform.assert_called_once_with(0, 10.0)
+        assert delay == 10.0
