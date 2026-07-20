@@ -145,7 +145,7 @@ To build the `mailgun` package from the sources you need `setuptools` (as a buil
 
 ### Runtime dependencies
 
-At runtime the package requires `requests >=2.33.0`. For async support, it uses `httpx2 >=2.7.0` and `typing-extensions >=4.7.1` (for pre-3.11 backward compatibility).
+At runtime the package requires `requests >=2.33.0`. For async support, it uses `httpx2 >=2.7.0`.
 Async client automatically detects and uses `httpx2` if available, falling back seamlessly to legacy `httpx`.
 
 ### Test dependencies
