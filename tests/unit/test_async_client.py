@@ -73,7 +73,8 @@ class TestAsyncClient:
 
         mock_transport.assert_called_once()
         _, kwargs = mock_transport.call_args
-        assert kwargs["retries"] == 0
+
+        assert kwargs["retries"] == 3
         assert kwargs["limits"].max_keepalive_connections == 100
         assert kwargs["limits"].max_connections == 100
 
