@@ -1,5 +1,6 @@
 """Examples for Mailgun Message Builders and Clients."""
 
+import asyncio
 import logging
 import os
 
@@ -264,20 +265,20 @@ if __name__ == "__main__":
         print("Please set the 'APIKEY' and 'DOMAIN' environment variables to run examples.")
     else:
         # 1. Run Synchronous Examples
-        # send_standard_email_sync(api_key=API_KEY, domain=DOMAIN)
-        # send_batch_email_sync(api_key=API_KEY, domain=DOMAIN)
+        send_standard_email_sync(api_key=API_KEY, domain=DOMAIN)
+        send_batch_email_sync(api_key=API_KEY, domain=DOMAIN)
 
-        # send_large_report_sync(API_KEY, DOMAIN)
+        send_large_report_sync(API_KEY, DOMAIN)
 
         test_idempotency_guard_in_action(DOMAIN)
 
-        # try:
-        #     send_marketing_campaign(api_key=API_KEY, domain=DOMAIN)
-        # except DeliverabilityError as e:
-        #     # The user gracefully catches the error and sees a clean, actionable message
-        #     # without a terrifying system traceback.
-        #     logger.error(f"Campaign aborted by SpamGuard:\n{e}")
+        try:
+            send_marketing_campaign(api_key=API_KEY, domain=DOMAIN)
+        except DeliverabilityError as e:
+            # The user gracefully catches the error and sees a clean, actionable message
+            # without a terrifying system traceback.
+            logger.error(f"Campaign aborted by SpamGuard:\n{e}")
 
         # 2. Run Asynchronous Examples
-        # asyncio.run(send_template_email_async(api_key=API_KEY, domain=DOMAIN))
-        # asyncio.run(send_amp_and_inline_images_async(api_key=API_KEY, domain=DOMAIN))
+        asyncio.run(send_template_email_async(api_key=API_KEY, domain=DOMAIN))
+        asyncio.run(send_amp_and_inline_images_async(api_key=API_KEY, domain=DOMAIN))
