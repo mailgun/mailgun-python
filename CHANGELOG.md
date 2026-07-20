@@ -4,7 +4,7 @@ We [keep a changelog.](http://keepachangelog.com/)
 
 ## [Unreleased]
 
-## v1.8.0 - 2026-07-XX
+## v1.8.0 - 2026-07-20
 
 ### 🌟 Top Highlights (The "Big Wins")
 
