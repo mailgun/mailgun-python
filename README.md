@@ -513,6 +513,20 @@ with Client(auth=("api", "your-api-key")) as client:
         .add_custom_variable("invoice_id", 1234)  # Translates to "v:invoice_id"
         .add_custom_header("Reply-To", "billing@...")  # Translates to "h:Reply-To"
         .attach_file("/tmp/invoice_1234.pdf", safe_base_dir="/tmp/")  # Path Traversal guardrail
+        # Define short, human-readable aliases for complex local file paths
+        .attach_inline("assets/logos/logo_v2_final.png", cid="company_logo")
+        .attach_inline("assets/signatures/ceo_sign.png", cid="ceo_signature")
+        .set_html(
+            """
+            <html>
+                <body>
+                    <img src="cid:company_logo" alt="Company Logo"/><br/>
+                    <p>Hello! Thank you for choosing us.</p><br/>
+                    <img src="cid:ceo_signature" alt="CEO Signature"/>
+                </body>
+            </html>
+            """
+        )
         .build()
     )
 
@@ -549,6 +563,24 @@ my_data: SendMessagePayload = {
 
 with Client(auth=("api", "key")) as client:
     client.messages.create(domain="domain.com", data=my_data)
+```
+
+### Readiness / Liveness Probe
+
+```python
+import sys
+import os
+from mailgun import Client
+
+api_key = os.environ.get("MAILGUN_API_KEY")
+
+with Client(auth=("api", api_key)) as client:
+    if client.ping():
+        print("Status: Healthy")
+        sys.exit(0)  # Exit code 0 indicates success
+    else:
+        print("Status: Unhealthy")
+        sys.exit(1)  # Exit code 1 triggers container restart/unready state
 ```
 
 ## Request examples
