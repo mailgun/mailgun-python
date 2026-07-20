@@ -7,7 +7,7 @@ import sys
 from typing import Any
 
 import atheris
-import httpx
+from mailgun._httpx_compat import httpx as compat_httpx
 import requests
 
 with atheris.instrument_imports():
@@ -26,7 +26,7 @@ _STATIC_SYNC_RESP = requests.Response()
 _STATIC_SYNC_RESP.status_code = 200
 _STATIC_SYNC_RESP._content = b"{}"
 
-_STATIC_ASYNC_RESP = httpx.Response(200, content=b"{}")
+_STATIC_ASYNC_RESP = compat_httpx.Response(200, content=b"{}")
 
 
 def mock_requests_send(
@@ -44,12 +44,12 @@ requests.adapters.HTTPAdapter.send = mock_requests_send  # type: ignore[method-a
 
 
 async def mock_httpx_handle(
-    self: httpx.AsyncBaseTransport, request: httpx.Request
-) -> httpx.Response:
+    self: compat_httpx.AsyncBaseTransport, request: compat_httpx.Request
+) -> compat_httpx.Response:
     return _STATIC_ASYNC_RESP
 
 
-httpx.AsyncHTTPTransport.handle_async_request = mock_httpx_handle  # type: ignore[method-assign]
+compat_httpx.AsyncHTTPTransport.handle_async_request = mock_httpx_handle  # type: ignore[method-assign]
 
 
 def TestOneInput(data: bytes) -> None:

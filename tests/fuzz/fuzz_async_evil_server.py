@@ -13,7 +13,7 @@ from typing import Any
 import atheris
 
 with atheris.instrument_imports():
-    import httpx
+    from mailgun._httpx_compat import httpx as compat_httpx
     from mailgun.client import AsyncClient
     from mailgun.handlers.error_handler import ApiError, MailgunTimeoutError
 
@@ -29,26 +29,26 @@ def TestOneInput(data: bytes) -> None:
     fdp = atheris.FuzzedDataProvider(data)
     client = AsyncClient(auth=("api", "test-key"))
 
-    original_send = httpx.AsyncClient.send
+    original_send = compat_httpx.AsyncClient.send
 
     async def evil_send(
-        self: httpx.AsyncClient, request: httpx.Request, **kwargs: Any
-    ) -> httpx.Response:
+        self: compat_httpx.AsyncClient, request: compat_httpx.Request, **kwargs: Any
+    ) -> compat_httpx.Response:
         if fdp.ConsumeBool():
             exceptions = [
-                httpx.ConnectError("Fuzzed Connection Drop"),
-                httpx.NetworkError("Fuzzed Network Error"),
-                httpx.ProtocolError("Fuzzed Protocol Error"),
-                httpx.ReadTimeout("Fuzzed Timeout"),
+                compat_httpx.ConnectError("Fuzzed Connection Drop"),
+                compat_httpx.NetworkError("Fuzzed Network Error"),
+                compat_httpx.ProtocolError("Fuzzed Protocol Error"),
+                compat_httpx.ReadTimeout("Fuzzed Timeout"),
             ]
             raise fdp.PickValueInList(exceptions)
 
         status = fdp.PickValueInList([200, 400, 401, 403, 404, 500, 502, 504])
         garbage_bytes = fdp.ConsumeBytes(1024)
 
-        return httpx.Response(status, content=garbage_bytes, request=request)
+        return compat_httpx.Response(status, content=garbage_bytes, request=request)
 
-    httpx.AsyncClient.send = evil_send  # type: ignore[method-assign]
+    compat_httpx.AsyncClient.send = evil_send  # type: ignore[method-assign]
 
     async def run_fuzz() -> None:
         with Path(os.devnull).open("w") as devnull, contextlib.redirect_stdout(
@@ -65,7 +65,7 @@ def TestOneInput(data: bytes) -> None:
                 MailgunTimeoutError,
                 TypeError,
                 ValueError,
-                httpx.RequestError,
+                compat_httpx.RequestError,
             ):
                 # Expected under fuzzed transport/inputs: keep exploring inputs
                 # and only fail on truly unexpected exceptions below.
@@ -78,7 +78,7 @@ def TestOneInput(data: bytes) -> None:
                     f"SDK crashed handling Async Evil Server response: {e}"
                 ) from e
             finally:
-                httpx.AsyncClient.send = original_send  # type: ignore[method-assign]
+                compat_httpx.AsyncClient.send = original_send  # type: ignore[method-assign]
                 await client.aclose()
 
     _FUZZ_LOOP.run_until_complete(run_fuzz())

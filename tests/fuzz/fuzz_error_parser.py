@@ -8,7 +8,7 @@ import sys
 import atheris
 
 with atheris.instrument_imports():
-    import httpx
+    from mailgun._httpx_compat import httpx as compat_httpx
     # Adjust import path based on your exact handler location
     from mailgun.handlers.error_handler import ApiError
 
@@ -32,11 +32,11 @@ def TestOneInput(data: bytes) -> None:
     content = fdp.ConsumeBytes(fdp.ConsumeIntInRange(0, 1024))
 
     # Mock the HTTPX Response object exactly as the Mailgun SDK would receive it
-    response = httpx.Response(
+    response = compat_httpx.Response(
         status_code=status_code,
         headers=headers,
         content=content,
-        request=httpx.Request("POST", "https://api.mailgun.net/v3/fuzz/messages")
+        request=compat_httpx.Request("POST", "https://api.mailgun.net/v3/fuzz/messages")
     )
 
     try:
