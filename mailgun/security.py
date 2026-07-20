@@ -1,11 +1,13 @@
 import hashlib
 import hmac
+import json
 import math
 import re
 import ssl
 import sys
 import unicodedata
 import warnings
+from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any, Final
 from urllib.parse import quote, unquote, urlparse
@@ -14,6 +16,12 @@ from requests.adapters import HTTPAdapter
 
 from mailgun.logger import get_logger
 from mailgun.types import TimeoutType
+
+
+if sys.version_info >= (3, 11):
+    from typing import TypedDict
+else:
+    from typing_extensions import TypedDict
 
 
 logger = get_logger(__name__)
@@ -519,3 +527,131 @@ class SecurityGuard:
         except AttributeError as e:
             # Fail-closed if underlying C-extensions reject malformed encodings
             raise ValueError("Malformed cryptographic payload.") from e
+
+    @staticmethod
+    def normalize_domain(domain: str | None) -> str:
+        """Natively convert internationalized domain names (IDN) to Punycode (RFC 3490).
+
+        This prevents UnicodeEncodeError when HTTP clients (like requests/httpx)
+        attempt to route to or build URLs with non-ASCII domains (e.g., Cyrillic).
+
+        Args:
+            domain: The target domain name
+
+        Returns:
+            The ASCII-safe Punycode string
+
+        Raises:
+            ValueError: If invalid domain name encoding.
+        """
+        if not domain:
+            return ""
+
+        try:
+            # Encode the Unicode string to IDNA bytes, then decode to an ASCII string.
+            # If the domain is already ASCII (e.g., 'example.com'), it remains unchanged.
+            return domain.encode("idna").decode("ascii")
+        except UnicodeError as e:
+            # Fallback or raise a clear validation error if the domain is completely malformed
+            msg = f"Invalid domain name encoding: {domain}"
+            raise ValueError(msg) from e
+
+
+class SpamReport(TypedDict):
+    """Schema for the local deliverability check report."""
+
+    score: float
+    issues: list[str]
+    is_safe: bool
+
+
+class _SpamGuardParser(HTMLParser):
+    """Internal lightning-fast HTML parser for detecting structural spam triggers."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.issues: list[str] = []
+        self.has_alt_tags = True
+        self.image_count = 0
+        self.has_scripts = False
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        attr_dict = dict(attrs)
+
+        if tag == "img":
+            self.image_count += 1
+            if "alt" not in attr_dict or not attr_dict["alt"]:
+                self.has_alt_tags = False
+
+        if tag == "script":
+            self.has_scripts = True
+            self.issues.append("CRITICAL: <script> tags are strictly forbidden in email clients.")
+
+
+class SpamGuard:
+    """Local static analyzer for email HTML templates."""
+
+    __slots__ = ()
+
+    @staticmethod
+    def check_html(html_content: str) -> SpamReport:
+        """Natively parse HTML and detect known spam/delivery triggers under 1ms.
+
+        This prevents obvious deliverability penalties without requiring network
+        requests to premium 3rd-party validation APIs.
+
+        Returns:
+            Dictionary with score, issues, and is_safe keys.
+        """
+        parser = _SpamGuardParser()
+        parser.feed(html_content)
+
+        issues = parser.issues
+        score = 100.0
+        byte_size_limit = 102400
+        safe_score = 80.0
+
+        if parser.image_count > 0 and not parser.has_alt_tags:
+            issues.append("Missing 'alt' attributes on images. This triggers spam filters.")
+            score -= 15.0
+
+        byte_size = len(html_content.encode("utf-8"))
+        if byte_size > byte_size_limit:
+            issues.append(
+                f"HTML exceeds 100KB ({byte_size / 1024:.1f}KB). Gmail will clip this email."
+            )
+            score -= 25.0
+
+        if parser.has_scripts:
+            score -= 50.0
+
+        score = max(0.0, score)
+
+        return {"score": score, "issues": issues, "is_safe": score >= safe_score}
+
+
+class IdempotencyGuard:
+    """Deterministic idempotency key generator for protection against duplicate requests."""
+
+    __slots__ = ()
+
+    @staticmethod
+    def generate_key(domain: str, payload: dict[str, Any]) -> str:
+        """Generates a unique, collision-resistant SHA-256 fingerprint of the message payload.
+
+        Returns:
+            SHA-256 fingerprint.
+        """
+        # Filtering only core fields
+        fingerprint_data = {
+            "domain": domain,
+            "to": payload.get("to"),
+            "subject": payload.get("subject"),
+            "template": payload.get("template"),
+            "text": payload.get("text"),
+            "html": payload.get("html"),
+            "v_variables": {k: v for k, v in payload.items() if str(k).startswith("v:")},
+        }
+
+        serialized = json.dumps(fingerprint_data, sort_keys=True, default=str)
+        return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
