@@ -1,20 +1,21 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import sys
+import time
 import warnings
 from functools import lru_cache
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Final
 from urllib.parse import parse_qs, urlparse
 
-import httpx
 import requests
-from requests.exceptions import (
-    ConnectionError as RequestsConnectionError,  # pyright: ignore[reportMissingModuleSource]
-)
 from requests.models import Response  # pyright: ignore[reportMissingModuleSource]
 
 from mailgun import routes
+from mailgun._httpx_compat import httpx
+from mailgun.config import RetryPolicy
 from mailgun.handlers.error_handler import ApiError, MailgunTimeoutError
 from mailgun.logger import get_logger
 from mailgun.security import SecurityGuard
@@ -23,9 +24,8 @@ from mailgun.security import SecurityGuard
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Mapping
 
-    from httpx import Response as HttpxResponse
-
-    from mailgun.types import TimeoutType
+    from mailgun.sandbox import MockResponse
+    from mailgun.types import APIResponseType, AsyncAPIResponseType, TimeoutType
 
 
 logger = get_logger(__name__)
@@ -165,7 +165,7 @@ def _load_handler(endpoint_key: str) -> Callable[..., str]:  # noqa: PLR0911, PL
 class BaseEndpoint:
     """Base class for endpoints. Contains methods common for Endpoint and AsyncEndpoint."""
 
-    __slots__ = ("_auth", "_timeout", "_url", "dry_run", "headers")
+    __slots__ = ("_auth", "_timeout", "_url", "dry_run", "headers", "retry_policy")
 
     def __init__(
         self,
@@ -190,6 +190,7 @@ class BaseEndpoint:
         self._auth = auth
         self._timeout = timeout
         self.dry_run = dry_run
+        self.retry_policy = None
 
     @staticmethod
     def _warn_if_deprecated(method: str, target_url: str) -> None:
@@ -210,6 +211,21 @@ class BaseEndpoint:
                 warnings.warn(warning_message, DeprecationWarning, stacklevel=3)
                 logger.warning(warning_message)
                 break
+
+    @staticmethod
+    def _reset_stream_pointers(files: Any) -> None:
+        """Ensure the idempotency of file generators and buffers during retries."""
+        if not isinstance(files, list):
+            return
+        for _, file_tuple in files:
+            if isinstance(file_tuple, tuple) and len(file_tuple) >= 2:  # noqa: PLR2004
+                file_obj = file_tuple[1]
+                # If it's our ChunkedStreamer, close current FD, so __iter__ open it again
+                if hasattr(file_obj, "close") and hasattr(file_obj, "chunk_size"):
+                    file_obj.close()
+                # If it's BytesIO or an opened file
+                elif hasattr(file_obj, "seek"):
+                    file_obj.seek(0)
 
     def __repr__(self) -> str:
         """DX: Show the actual resolved target route instead of memory address.
@@ -294,11 +310,14 @@ class BaseEndpoint:
         safe_kwargs = SecurityGuard.filter_safe_kwargs(kwargs)
         safe_headers = SecurityGuard.sanitize_headers(headers) or {}
         target_domain = SecurityGuard.sanitize_domain(domain)
+        target_domain_normalized = SecurityGuard.normalize_domain(target_domain)
 
         actual_timeout = timeout if timeout is not None else self._timeout
         safe_timeout = SecurityGuard.sanitize_timeout(actual_timeout)
 
-        target_url = self.build_url(url, domain=target_domain, method=safe_method, **kwargs)
+        target_url = self.build_url(
+            url, domain=target_domain_normalized, method=safe_method, **kwargs
+        )
         self._warn_if_deprecated(safe_method, target_url)
 
         # PEP 578 and protection against Log Forging (CWE-117)
@@ -335,7 +354,7 @@ class Endpoint(BaseEndpoint):
         super().__init__(url, headers, auth, timeout=timeout, dry_run=dry_run)
         self._session = session or requests.Session()
 
-    def api_call(
+    def api_call(  # noqa: PLR0914, PLR0915
         self,
         auth: tuple[str, str] | None,
         method: str,
@@ -347,7 +366,7 @@ class Endpoint(BaseEndpoint):
         files: Any | None = None,
         domain: str | None = None,
         **kwargs: Any,
-    ) -> Response | Any:
+    ) -> APIResponseType:  # noqa: PLR0914, PLR0915 - Core request loop contains complex retry/sandbox logic
         """Execute the HTTP request to the Mailgun API.
 
         Args:
@@ -375,15 +394,27 @@ class Endpoint(BaseEndpoint):
 
         SecurityGuard.validate_no_control_characters(target_url, context="Endpoint URL")
 
-        # Zero-Leak Sandbox Mode Interception
+        # --- DRY RUN INTERCEPTOR (Zero-Leak Sandbox Mode) ---
         if self.dry_run:
+            # Route 1: Rich Sandbox Preview for emails
+            if "messages" in url.get("keys", []):
+                from mailgun.sandbox import LocalSandbox  # noqa: PLC0415
+
+                sandbox_domain = domain or kwargs.get("domain", "local.sandbox")
+                payload = data or {}
+
+                logger.info("DRY RUN: Intercepting email payload for local sandbox preview.")
+                sandbox = LocalSandbox()
+                return sandbox.intercept_and_preview(sandbox_domain, payload)
+
+            # Route 2: Standard JSON Mock for all other endpoints (domains, ips, etc.)
             logger.info(
                 "DRY RUN: Intercepting %s request to %s", safe_method.upper(), safe_url_for_log
             )
             mock_resp = Response()
-            mock_resp.status_code = 200
+            mock_resp.status_code = HTTPStatus.OK
             mock_resp.encoding = "utf-8"
-            mock_resp._content = b'{"message": "Dry run successful - request intercepted", "id": "<dry-run-mock-id>"}'  # noqa: SLF001
+            mock_resp._content = b'{"message": "Dry run successful - request intercepted", "id": "<dry-run-mock-id>"}'  # noqa: SLF001 - Mocking internal state
             return mock_resp
 
         # Case-insensitive validation for Content-Type to conform with RFC 7230
@@ -397,57 +428,101 @@ class Endpoint(BaseEndpoint):
 
         req_method = getattr(self._session, safe_method.lower())
 
+        policy = getattr(self, "retry_policy", None) or RetryPolicy()
+        max_attempts = policy.max_retries + 1
+
         sys.audit("mailgun.api.request", safe_method.upper(), safe_url_for_log)
         logger.debug("Sending Request: %s %s", safe_method.upper(), safe_url_for_log)
 
-        try:
-            response = req_method(
-                target_url,
-                data=data,
-                params=filters,
-                headers=safe_headers,
-                auth=auth,
-                timeout=safe_timeout,
-                files=files,
-                verify=True,
-                stream=False,
-                allow_redirects=False,
-                **safe_kwargs,
-            )
-
-            status_code = getattr(response, "status_code", 200)
-            is_error = isinstance(status_code, int) and status_code >= _HTTP_ERROR_THRESHOLD
-            if is_error:
-                logger.error(
-                    "API Error %s | %s %s", status_code, safe_method.upper(), safe_url_for_log
-                )
-            else:
-                logger.debug(
-                    "API Success %s | %s %s",
-                    getattr(response, "status_code", 200),
-                    safe_method.upper(),
+        for attempt in range(max_attempts):
+            try:
+                response = req_method(
                     target_url,
+                    data=data,
+                    params=filters,
+                    headers=safe_headers,
+                    auth=auth,
+                    timeout=safe_timeout,
+                    files=files,
+                    verify=True,
+                    stream=False,
+                    allow_redirects=False,
+                    **safe_kwargs,
                 )
 
-        except requests.exceptions.Timeout as e:
-            logger.exception("Timeout Error: %s %s", safe_method.upper(), safe_url_for_log)
-            raise MailgunTimeoutError("Request timed out") from e
-        except RequestsConnectionError as e:
-            logger.critical("Connection Failed (DNS/Network): %s | URL: %s", e, safe_url_for_log)
-            msg = f"Network routing failed: {e}"
-            raise ApiError(msg) from e
-        except requests.RequestException as e:
-            logger.critical("Request Exception: %s | URL: %s", e, safe_url_for_log)
-            raise ApiError(e) from e
-        else:
+                status_code = getattr(response, "status_code", 200)
+                is_transient_error = status_code in {429, 500, 502, 503, 504}
+
+                # Логіка Retry Policy
+                if is_transient_error and attempt < max_attempts - 1:
+                    delay = policy.calculate_delay(attempt)
+
+                    if status_code == HTTPStatus.TOO_MANY_REQUESTS and policy.respect_retry_after:
+                        retry_after = response.headers.get("Retry-After")
+                        if retry_after and retry_after.isdigit():
+                            delay = float(retry_after)
+
+                    logger.warning(
+                        "API Transient Error %s | Retrying in %.2fs (Attempt %d/%d) | URL: %s",
+                        status_code,
+                        delay,
+                        attempt + 1,
+                        policy.max_retries,
+                        safe_url_for_log,
+                    )
+                    self._reset_stream_pointers(files)
+                    time.sleep(delay)
+                    continue
+
+                # Фінальна обробка після виходу з циклу ретраїв
+                is_error = isinstance(status_code, int) and status_code >= _HTTP_ERROR_THRESHOLD
+                if is_error:
+                    logger.error(
+                        "API Error %s | %s %s", status_code, safe_method.upper(), safe_url_for_log
+                    )
+                else:
+                    logger.debug(
+                        "API Success %s | %s %s", status_code, safe_method.upper(), target_url
+                    )
+
+            except requests.RequestException as e:
+                if attempt < max_attempts - 1:
+                    delay = policy.calculate_delay(attempt)
+
+                    logger.warning(
+                        "Network Error: %s | Retrying in %.2fs (Attempt %d/%d) | URL: %s",
+                        e,
+                        delay,
+                        attempt + 1,
+                        policy.max_retries,
+                        safe_url_for_log,
+                    )
+
+                    self._reset_stream_pointers(files)
+
+                    time.sleep(delay)
+
+                    continue
+
+                if isinstance(e, requests.exceptions.Timeout):
+                    logger.exception("Timeout Error: %s %s", safe_method.upper(), safe_url_for_log)
+                    raise MailgunTimeoutError("Request timed out") from e
+
+                logger.critical(
+                    "Connection Failed (DNS/Network): %s | URL: %s", e, safe_url_for_log
+                )
+                msg = f"Network routing failed: {e}"
+                raise ApiError(msg) from e
             return response
+
+        return None
 
     def get(
         self,
         filters: Mapping[str, str | Any] | None = None,
         domain: str | None = None,
         **kwargs: Any,
-    ) -> Response:
+    ) -> APIResponseType:
         """Send a GET request to retrieve resources.
 
         Args:
@@ -477,7 +552,7 @@ class Endpoint(BaseEndpoint):
         headers: Any = None,
         files: Any | None = None,
         **kwargs: Any,
-    ) -> Response:
+    ) -> APIResponseType:
         """Send a POST request to create a new resource or execute an action.
 
         Args:
@@ -509,7 +584,7 @@ class Endpoint(BaseEndpoint):
 
     def put(
         self, data: Any | None = None, filters: Mapping[str, str | Any] | None = None, **kwargs: Any
-    ) -> Response:
+    ) -> APIResponseType:
         """Send a PUT request to update or replace a resource.
 
         Args:
@@ -533,7 +608,7 @@ class Endpoint(BaseEndpoint):
 
     def patch(
         self, data: Any | None = None, filters: Mapping[str, str | Any] | None = None, **kwargs: Any
-    ) -> Response:
+    ) -> APIResponseType:
         """Send a PATCH request to partially update a resource.
 
         Args:
@@ -557,7 +632,7 @@ class Endpoint(BaseEndpoint):
 
     def update(
         self, data: Any | None, filters: Mapping[str, str | Any] | None = None, **kwargs: Any
-    ) -> Response:
+    ) -> APIResponseType:
         """Send a PUT request specifically structured for updating resources with dynamic headers.
 
         Args:
@@ -579,7 +654,7 @@ class Endpoint(BaseEndpoint):
             **kwargs,
         )
 
-    def delete(self, domain: str | None = None, **kwargs: Any) -> Response:
+    def delete(self, domain: str | None = None, **kwargs: Any) -> APIResponseType:
         """Send a DELETE request to remove a resource.
 
         Args:
@@ -669,7 +744,7 @@ class AsyncEndpoint(BaseEndpoint):
         super().__init__(url, headers, auth, timeout=timeout, dry_run=dry_run)
         self._client = client or httpx.AsyncClient()
 
-    async def api_call(
+    async def api_call(  # noqa: PLR0914, PLR0915
         self,
         auth: tuple[str, str] | None,
         method: str,
@@ -681,7 +756,7 @@ class AsyncEndpoint(BaseEndpoint):
         files: Any | None = None,
         domain: str | None = None,
         **kwargs: Any,
-    ) -> HttpxResponse:
+    ) -> Response | MockResponse | None:  # noqa: PLR0914, PLR0915
         """Execute the asynchronous HTTP request to the Mailgun API.
 
         Args:
@@ -709,8 +784,18 @@ class AsyncEndpoint(BaseEndpoint):
 
         SecurityGuard.validate_no_control_characters(target_url, context="Endpoint URL")
 
-        # Zero-Leak Sandbox Mode Interception
+        # --- DRY RUN INTERCEPTOR (ASYNC) ---
         if self.dry_run:
+            if "messages" in url.get("keys", []):
+                from mailgun.sandbox import LocalSandbox  # noqa: PLC0415
+
+                sandbox_domain = domain or kwargs.get("domain", "local.sandbox")
+                payload = data or {}
+
+                logger.info("DRY RUN: Intercepting async email payload for local sandbox preview.")
+                sandbox = LocalSandbox()
+                return sandbox.intercept_and_preview(sandbox_domain, payload)
+
             logger.info(
                 "DRY RUN: Intercepting async %s request to %s",
                 safe_method.upper(),
@@ -756,48 +841,81 @@ class AsyncEndpoint(BaseEndpoint):
         else:
             request_kwargs["data"] = data
 
+        policy = getattr(self, "retry_policy", None) or RetryPolicy()
+        max_attempts = policy.max_retries + 1
+
         # PEP 578 and protection against Log Forging (CWE-117)
         sys.audit("mailgun.api.request", safe_method.upper(), safe_url_for_log)
         logger.debug("Sending Async Request: %s %s", safe_method.upper(), safe_url_for_log)
 
-        try:
-            response = await self._client.request(**request_kwargs)
+        for attempt in range(max_attempts):
+            try:
+                response = await self._client.request(**request_kwargs)
 
-            status_code = getattr(response, "status_code", 200)
-            is_error = isinstance(status_code, int) and status_code >= _HTTP_ERROR_THRESHOLD
-            if is_error:
-                logger.error(
-                    "API Error %s | %s %s", status_code, safe_method.upper(), safe_url_for_log
-                )
-            else:
-                logger.debug(
-                    "API Success %s | %s %s",
-                    getattr(response, "status_code", 200),
-                    safe_method.upper(),
-                    target_url,
-                )
+                status_code = getattr(response, "status_code", 200)
+                is_transient_error = status_code in {429, 500, 502, 503, 504}
 
-        except httpx.TimeoutException as e:
-            logger.exception("Timeout Error: %s %s", safe_method.upper(), safe_url_for_log)
-            raise MailgunTimeoutError("Request timed out") from e
-        except httpx.ConnectError as e:
-            logger.critical(
-                "Async Connection Failed (DNS/Network): %s | URL: %s", e, safe_url_for_log
-            )
-            msg = f"Network routing failed: {e}"
-            raise ApiError(msg) from e
-        except httpx.RequestError as e:
-            logger.critical("Request Exception: %s | URL: %s", e, safe_url_for_log)
-            raise ApiError(e) from e
-        else:
+                if is_transient_error and attempt < max_attempts - 1:
+                    delay = policy.calculate_delay(attempt)
+
+                    if status_code == HTTPStatus.TOO_MANY_REQUESTS and policy.respect_retry_after:
+                        retry_after = response.headers.get("Retry-After")
+                        if retry_after and retry_after.isdigit():
+                            delay = float(retry_after)
+
+                    logger.warning(
+                        "API Transient Error %s | Async Retrying in %.2fs (Attempt %d/%d)",
+                        status_code,
+                        delay,
+                        attempt + 1,
+                        policy.max_retries,
+                    )
+                    self._reset_stream_pointers(files)
+                    await asyncio.sleep(delay)
+                    continue
+
+                is_error = isinstance(status_code, int) and status_code >= _HTTP_ERROR_THRESHOLD
+                if is_error:
+                    logger.error(
+                        "API Error %s | %s %s", status_code, safe_method.upper(), safe_url_for_log
+                    )
+                else:
+                    logger.debug(
+                        "API Success %s | %s %s", status_code, safe_method.upper(), target_url
+                    )
+
+            except (httpx.TimeoutException, httpx.ConnectError, httpx.RequestError) as e:
+                if attempt < max_attempts - 1:
+                    delay = policy.calculate_delay(attempt)
+                    logger.warning(
+                        "Async Network Error: %s | Retrying in %.2fs (Attempt %d/%d)",
+                        e,
+                        delay,
+                        attempt + 1,
+                        policy.max_retries,
+                    )
+                    self._reset_stream_pointers(files)
+                    await asyncio.sleep(delay)
+                    continue
+
+                if isinstance(e, httpx.TimeoutException):
+                    logger.exception("Timeout Error: %s %s", safe_method.upper(), safe_url_for_log)
+                    raise MailgunTimeoutError("Request timed out") from e
+
+                logger.critical("Async Connection Failed: %s | URL: %s", e, safe_url_for_log)
+                msg = f"Network routing failed: {e}"
+                raise ApiError(msg) from e
+
             return response
+
+        return None
 
     async def get(
         self,
         filters: Mapping[str, str | Any] | None = None,
         domain: str | None = None,
         **kwargs: Any,
-    ) -> HttpxResponse:
+    ) -> AsyncAPIResponseType:
         """Send an asynchronous GET request to retrieve resources.
 
         Args:
@@ -827,7 +945,7 @@ class AsyncEndpoint(BaseEndpoint):
         headers: Any = None,
         files: Any | None = None,
         **kwargs: Any,
-    ) -> HttpxResponse:
+    ) -> AsyncAPIResponseType:
         """Send an asynchronous POST request to create a new resource or execute an action.
 
         Args:
@@ -859,7 +977,7 @@ class AsyncEndpoint(BaseEndpoint):
 
     async def put(
         self, data: Any | None = None, filters: Mapping[str, str | Any] | None = None, **kwargs: Any
-    ) -> HttpxResponse:
+    ) -> AsyncAPIResponseType:
         """Send an asynchronous PUT request to update or replace a resource.
 
         Args:
@@ -883,7 +1001,7 @@ class AsyncEndpoint(BaseEndpoint):
 
     async def patch(
         self, data: Any | None = None, filters: Mapping[str, str | Any] | None = None, **kwargs: Any
-    ) -> HttpxResponse:
+    ) -> AsyncAPIResponseType:
         """Send an asynchronous PATCH request to partially update a resource.
 
         Args:
@@ -907,7 +1025,7 @@ class AsyncEndpoint(BaseEndpoint):
 
     async def update(
         self, data: Any | None, filters: Mapping[str, str | Any] | None = None, **kwargs: Any
-    ) -> HttpxResponse:
+    ) -> AsyncAPIResponseType:
         """Send an asynchronous PUT request specifically structured for updating resources with dynamic headers.
 
         Args:
@@ -930,7 +1048,7 @@ class AsyncEndpoint(BaseEndpoint):
             **kwargs,
         )
 
-    async def delete(self, domain: str | None = None, **kwargs: Any) -> httpx.Response:
+    async def delete(self, domain: str | None = None, **kwargs: Any) -> AsyncAPIResponseType:
         """Send an asynchronous DELETE request to remove a resource.
 
         Args:

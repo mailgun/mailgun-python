@@ -19,12 +19,12 @@ from __future__ import annotations
 import ssl
 import sys
 import warnings
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Final
 
-import httpx
 import requests  # pyright: ignore[reportMissingModuleSource]
-from urllib3.util.retry import Retry
 
+from mailgun._httpx_compat import httpx
 from mailgun.config import Config
 from mailgun.endpoints import AsyncEndpoint, BaseEndpoint, Endpoint
 from mailgun.filters import RedactingFilter
@@ -88,7 +88,11 @@ class BaseClient:
             **kwargs: Additional configuration parameters, such as 'api_url'.
         """
         self.auth = SecurityGuard.validate_auth(auth)
-        self.config = Config(api_url=kwargs.get("api_url"))
+        self.config = Config(
+            api_url=kwargs.get("api_url"),
+            dry_run=kwargs.get("dry_run", False),
+            retry_policy=kwargs.get("retry_policy"),
+        )
 
         # DX Guardrail: Constructor Deprecation Interceptions
         if "api_version" in kwargs:
@@ -168,15 +172,8 @@ class Client(BaseClient):
             A configured requests.Session instance.
         """
         session = requests.Session()
-        retry_strategy = Retry(
-            total=3,
-            backoff_factor=1,
-            status_forcelist=[429, 500, 502, 503, 504],
-            allowed_methods=["GET", "OPTIONS", "HEAD"],
-        )
-        adapter = SecureHTTPAdapter(
-            max_retries=retry_strategy, pool_connections=100, pool_maxsize=100
-        )
+
+        adapter = SecureHTTPAdapter(pool_connections=100, pool_maxsize=100)
         session.mount("https://", adapter)
         session.mount("http://", adapter)
         return session
@@ -202,17 +199,22 @@ class Client(BaseClient):
 
         try:
             url, headers = self.config[name]
-            return Endpoint(
+            endpoint = Endpoint(
                 url=url,
                 headers=headers,
                 auth=self.auth,
                 session=self._session,
                 timeout=self.timeout,
+                dry_run=self.config.dry_run,
             )
+
         except KeyError:
             # __getattr__ must return AttributeError
             msg = f"'{self.__class__.__name__}' object has no attribute '{name}'"
             raise AttributeError(msg) from None
+
+        endpoint.retry_policy = getattr(self.config, "retry_policy", None)
+        return endpoint
 
     def close(self) -> None:
         """Close the underlying requests.Session connection pool and purge memory."""
@@ -242,6 +244,28 @@ class Client(BaseClient):
     ) -> None:
         """Exit the synchronous context manager, ensuring connection pools are closed."""
         self.close()
+
+    def ping(self) -> bool:
+        """Perform a fast, low-overhead health check to verify API credentials.
+
+        This checks network connectivity to the Mailgun infrastructure.
+        This method is fail-safe: it will never raise network exceptions or
+        authentication errors to the application layer. Instead, it returns a
+        clean boolean value, making it ideal for container readiness probes.
+
+        Returns:
+            bool: True if the connection succeeds and credentials are valid (HTTP 200),
+                  False on network timeouts, DNS drops, or invalid API keys.
+        """
+        try:
+            # Query the domains endpoint with a strict limit of 1
+            response = self.domains.get(filters={"limit": 1})
+        except Exception:  # noqa: BLE001 - Explicitly failing closed on readiness probe
+            return False
+        else:
+            if hasattr(response, "status_code"):
+                return response.status_code == HTTPStatus.OK
+            return False
 
 
 # ==============================================================================
@@ -291,16 +315,22 @@ class AsyncClient(BaseClient):
 
         try:
             url, headers = self.config[name]
-            return AsyncEndpoint(
+
+            endpoint = AsyncEndpoint(
                 url=url,
                 headers=headers,
                 auth=self.auth,
                 client=self._client,
                 timeout=self.timeout,
+                dry_run=self.config.dry_run,
             )
+
         except KeyError:
             msg = f"'{self.__class__.__name__}' object has no attribute '{name}'"
             raise AttributeError(msg) from None
+
+        endpoint.retry_policy = getattr(self.config, "retry_policy", None)
+        return endpoint
 
     @property
     def _client(self) -> httpx.AsyncClient | None:
@@ -309,23 +339,26 @@ class AsyncClient(BaseClient):
         Returns:
             The active httpx.AsyncClient instance.
         """
-        if not self._httpx_client or self._httpx_client.is_closed:
-            if getattr(self, "_httpx_client", None) is None:
-                # Enforce TLS 1.2+ for httpx (CWE-319)
-                ssl_context = ssl.create_default_context()
-                ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
+        # Assign to a local variable so Pyright can properly narrow the type
+        current_client: httpx.AsyncClient | None = getattr(self, "_httpx_client", None)
 
-                # Check if the user already provided a custom transport (e.g. for mocking)
-                kwargs = self._client_kwargs.copy()
-                if "transport" not in kwargs:
-                    limits = httpx.Limits(max_keepalive_connections=100, max_connections=100)
-                    kwargs["transport"] = httpx.AsyncHTTPTransport(
-                        retries=3, limits=limits, verify=ssl_context
-                    )
+        if current_client is None or current_client.is_closed:
+            # Enforce TLS 1.2+ for httpx (CWE-319)
+            ssl_context = ssl.create_default_context()
+            ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
 
-                self._httpx_client = httpx.AsyncClient(**kwargs)
+            # Check if the user already provided a custom transport (e.g. for mocking)
+            kwargs = self._client_kwargs.copy()
+            if "transport" not in kwargs:
+                limits = httpx.Limits(max_keepalive_connections=100, max_connections=100)
+                kwargs["transport"] = httpx.AsyncHTTPTransport(
+                    retries=3, limits=limits, verify=ssl_context
+                )
+
+            self._httpx_client = httpx.AsyncClient(**kwargs)
             return self._httpx_client
-        return None
+
+        return current_client
 
     async def aclose(self) -> None:
         """Close the underlying httpx.AsyncClient and purge memory."""
@@ -361,3 +394,25 @@ class AsyncClient(BaseClient):
             exc_tb: The traceback associated with the exception.
         """
         await self.aclose()
+
+    async def ping(self) -> bool:
+        """Perform a fast, low-overhead health check to verify API credentials.
+
+        This checks network connectivity to the Mailgun infrastructure.
+        This method is fail-safe: it will never raise network exceptions or
+        authentication errors to the application layer. Instead, it returns a
+        clean boolean value, making it ideal for container readiness probes.
+
+        Returns:
+            bool: True if the connection succeeds and credentials are valid (HTTP 200),
+                  False on network timeouts, DNS drops, or invalid API keys.
+        """
+        try:
+            # Query the domains endpoint with a strict limit of 1
+            response = self.domains.get(filters={"limit": 1})
+        except Exception:  # noqa: BLE001 - Explicitly failing closed on readiness probe
+            return False
+        else:
+            if hasattr(response, "status_code"):
+                return response.status_code == HTTPStatus.OK
+            return False

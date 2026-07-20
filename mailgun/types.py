@@ -4,11 +4,16 @@ from __future__ import annotations
 
 import re
 import sys
-from typing import TYPE_CHECKING, TypeAlias, Union
+from typing import TYPE_CHECKING, Any, TypeAlias, Union
+
+from requests.models import Response  # pyright: ignore[reportMissingModuleSource]
+
+from mailgun._httpx_compat import httpx
 
 
 if TYPE_CHECKING:
-    from httpx import Timeout as HttpxTimeout
+    from mailgun._httpx_compat import Timeout as HttpxTimeout
+    from mailgun.sandbox import MockResponse
 
 
 if sys.version_info >= (3, 11):
@@ -17,9 +22,11 @@ else:
     from typing_extensions import NotRequired, TypedDict
 
 # ---------------------------------------------------------
-# Security & Client Types
+# Security, Endpoints & Client Types
 # ---------------------------------------------------------
 TimeoutType: TypeAlias = Union[float, tuple[float, float], "HttpxTimeout", None]
+APIResponseType = Union[Response, "MockResponse", Any]
+AsyncAPIResponseType = Union[httpx.Response, "MockResponse", Any]
 
 # ---------------------------------------------------------
 # Routing Types
