@@ -2,7 +2,19 @@
 
 We [keep a changelog.](http://keepachangelog.com/)
 
-## [Unreleased]
+## [Unreleased] (v1.9.0)
+
+### Added
+
+- `LocalSandbox` Email Preview: Standard routes now natively intercept email payloads when `dry_run=True` and trigger `LocalSandbox` for local browser previews without executing real network calls.
+- `IdempotencyGuard`: Implemented exactly-once email delivery mechanisms to prevent duplicate sends during network partitions.
+- `RetryPolicy`: Introduced a flexible retry configuration with exponential backoff and jitter to mitigate the "Thundering Herd" effect.
+- `httpx2` Compatibility: Added native support for the modern `httpx2` engine via `mailgun._httpx_compat` with a graceful, zero-breaking fallback to legacy `httpx`.
+
+### Changed
+
+- Refactored core API routing and exception handlers to eliminate magic numbers (`PLR2004`), naked exceptions (`BLE001`), and unsafe `try/except` returns (`TRY300`).
+- Updated `.github/workflows/commit_checks.yaml` to run tests against Python 3.14.
 
 ## v1.8.0 - 2026-07-20
 
