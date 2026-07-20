@@ -24,7 +24,7 @@ authors = [
   { name = "diskovod", email = "diskovodik@gmail.com" },
   { name = "Mailgun", email = "api@mailgun.com" },
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 
 classifiers = [
   "Development Status :: 3 - Alpha",
@@ -45,9 +45,14 @@ classifiers = [
 
 dynamic = [ "version" ]
 dependencies = [
-    "httpx>=0.24",
+    "httpx2 >=2.7.0",     # The new primary async engine
+    "httpx >=0.24.0",     # Kept as a fallback/safety net
     "requests>=2.33.0",
     "typing-extensions>=4.7.1; python_version < '3.11'",
+]
+
+optional-dependencies.backend = [
+  "fastapi",
 ]
 
 optional-dependencies.build = [
