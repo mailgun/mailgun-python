@@ -33,7 +33,6 @@ classifiers = [
   "Natural Language :: English",
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
@@ -48,11 +47,14 @@ dependencies = [
     "httpx2 >=2.7.0",     # The new primary async engine
     "httpx >=0.24.0",     # Kept as a fallback/safety net
     "requests>=2.33.0",
-    "typing-extensions>=4.7.1; python_version < '3.11'",
 ]
 
-optional-dependencies.backend = [
-  "fastapi",
+optional-dependencies.pydantic = [
+  "pydantic >=2.13.4",
+]
+
+optional-dependencies.fastapi = [
+  "fastapi>=0.100.0", "pydantic>=2.0.0"
 ]
 
 optional-dependencies.build = [
@@ -127,8 +129,8 @@ write_to_template = '__version__ = "{version}"'
 [tool.ruff]
 #indent-width = 4
 
-# Assume Python 3.10.
-target-version = "py310"
+# Assume Python 3.11.
+target-version = "py311"
 line-length = 100
 # Exclude a variety of commonly ignored directories.
 exclude = [
@@ -258,7 +260,7 @@ exclude_lines = [
 strict = true
 # Adapted from this StackOverflow post:
 # https://stackoverflow.com/questions/55944201/python-type-hinting-how-do-i-enforce-that-project-wide
-python_version = "3.10"
+python_version = "3.11"
 mypy_path = "type_stubs"
 namespace_packages = true
 # This flag enhances the user feedback for error messages

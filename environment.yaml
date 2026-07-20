@@ -10,7 +10,6 @@ dependencies:
   - requests >=2.32.5
   - conda-forge::httpx2 >=2.7.0
   - httpx >=0.24.0
-  - typing_extensions >=4.7.1  # [py<311]
   # tests
   - pytest >=9.0.3
   # other

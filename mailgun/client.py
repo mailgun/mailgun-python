@@ -17,10 +17,9 @@ Classes:
 from __future__ import annotations
 
 import ssl
-import sys
 import warnings
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Final
+from typing import TYPE_CHECKING, Any, Final, Self
 
 import requests  # pyright: ignore[reportMissingModuleSource]
 
@@ -29,12 +28,6 @@ from mailgun.config import Config
 from mailgun.endpoints import AsyncEndpoint, BaseEndpoint, Endpoint
 from mailgun.filters import RedactingFilter
 from mailgun.security import SecretAuth, SecureHTTPAdapter, SecurityGuard
-
-
-if sys.version_info >= (3, 11):
-    from typing import Self
-else:
-    from typing_extensions import Self
 
 
 if TYPE_CHECKING:

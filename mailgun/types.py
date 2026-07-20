@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import re
-import sys
-from typing import TYPE_CHECKING, Any, TypeAlias, Union
+from typing import TYPE_CHECKING, Any, NotRequired, TypeAlias, TypedDict, Union
 
 from requests.models import Response  # pyright: ignore[reportMissingModuleSource]
 
@@ -15,11 +14,6 @@ if TYPE_CHECKING:
     from mailgun._httpx_compat import Timeout as HttpxTimeout
     from mailgun.sandbox import MockResponse
 
-
-if sys.version_info >= (3, 11):
-    from typing import NotRequired, TypedDict
-else:
-    from typing_extensions import NotRequired, TypedDict
 
 # ---------------------------------------------------------
 # Security, Endpoints & Client Types

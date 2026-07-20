@@ -9,19 +9,13 @@ import unicodedata
 import warnings
 from html.parser import HTMLParser
 from pathlib import Path
-from typing import Any, Final
+from typing import Any, Final, TypedDict
 from urllib.parse import quote, unquote, urlparse
 
 from requests.adapters import HTTPAdapter
 
 from mailgun.logger import get_logger
 from mailgun.types import TimeoutType
-
-
-if sys.version_info >= (3, 11):
-    from typing import TypedDict
-else:
-    from typing_extensions import TypedDict
 
 
 logger = get_logger(__name__)

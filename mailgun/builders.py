@@ -4,15 +4,8 @@ from __future__ import annotations
 
 import json
 import mimetypes
-import sys
 from pathlib import Path
-from typing import IO, TYPE_CHECKING, Any, Union
-
-
-if sys.version_info >= (3, 11):
-    from typing import Self
-else:
-    from typing_extensions import Self
+from typing import IO, TYPE_CHECKING, Any, Self, Union
 
 from mailgun.security import IdempotencyGuard, SecurityGuard, SpamGuard, SpamReport
 
