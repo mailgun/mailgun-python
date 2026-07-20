@@ -289,6 +289,71 @@ class TestAsyncClient:
         with pytest.raises(ValueError, match="Header Injection risk"):
             SecurityGuard.validate_auth(("api", "key\rwithnewline"))
 
+    @pytest.mark.asyncio
+    async def test_async_client_property_lazy_initialization_happy_path(self) -> None:
+        """
+        [Happy Path] Verify that _client lazily initializes and returns the same
+        active instance on subsequent calls, proving the CWE-400 hotfix works.
+        """
+        client = AsyncClient(auth=("api", "key"))
+
+        # First access should initialize the pool
+        httpx_client_1 = client._client
+        assert httpx_client_1 is not None
+        assert httpx_client_1.is_closed is False
+
+        # Second access MUST return the exact same instance (not None, and not a new pool)
+        httpx_client_2 = client._client
+        assert httpx_client_2 is not None
+        assert httpx_client_1 is httpx_client_2, "Failed to reuse the active connection pool!"
+
+        await client.aclose()
+
+    @pytest.mark.asyncio
+    async def test_async_client_context_manager_retains_connection_edge_case(self) -> None:
+        """
+        [Edge Case] Verify that inside an async context manager, multiple accesses
+        to _client return the same open connection pool. This was the exact scenario
+        that triggered the socket leak bug.
+        """
+        async with AsyncClient(auth=("api", "key")) as client:
+            client1 = client._client
+            client2 = client._client
+
+            # The client must not fall through to returning None
+            assert client1 is not None
+            assert client2 is not None
+
+            # The context manager must hold the same instance open
+            assert client1 is client2
+            assert client1.is_closed is False
+
+    @pytest.mark.asyncio
+    async def test_async_client_property_reinitializes_if_closed_unhappy_path(self) -> None:
+        """
+        [Unhappy Path] Verify that if the underlying httpx client is forcefully closed
+        (e.g., dropped connection or aggressive GC), accessing the property spins up
+        a fresh connection pool rather than failing or returning None.
+        """
+        client = AsyncClient(auth=("api", "key"))
+
+        first_pool = client._client
+        assert first_pool is not None
+
+        # Simulate a forcefully closed connection pool (unhappy path)
+        await first_pool.aclose()
+        assert first_pool.is_closed is True
+
+        # Next access MUST detect the closed state and create a new instance
+        second_pool = client._client
+        assert second_pool is not None
+        assert second_pool.is_closed is False
+
+        # Validate that a brand new httpx.AsyncClient was generated
+        assert first_pool is not second_pool, "Failed to regenerate a closed connection pool!"
+
+        await client.aclose()
+
 
 class TestAsyncEndpoint:
     @staticmethod

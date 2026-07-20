@@ -333,7 +333,7 @@ class AsyncClient(BaseClient):
         return endpoint
 
     @property
-    def _client(self) -> httpx.AsyncClient | None:
+    def _client(self) -> httpx.AsyncClient:
         """Provide lazy initialization for the underlying httpx.AsyncClient.
 
         Returns:
