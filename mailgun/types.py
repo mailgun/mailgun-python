@@ -9,15 +9,15 @@ from requests.models import Response  # pyright: ignore[reportMissingModuleSourc
 
 
 if TYPE_CHECKING:
+    from mailgun._httpx_compat import Response as HttpxResponse
     from mailgun._httpx_compat import Timeout as HttpxTimeout
-    from mailgun._httpx_compat import httpx
 
 # ---------------------------------------------------------
 # Security, Endpoints & Client Types
 # ---------------------------------------------------------
 TimeoutType: TypeAlias = Union[float, tuple[float, float], "HttpxTimeout", None]
 APIResponseType: TypeAlias = Response | Any
-AsyncAPIResponseType: TypeAlias = Union["httpx.Response", Any]
+AsyncAPIResponseType: TypeAlias = Union["HttpxResponse", Any]
 
 # ---------------------------------------------------------
 # Routing Types
