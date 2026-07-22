@@ -10,7 +10,7 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Final
 from urllib.parse import parse_qs, urlparse
 
-import requests
+import requests  # pyright: ignore[reportMissingModuleSource]
 from requests.models import Response  # pyright: ignore[reportMissingModuleSource]
 
 from mailgun import routes
@@ -282,7 +282,9 @@ class BaseEndpoint:
         if custom_headers and isinstance(custom_headers, dict):
             req_headers.update(custom_headers)
 
-        return req_headers
+        # CWE-400 / Crash Prevention: Enforce string keys and values to
+        # prevent HTTP protocol serialization crashes in requests/httpx.
+        return {str(k): str(v) for k, v in req_headers.items()}
 
     def _prepare_request(
         self,
@@ -388,6 +390,9 @@ class Endpoint(BaseEndpoint):
             MailgunTimeoutError: If the request times out.
             ApiError: If the server returns a 4xx or 5xx status code or a network error occurs.
         """
+        # Extract open_browser preference before kwargs are sanitized (Defaults to False)
+        open_browser = kwargs.pop("open_browser", False)
+
         safe_method, target_url, safe_url_for_log, safe_timeout, safe_headers, safe_kwargs = (
             self._prepare_request(method, url, domain, timeout, headers, kwargs)
         )
@@ -396,15 +401,15 @@ class Endpoint(BaseEndpoint):
 
         # --- DRY RUN INTERCEPTOR (Zero-Leak Sandbox Mode) ---
         if self.dry_run:
-            # Route 1: Rich Sandbox Preview for emails
-            if "messages" in url.get("keys", []):
+            # Rich Sandbox Preview for emails (Matches 'messages' and 'messages.mime')
+            if any("messages" in k for k in url.get("keys", [])):
                 from mailgun.sandbox import LocalSandbox  # noqa: PLC0415
 
                 sandbox_domain = domain or kwargs.get("domain", "local.sandbox")
                 payload = data or {}
 
                 logger.info("DRY RUN: Intercepting email payload for local sandbox preview.")
-                sandbox = LocalSandbox()
+                sandbox = LocalSandbox(open_browser=open_browser)
                 return sandbox.intercept_and_preview(sandbox_domain, payload)
 
             # Route 2: Standard JSON Mock for all other endpoints (domains, ips, etc.)
@@ -416,6 +421,10 @@ class Endpoint(BaseEndpoint):
             mock_resp.encoding = "utf-8"
             mock_resp._content = b'{"message": "Dry run successful - request intercepted", "id": "<dry-run-mock-id>"}'  # noqa: SLF001 - Mocking internal state
             return mock_resp
+
+        # Ensure protocol consistency: HTTP libraries MUST generate their own multipart boundaries
+        if files and safe_headers:
+            safe_headers = {k: v for k, v in safe_headers.items() if k.lower() != "content-type"}
 
         # Case-insensitive validation for Content-Type to conform with RFC 7230
         is_json_request = any(
@@ -460,7 +469,8 @@ class Endpoint(BaseEndpoint):
                     if status_code == HTTPStatus.TOO_MANY_REQUESTS and policy.respect_retry_after:
                         retry_after = response.headers.get("Retry-After")
                         if retry_after and retry_after.isdigit():
-                            delay = float(retry_after)
+                            # Clamp the delay to prevent infinite sleeping (CWE-400)
+                            delay = min(float(retry_after), policy.max_delay)
 
                     logger.warning(
                         "API Transient Error %s | Retrying in %.2fs (Attempt %d/%d) | URL: %s",
@@ -708,7 +718,11 @@ class Endpoint(BaseEndpoint):
             # Mailgun returns a full URL. Parse it to extract just the new pagination parameters
             # (like 'page' or 'url') so the next self.get() call works correctly.
             query_params = parse_qs(urlparse(next_url).query)
-            current_filters.update({k: v[0] for k, v in query_params.items()})
+            for k, v in query_params.items():
+                if not v:
+                    continue
+                # If Mailgun returned multiple values (e.g., multiple tags), preserve the list
+                current_filters[k] = v[0] if len(v) == 1 else v
 
 
 # ==============================================================================
@@ -752,7 +766,7 @@ class AsyncEndpoint(BaseEndpoint):
         headers: dict[str, str],
         data: Any | None = None,
         filters: Mapping[str, str | Any] | None = None,
-        timeout: TimeoutType = None,
+        timeout: TimeoutType = None,  # noqa: ASYNC109
         files: Any | None = None,
         domain: str | None = None,
         **kwargs: Any,
@@ -778,6 +792,8 @@ class AsyncEndpoint(BaseEndpoint):
             MailgunTimeoutError: If the request times out.
             ApiError: If the server returns a 4xx or 5xx status code or a network error occurs.
         """
+        open_browser = kwargs.pop("open_browser", False)
+
         safe_method, target_url, safe_url_for_log, safe_timeout, safe_headers, safe_kwargs = (
             self._prepare_request(method, url, domain, timeout, headers, kwargs)
         )
@@ -786,14 +802,15 @@ class AsyncEndpoint(BaseEndpoint):
 
         # --- DRY RUN INTERCEPTOR (ASYNC) ---
         if self.dry_run:
-            if "messages" in url.get("keys", []):
+            # Rich Sandbox Preview for emails (Matches 'messages' and 'messages.mime')
+            if any("messages" in k for k in url.get("keys", [])):
                 from mailgun.sandbox import LocalSandbox  # noqa: PLC0415
 
                 sandbox_domain = domain or kwargs.get("domain", "local.sandbox")
                 payload = data or {}
 
                 logger.info("DRY RUN: Intercepting async email payload for local sandbox preview.")
-                sandbox = LocalSandbox()
+                sandbox = LocalSandbox(open_browser=open_browser)
                 return sandbox.intercept_and_preview(sandbox_domain, payload)
 
             logger.info(
@@ -861,7 +878,8 @@ class AsyncEndpoint(BaseEndpoint):
                     if status_code == HTTPStatus.TOO_MANY_REQUESTS and policy.respect_retry_after:
                         retry_after = response.headers.get("Retry-After")
                         if retry_after and retry_after.isdigit():
-                            delay = float(retry_after)
+                            # Clamp the delay to prevent infinite sleeping (CWE-400)
+                            delay = min(float(retry_after), policy.max_delay)
 
                     logger.warning(
                         "API Transient Error %s | Async Retrying in %.2fs (Attempt %d/%d)",
@@ -1092,4 +1110,7 @@ class AsyncEndpoint(BaseEndpoint):
                 break
 
             query_params = parse_qs(urlparse(next_url).query)
-            current_filters.update({k: v[0] for k, v in query_params.items()})
+            for k, v in query_params.items():
+                if not v:
+                    continue
+                current_filters[k] = v[0] if len(v) == 1 else v

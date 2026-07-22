@@ -211,12 +211,14 @@ class Client(BaseClient):
 
     def close(self) -> None:
         """Close the underlying requests.Session connection pool and purge memory."""
-        if self._session:
+        # Safely fetch without triggering AttributeError on unbound slots
+        session = getattr(self, "_session", None)
+        if session:
             try:
                 # CWE-316: Clear session resources
-                self._session.auth = None
-                self._session.headers.clear()
-                self._session.close()
+                session.auth = None
+                session.headers.clear()
+                session.close()
             finally:
                 self._session = None
         self.auth = None
@@ -402,7 +404,7 @@ class AsyncClient(BaseClient):
         """
         try:
             # Query the domains endpoint with a strict limit of 1
-            response = self.domains.get(filters={"limit": 1})
+            response = await self.domains.get(filters={"limit": 1})
         except Exception:  # noqa: BLE001 - Explicitly failing closed on readiness probe
             return False
         else:
