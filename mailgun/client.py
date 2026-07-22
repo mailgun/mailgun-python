@@ -259,7 +259,7 @@ class Client(BaseClient):
             return False
         else:
             if hasattr(response, "status_code"):
-                return response.status_code == HTTPStatus.OK
+                return bool(response.status_code == HTTPStatus.OK)
             return False
 
 
@@ -409,5 +409,5 @@ class AsyncClient(BaseClient):
             return False
         else:
             if hasattr(response, "status_code"):
-                return response.status_code == HTTPStatus.OK
+                return bool(response.status_code == HTTPStatus.OK)
             return False

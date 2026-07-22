@@ -143,7 +143,9 @@ class SendMessageSchema(BaseModel):
             Standard fields as a dict
         """
         # Get standard fields as a dict
-        data = self.model_dump(by_alias=True, exclude_none=True, exclude={"custom_params"})
+        data: dict[str, Any] = self.model_dump(
+            by_alias=True, exclude_none=True, exclude={"custom_params"}
+        )
         # Flatten custom_params into the root
         data.update(self.custom_params)
         return data
