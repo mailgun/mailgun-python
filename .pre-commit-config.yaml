@@ -37,6 +37,9 @@ ci:
     skip: []
     submodules: false
 
+# Run hooks on staged files by default, ignoring the commit-msg phase
+default_stages: [pre-commit]
+
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
