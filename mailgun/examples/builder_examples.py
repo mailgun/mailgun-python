@@ -191,6 +191,47 @@ def send_large_report_sync(api_key: str, domain: str) -> None:
             os.remove(test_file)
 
 
+async def send_large_report_async(api_key: str, domain: str) -> None:
+    """
+    Example: Asynchronously sending a massive 20MB monthly report safely
+    without spiking RAM or blocking the event loop (CWE-400 Defense).
+    """
+    print("\n--- Sending Large Report Safely (Async) ---")
+
+    test_file = "large_report_async.pdf"
+
+    # Generate a dummy 20MB file synchronously for setup
+    with open(test_file, "wb") as f:
+        f.write(os.urandom(20 * 1024 * 1024))
+
+    try:
+        # 1. Build the payload and attach the streamer
+        payload, files = (
+            MailgunMessageBuilder(f"mailgun@{domain}")
+            .add_recipient(MESSAGES_TO)
+            .set_subject("Monthly Enterprise Report (Async)")
+            .set_text("Here is the 20MB data export sent securely via asyncio.")
+            .attach_stream(test_file)
+            .build()
+        )
+
+        # Increase read/write timeout to 300 sec,
+        # but keep 10 sec for connection timeout.
+        custom_timeout = (10.0, 300.0)
+
+        # 2. Use the AsyncClient context manager
+        async with AsyncClient(auth=("api", api_key), timeout=custom_timeout) as client:
+            # 3. Await the request. Under the hood, httpx will detect the
+            # ChunkedStreamer and iterate over __aiter__ automatically.
+            req = await client.messages.create(domain=domain, data=payload, files=files)
+            print("Success:", req.json())
+
+    finally:
+        # Clean up the dummy file
+        if os.path.exists(test_file):
+            os.remove(test_file)
+
+
 def test_idempotency_guard_in_action(domain: str) -> None:
     """
     Demonstration of the automatic generation of the idempotency key (IdempotencyGuard).
@@ -282,3 +323,4 @@ if __name__ == "__main__":
         # 2. Run Asynchronous Examples
         asyncio.run(send_template_email_async(api_key=API_KEY, domain=DOMAIN))
         asyncio.run(send_amp_and_inline_images_async(api_key=API_KEY, domain=DOMAIN))
+        asyncio.run(send_large_report_async(API_KEY, DOMAIN))

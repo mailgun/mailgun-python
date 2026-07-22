@@ -12,9 +12,9 @@ def run_html_sandbox_preview() -> None:
     """
     Scenario 1: Visual Sandbox Preview for HTML Emails (Sync).
     Instead of hitting the network, the SDK intercepts the payload
-    and opens the rendered HTML in your default browser.
+    and opens the rendered HTML in your default browser via explicit opt-in.
     """
-    print("\n--- 🧪 Scenario 1: HTML Sandbox Previewer ---")
+    print("\n--- 🧪 Scenario 1: HTML Sandbox Previewer (Explicit Opt-In) ---")
 
     # Initialize the client with dry_run=True.
     # No real API_KEY is needed because the network layer is severed.
@@ -39,7 +39,8 @@ def run_html_sandbox_preview() -> None:
             .build()
         )
 
-        response = client.messages.create(domain="my-company.com", data=payload)
+        # Explicitly ENABLE the browser popup for this specific request
+        response = client.messages.create(domain="my-company.com", data=payload, open_browser=True)
 
         print("\nSystem response (HTML Email):")
         print(response.json())
@@ -49,7 +50,7 @@ def run_standard_route_mock() -> None:
     """
     Scenario 2: Standard Route Interception (Sync).
     If you query a non-message endpoint (like /domains) with dry_run=True,
-    the SDK gracefully returns a mock JSON response without opening a browser.
+    the SDK gracefully returns a mock JSON response.
     """
     print("\n--- 🧪 Scenario 2: Standard Route Dry Run ---")
 
@@ -63,11 +64,10 @@ def run_standard_route_mock() -> None:
 
 async def run_async_text_sandbox_preview() -> None:
     """
-    Scenario 3: Visual Sandbox for Plain Text Emails (Async).
-    Demonstrates the AsyncClient and how the sandbox automatically
-    wraps plain text into a readable HTML <pre> format.
+    Scenario 3: Visual Sandbox for Plain Text Emails (Async) [SILENT].
+    Demonstrates the new default silent behavior of the LocalSandbox.
     """
-    print("\n--- 🧪 Scenario 3: Async Plain Text Sandbox ---")
+    print("\n--- 🧪 Scenario 3: Async Plain Text Sandbox (Silent Default) ---")
 
     async with AsyncClient(auth=("api", "fake-key"), dry_run=True) as client:
         payload, _ = (
@@ -77,13 +77,14 @@ async def run_async_text_sandbox_preview() -> None:
             .set_text(
                 "Hello,\n\n"
                 "This is a plain text email.\n"
-                "Notice how the LocalSandbox automatically detects the missing HTML\n"
-                "and wraps this text in <pre> tags so it displays correctly in your browser.\n\n"
+                "Notice how the LocalSandbox defaults to silent processing.\n"
+                "The HTML file is safely generated in your temp directory without popping a tab.\n\n"
                 "Best,\nThe Mailgun Python SDK Team"
             )
             .build()
         )
 
+        # Uses the default behavior (open_browser=False)
         response = await client.messages.create(domain="my-company.com", data=payload)
 
         print("\nSystem response (Plain Text Email):")

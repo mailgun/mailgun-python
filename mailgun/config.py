@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 
-@lru_cache
+@lru_cache(maxsize=256)
 def _get_cached_route_data(clean_key: str) -> dict[str, Any]:
     """Apply internal cached routing logic.
 
@@ -141,6 +141,8 @@ class Config:
     _V1_ENDPOINTS: Final[frozenset[str]] = frozenset(routes.DOMAIN_ENDPOINTS["v1"])
     _V3_ENDPOINTS: Final[frozenset[str]] = frozenset(routes.DOMAIN_ENDPOINTS["v3"])
     _V4_ENDPOINTS: Final[frozenset[str]] = frozenset(routes.DOMAIN_ENDPOINTS.get("v4", []))
+
+    _audit_hook_enabled: bool = False
 
     def __init__(
         self,
@@ -322,6 +324,8 @@ class Config:
         Enterprise security teams can enable this during SDK boot to gain instant
         visibility into API requests sent via the SDK without altering standard logs.
         """
+        if cls._audit_hook_enabled:
+            return
 
         def audit_hook(event: str, args: tuple[Any, ...]) -> None:
             if event == "mailgun.api.request":
@@ -329,4 +333,5 @@ class Config:
                 logger.info("SECURITY AUDIT: Outbound API call tracked - %s %s", method, url)
 
         sys.addaudithook(audit_hook)
+        cls._audit_hook_enabled = True
         logger.info("Mailgun Security Audit Hooks Enabled.")
