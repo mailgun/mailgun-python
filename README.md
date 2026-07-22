@@ -29,16 +29,19 @@ Check out all the resources and Python code examples in the official
   - [Usage](#usage)
     - [Logging Debugging and Secure Redaction](#logging-debugging-and-secure-redaction)
     - [Timeout Configuration](#timeout-configuration)
+    - [Exactly-Once Delivery & Retry Policies](#exactly-once-delivery--retry-policies)
     - [API Response Codes](#api-response-codes)
     - [IDE Autocompletion & DX](#ide-autocompletion--dx)
-    - [Zero-Leak Sandbox Mode](#zero-leak-sandbox-mode)
-    - [API Response Codes](#api-response-codes)
-    - [Context Managers (Safe Resource Teardown)](#context-managers-safe-resource-teardown)
+    - [Zero-Leak Development Mode](#zero-leak-development-mode)
+    - [Local Email Previews (LocalSandbox)](#local-email-previews-localsandbox)
+    - [Strict Payload Schemas](#strict-payload-schemas)
+    - [Strict Typed Schemas (mailgun.ext)](#strict-typed-schemas-mailgunext)
+    - [Memory-Safe Attachments (ChunkedStreamer)](#memory-safe-attachments-chunkedstreamer)
     - [Fluent Message Builder](#fluent-message-builder)
     - [Streaming Pagination](#streaming-pagination)
-    - [Strict Payload Schemas](#strict-payload-schemas)
-  - [API Reference](#request-examples)
-    - [Full list of supported endpoints](#full-list-of-supported-endpoints)
+    - [Readiness Probe](#readiness-probe)
+  - [API Reference](#api-reference)
+    - [Full list of examples](#full-list-of-examples)
     - [Messages](#messages)
       - [Send an email](#send-an-email)
       - [Send an email with advanced parameters (Tags, Testmode, STO)](#send-an-email-with-advanced-parameters-tags-testmode-sto)
@@ -51,9 +54,9 @@ Check out all the resources and Python code examples in the official
       - [Create a domain](#create-a-domain)
       - [Update a domain](#update-a-domain)
       - [Domain connections](#domain-connections)
-    - [Domain keys](#domain-keys)
-      - [List keys for all domains](#list-keys-for-all-domains)
-      - [Create a domain key](#create-a-domain-key)
+      - [Domain keys](#domain-keys)
+        - [List keys for all domains](#list-keys-for-all-domains)
+        - [Create a domain key](#create-a-domain-key)
         - [Update DKIM authority](#update-dkim-authority)
       - [Domain Tracking](#domain-tracking)
         - [Get tracking settings](#get-tracking-settings)
@@ -126,15 +129,13 @@ Check out all the resources and Python code examples in the official
   - [License](#license)
   - [Contribute](#contribute)
   - [Security](#security)
+    - [Enterprise Security Audit Hooks (PEP 578)](#enterprise-security-audit-hooks-pep-578)
+    - [Pre-Flight Delivery Validation (SpamGuard)](#pre-flight-delivery-validation-spamguard)
   - [Contributors](#contributors)
 
 ## Compatibility
 
-This library `mailgun` officially supports the following Python versions:
-
-- python >=3.10,\<3.15
-
-It's tested up to 3.14 (including).
+This SDK is compatible with Python **3.11+**. It is tested up to 3.14 (including).
 It guarantees cross-platform compatibility across Linux, macOS, and Windows.
 
 ## Requirements
@@ -169,9 +170,7 @@ Use the below code to install it locally by cloning this repository:
 ```bash
 git clone https://github.com/mailgun/mailgun-python
 cd mailgun-python
-```
 
-```bash
 pip install .
 ```
 
@@ -258,9 +257,6 @@ Synchronous and Asynchronous Clients.
 
 Initialize your [Mailgun](http://www.mailgun.com/) client.
 
-> [!TIP]
-> **New in v1.7.0:** The SDK now utilizes connection pooling (`requests.Session`) under the hood to dramatically improve performance by reusing TLS connections.
-
 **The Simple Variant (Backward Compatible)**
 For simple scripts, lambdas, or single-request apps, you can initialize and use the client directly. Python's garbage collector will eventually clean up the connection.
 
@@ -278,13 +274,25 @@ client.messages.create(data={"to": "user@example.com"})
 
 **The Recommended Variant (Context Manager)**
 
+Initialize your Mailgun client using the with context manager to ensure connection pooling (`requests.Session)` and underlying socket descriptors are gracefully torn down:
+
 ```python
 import os
 from mailgun.client import Client
 
 # Sockets are safely managed and closed automatically
 with Client(auth=("api", os.environ["APIKEY"])) as client:
-    client.messages.create(data={"to": "user@example.com"})
+    response = client.messages.create(
+        domain=os.environ["DOMAIN"],
+        data={
+            "from": os.environ["MESSAGES_FROM"],
+            "to": [os.environ["MESSAGES_TO"]],
+            "subject": "Hello from Mailgun Python SDK",
+            "text": "Testing some Mailgun awesomeness!",
+        },
+    )
+    print(response.status_code)
+    print(response.json())
 ```
 
 ### AsyncClient
@@ -302,7 +310,7 @@ async def main():
     # and automatic socket teardown.
     async with AsyncClient(auth=("api", "your-api-key")) as client:
         response = await client.messages.create(
-            domain="YOUR_DOMAIN_NAME",
+            domain=os.environ["DOMAIN"],
             data={
                 "from": "Excited User <mailgun@YOUR_DOMAIN_NAME>",
                 "to": ["bar@example.com"],
@@ -318,42 +326,6 @@ if __name__ == "__main__":
 ```
 
 ## Usage
-
-Send a message with a Synchronous Client safely inside a context manager.
-
-```python
-import os
-from mailgun import Client
-
-# Send an email using context manager
-with Client(auth=("api", os.environ["APIKEY"])) as client:
-    response = client.messages.create(
-        data={
-            "from": "Excited User <mailgun@sandbox.mailgun.org>",
-            "to": ["recipient@example.com"],
-            "subject": "Hello from Mailgun Python SDK",
-            "text": "Testing some Mailgun awesomeness!",
-        }
-    )
-
-    print(response.status_code)
-    print(response.json())
-```
-
-The `AsyncClient` provides async equivalents for all methods available in the sync `Client`. The method signatures and parameters are identical - simply add `await` when calling methods:
-
-```python
-import os
-from mailgun import Client, AsyncClient
-
-# Sync version
-with Client(auth=("api", os.environ["APIKEY"])) as client:
-    result = client.domainlist.get()
-
-# Async version
-async with AsyncClient(auth=("api", os.environ["APIKEY"])) as client:
-    result = await client.domainlist.get()
-```
 
 For detailed examples of all available methods, parameters, and use cases, refer to the [mailgun/examples](mailgun/examples) section. All examples can be adapted to async by using `AsyncClient` and adding `await` to method calls.
 
@@ -395,41 +367,79 @@ from mailgun import Client
 # 3.5 seconds to connect, 15 seconds to wait for the server response
 with Client(auth=("api", "your-key"), timeout=(3.5, 15.0)) as client:
     # Execute safely timed API calls here
-    pass
+    client.domains.get()
 ```
+
+### Exactly-Once Delivery & Retry Policies
+
+Configure resilient retries using exponential backoff and jitter alongside `IdempotencyGuard` to prevent duplicate billing during transient partitions:
+
+```python
+import os
+import uuid
+from mailgun.client import Client
+from mailgun.config import RetryPolicy
+
+# Configure 3 retries, a 1.0s base delay, a 10.0s max cap, and respect 429 Retry-After headers
+custom_retry = RetryPolicy(max_retries=3, base_delay=1.0, max_delay=10.0, respect_retry_after=True)
+
+with Client(auth=("api", "your-api-key"), retry_policy=custom_retry) as client:
+    # Generate a unique idempotency key for this specific transaction
+    headers = {"Idempotency-Key": str(uuid.uuid4())}
+
+    # If the network fails, the SDK will safely back off and retry.
+    # IdempotencyGuard ensures retries won't result in duplicate emails to the user
+    client.messages.create(
+        domain=os.environ["DOMAIN"],
+        data={"to": "user@example.com", "subject": "Payment Receipt", "text": "Hello World!"},
+        headers=headers,
+    )
+```
+
+### API Response Codes
+
+All of Mailgun's HTTP response codes follow standard HTTP definitions. For some additional information and
+troubleshooting steps, please see below.
+
+**400** - Bad Request (e.g., missing parameter). Will typically contain a JSON response with a "message" key which contains a human-readable message / action
+to interpret.
+
+**401/403** - Auth error or access denied. Please ensure your API key is correct and that you are part of a group that has
+access to the desired resource.
+
+**404** - Resource not found. NOTE: this one can be temporal as our system is an eventually-consistent system but
+requires diligence. If a JSON response is missing for a 404 - that's usually a sign that there was a mistake in the API
+request, such as a non-existing endpoint.
+
+**429** - Rate limit exceeded. Mailgun does have rate limits in place to protect our system. The SDK automatically retries these using Exponential Backoff. In the unlikely case you encounter them and need them raised, please reach out to our support team.
+
+**500/502/503** - Internal Error on the Mailgun side. The SDK automatically retries these using Exponential Backoff.
+If the issue persists, please reach out to our support team.
 
 ### IDE Autocompletion & DX
 
-The `Client` utilizes a dynamic routing engine but is heavily optimized for modern Developer Experience (DX).
+The `Client`/`AsyncClient` utilize a dynamic routing engine but is heavily optimized for modern Developer Experience (DX).
 
 - **Introspection**: Calling `dir(client)` or using autocomplete in IDEs like VS Code or PyCharm will automatically expose all available API endpoints (e.g., `client.messages`, `client.domains`, `client.bounces`).
 - **Security Guardrails**: If you accidentally print the client instance or an exception traceback occurs in your CI/CD logs, your API key is strictly redacted from memory dumps: (`'api', '***REDACTED***'`).
 - **Performance**: JSON payloads are automatically minified before transit to save bandwidth on large batch requests, and internal route resolution is heavily cached in memory.
 
-### Local Email Preview (LocalSandbox)
+### Zero-Leak Development Mode
 
-The SDK provides a native `LocalSandbox`. When you initialize the client with `dry_run=True`, it intercepts outbound emails and allows you to preview the generated HTML locally in your browser. It uses zero network calls, making it perfect for CI/CD and local development.
-
-This allows you to fully validate your SDK initialization, dynamic routing, and payload building without dispatching real HTTP requests to Mailgun servers. This prevents accidental spam, list mutations, or billing charges during testing.
+During local development and automated CI/CD test runs, you can instantiate the client in dry-run mode to completely intercept and mock outbound network requests:
 
 ```python
+import os
 from mailgun.client import Client
 
-# Initializing with dry_run=True activates the Local Sandbox
-with Client(auth=("api", "your-api-key"), dry_run=True) as client:
-    response = client.messages.create(
-        domain="your-sandbox-domain.com",
-        data={
-            "from": "sender@your-domain.com",
-            "to": "test@example.com",
-            "subject": "Sandbox Test",
-            "text": "This email won't be sent, but intercepted locally!",
-        },
+# dry_run=True intercepts the network call and prevents actual delivery
+with Client(auth=("api", "key"), dry_run=True) as client:
+    client.messages.create(
+        os.environ["DOMAIN"],
+        to="user@example.com",
+        subject="Safe Local Testing",
+        text="This email will be mocked and will not hit the live internet.",
     )
-
-    # The SDK automatically handles the mock response safely
-    print(response.json()["message"])
-    # Output: "Local Sandbox Intercepted"
 ```
 
 Key Behaviors in `dry_run` Mode:
@@ -439,46 +449,87 @@ Key Behaviors in `dry_run` Mode:
 - Deprecation warnings will still be raised if you use an outdated endpoint.
 - `sys.audit` events and standard `logging` messages are still emitted, clearly marked with `DRY RUN: Intercepting request...`.
 
-### Advanced Retry Policy (Jitter & Backoff)
+### Local Email Previews (LocalSandbox)
 
-To prevent the "Thundering Herd" effect during network outages, the Mailgun SDK includes a customizable `RetryPolicy` equipped with exponential backoff and "Full Jitter" randomization.
+Combine `dry_run=True` with `LocalSandbox` to automatically write email payloads to local `.html` files and preview them instantly in your default browser without needing paid external tools:
 
 ```python
 from mailgun.client import Client
-from mailgun.config import RetryPolicy
+from mailgun.builders import MailgunMessageBuilder
+from mailgun.ext.sandbox import LocalSandbox
 
-# Configure 3 retries, a 1.0s base delay, a 10.0s max cap, and respect 429 Retry-After headers
-custom_retry = RetryPolicy(max_retries=3, base_delay=1.0, max_delay=10.0, respect_retry_after=True)
+# Intercepts the delivery and opens the rendered HTML in a new browser tab
+payload, _ = (
+    MailgunMessageBuilder("test@my-company.com")
+    .add_recipient("customer@gmail.com")
+    .set_subject("🎉 Your report is ready (Layout Test)")
+    .set_html("""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto;">
+                <h2 style="color: #3B82F6;">Hello, this is a local test!</h2>
+                <p>This email never left your computer.</p>
+                <div style="padding: 20px; background: #F3F4F6; border-radius: 8px;">
+                    <strong>LocalSandbox</strong> is completely decoupled from the HTTP client.
+                </div>
+            </div>
+        """)
+    .build()
+)
 
-with Client(auth=("api", "your-api-key"), retry_policy=custom_retry) as client:
-    # If the network fails, the SDK will safely back off and retry
-    response = client.domains.get()
+# 1. Preview the layout using the external sandbox explicitly
+sandbox = LocalSandbox(open_browser=True)
+sandbox.intercept_and_preview(payload)
+
+# 2. Safely verify the HTTP pipeline logic using standard dry_run
+with Client(auth=("api", "fake-key"), dry_run=True) as client:
+    response = client.messages.create(domain="my-company.com", data=payload)
+    print("\nSystem response (HTML Email):")
+    print(response.json())
 ```
 
-### Exactly-Once Delivery (IdempotencyGuard)
+### Strict Payload Schemas
 
-Network requests can sometimes hang, leaving you wondering if an email was actually sent. Our `IdempotencyGuard` guarantees that even if a request is retried, the Mailgun API will only send the email **once**.
+If you prefer to build your own dictionaries instead of using the builder, you can opt in to `TypedDict` schemas for full IDE autocomplete and `mypy` compile-time safety.
 
 ```python
-from mailgun.client import Client
-import uuid
+from mailgun import Client
+from mailgun.types import SendMessagePayload
 
-with Client(auth=("api", "your-api-key")) as client:
-    # Generate a unique idempotency key for this specific transaction
-    headers = {"Idempotency-Key": str(uuid.uuid4())}
+my_data: SendMessagePayload = {
+    "from": "admin@domain.com",
+    "to": ["user@example.com"],
+    "subject": "Strictly Typed Request",
+}
 
-    response = client.messages.create(
-        domain="your-domain.com",
-        data={"to": "user@example.com", "text": "Hello World!"},
-        headers=headers,
+with Client(auth=("api", "key")) as client:
+    client.messages.create(domain="domain.com", data=my_data)
+```
+
+### Strict Typed Schemas (mailgun.ext)
+
+For enterprise applications using frameworks like FastAPI or Django, you can import strict typed dictionaries and Pydantic models from `mailgun.ext.pydantic` to validate input payloads at system boundaries:
+
+```python
+from mailgun.ext.pydantic.models import SendMessageSchema
+from pydantic import ValidationError
+
+try:
+    valid_payload = SendMessageSchema(
+        from_="admin@company.com",
+        to=["user@example.com"],
+        subject="Weekly Report",
+        text="Here is your report.",
     )
+    print("✅ Valid payload passed validation!")
+    print(f"Data: {valid_payload.to_mailgun_payload()}")
+except ValidationError as e:
+    print(f"❌ Valid payload failed: {e}")
 ```
 
-### Strict Payload Validation (Pydantic & FastAPI)
+**Strict Payload Validation (Pydantic & FastAPI)**:
 
-The Mailgun SDK ships with optional, strict Pydantic v2 models that map exactly to the API specifications. This enables "Fail-Fast" local validation and perfectly integrates with frameworks like FastAPI.
+This enables "Fail-Fast" local validation and perfectly integrates with frameworks like FastAPI.
 
-First, ensure you have installed the optional dependencies: `pip install mailgun[pydantic]`
+First, ensure you have installed the optional dependencies: `pip install mailgun[fastapi]`
 
 ```python
 from fastapi import FastAPI, Depends
@@ -506,79 +557,45 @@ async def send_email(
     return response.json()
 ```
 
-### Pre-Flight Validation (SpamGuard & IDN)
+### Memory-Safe Attachments (ChunkedStreamer)
 
-The SDK includes a zero-network static analyzer called **SpamGuard**. It evaluates your payload *before* making an HTTP request. If your HTML contains known spam triggers (like invalid tags) or if you attempt to send to malformed Internationalized Domain Names (IDN), the SDK fails fast locally.
-
-```python
-from mailgun.client import Client
-from mailgun.security import SpamGuard
-from mailgun.handlers.error_handler import DeliverabilityError
-
-with Client(auth=("api", "your-api-key")) as client:
-    try:
-        # SpamGuard intercepts this before the network request is ever sent
-        response = client.messages.create(
-            domain="your-domain.com",
-            data={
-                "to": "test@example.com",
-                "subject": "Make Money Fast!!!",
-                "html": "<script>alert('spam');</script> Buy now!",
-            },
-        )
-    except DeliverabilityError as e:
-        print(f"Blocked locally to protect domain reputation: {e}")
-```
-
-### API Response Codes
-
-All of Mailgun's HTTP response codes follow standard HTTP definitions. For some additional information and
-troubleshooting steps, please see below.
-
-**400** - Bad Request (e.g., missing parameter). Will typically contain a JSON response with a "message" key which contains a human-readable message / action
-to interpret.
-
-**401/403** - Auth error or access denied. Please ensure your API key is correct and that you are part of a group that has
-access to the desired resource.
-
-**404** - Resource not found. NOTE: this one can be temporal as our system is an eventually-consistent system but
-requires diligence. If a JSON response is missing for a 404 - that's usually a sign that there was a mistake in the API
-request, such as a non-existing endpoint.
-
-**429** - Rate limit exceeded. Mailgun does have rate limits in place to protect our system. The SDK automatically retries these using Exponential Backoff. In the unlikely case you encounter them and need them raised, please reach out to our support team.
-
-**500/502/503** - Internal Error on the Mailgun side. The SDK automatically retries these using Exponential Backoff.
-If the issue persists, please reach out to our support team.
-
-### Context Managers (Safe Resource Teardown)
-
-Always use the `Client` or `AsyncClient` inside a `with` statement. This ensures that underlying TCP connection pools are safely closed and sensitive API keys are immediately purged from memory once the block exits, preventing resource leaks.
-
-**Synchronous:**
+When sending massive attachments or processing large file exports, use the `ChunkedStreamer` utility to stream data in 512KB chunks, preventing out-of-memory (OOM) errors in resource-constrained environments or serverless functions:
 
 ```python
-from mailgun import Client
+import os
 
-with Client(auth=("api", "your-api-key")) as client:
-    response = client.domains.get()
-    print(response.json())
-# Connection pool is closed and credentials are wiped from memory here.
-```
+from mailgun.builders import MailgunMessageBuilder
+from mailgun.client import AsyncClient, Client
 
-**Asynchronous:**
+API_KEY: str = os.environ.get("APIKEY", "")
+DOMAIN: str = os.environ.get("DOMAIN", "")
+MESSAGES_TO = os.environ.get("MESSAGES_TO") or f"success@{DOMAIN}"
 
-```python
-import asyncio
-from mailgun import AsyncClient
+test_file = "large_report.pdf"
+with open(test_file, "wb") as f:
+    f.write(os.urandom(20 * 1024 * 1024))
 
+try:
+    payload, files = (
+        MailgunMessageBuilder(f"mailgun@{DOMAIN}")
+        .add_recipient(MESSAGES_TO)
+        .set_subject("Monthly Enterprise Report")
+        .set_text("Here is the 20MB data export.")
+        .attach_stream(test_file)
+        .build()
+    )
 
-async def main():
-    async with AsyncClient(auth=("api", "your-api-key")) as client:
-        response = await client.domains.get()
-        print(response.json())
+    # If the network is slow, increase read/write timeout to 300 sec,
+    # but keep 10 sec for connection timeout.
+    custom_timeout = (10.0, 300.0)
 
+    with Client(auth=("api", API_KEY), timeout=custom_timeout) as client:
+        req = client.messages.create(domain=DOMAIN, data=payload, files=files)
+        print("Success:", req.json())
 
-asyncio.run(main())
+finally:
+    if os.path.exists(test_file):
+        os.remove(test_file)
 ```
 
 ### Fluent Message Builder
@@ -619,7 +636,7 @@ with Client(auth=("api", "your-api-key")) as client:
     client.messages.create(domain="yourdomain.com", data=payload, files=files)
 ```
 
-### Streaming Pagination (Memory Safe)
+### Streaming Pagination
 
 For endpoints that return massive datasets (like Events, Bounces, or Suppressions), loading all pages into memory can cause latency spikes or Out-of-Memory crashes.
 The `.stream()` method handles cursor-based pagination invisibly under the hood, yielding one item at a time.
@@ -633,25 +650,7 @@ with Client(auth=("api", "key")) as client:
         print(f"Bounced: {event['recipient']}")
 ```
 
-### Strict Payload Schemas
-
-If you prefer to build your own dictionaries instead of using the builder, you can opt in to `TypedDict` schemas for full IDE autocomplete and `mypy` compile-time safety.
-
-```python
-from mailgun import Client
-from mailgun.types import SendMessagePayload
-
-my_data: SendMessagePayload = {
-    "from": "admin@domain.com",
-    "to": ["user@example.com"],
-    "subject": "Strictly Typed Request",
-}
-
-with Client(auth=("api", "key")) as client:
-    client.messages.create(domain="domain.com", data=my_data)
-```
-
-### Readiness / Liveness Probe
+### Readiness Probe
 
 ```python
 import sys
@@ -669,12 +668,12 @@ with Client(auth=("api", api_key)) as client:
         sys.exit(1)  # Exit code 1 triggers container restart/unready state
 ```
 
-## Request examples
+## API Reference
 
-### Full list of supported endpoints
+### Full list of examples
 
 > [!IMPORTANT]
-> This is a full list of supported endpoints this SDK provides [mailgun/examples](mailgun/examples)
+> This is a full list of [mailgun/examples](mailgun/examples).
 
 ### Messages
 
@@ -1845,7 +1844,7 @@ It will successfully execute the request but will emit a non-breaking Python `De
 
 ## Type Hinting
 
-This SDK is fully type-hinted and compatible with static type checkers like `mypy` and `pyright`.
+This SDK is fully type-hinted and complies with PEP 561 (`py.typed` included). Static type checkers (`mypy`, `pyright`) are enforced during CI checks.
 
 Because of the dynamic URL dispatch engine (`__getattr__`), IDEs may flag endpoints like `client.messages.create` as `Any`.
 If you enforce strict typing in your application, you may safely ignore these specific dynamically dispatched calls.
@@ -1889,6 +1888,26 @@ with Client(auth=("api", os.environ.get("APIKEY", "your-api-key"))) as client:
     # The audit hook will now automatically intercept and log events like:
     # "SECURITY AUDIT: Outbound API call tracked - GET https://api.mailgun.net/v3/domains"
     response = client.domains.get()
+```
+
+### Pre-Flight Delivery Validation (SpamGuard)
+
+The SDK includes a zero-network static analyzer called **SpamGuard**. It evaluates your payload *before* making an HTTP request. If your HTML contains known spam triggers (like invalid tags) or if you attempt to send to malformed Internationalized Domain Names (IDN), the SDK fails fast locally.
+
+```python
+from mailgun.client import Client
+from mailgun.handlers.error_handler import DeliverabilityError
+
+with Client(auth=("api", "YOUR_API_KEY")) as client:
+    try:
+        client.messages.create(
+            "YOUR_DOMAIN_NAME",
+            to=["test@example.com"],
+            subject="Hello",
+            html="<html><script>alert('bad');</script></html>",  # Will trigger SpamGuard
+        )
+    except DeliverabilityError as e:
+        print(f"Pre-flight check failed! Risk score: {e.score}. Issues: {e.issues}")
 ```
 
 ## Contributors
