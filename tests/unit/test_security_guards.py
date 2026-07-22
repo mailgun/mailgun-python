@@ -1,4 +1,3 @@
-import pytest
 from mailgun.security import IdempotencyGuard, SpamGuard
 
 class TestIdempotencyGuard:
