@@ -68,7 +68,7 @@ class LocalSandbox:
         }
         self._open_browser: Final = open_browser and not env_disable
 
-    def intercept_and_preview(self, _domain: str, payload: dict[str, Any]) -> MockResponse:
+    def intercept_and_preview(self, payload: dict[str, Any]) -> MockResponse:
         """Intercept the payload, write it as an HTML file, and open it in the browser.
 
         Returns:

@@ -7,20 +7,17 @@ from typing import TYPE_CHECKING, Any, NotRequired, TypeAlias, TypedDict, Union
 
 from requests.models import Response  # pyright: ignore[reportMissingModuleSource]
 
-from mailgun._httpx_compat import httpx
-
 
 if TYPE_CHECKING:
     from mailgun._httpx_compat import Timeout as HttpxTimeout
-    from mailgun.sandbox import MockResponse
-
+    from mailgun._httpx_compat import httpx
 
 # ---------------------------------------------------------
 # Security, Endpoints & Client Types
 # ---------------------------------------------------------
 TimeoutType: TypeAlias = Union[float, tuple[float, float], "HttpxTimeout", None]
-APIResponseType = Union[Response, "MockResponse", Any]
-AsyncAPIResponseType = Union[httpx.Response, "MockResponse", Any]
+APIResponseType: TypeAlias = Response | Any
+AsyncAPIResponseType: TypeAlias = Union["httpx.Response", Any]
 
 # ---------------------------------------------------------
 # Routing Types

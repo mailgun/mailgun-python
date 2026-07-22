@@ -24,7 +24,6 @@ from mailgun.security import SecurityGuard
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Mapping
 
-    from mailgun.sandbox import MockResponse
     from mailgun.types import APIResponseType, AsyncAPIResponseType, TimeoutType
 
 
@@ -390,9 +389,6 @@ class Endpoint(BaseEndpoint):
             MailgunTimeoutError: If the request times out.
             ApiError: If the server returns a 4xx or 5xx status code or a network error occurs.
         """
-        # Extract open_browser preference before kwargs are sanitized (Defaults to False)
-        open_browser = kwargs.pop("open_browser", False)
-
         safe_method, target_url, safe_url_for_log, safe_timeout, safe_headers, safe_kwargs = (
             self._prepare_request(method, url, domain, timeout, headers, kwargs)
         )
@@ -401,25 +397,13 @@ class Endpoint(BaseEndpoint):
 
         # --- DRY RUN INTERCEPTOR (Zero-Leak Sandbox Mode) ---
         if self.dry_run:
-            # Rich Sandbox Preview for emails (Matches 'messages' and 'messages.mime')
-            if any("messages" in k for k in url.get("keys", [])):
-                from mailgun.sandbox import LocalSandbox  # noqa: PLC0415
-
-                sandbox_domain = domain or kwargs.get("domain", "local.sandbox")
-                payload = data or {}
-
-                logger.info("DRY RUN: Intercepting email payload for local sandbox preview.")
-                sandbox = LocalSandbox(open_browser=open_browser)
-                return sandbox.intercept_and_preview(sandbox_domain, payload)
-
-            # Route 2: Standard JSON Mock for all other endpoints (domains, ips, etc.)
             logger.info(
                 "DRY RUN: Intercepting %s request to %s", safe_method.upper(), safe_url_for_log
             )
             mock_resp = Response()
             mock_resp.status_code = HTTPStatus.OK
             mock_resp.encoding = "utf-8"
-            mock_resp._content = b'{"message": "Dry run successful - request intercepted", "id": "<dry-run-mock-id>"}'  # noqa: SLF001 - Mocking internal state
+            mock_resp._content = b'{"message": "Dry run successful - request intercepted", "id": "<dry-run-mock-id>"}'  # noqa: SLF001
             return mock_resp
 
         # Ensure protocol consistency: HTTP libraries MUST generate their own multipart boundaries
@@ -770,7 +754,7 @@ class AsyncEndpoint(BaseEndpoint):
         files: Any | None = None,
         domain: str | None = None,
         **kwargs: Any,
-    ) -> Response | MockResponse | None:  # noqa: PLR0914, PLR0915
+    ) -> AsyncAPIResponseType:  # noqa: PLR0914, PLR0915
         """Execute the asynchronous HTTP request to the Mailgun API.
 
         Args:
@@ -792,8 +776,6 @@ class AsyncEndpoint(BaseEndpoint):
             MailgunTimeoutError: If the request times out.
             ApiError: If the server returns a 4xx or 5xx status code or a network error occurs.
         """
-        open_browser = kwargs.pop("open_browser", False)
-
         safe_method, target_url, safe_url_for_log, safe_timeout, safe_headers, safe_kwargs = (
             self._prepare_request(method, url, domain, timeout, headers, kwargs)
         )
@@ -802,17 +784,6 @@ class AsyncEndpoint(BaseEndpoint):
 
         # --- DRY RUN INTERCEPTOR (ASYNC) ---
         if self.dry_run:
-            # Rich Sandbox Preview for emails (Matches 'messages' and 'messages.mime')
-            if any("messages" in k for k in url.get("keys", [])):
-                from mailgun.sandbox import LocalSandbox  # noqa: PLC0415
-
-                sandbox_domain = domain or kwargs.get("domain", "local.sandbox")
-                payload = data or {}
-
-                logger.info("DRY RUN: Intercepting async email payload for local sandbox preview.")
-                sandbox = LocalSandbox(open_browser=open_browser)
-                return sandbox.intercept_and_preview(sandbox_domain, payload)
-
             logger.info(
                 "DRY RUN: Intercepting async %s request to %s",
                 safe_method.upper(),
