@@ -16,7 +16,7 @@ with atheris.instrument_imports():
     from mailgun.handlers.error_handler import ApiError
 
 
-_DEVNULL = open(os.devnull, "w")
+_DEVNULL = sys.stderr
 
 logging.disable(logging.CRITICAL)
 
