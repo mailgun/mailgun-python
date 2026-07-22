@@ -44,7 +44,31 @@ TARGETS: list[dict[str, Any]] = [
         "name": "webhooks_get",
         "url": f"https://api.mailgun.net/v3/domains/{DOMAIN}/webhooks",
     },
+    {
+        "method": "GET",
+        "name": "templates_get",
+        "url": f"https://api.mailgun.net/v3/{DOMAIN}/templates",
+    },
+    {
+        "method": "GET",
+        "name": "lists_get",
+        "url": "https://api.mailgun.net/v3/lists/pages",
+    },
+    {
+        "method": "GET",
+        "name": "domains_get",
+        "url": f"https://api.mailgun.net/v3/domains/{DOMAIN}",
+    },
 ]
+
+# Target corpus directories mapped to all active fuzzers
+CORPUS_MAP: dict[str, list[str]] = {
+    "fuzz_async_client": ["messages_post", "validate_get"],
+    "fuzz_client": ["messages_post"],
+    "fuzz_handlers": ["routes_get", "webhooks_get", "templates_get", "lists_get", "domains_get"],
+    "fuzz_pydantic_models": ["messages_post"],  # Seeds schema validator with real payloads
+    "fuzz_webhooks": ["webhooks_get"],          # Seeds webhook parsers
+}
 
 
 def harvest_seeds() -> None:
@@ -53,13 +77,6 @@ def harvest_seeds() -> None:
         return
 
     auth = ("api", API_KEY)
-
-    # Target corpus directories for different fuzzers
-    corpus_map: dict[str, list[str]] = {
-        "fuzz_async_client": ["messages_post", "validate_get"],
-        "fuzz_client": ["messages_post"],
-        "fuzz_handlers": ["routes_get", "webhooks_get"],
-    }
 
     for target in TARGETS:
         method = target.get("method", "GET")
@@ -82,7 +99,7 @@ def harvest_seeds() -> None:
             # to distinguish between success and error schemas
             payload = json.dumps(resp.json(), indent=2).encode("utf-8")
 
-            for folder, target_names in corpus_map.items():
+            for folder, target_names in CORPUS_MAP.items():
                 if target["name"] in target_names:
                     dir_path = Path("tests") / "fuzz" / "corpus" / folder
                     dir_path.mkdir(parents=True, exist_ok=True)

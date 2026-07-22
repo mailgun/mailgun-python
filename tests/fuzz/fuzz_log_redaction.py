@@ -2,6 +2,7 @@
 """Fuzz test for Log Sanitization (ReDoS and Deep Type confusion)."""
 
 import logging
+import re
 import sys
 from typing import Any
 
@@ -17,14 +18,12 @@ def generate_complex_args(
     fdp: atheris.FuzzedDataProvider, depth: int = 0, state: dict[str, int] | None = None
 ) -> Any:
     # Recursive generator to test deep dictionary walking logic
-    # Now includes structural guardrails to prevent OOM
+    # Includes structural guardrails to prevent OOM
     if state is None:
         state = {"total_nodes": 0}
 
-    # Increment node counter
     state["total_nodes"] += 1
 
-    # Guardrail: If too deep or too many nodes, return simple string to prune tree
     if depth > 3 or state["total_nodes"] > 500:
         return fdp.ConsumeUnicodeNoSurrogates(16)
 
@@ -56,8 +55,6 @@ def TestOneInput(data: bytes) -> None:
 
     # Route 1: ReDoS (Regular Expression Denial of Service) Attack
     if fdp.ConsumeBool():
-        # Inject massive repetitive strings to test if the regex engine hangs
-        # e.g., "api_key=api_key=api_key=..."
         poison = fdp.PickValueInList(["Bearer ", "api_key=", "password:", "token="])
         msg = (poison * fdp.ConsumeIntInRange(10, 100)) + fdp.ConsumeUnicodeNoSurrogates(
             200
@@ -67,11 +64,9 @@ def TestOneInput(data: bytes) -> None:
     # Route 2: Deeply Nested Type Confusion Attack
     else:
         msg = fdp.ConsumeUnicodeNoSurrogates(64)
-        # Create complex nested structures (tuples of dicts of lists)
         args = tuple(
             generate_complex_args(fdp) for _ in range(fdp.ConsumeIntInRange(1, 5))
         )
-        # If msg is massive, truncate it before creating LogRecord
         if len(msg) > 1024:
             msg = msg[:1024]
 
@@ -89,10 +84,18 @@ def TestOneInput(data: bytes) -> None:
         return
 
     try:
-        # Target: Does the redactor crash on nested lists, ints, or ReDoS?
+        # Target 1: Redaction check
         filter_instance.filter(record)
-    except (TypeError, ValueError):
-        # Expected for malformed fuzz-generated inputs; not treated as security crashes.
+
+        # Target 2: String formatting evaluation
+        # Guardrail: Prevent LibFuzzer OOM from massive string allocation requests
+        # caused by fuzzed Python format specifiers (e.g., %999999999s).
+        if isinstance(record.msg, str) and re.search(r"%[^a-zA-Z%]*[0-9]{4,}", record.msg):
+            return
+
+        _ = record.getMessage()
+    except (TypeError, ValueError, OverflowError, KeyError):
+        # Expected for formatting mismatches (%c out of range, missing keys, etc.)
         pass
     except Exception as e:
         # Any other exception (AttributeError, RecursionError) is a security failure

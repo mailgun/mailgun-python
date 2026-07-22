@@ -6,6 +6,7 @@ import pytest
 from mailgun.client import AsyncClient, Client, Config
 from mailgun.logger import get_logger
 from mailgun.security import SecurityGuard
+from mailgun.builders import MailgunMessageBuilder
 
 CORPUS_ROOT = Path("tests/fuzz/corpus")
 
@@ -279,3 +280,27 @@ class TestPathTraversal:
 
         with pytest.raises(ValueError, match=r"Security Alert \(CWE-20\)"):
             client.bounces.get(domain=malicious_domain)
+
+
+class TestBuilderSecurityRegression:
+    def test_add_custom_header_rejects_control_characters(self) -> None:
+        """
+        Regression test for CWE-20/CWE-113: Block Header Injection.
+        Validates the fuzzer-discovered payload containing the \\x08 Backspace char.
+        """
+        builder = MailgunMessageBuilder("test@domain.com")
+
+        # 1. Test the exact fuzzer artifact (Backspace character)
+        with pytest.raises(ValueError, match=r"Security Alert \(CWE-20\)"):
+            builder.add_custom_header("ains\x08o", "safe_value")
+
+        # 2. Test standard CRLF Header Injection
+        with pytest.raises(ValueError, match=r"Security Alert \(CWE-20\)"):
+            builder.add_custom_header("X-Custom", "safe\r\nBcc: evil@hacker.com")
+
+    def test_set_subject_rejects_control_characters(self) -> None:
+        """Ensure subject lines cannot be used for MIME boundary manipulation."""
+        builder = MailgunMessageBuilder("test@domain.com")
+
+        with pytest.raises(ValueError, match=r"Security Alert \(CWE-20\)"):
+            builder.set_subject("Monthly Report\nContent-Type: text/html")

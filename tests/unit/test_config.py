@@ -1,7 +1,7 @@
 import importlib
 import logging
 import sys
-from typing import Any
+from typing import Any, Generator
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -9,6 +9,14 @@ import pytest
 import mailgun.config
 from mailgun.client import Config, SecurityGuard
 from mailgun.config import RetryPolicy
+
+
+@pytest.fixture(autouse=True)
+def reset_audit_hook_state() -> Generator[None, Any, None]:
+    """Reset the Config Singleton state before and after each test."""
+    Config._audit_hook_enabled = False
+    yield
+    Config._audit_hook_enabled = False
 
 
 class TestConfigAuditHook:

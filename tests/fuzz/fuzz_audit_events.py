@@ -13,12 +13,13 @@ def TestOneInput(data: bytes) -> None:
         return
 
     fdp = atheris.FuzzedDataProvider(data)
+    fuzzed_method = fdp.ConsumeUnicodeNoSurrogates(16)
     fuzzed_url = fdp.ConsumeUnicodeNoSurrogates(256)
 
     try:
         # Simulate the SDK's internal emission of an audit event
         # If fuzzed_url contains '\x00', sys.audit will throw a native ValueError
-        sys.audit("mailgun.api.request", "GET", fuzzed_url)
+        sys.audit("mailgun.api.request", fuzzed_method, fuzzed_url)
 
     except ValueError as e:
         if "embedded null" in str(e).lower():
