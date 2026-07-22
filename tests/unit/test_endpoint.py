@@ -60,7 +60,7 @@ class TestEndpointCoreMechanics:
 
 class TestEndpointDryRun:
     def test_api_call_dry_run_intercepts_request(self) -> None:
-        """Ensure Sandbox mode intercepts email messages with the rich previewer."""
+        """Ensure dry_run mode intercepts email messages and returns a mock response."""
         url = {"base": f"{BASE_URL_V3}/", "keys": ["messages"]}
         ep = Endpoint(url=url, headers={}, auth=("api", "key"), dry_run=True)
         with patch.object(requests.Session, "request") as mock_req:
@@ -68,8 +68,8 @@ class TestEndpointDryRun:
 
             mock_req.assert_not_called()
             assert resp.status_code == 200
-            # The messages endpoint now triggers the Local Sandbox
-            assert "Local Sandbox Intercepted" in resp.json()["message"]
+            # The messages endpoint returns a standard dry run mock
+            assert "Dry run successful" in resp.json()["message"]
 
     def test_api_call_dry_run_standard_route(self) -> None:
         """Ensure standard routes fallback to the generic JSON mock."""
@@ -96,7 +96,7 @@ class TestEndpointDryRun:
         )
 
     def test_async_api_call_dry_run_intercepts_request(self) -> None:
-        """Ensure Async Sandbox mode intercepts email messages with the rich previewer."""
+        """Ensure Async dry_run mode intercepts email messages and returns a mock response."""
         url = {"base": f"{BASE_URL_V3}/", "keys": ["messages"]}
 
         mock_client = AsyncMock(spec=httpx.AsyncClient)
@@ -110,8 +110,8 @@ class TestEndpointDryRun:
             )
             mock_client.request.assert_not_called()
             assert resp.status_code == 200
-            # The messages endpoint now triggers the Local Sandbox
-            assert "Local Sandbox Intercepted" in resp.json()["message"]
+            # The messages endpoint returns a standard dry run mock
+            assert "Dry run successful" in resp.json()["message"]
 
         asyncio.run(run_test())
 

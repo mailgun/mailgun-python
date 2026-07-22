@@ -165,9 +165,9 @@ class TestSecurityGuardPathSegments:
 class TestSecurityGuardResourceExhaustion:
     """CWE-400 and file size limits."""
 
-    def test_infinite_timeout_emits_deprecation_warning(self) -> None:
-        with pytest.warns(DeprecationWarning, match="allows infinite socket blocking \\(CWE-400\\)"):
-            assert SecurityGuard.sanitize_timeout(None) is None
+    def test_infinite_timeout_raises_value_error(self) -> None:
+        with pytest.raises(ValueError, match="prevent socket blocking \\(CWE-400\\)"):
+            SecurityGuard.sanitize_timeout(None)
 
     def test_valid_timeout_passes_cleanly(self) -> None:
         assert SecurityGuard.sanitize_timeout((10.0, 60.0)) == (10.0, 60.0)

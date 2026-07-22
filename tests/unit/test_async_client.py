@@ -239,7 +239,7 @@ class TestAsyncClient:
     ) -> None:
         """Verify that the global timeout is not shadowed by the method's default value."""
         mock_request.return_value = MagicMock(status_code=200, spec=compat_httpx.Response)
-        client = AsyncClient(auth=("api", "key"), timeout=999.0)
+        client = AsyncClient(auth=("api", "key"), timeout=299.0)
 
         await client.messages.create(domain="test.com", data={"to": "test@test.com"})
 
@@ -247,7 +247,7 @@ class TestAsyncClient:
         kwargs = mock_request.call_args[1]
 
         assert "timeout" in kwargs
-        assert kwargs["timeout"] == 999.0
+        assert kwargs["timeout"] == 299.0
 
     @patch("mailgun.client.httpx.AsyncHTTPTransport")
     @patch("mailgun.client.httpx.AsyncClient")
