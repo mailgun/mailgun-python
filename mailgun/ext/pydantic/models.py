@@ -6,6 +6,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 # Lightweight regex for email validation without depending on `pydantic[email]`
 _EMAIL_REGEX = re.compile(r"^[^@]+@[^@]+\.[^@]+$")
+# CWE-113: Strict detection of Carriage Return and Line Feed characters
+_CRLF_REGEX = re.compile(r"[\r\n]")
 
 
 def _validate_emails(value: str | list[str]) -> str | list[str]:
@@ -18,13 +20,18 @@ def _validate_emails(value: str | list[str]) -> str | list[str]:
         The validated email or list of emails.
 
     Raises:
-        ValueError: If an email format is invalid.
+        ValueError: If an email format is invalid or contains injection vectors.
     """
     if not value:
-        return value
+        raise ValueError("Email fields cannot be empty.")
 
     emails = [value] if isinstance(value, str) else value
     for email in emails:
+        # 1. Poka-yoke: Prevent HTTP Header Injection (CWE-113)
+        if _CRLF_REGEX.search(email):
+            msg = f"Security Alert (CWE-113): CRLF injection detected in email: '{email}'"
+            raise ValueError(msg)
+
         # Quick format check. Ignore names (e.g., "John Doe <john@doe.com>")
         raw_email = email.split("<")[-1].replace(">", "").strip()
         if not _EMAIL_REGEX.match(raw_email):
@@ -56,12 +63,12 @@ class SendMessageSchema(BaseModel):
     cc: str | list[str] | None = Field(default=None)
     bcc: str | list[str] | None = Field(default=None)
 
-    # Subject and content
+    # Subject and content (CWE-400: Strict memory bounding set to 25MB max)
     subject: str | None = Field(default=None, max_length=998)  # RFC 2822 limit
-    text: str | None = Field(default=None)
-    html: str | None = Field(default=None)
-    amp_html: str | None = Field(default=None)
-    template: str | None = Field(default=None)
+    text: str | None = Field(default=None, max_length=25_000_000)
+    html: str | None = Field(default=None, max_length=25_000_000)
+    amp_html: str | None = Field(default=None, max_length=25_000_000)
+    template: str | None = Field(default=None, max_length=255)
 
     # The strict container for dynamic parameters
     # This prevents Mass Assignment while supporting Mailgun's dynamic schema
@@ -70,7 +77,7 @@ class SendMessageSchema(BaseModel):
     @field_validator("custom_params")  # type: ignore[untyped-decorator]
     @classmethod
     def validate_prefixes(cls, v: dict[str, str]) -> dict[str, str]:
-        """Validates that custom parameter keys start with allowed Mailgun prefixes.
+        """Validates that custom parameter keys start with allowed Mailgun prefixes and contain no CRLFs.
 
         Args:
             v: The dictionary of custom parameters to validate.
@@ -79,15 +86,21 @@ class SendMessageSchema(BaseModel):
             The validated dictionary of custom parameters.
 
         Raises:
-            ValueError: If a key does not start with 'v:', 'h:', or 'o:'.
+            ValueError: If a key does not start with 'v:', 'h:', 'o:', or contains CRLFs.
         """
-        for key in v:
+        for key, val in v.items():
             if not key.startswith(("v:", "h:", "o:")):
                 msg = (
                     f"Unknown custom parameter '{key}'. "
                     "Mailgun specific options must start with 'v:', 'h:', or 'o:'"
                 )
                 raise ValueError(msg)
+
+            # CWE-113: Block CRLF injection in custom headers and variables
+            if _CRLF_REGEX.search(key) or _CRLF_REGEX.search(str(val)):
+                msg_0 = f"Security Alert (CWE-113): CRLF injection detected in custom parameter: '{key}'"
+                raise ValueError(msg_0)
+
         return v
 
     @field_validator("to", "from_", "cc", "bcc", mode="after")  # type: ignore[untyped-decorator]

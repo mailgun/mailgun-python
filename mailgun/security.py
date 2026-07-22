@@ -5,8 +5,8 @@ import math
 import re
 import ssl
 import sys
+import time
 import unicodedata
-import warnings
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any, Final, TypedDict
@@ -42,13 +42,33 @@ class SecureHTTPAdapter(HTTPAdapter):
     Mitigates CWE-319.
     """
 
-    def init_poolmanager(self, *args: Any, **kwargs: Any) -> None:
-        """Initialize the pool manager with a secure TLS context."""
+    @staticmethod
+    def _get_secure_ssl_context() -> ssl.SSLContext:
+        """Create and return a hardened SSL context enforcing TLS 1.2+.
+
+        Returns:
+            ssl.SSLContext: A hardened SSL context.
+        """
         context = ssl.create_default_context()
         context.minimum_version = ssl.TLSVersion.TLSv1_2
-        kwargs["ssl_context"] = context
+        return context
+
+    def init_poolmanager(self, *args: Any, **kwargs: Any) -> None:
+        """Initialize the pool manager with a secure TLS context."""
+        kwargs["ssl_context"] = self._get_secure_ssl_context()
         # HTTPAdapter lacks strict static types for this internal method.
         super().init_poolmanager(*args, **kwargs)
+
+    def proxy_manager_for(self, proxy: str, **proxy_kwargs: Any) -> Any:
+        """Ensure proxy connections also strictly enforce TLS 1.2+.
+
+        Returns:
+            Any: The proxy manager instance.
+        """
+        # Inject our hardened SSL context into the proxy kwargs
+        proxy_kwargs["ssl_context"] = self._get_secure_ssl_context()
+        # Pass it up to the parent class to actually construct the ProxyManager
+        return super().proxy_manager_for(proxy, **proxy_kwargs)
 
 
 class SecretAuth(tuple):  # type: ignore[type-arg]
@@ -216,6 +236,7 @@ class SecurityGuard:
 
         Strict Creation-Time Timeout Constraints & Float Validation.
         Prevents thread pool exhaustion from infinite blocking (CWE-400).
+        Enforces a strict maximum boundary of 300 seconds.
 
         Args:
             timeout: The requested timeout value.
@@ -224,18 +245,17 @@ class SecurityGuard:
             The safely verified timeout value.
 
         Raises:
-            ValueError: If the timeout is a negative number, zero, non-finite,
-                or a tuple with an incorrect number of elements.
+            ValueError: If the timeout is None, negative, zero, non-finite,
+                exceeds 300 seconds, or a tuple with an incorrect number of elements.
         """
         if timeout is None:
-            # Soft Deprecation
-            warnings.warn(
-                "Passing 'timeout=None' allows infinite socket blocking (CWE-400). "
-                "This will be removed in a future major release. Please provide an explicit timeout.",
-                DeprecationWarning,
-                stacklevel=3,
+            raise ValueError(
+                "A strict timeout must be provided to prevent socket blocking (CWE-400)."
             )
-            return None
+
+        # Extract values from httpx.Timeout object cleanly
+        if hasattr(timeout, "read") and hasattr(timeout, "connect"):
+            timeout = (getattr(timeout, "connect", 60.0), getattr(timeout, "read", 60.0))
 
         def _validate_float(val: Any) -> float:
             """Validate float value.
@@ -248,7 +268,7 @@ class SecurityGuard:
 
             Raises:
                 TypeError: If the timeout is not a numeric type.
-                ValueError: If the timeout is NaN, Infinity, or less than or equal to zero.
+                ValueError: If the timeout is NaN, Infinity, less than/equal to zero, or exceeds 300.
             """
             if isinstance(val, bool) or not isinstance(val, (int, float)):
                 msg = f"Timeout must be a numeric value, got {type(val).__name__}"
@@ -260,6 +280,9 @@ class SecurityGuard:
                 raise ValueError("Timeout must be a finite number.")
             if f_val <= 0:
                 raise ValueError("Timeout must be a strictly positive finite number.")
+            if f_val > 300.0:  # noqa: PLR2004
+                raise ValueError("Timeout exceeds maximum allowed boundary of 300 seconds.")
+
             return f_val
 
         if isinstance(timeout, tuple):
@@ -268,7 +291,7 @@ class SecurityGuard:
                 raise ValueError(
                     "Timeout must be a tuple containing exactly two elements: (connect, read)."
                 )
-            return (_validate_float(timeout[0]), _validate_float(timeout[1]))
+            return _validate_float(timeout[0]), _validate_float(timeout[1])
 
         return _validate_float(timeout)
 
@@ -456,7 +479,13 @@ class SecurityGuard:
             ValueError: If the file exceeds the maximum allowed size.
         """
         path = Path(file_path)
-        size_bytes = Path(path).stat().st_size
+
+        # MUST assert it's a regular file to reject infinite /dev/zero or FIFOs
+        if not path.is_file():
+            msg = f"Security Alert (CWE-400): Path is not a regular file: {path}"
+            raise ValueError(msg)
+
+        size_bytes = path.stat().st_size
         max_bytes = max_size_mb * 1024 * 1024
 
         if size_bytes > max_bytes:
@@ -482,7 +511,8 @@ class SecurityGuard:
     def verify_webhook(signing_key: str, token: str, timestamp: str, signature: str) -> bool:
         """Cryptographically verify a Mailgun webhook signature.
 
-        Protects against CWE-347 (Improper Verification) and CWE-208 (Timing Attacks).
+        Protects against CWE-347 (Improper Verification), CWE-208 (Timing Attacks),
+        and CWE-294 (Capture-Replay Attacks).
 
         Args:
             signing_key: The Mailgun webhook signing key from the dashboard.
@@ -491,7 +521,7 @@ class SecurityGuard:
             signature: The signature provided in the webhook payload.
 
         Returns:
-            True if the signature mathematically matches the payload, False otherwise.
+            True if the signature mathematically matches the payload and is within the TTL, False otherwise.
 
         Raises:
             TypeError: If any of the signature components are not strictly strings.
@@ -508,16 +538,23 @@ class SecurityGuard:
             raise TypeError("Webhook signature components must be strictly strings.")
 
         try:
-            # 2. Canonicalization: Encode strings to bytes safely
+            # 2. TTL/Replay Attack Prevention (CWE-294): Ensure webhook isn't older than 15 minutes
+            if abs(time.time() - float(timestamp)) > 900:  # noqa: PLR2004
+                return False
+
+            # 3. Canonicalization: Encode strings to bytes safely
             msg = f"{timestamp}{token}".encode()
             key = signing_key.encode("utf-8")
 
-            # 3. Cryptographic Hashing
+            # 4. Cryptographic Hashing
             expected_mac = hmac.new(key, msg, hashlib.sha256).hexdigest()
 
-            # 4. Timing Attack Prevention: NEVER use '==' for crypto comparisons.
+            # 5. Timing Attack Prevention: NEVER use '==' for crypto comparisons.
             return hmac.compare_digest(expected_mac, signature)
 
+        except ValueError as e:
+            # Catch non-numeric timestamps injected by attackers
+            raise ValueError("Malformed cryptographic payload: timestamp must be numeric.") from e
         except AttributeError as e:
             # Fail-closed if underlying C-extensions reject malformed encodings
             raise ValueError("Malformed cryptographic payload.") from e
@@ -597,24 +634,36 @@ class SpamGuard:
         Returns:
             Dictionary with score, issues, and is_safe keys.
         """
+        if not html_content or not html_content.strip():
+            return {"score": 0.0, "issues": ["HTML content cannot be empty."], "is_safe": False}
+
+        # 1. Fail-fast memory/CPU protection (MUST occur before parsing)
+        byte_size = len(html_content.encode("utf-8"))
+        byte_size_limit = 102400  # 100KB
+
+        if byte_size > byte_size_limit:
+            return {
+                "score": 0.0,
+                "issues": [
+                    f"Payload exceeds 100KB ({byte_size / 1024:.1f}KB). Validation aborted."
+                ],
+                "is_safe": False,
+            }
+
+        # 2. Safe to execute synchronous parsing
         parser = _SpamGuardParser()
-        parser.feed(html_content)
+        try:
+            parser.feed(html_content)
+        except Exception as e:  # noqa: BLE001
+            return {"score": 0.0, "issues": [f"Fatal HTML parsing error: {e}"], "is_safe": False}
 
         issues = parser.issues
         score = 100.0
-        byte_size_limit = 102400
         safe_score = 80.0
 
         if parser.image_count > 0 and not parser.has_alt_tags:
             issues.append("Missing 'alt' attributes on images. This triggers spam filters.")
             score -= 15.0
-
-        byte_size = len(html_content.encode("utf-8"))
-        if byte_size > byte_size_limit:
-            issues.append(
-                f"HTML exceeds 100KB ({byte_size / 1024:.1f}KB). Gmail will clip this email."
-            )
-            score -= 25.0
 
         if parser.has_scripts:
             score -= 50.0
@@ -630,7 +679,7 @@ class IdempotencyGuard:
     __slots__ = ()
 
     @staticmethod
-    def generate_key(domain: str, payload: dict[str, Any]) -> str:
+    def generate_key(domain: str, payload: dict[str, Any], files: list[Any] | None = None) -> str:
         """Generates a unique, collision-resistant SHA-256 fingerprint of the message payload.
 
         Returns:
@@ -640,12 +689,24 @@ class IdempotencyGuard:
         fingerprint_data = {
             "domain": domain,
             "to": payload.get("to"),
+            "cc": payload.get("cc"),
+            "bcc": payload.get("bcc"),
             "subject": payload.get("subject"),
             "template": payload.get("template"),
             "text": payload.get("text"),
             "html": payload.get("html"),
             "v_variables": {k: v for k, v in payload.items() if str(k).startswith("v:")},
         }
+
+        # Include attachment signatures to prevent false-positive deduplication
+        if files:
+            # Files are stored as ("attachment", (filename, payload/stream, content_type))
+            file_signatures = [
+                f"{f_tuple[0]}_{f_tuple[1][0]}"
+                for f_tuple in files
+                if len(f_tuple) > 1 and len(f_tuple[1]) > 0
+            ]
+            fingerprint_data["files"] = file_signatures
 
         serialized = json.dumps(fingerprint_data, sort_keys=True, default=str)
         return hashlib.sha256(serialized.encode("utf-8")).hexdigest()

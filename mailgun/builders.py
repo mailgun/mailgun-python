@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import mimetypes
 from pathlib import Path
@@ -11,7 +12,7 @@ from mailgun.security import IdempotencyGuard, SecurityGuard, SpamGuard, SpamRep
 
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
+    from collections.abc import AsyncGenerator, Generator
 
 
 CHUNK_SIZE: int = 512 * 1024  # 512KB
@@ -46,13 +47,17 @@ class ChunkedStreamer:
         Returns:
             A byte string containing the read data.
         """
-        current_file = self._file
+        if self._file is None:
+            self._file = Path(self._file_path).open("rb")  # noqa: SIM115
 
-        if current_file is None:
-            current_file = Path(self._file_path).open("rb")  # noqa: SIM115
-            self._file = current_file
+        chunk = self._file.read(size)
 
-        return current_file.read(size)  # Mypy now guarantees current_file is IO[bytes]
+        # Auto-close the file descriptor as soon as EOF is reached.
+        # This guarantees teardown even if the HTTP library forgets to call .close().
+        if not chunk:
+            self.close()
+
+        return chunk
 
     def __iter__(self) -> Generator[bytes, None, None]:
         """Stream the file natively in chunks.
@@ -60,12 +65,40 @@ class ChunkedStreamer:
         Yields:
             Sequential byte chunks of the file payload.
         """
-        with Path(self._file_path).open("rb") as f:
+        try:
+            # Sync the iterator with the class-level _file descriptor
+            if self._file is None:
+                self._file = Path(self._file_path).open("rb")  # noqa: SIM115
+
             while True:
-                chunk = f.read(self.chunk_size)
+                chunk = self._file.read(self.chunk_size)
                 if not chunk:
                     break
                 yield chunk
+        finally:
+            # The finally block executes if the generator exhausts
+            # naturally OR if a network error causes a GeneratorExit early.
+            self.close()
+
+    async def __aiter__(self) -> AsyncGenerator[bytes, None]:
+        """Safely stream chunks in an async context without blocking the event loop.
+
+        Yields:
+            Sequential byte chunks of the file payload.
+        """
+        try:
+            if self._file is None:
+                # Offload the blocking open() call to a thread pool
+                self._file = await asyncio.to_thread(Path(self._file_path).open, "rb")
+
+            while True:
+                # Offload the blocking read() call to a thread pool
+                chunk = await asyncio.to_thread(self._file.read, self.chunk_size)
+                if not chunk:
+                    break
+                yield chunk
+        finally:
+            self.close()
 
     def close(self) -> None:
         """Explicitly close the underlying file descriptor to prevent leaks.
@@ -134,6 +167,7 @@ class MailgunMessageBuilder:
         Returns:
             The builder instance.
         """
+        SecurityGuard.validate_no_control_characters(subject, "Subject")
         self._payload["subject"] = subject
         return self
 
@@ -195,6 +229,8 @@ class MailgunMessageBuilder:
         Returns:
             The builder instance.
         """
+        SecurityGuard.validate_no_control_characters(key, "Custom Header Key")
+        SecurityGuard.validate_no_control_characters(value, "Custom Header Value")
         self._payload[f"h:{key}"] = value
         return self
 
@@ -376,7 +412,9 @@ class MailgunMessageBuilder:
         final_payload = self._payload.copy()
 
         if self._idempotency_safe and "h:X-Idempotency-Key" not in final_payload:
-            idempotency_key = IdempotencyGuard.generate_key(self._domain, final_payload)
+            idempotency_key = IdempotencyGuard.generate_key(
+                self._domain, final_payload, self._files
+            )
             final_payload["h:X-Idempotency-Key"] = idempotency_key
 
         for key in ["to", "cc", "bcc"]:
