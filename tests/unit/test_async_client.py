@@ -360,7 +360,7 @@ class TestAsyncClient:
         client = AsyncClient(auth=("api", "key"))
         _ = client._client
         with pytest.warns(ResourceWarning, match="Unclosed AsyncClient detected"):
-            client = None
+            del client
             gc.collect()
 
 
