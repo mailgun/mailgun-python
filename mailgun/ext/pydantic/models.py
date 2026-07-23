@@ -1,3 +1,5 @@
+# mypy: disable-error-code="untyped-decorator"
+
 import re
 from typing import Any
 
@@ -74,7 +76,7 @@ class SendMessageSchema(BaseModel):
     # This prevents Mass Assignment while supporting Mailgun's dynamic schema
     custom_params: dict[str, str] = Field(default_factory=dict)
 
-    @field_validator("custom_params")  # type: ignore[untyped-decorator]
+    @field_validator("custom_params")
     @classmethod
     def validate_prefixes(cls, v: dict[str, str]) -> dict[str, str]:
         """Validates that custom parameter keys start with allowed Mailgun prefixes and contain no CRLFs.
@@ -103,7 +105,7 @@ class SendMessageSchema(BaseModel):
 
         return v
 
-    @field_validator("to", "from_", "cc", "bcc", mode="after")  # type: ignore[untyped-decorator]
+    @field_validator("to", "from_", "cc", "bcc", mode="after")
     @classmethod
     def check_email_formats(cls, v: Any) -> Any:
         """Validates the correct format of email addresses.
@@ -115,7 +117,7 @@ class SendMessageSchema(BaseModel):
             _validate_emails(v)
         return v
 
-    @model_validator(mode="after")  # type: ignore[untyped-decorator]
+    @model_validator(mode="after")
     def validate_body(self) -> "SendMessageSchema":
         """Cross-validation of body content.
 

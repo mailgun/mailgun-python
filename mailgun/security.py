@@ -249,9 +249,10 @@ class SecurityGuard:
                 exceeds 300 seconds, or a tuple with an incorrect number of elements.
         """
         if timeout is None:
-            raise ValueError(
-                "A strict timeout must be provided to prevent socket blocking (CWE-400)."
+            msg = (
+                "Security Alert (CWE-400): Infinite timeouts are forbidden. Provide a finite value."
             )
+            raise ValueError(msg)
 
         # Extract values from httpx.Timeout object cleanly
         if hasattr(timeout, "read") and hasattr(timeout, "connect"):
@@ -281,7 +282,9 @@ class SecurityGuard:
             if f_val <= 0:
                 raise ValueError("Timeout must be a strictly positive finite number.")
             if f_val > 300.0:  # noqa: PLR2004
-                raise ValueError("Timeout exceeds maximum allowed boundary of 300 seconds.")
+                raise ValueError(
+                    "Security Alert: Timeout exceeds maximum allowed boundary of 300 seconds."
+                )
 
             return f_val
 
@@ -449,24 +452,32 @@ class SecurityGuard:
 
         Raises:
             ValueError: If the resolved path escapes the safe base directory.
-            FileNotFoundError: If the file does not exist.
         """
-        target = Path(file_path).resolve()
-        base = Path(safe_base_dir).resolve()
+        original_path = str(file_path)
+        target_path = Path(file_path).resolve()
 
-        if not target.is_relative_to(base):
-            sys.audit("mailgun.security.path_traversal_attempt", str(target))
-            msg = (
-                f"Security Alert (CWE-22): Path traversal blocked. "
-                f"File {target} is outside of safe directory {base}."
-            )
+        if not target_path.exists() or not target_path.is_file():
+            msg = f"Security Alert: Invalid attachment path or not a file: {file_path}"
             raise ValueError(msg)
 
-        if not target.exists() or not target.is_file():
-            msg = f"Attachment not found or is not a file: {target}"
-            raise FileNotFoundError(msg)
+        if safe_base_dir:
+            base_path = Path(safe_base_dir).resolve()
+            if not target_path.is_relative_to(base_path):
+                raise ValueError("Security Alert (CWE-22): Path traversal attempt detected.")
+        else:
+            # Fallback zero-trust checks if no specific sandbox is provided
+            if ".." in original_path:
+                raise ValueError(
+                    "Security Alert (CWE-22): Path traversal tokens ('..') are explicitly forbidden."
+                )
 
-        return target
+            forbidden_roots = ("/etc", "/var", "/root", "/boot", "C:\\Windows", "C:\\System32")
+            if any(str(target_path).lower().startswith(root.lower()) for root in forbidden_roots):
+                raise ValueError(
+                    "Security Alert: Access to sensitive OS system directories is explicitly forbidden."
+                )
+
+        return target_path
 
     @staticmethod
     def check_file_size(file_path: str | Path, max_size_mb: int = 25) -> None:
@@ -508,7 +519,13 @@ class SecurityGuard:
         return _PATH_CONTROL_CHAR_RE.sub("_", safe_str)
 
     @staticmethod
-    def verify_webhook(signing_key: str, token: str, timestamp: str, signature: str) -> bool:
+    def verify_webhook(
+        signing_key: str | bytes,
+        token: str,
+        timestamp: str | int,
+        signature: str,
+        max_age_seconds: int = 300,
+    ) -> bool:
         """Cryptographically verify a Mailgun webhook signature.
 
         Protects against CWE-347 (Improper Verification), CWE-208 (Timing Attacks),
@@ -519,45 +536,45 @@ class SecurityGuard:
             token: The token provided in the webhook payload.
             timestamp: The timestamp provided in the webhook payload.
             signature: The signature provided in the webhook payload.
+            max_age_seconds: Maximum allowed age of the webhook in seconds.
 
         Returns:
-            True if the signature mathematically matches the payload and is within the TTL, False otherwise.
+            True if the signature mathematically matches and is within TTL, False otherwise.
 
         Raises:
-            TypeError: If any of the signature components are not strictly strings.
-            ValueError: If the cryptographic payload is malformed or undecodable.
+            TypeError: If the signature components are invalid types.
         """
-        # 1. Type Guard: Prevent AttributeError if a developer or attacker
-        # passes None, an int, or a list instead of a string.
-        if (
-            not isinstance(signing_key, str)
-            or not isinstance(token, str)
-            or not isinstance(timestamp, str)
-            or not isinstance(signature, str)
-        ):
-            raise TypeError("Webhook signature components must be strictly strings.")
+        # 1. Type Guard: Prevent AttributeError and Type Confusion
+        if not isinstance(token, str) or not isinstance(signature, str):
+            raise TypeError("Security Alert: Webhook token and signature must be strings.")
 
+        if not isinstance(signing_key, (str, bytes)):
+            raise TypeError("Security Alert: Signing key must be a string or bytes.")
+
+        # 2. Extract integer for math, but DO NOT mutate the raw timestamp string
         try:
-            # 2. TTL/Replay Attack Prevention (CWE-294): Ensure webhook isn't older than 15 minutes
-            if abs(time.time() - float(timestamp)) > 900:  # noqa: PLR2004
-                return False
+            ts_math = int(timestamp)
+        except (ValueError, TypeError) as e:
+            raise TypeError("Security Alert: Webhook timestamp must be a valid integer.") from e
 
-            # 3. Canonicalization: Encode strings to bytes safely
-            msg = f"{timestamp}{token}".encode()
-            key = signing_key.encode("utf-8")
+        # 3. TTL/Replay Attack Prevention (CWE-294)
+        if abs(time.time() - ts_math) > max_age_seconds:
+            logger.warning("Security Alert (CWE-294): Webhook timestamp expired.")
+            return False
 
-            # 4. Cryptographic Hashing
-            expected_mac = hmac.new(key, msg, hashlib.sha256).hexdigest()
+        # 4. Canonicalization: Encode securely
+        if isinstance(signing_key, str):
+            signing_key = signing_key.encode("utf-8")
 
-            # 5. Timing Attack Prevention: NEVER use '==' for crypto comparisons.
-            return hmac.compare_digest(expected_mac, signature)
+        # Hash the exact raw string representation, not the integer cast.
+        raw_timestamp = str(timestamp)
+        msg = f"{raw_timestamp}{token}".encode()
 
-        except ValueError as e:
-            # Catch non-numeric timestamps injected by attackers
-            raise ValueError("Malformed cryptographic payload: timestamp must be numeric.") from e
-        except AttributeError as e:
-            # Fail-closed if underlying C-extensions reject malformed encodings
-            raise ValueError("Malformed cryptographic payload.") from e
+        # 5. Cryptographic Hashing
+        expected_mac = hmac.new(key=signing_key, msg=msg, digestmod=hashlib.sha256).hexdigest()
+
+        # 6. Timing Attack Prevention (CWE-208): NEVER use '==' for crypto comparisons.
+        return hmac.compare_digest(expected_mac, signature)
 
     @staticmethod
     def normalize_domain(domain: str | None) -> str:
@@ -624,6 +641,8 @@ class SpamGuard:
 
     __slots__ = ()
 
+    MAX_HTML_SIZE: Final[int] = 5242880  # 5MB
+
     @staticmethod
     def check_html(html_content: str) -> SpamReport:
         """Natively parse HTML and detect known spam/delivery triggers under 1ms.
@@ -633,11 +652,18 @@ class SpamGuard:
 
         Returns:
             Dictionary with score, issues, and is_safe keys.
+
+        Raises:
+            ValueError: If the payload exceeds absolute safety limits for static analysis.
         """
         if not html_content or not html_content.strip():
             return {"score": 0.0, "issues": ["HTML content cannot be empty."], "is_safe": False}
 
-        # 1. Fail-fast memory/CPU protection (MUST occur before parsing)
+        # 1. Fail-fast on >5MB before parsing
+        if len(html_content) > SpamGuard.MAX_HTML_SIZE:
+            raise ValueError("Payload exceeds absolute safety limits for static analysis.")
+
+        # 2. Fail-fast memory/CPU protection (MUST occur before parsing)
         byte_size = len(html_content.encode("utf-8"))
         byte_size_limit = 102400  # 100KB
 
@@ -650,7 +676,7 @@ class SpamGuard:
                 "is_safe": False,
             }
 
-        # 2. Safe to execute synchronous parsing
+        # 3. Safe to execute synchronous parsing
         parser = _SpamGuardParser()
         try:
             parser.feed(html_content)
@@ -700,12 +726,25 @@ class IdempotencyGuard:
 
         # Include attachment signatures to prevent false-positive deduplication
         if files:
-            # Files are stored as ("attachment", (filename, payload/stream, content_type))
-            file_signatures = [
-                f"{f_tuple[0]}_{f_tuple[1][0]}"
-                for f_tuple in files
-                if len(f_tuple) > 1 and len(f_tuple[1]) > 0
-            ]
+            file_signatures = []
+            for f_tuple in files:
+                if len(f_tuple) > 1 and f_tuple[1]:
+                    file_data = f_tuple[1]
+
+                    # Safely extract a signature without indexing IO streams
+                    if isinstance(file_data, tuple):
+                        sig = str(file_data[0])
+                    elif isinstance(file_data, str):
+                        sig = file_data  # Use the literal path string
+                    elif hasattr(file_data, "name"):
+                        sig = str(file_data.name)
+                    elif isinstance(file_data, (bytes, bytearray)):
+                        # Hash the first 512 bytes to guarantee unique idempotency keys for raw byte streams
+                        sig = hashlib.sha256(file_data[:512]).hexdigest()
+                    else:
+                        sig = str(id(file_data))  # Absolute fallback to memory address
+
+                    file_signatures.append(f"{f_tuple[0]}_{sig}")
             fingerprint_data["files"] = file_signatures
 
         serialized = json.dumps(fingerprint_data, sort_keys=True, default=str)

@@ -44,7 +44,12 @@ def build_path_from_keys(keys: Iterable[str]) -> str:
     if not keys:
         return ""
     keys_seq = keys if isinstance(keys, (list, tuple)) else list(keys)
-    return "".join(f"/{SecurityGuard.sanitize_path_segment(k)}" for k in keys_seq if k)
+    # Safely evaluate truthiness to prevent dropping `0` integer IDs
+    return "".join(
+        f"/{SecurityGuard.sanitize_path_segment(str(k))}"
+        for k in keys_seq
+        if k is not None and str(k).strip()
+    )
 
 
 @lru_cache(maxsize=32)

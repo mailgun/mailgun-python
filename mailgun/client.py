@@ -390,6 +390,17 @@ class AsyncClient(BaseClient):
         """
         await self.aclose()
 
+    def __del__(self) -> None:
+        """Safety net for unclosed sockets (CWE-400) if context managers are skipped."""
+        if self._httpx_client is not None and not self._httpx_client.is_closed:
+            warnings.warn(
+                f"Unclosed {self.__class__.__name__} detected. You must explicitly "
+                "call '.aclose()' or use the 'async with' context manager to prevent "
+                "socket and memory leaks.",
+                ResourceWarning,
+                stacklevel=2,
+            )
+
     async def ping(self) -> bool:
         """Perform a fast, low-overhead health check to verify API credentials.
 

@@ -32,9 +32,18 @@ class ChunkedStreamer:
 
     __slots__ = ("_file", "_file_path", "chunk_size")
 
-    def __init__(self, file_path: str | Path, chunk_size: int = CHUNK_SIZE) -> None:
+    def __init__(
+        self,
+        file_path: str | Path,
+        safe_base_dir: str | Path | None = None,
+        chunk_size: int = CHUNK_SIZE,
+    ) -> None:
         """Init chunked streamer."""
-        self._file_path = str(file_path)
+        # Provide a secure default base directory (e.g., current working directory) if None is passed
+        resolved_base_dir = safe_base_dir if safe_base_dir is not None else Path.cwd()
+        safe_path = SecurityGuard.validate_attachment_path(file_path, resolved_base_dir)
+
+        self._file_path = str(safe_path)
         self.chunk_size = chunk_size
         self._file: IO[bytes] | None = None
 
@@ -302,7 +311,7 @@ class MailgunMessageBuilder:
         if not content_type:
             content_type = "application/octet-stream"
 
-        streamer = ChunkedStreamer(path, chunk_size)
+        streamer = ChunkedStreamer(path, chunk_size=chunk_size)
 
         self._files.append(("attachment", (path.name, streamer, content_type)))
 
