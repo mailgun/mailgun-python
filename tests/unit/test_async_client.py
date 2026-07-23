@@ -1,6 +1,7 @@
 """Unit tests for mailgun.client (AsyncClient, AsyncEndpoint)."""
 
 import copy
+import gc
 from typing import Any
 
 from mailgun._httpx_compat import httpx as compat_httpx
@@ -359,7 +360,8 @@ class TestAsyncClient:
         client = AsyncClient(auth=("api", "key"))
         _ = client._client
         with pytest.warns(ResourceWarning, match="Unclosed AsyncClient detected"):
-            client.__del__()
+            client = None
+            gc.collect()
 
 
 class TestAsyncEndpoint:
