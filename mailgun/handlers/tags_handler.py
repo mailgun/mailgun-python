@@ -12,7 +12,7 @@ from mailgun.security import SecurityGuard
 
 
 def handle_tags(
-    url: Any,
+    url: dict[str, Any],
     domain: str | None,
     _method: str | None,
     **kwargs: Any,

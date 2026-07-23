@@ -3,7 +3,7 @@ from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Coroutine, cast
 
-import httpx
+from mailgun._httpx_compat import httpx
 import pytest
 import requests  # pyright: ignore[reportMissingModuleSource]
 import responses

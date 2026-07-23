@@ -2,7 +2,29 @@
 
 We [keep a changelog.](http://keepachangelog.com/)
 
-## [Unreleased]
+## [Unreleased] (v1.9.0)
+
+### Added
+
+- **IdempotencyGuard**: Implemented exactly-once email delivery mechanisms (SHA-256 fingerprinting) to prevent duplicate sends during network partitions.
+- **RetryPolicy**: Introduced a flexible retry configuration with stateless exponential backoff and jitter to mitigate the "Thundering Herd" effect.
+- **`httpx2` Compatibility**: Added native support for the modern `httpx2` engine via the `mailgun._httpx_compat.py` bridge, with graceful fallbacks.
+- **`mailgun.ext` Ecosystem**: Introduced strict Pydantic v2 payload schemas (e.g., `SendMessageSchema`).
+- **LocalSandbox Email Preview**: Standard routes now natively intercept email payloads when `dry_run=True` to generate local browser previews without executing network calls.
+- **ChunkedStreamer**: Added memory-safe lazy streaming for large file attachments (up to 25MB) using 512KB partitions.
+- **SpamGuard**: Added a zero-network static HTML analyzer to preemptively flag deliverability risks (XSS, missing alt tags) before dispatching to Mailgun.
+- **IDN Routing**: Implemented `normalize_domain` to natively convert Internationalized Domain Names to safe RFC 3490 Punycode.
+- Added `DeliverabilityError` exception to handle SpamGuard rule violations.
+
+### Changed
+
+- **[BREAKING CHANGE]** Dropped support for Python 3.10. The SDK now strictly requires Python 3.11 or higher.
+- Purged the `typing-extensions` dependency from the package, replacing it with standard library `typing` equivalents (`Self`, `TypedDict`, `NotRequired`).
+
+### Fixed
+
+- Fixed strict typing issues and circular import risks by routing response contracts (`MockResponse`) strictly through `mailgun/types.py`.
+- Updated GitHub Actions CI workflows to explicitly test against Python 3.14.
 
 ## v1.8.0 - 2026-07-20
 

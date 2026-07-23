@@ -2,18 +2,139 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
-import sys
+import mimetypes
+from contextlib import suppress
 from pathlib import Path
-from typing import Any
+from typing import IO, TYPE_CHECKING, Any, Self, Union
+
+from mailgun.security import IdempotencyGuard, SecurityGuard, SpamGuard, SpamReport
 
 
-if sys.version_info >= (3, 11):
-    from typing import Self
-else:
-    from typing_extensions import Self
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, Generator
 
-from mailgun.security import SecurityGuard
+
+CHUNK_SIZE: int = 512 * 1024  # 512KB
+
+# Defines the 3-tuple structure: (filename, payload, content_type)
+FileContent = Union[bytes, "ChunkedStreamer", IO[bytes]]
+FileTuple = tuple[str, FileContent, str]
+
+
+class ChunkedStreamer:
+    """Generator-based stream for safe attachment processing (CWE-400 Defense).
+
+    Lazily reads files in chunks to prevent Out-Of-Memory (OOM) crashes
+    when processing large attachments in memory-constrained environments
+    (like Serverless functions).
+    """
+
+    __slots__ = ("_file", "_file_path", "chunk_size")
+
+    def __init__(
+        self,
+        file_path: str | Path,
+        safe_base_dir: str | Path | None = None,
+        chunk_size: int = CHUNK_SIZE,
+    ) -> None:
+        """Init chunked streamer."""
+        # Provide a secure default base directory (e.g., current working directory) if None is passed
+        resolved_base_dir = safe_base_dir if safe_base_dir is not None else Path.cwd()
+        safe_path = SecurityGuard.validate_attachment_path(file_path, resolved_base_dir)
+
+        self._file_path = str(safe_path)
+        self.chunk_size = chunk_size
+        self._file: IO[bytes] | None = None
+
+    def read(self, size: int) -> bytes:
+        """File-like read method required by requests/httpx multipart encoders.
+
+        Args:
+            size: The maximum number of bytes to read.
+
+        Returns:
+            A byte string containing the read data.
+        """
+        if self._file is None:
+            self._file = Path(self._file_path).open("rb")  # noqa: SIM115
+
+        chunk = self._file.read(size)
+
+        # Auto-close the file descriptor as soon as EOF is reached.
+        # This guarantees teardown even if the HTTP library forgets to call .close().
+        if not chunk:
+            self.close()
+
+        return chunk
+
+    def __iter__(self) -> Generator[bytes, None, None]:
+        """Stream the file natively in chunks.
+
+        Yields:
+            Sequential byte chunks of the file payload.
+        """
+        try:
+            # Sync the iterator with the class-level _file descriptor
+            if self._file is None:
+                self._file = Path(self._file_path).open("rb")  # noqa: SIM115
+
+            while True:
+                chunk = self._file.read(self.chunk_size)
+                if not chunk:
+                    break
+                yield chunk
+        finally:
+            # The finally block executes if the generator exhausts
+            # naturally OR if a network error causes a GeneratorExit early.
+            self.close()
+
+    async def __aiter__(self) -> AsyncGenerator[bytes, None]:
+        """Safely stream chunks in an async context without blocking the event loop.
+
+        Yields:
+            Sequential byte chunks of the file payload.
+        """
+        try:
+            if self._file is None:
+                # Offload the blocking open() call to a thread pool
+                self._file = await asyncio.to_thread(Path(self._file_path).open, "rb")
+
+            while True:
+                # Offload the blocking read() call to a thread pool
+                chunk = await asyncio.to_thread(self._file.read, self.chunk_size)
+                if not chunk:
+                    break
+                yield chunk
+        finally:
+            self.close()
+
+    def close(self) -> None:
+        """Explicitly close the underlying file descriptor to prevent leaks.
+
+        This method is automatically called by requests/httpx after the
+        multipart payload has been fully transmitted.
+        """
+        file_obj = getattr(self, "_file", None)
+        if file_obj is not None:
+            with suppress(Exception):
+                file_obj.close()
+            self._file = None
+
+    def __del__(self) -> None:
+        """Safety net to prevent FD leaks if the object is garbage collected before being explicitly closed."""
+        with suppress(Exception):
+            self.close()
+
+    @property
+    def name(self) -> str:
+        """The file name to satisfy some HTTP library introspection checks.
+
+        Returns:
+            The base name of the file.
+        """
+        return Path(self._file_path).name
 
 
 class MailgunMessageBuilder:
@@ -26,7 +147,9 @@ class MailgunMessageBuilder:
     def __init__(self, from_email: str) -> None:
         """Initialize the builder with a sender email."""
         self._payload: dict[str, Any] = {"from": from_email, "to": []}
-        self._files: list[tuple[str, tuple[str, bytes]]] = []
+        self._files: list[tuple[str, FileTuple]] = []
+        self._idempotency_safe: bool = True  # Enabled dy default
+        self._domain: str = from_email.rsplit("@", maxsplit=1)[-1] if "@" in from_email else ""
 
     def add_recipient(self, email: str, recipient_type: str = "to") -> Self:
         """Add a recipient (to, cc, bcc).
@@ -57,6 +180,7 @@ class MailgunMessageBuilder:
         Returns:
             The builder instance.
         """
+        SecurityGuard.validate_no_control_characters(subject, "Subject")
         self._payload["subject"] = subject
         return self
 
@@ -118,6 +242,8 @@ class MailgunMessageBuilder:
         Returns:
             The builder instance.
         """
+        SecurityGuard.validate_no_control_characters(key, "Custom Header Key")
+        SecurityGuard.validate_no_control_characters(value, "Custom Header Value")
         self._payload[f"h:{key}"] = value
         return self
 
@@ -134,6 +260,9 @@ class MailgunMessageBuilder:
     def attach_file(self, file_path: str | Path, safe_base_dir: str | Path | None = None) -> Self:
         """Safely attach a file to the email, protected against Path Traversal and OOM.
 
+        Standard attachment upload (Reads entire file into memory).
+        Useful for small files (logos, receipts).
+
         Returns:
             The builder instance.
         """
@@ -146,14 +275,31 @@ class MailgunMessageBuilder:
         # 2. Apply CWE-400 Memory Guardrail (Fail-fast if > 25MB)
         SecurityGuard.check_file_size(path)
 
+        content_type, _ = mimetypes.guess_type(str(path))
+        if not content_type:
+            content_type = "application/octet-stream"
+
         # 3. Read into memory for the multipart payload
-        file_data = path.read_bytes()
-        self._files.append(("attachment", (path.name, file_data)))
+        file_bytes = path.read_bytes()
+        self._files.append(("attachment", (path.name, file_bytes, content_type)))
 
         return self
 
-    def attach_inline(self, file_path: str | Path, safe_base_dir: str | Path | None = None) -> Self:
-        """Safely attach an inline image/file, protected against Path Traversal and OOM.
+    def attach_stream(
+        self,
+        file_path: str | Path,
+        safe_base_dir: str | Path | None = None,
+        chunk_size: int = CHUNK_SIZE,
+    ) -> Self:
+        """Memory-safe streamed attachment upload (CWE-400 protection).
+
+        Uses ChunkedStreamer to lazily read the file. Highly recommended
+        for large PDFs, videos, or datasets (up to 25MB).
+
+        Args:
+            file_path: Path to the target file.
+            safe_base_dir: Guardrail directory to prevent Path Traversal.
+            chunk_size: Bytes to read per iteration (default 512KB).
 
         Returns:
             The builder instance.
@@ -161,10 +307,53 @@ class MailgunMessageBuilder:
         path = Path(file_path)
 
         if safe_base_dir:
-            path = SecurityGuard.validate_attachment_path(path, safe_base_dir)
+            SecurityGuard.validate_attachment_path(path, safe_base_dir)
+
         SecurityGuard.check_file_size(path)
 
-        self._files.append(("inline", (path.name, path.read_bytes())))
+        content_type, _ = mimetypes.guess_type(str(path))
+        if not content_type:
+            content_type = "application/octet-stream"
+
+        streamer = ChunkedStreamer(path, chunk_size=chunk_size)
+
+        self._files.append(("attachment", (path.name, streamer, content_type)))
+
+        return self
+
+    def attach_inline(
+        self, file_path: str | Path, cid: str | None = None, safe_base_dir: str | Path | None = None
+    ) -> Self:
+        """Safely prepare and map an inline image attachment with an explicit Content-ID.
+
+        This method instantly reads the file context into memory and terminates
+        the file handler to prevent descriptor leaks in high-concurrency runtimes.
+
+        Args:
+            file_path: The local absolute or relative path to the target image/file.
+            cid: Optional custom Content-ID alias. If omitted, the filename is used as the CID.
+            safe_base_dir: Guardrail path directory to insulate against Path Traversal (CWE-22).
+
+        Returns:
+            The builder instance for fluent call chaining.
+        """
+        path = Path(file_path)
+
+        if safe_base_dir:
+            SecurityGuard.validate_attachment_path(path, safe_base_dir)
+
+        SecurityGuard.check_file_size(path)
+
+        target_cid = cid or path.name
+
+        content_type, _ = mimetypes.guess_type(str(path))
+        if not content_type:
+            content_type = "application/octet-stream"
+
+        file_bytes = path.read_bytes()
+
+        self._files.append(("inline", (target_cid, file_bytes, content_type)))
+
         return self
 
     def set_template_version(self, version: str) -> Self:
@@ -206,13 +395,40 @@ class MailgunMessageBuilder:
         self._payload["recipient-variables"] = json.dumps(variables, separators=(",", ":"))
         return self
 
-    def build(self) -> tuple[dict[str, Any], list[tuple[str, tuple[str, bytes]]] | None]:
+    def check_deliverability(self) -> dict[str, float | list[str] | bool] | SpamReport:
+        """Performs a local, zero-network static analysis of the current HTML payload to detect common structural spam triggers.
+
+        Returns:
+            A dictionary containing a deliverability score and a list of identified issues.
+        """
+        html_payload = self._payload.get("html")
+        if not html_payload:
+            return {"score": 100.0, "issues": ["No HTML content to analyze."], "is_safe": True}
+
+        return SpamGuard.check_html(html_payload)
+
+    def set_idempotency_safe(self, *, enabled: bool) -> Self:
+        """Allows you to force-disable the automatic generation of the idempotency key.
+
+        Returns:
+            The builder instance.
+        """
+        self._idempotency_safe = enabled
+        return self
+
+    def build(self) -> tuple[dict[str, Any], list[tuple[str, FileTuple]] | None]:
         """Finalize the payload for the sync and async clients.
 
         Returns:
             A tuple containing the payload dictionary and the list of files to be attached.
         """
         final_payload = self._payload.copy()
+
+        if self._idempotency_safe and "h:X-Idempotency-Key" not in final_payload:
+            idempotency_key = IdempotencyGuard.generate_key(
+                self._domain, final_payload, self._files
+            )
+            final_payload["h:X-Idempotency-Key"] = idempotency_key
 
         for key in ["to", "cc", "bcc"]:
             if key in final_payload and isinstance(final_payload[key], list):

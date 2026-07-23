@@ -1,3 +1,6 @@
+import asyncio
+import time
+from unittest.mock import AsyncMock
 from urllib.parse import urlparse
 
 import pytest
@@ -38,3 +41,12 @@ def pytest_collection_modifyitems(
             for marker in list(item.iter_markers()):
                 if marker.name in ("skip", "skipif"):
                     item.own_markers.remove(marker)
+
+@pytest.fixture(autouse=True)
+def bypass_retry_delays(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Automatically speeds up test execution by blocking the actual delays
+    from 'time.sleep' and 'asyncio.sleep' triggered by our 'RetryPolicy'.
+    """
+    monkeypatch.setattr(time, "sleep", lambda delay: None)
+
+    monkeypatch.setattr(asyncio, "sleep", AsyncMock())

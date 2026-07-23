@@ -16,25 +16,19 @@ Classes:
 
 from __future__ import annotations
 
+import contextlib
 import ssl
-import sys
 import warnings
-from typing import TYPE_CHECKING, Any, Final
+from http import HTTPStatus
+from typing import TYPE_CHECKING, Any, Final, Self
 
-import httpx
 import requests  # pyright: ignore[reportMissingModuleSource]
-from urllib3.util.retry import Retry
 
+from mailgun._httpx_compat import httpx
 from mailgun.config import Config
 from mailgun.endpoints import AsyncEndpoint, BaseEndpoint, Endpoint
 from mailgun.filters import RedactingFilter
 from mailgun.security import SecretAuth, SecureHTTPAdapter, SecurityGuard
-
-
-if sys.version_info >= (3, 11):
-    from typing import Self
-else:
-    from typing_extensions import Self
 
 
 if TYPE_CHECKING:
@@ -88,7 +82,11 @@ class BaseClient:
             **kwargs: Additional configuration parameters, such as 'api_url'.
         """
         self.auth = SecurityGuard.validate_auth(auth)
-        self.config = Config(api_url=kwargs.get("api_url"))
+        self.config = Config(
+            api_url=kwargs.get("api_url"),
+            dry_run=kwargs.get("dry_run", False),
+            retry_policy=kwargs.get("retry_policy"),
+        )
 
         # DX Guardrail: Constructor Deprecation Interceptions
         if "api_version" in kwargs:
@@ -168,15 +166,8 @@ class Client(BaseClient):
             A configured requests.Session instance.
         """
         session = requests.Session()
-        retry_strategy = Retry(
-            total=3,
-            backoff_factor=1,
-            status_forcelist=[429, 500, 502, 503, 504],
-            allowed_methods=["GET", "OPTIONS", "HEAD"],
-        )
-        adapter = SecureHTTPAdapter(
-            max_retries=retry_strategy, pool_connections=100, pool_maxsize=100
-        )
+
+        adapter = SecureHTTPAdapter(pool_connections=100, pool_maxsize=100)
         session.mount("https://", adapter)
         session.mount("http://", adapter)
         return session
@@ -202,26 +193,33 @@ class Client(BaseClient):
 
         try:
             url, headers = self.config[name]
-            return Endpoint(
+            endpoint = Endpoint(
                 url=url,
                 headers=headers,
                 auth=self.auth,
                 session=self._session,
                 timeout=self.timeout,
+                dry_run=self.config.dry_run,
             )
+
         except KeyError:
             # __getattr__ must return AttributeError
             msg = f"'{self.__class__.__name__}' object has no attribute '{name}'"
             raise AttributeError(msg) from None
 
+        endpoint.retry_policy = getattr(self.config, "retry_policy", None)
+        return endpoint
+
     def close(self) -> None:
         """Close the underlying requests.Session connection pool and purge memory."""
-        if self._session:
+        # Safely fetch without triggering AttributeError on unbound slots
+        session = getattr(self, "_session", None)
+        if session:
             try:
                 # CWE-316: Clear session resources
-                self._session.auth = None
-                self._session.headers.clear()
-                self._session.close()
+                session.auth = None
+                session.headers.clear()
+                session.close()
             finally:
                 self._session = None
         self.auth = None
@@ -242,6 +240,39 @@ class Client(BaseClient):
     ) -> None:
         """Exit the synchronous context manager, ensuring connection pools are closed."""
         self.close()
+
+    def __del__(self) -> None:
+        """Emit a ResourceWarning if the client is garbage-collected without being closed."""
+        if getattr(self, "_session", None) is not None:
+            warnings.warn(
+                "Unclosed Client detected. Please use the client as a context manager or call client.close() explicitly.",
+                ResourceWarning,
+                stacklevel=2,
+            )
+            with contextlib.suppress(Exception):
+                self.close()
+
+    def ping(self) -> bool:
+        """Perform a fast, low-overhead health check to verify API credentials.
+
+        This checks network connectivity to the Mailgun infrastructure.
+        This method is fail-safe: it will never raise network exceptions or
+        authentication errors to the application layer. Instead, it returns a
+        clean boolean value, making it ideal for container readiness probes.
+
+        Returns:
+            bool: True if the connection succeeds and credentials are valid (HTTP 200),
+                  False on network timeouts, DNS drops, or invalid API keys.
+        """
+        try:
+            # Query the domains endpoint with a strict limit of 1
+            response = self.domains.get(filters={"limit": 1})
+        except Exception:  # noqa: BLE001 - Explicitly failing closed on readiness probe
+            return False
+        else:
+            if hasattr(response, "status_code"):
+                return bool(response.status_code == HTTPStatus.OK)
+            return False
 
 
 # ==============================================================================
@@ -291,16 +322,22 @@ class AsyncClient(BaseClient):
 
         try:
             url, headers = self.config[name]
-            return AsyncEndpoint(
+
+            endpoint = AsyncEndpoint(
                 url=url,
                 headers=headers,
                 auth=self.auth,
                 client=self._client,
                 timeout=self.timeout,
+                dry_run=self.config.dry_run,
             )
+
         except KeyError:
             msg = f"'{self.__class__.__name__}' object has no attribute '{name}'"
             raise AttributeError(msg) from None
+
+        endpoint.retry_policy = getattr(self.config, "retry_policy", None)
+        return endpoint
 
     @property
     def _client(self) -> httpx.AsyncClient:
@@ -364,3 +401,36 @@ class AsyncClient(BaseClient):
             exc_tb: The traceback associated with the exception.
         """
         await self.aclose()
+
+    def __del__(self) -> None:
+        """Safety net for unclosed sockets (CWE-400) if context managers are skipped."""
+        if self._httpx_client is not None and not self._httpx_client.is_closed:
+            warnings.warn(
+                f"Unclosed {self.__class__.__name__} detected. You must explicitly "
+                "call '.aclose()' or use the 'async with' context manager to prevent "
+                "socket and memory leaks.",
+                ResourceWarning,
+                stacklevel=2,
+            )
+
+    async def ping(self) -> bool:
+        """Perform a fast, low-overhead health check to verify API credentials.
+
+        This checks network connectivity to the Mailgun infrastructure.
+        This method is fail-safe: it will never raise network exceptions or
+        authentication errors to the application layer. Instead, it returns a
+        clean boolean value, making it ideal for container readiness probes.
+
+        Returns:
+            bool: True if the connection succeeds and credentials are valid (HTTP 200),
+                  False on network timeouts, DNS drops, or invalid API keys.
+        """
+        try:
+            # Query the domains endpoint with a strict limit of 1
+            response = await self.domains.get(filters={"limit": 1})
+        except Exception:  # noqa: BLE001 - Explicitly failing closed on readiness probe
+            return False
+        else:
+            if hasattr(response, "status_code"):
+                return bool(response.status_code == HTTPStatus.OK)
+            return False

@@ -37,3 +37,20 @@ class RouteNotFoundError(ApiError):
 
 class UploadError(ApiError):
     """Raised when the maximum message size is greater than 25 MB."""
+
+
+class DeliverabilityError(ApiError):
+    """Raised when SpamGuard detects critical structural flaws in the HTML payload that would severely penalize domain reputation or trigger spam filters."""
+
+    def __init__(self, score: float, issues: list[str]) -> None:
+        self.score = score
+        self.issues = issues
+
+        # Format a highly readable, bulleted message for the console
+        formatted_issues = "\n  - ".join(issues)
+        message = (
+            f"HTML Deliverability Check Failed (Score: {score}/100).\n"
+            f"The payload was blocked to protect your domain reputation. "
+            f"Please fix the following issues:\n  - {formatted_issues}"
+        )
+        super().__init__(message)

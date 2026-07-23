@@ -60,7 +60,7 @@ class TestEndpointCoreMechanics:
 
 class TestEndpointDryRun:
     def test_api_call_dry_run_intercepts_request(self) -> None:
-        """Ensure Sandbox mode prevents networking from executing."""
+        """Ensure dry_run mode intercepts email messages and returns a mock response."""
         url = {"base": f"{BASE_URL_V3}/", "keys": ["messages"]}
         ep = Endpoint(url=url, headers={}, auth=("api", "key"), dry_run=True)
         with patch.object(requests.Session, "request") as mock_req:
@@ -68,6 +68,19 @@ class TestEndpointDryRun:
 
             mock_req.assert_not_called()
             assert resp.status_code == 200
+            # The messages endpoint returns a standard dry run mock
+            assert "Dry run successful" in resp.json()["message"]
+
+    def test_api_call_dry_run_standard_route(self) -> None:
+        """Ensure standard routes fallback to the generic JSON mock."""
+        url = {"base": f"{BASE_URL_V3}/", "keys": ["domains"]}
+        ep = Endpoint(url=url, headers={}, auth=("api", "key"), dry_run=True)
+        with patch.object(requests.Session, "request") as mock_req:
+            resp = ep.get()
+
+            mock_req.assert_not_called()
+            assert resp.status_code == 200
+            # Standard routes still return the basic dry run message
             assert "Dry run successful" in resp.json()["message"]
 
     def test_api_call_dry_run_logs_interception(
@@ -83,6 +96,7 @@ class TestEndpointDryRun:
         )
 
     def test_async_api_call_dry_run_intercepts_request(self) -> None:
+        """Ensure Async dry_run mode intercepts email messages and returns a mock response."""
         url = {"base": f"{BASE_URL_V3}/", "keys": ["messages"]}
 
         mock_client = AsyncMock(spec=httpx.AsyncClient)
@@ -91,12 +105,30 @@ class TestEndpointDryRun:
         )
 
         async def run_test() -> None:
-            # We don't need to patch.object because ep uses mock_client natively now
             resp = await ep.create(
                 domain="test.com", data={"to": "test@example.com"}
             )
             mock_client.request.assert_not_called()
             assert resp.status_code == 200
+            # The messages endpoint returns a standard dry run mock
+            assert "Dry run successful" in resp.json()["message"]
+
+        asyncio.run(run_test())
+
+    def test_async_api_call_dry_run_standard_route(self) -> None:
+        """Ensure standard async routes fallback to the generic JSON mock."""
+        url = {"base": f"{BASE_URL_V3}/", "keys": ["domains"]}
+
+        mock_client = AsyncMock(spec=httpx.AsyncClient)
+        ep = AsyncEndpoint(
+            url=url, headers={}, auth=("api", "key"), dry_run=True, client=mock_client
+        )
+
+        async def run_test() -> None:
+            resp = await ep.get()
+            mock_client.request.assert_not_called()
+            assert resp.status_code == 200
+            # Standard routes still return the basic dry run message
             assert "Dry run successful" in resp.json()["message"]
 
         asyncio.run(run_test())

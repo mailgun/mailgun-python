@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from mailgun.builders import MailgunMessageBuilder, MailgunTemplateBuilder
+from mailgun.builders import MailgunMessageBuilder, MailgunTemplateBuilder, ChunkedStreamer
 
 
 class TestBuildersFailSafeMechanisms:
@@ -238,3 +238,27 @@ class TestMailgunTemplateBuilder:
         assert "name" not in payload
         assert payload["description"] == "Updated description"
         assert payload["active"] == "no"
+
+
+class TestChunkedStreamer:
+    """Verifies safe, memory-bounded lazy loading of file attachments."""
+
+    def test_chunked_streamer_reads_in_exact_bounds(self, tmp_path: Path) -> None:
+        """Verify the generator reads files explicitly at the configured chunk sizes."""
+        # Create a dummy 1KB file
+        test_file = tmp_path / "large_attachment.pdf"
+        test_file.write_bytes(b"X" * 1024)
+
+        # Configure the streamer with safe_base_dir set to tmp_path to read precisely 256 bytes at a time
+        streamer = ChunkedStreamer(test_file, safe_base_dir=tmp_path, chunk_size=256)
+        chunks = []
+        # Simulate the requests/httpx network transport calling .read()
+        while True:
+            chunk = streamer.read(256)
+            if not chunk:
+                break
+            chunks.append(chunk)
+
+        assert len(chunks) == 4
+        assert all(len(c) == 256 for c in chunks)
+        assert b"".join(chunks) == b"X" * 1024

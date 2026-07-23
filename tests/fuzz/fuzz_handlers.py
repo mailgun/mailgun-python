@@ -201,7 +201,8 @@ def TestOneInput(data: bytes) -> None:
                 f"CRASH: Handler {handler_name} returned non-string: {type(result)}"
             )
 
-    except (ApiError, AttributeError, KeyError, TypeError, ValueError):
+    # REMOVED: AttributeError, KeyError
+    except (ApiError, TypeError, ValueError):
         # SECURITY SUCCESS: Intercepted malformed path combinations
         pass
     except Exception as e:

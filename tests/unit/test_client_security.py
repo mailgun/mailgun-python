@@ -6,7 +6,7 @@ import sys
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import httpx
+from mailgun._httpx_compat import httpx as compat_httpx
 import pytest
 import requests
 
@@ -165,9 +165,9 @@ class TestSecurityGuardPathSegments:
 class TestSecurityGuardResourceExhaustion:
     """CWE-400 and file size limits."""
 
-    def test_infinite_timeout_emits_deprecation_warning(self) -> None:
-        with pytest.warns(DeprecationWarning, match="allows infinite socket blocking \\(CWE-400\\)"):
-            assert SecurityGuard.sanitize_timeout(None) is None
+    def test_infinite_timeout_raises_value_error(self) -> None:
+        with pytest.raises(ValueError, match="Infinite timeouts are forbidden"):
+            SecurityGuard.sanitize_timeout(None)
 
     def test_valid_timeout_passes_cleanly(self) -> None:
         assert SecurityGuard.sanitize_timeout((10.0, 60.0)) == (10.0, 60.0)
@@ -282,7 +282,7 @@ class TestTransportSecurity:
 
             # Ensure handle_async_request is an AsyncMock that returns a valid response
             mock_transport_instance.handle_async_request = AsyncMock(
-                return_value=httpx.Response(200)
+                return_value=compat_httpx.Response(200)
             )
 
             await client.domains.get()
@@ -309,13 +309,13 @@ class TestExceptionSafety:
         """Verify that when an async network failure occurs, the logger uses safe_url_for_log."""
         client = AsyncClient(auth=("api", "key"))
 
-        with patch("httpx.AsyncHTTPTransport") as mock_transport_class:
+        with patch("mailgun.client.httpx.AsyncHTTPTransport") as mock_transport_class:
             mock_transport_instance = AsyncMock()
             mock_transport_class.return_value = mock_transport_instance
 
             # Set the side_effect on the async handler
             mock_transport_instance.handle_async_request = AsyncMock(
-                side_effect=httpx.ConnectError("DNS failure")
+                side_effect=compat_httpx.ConnectError("DNS failure")
             )
 
             with pytest.raises(ApiError, match="Network routing failed"):

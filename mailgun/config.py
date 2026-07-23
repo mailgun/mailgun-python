@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import random
 import sys
-from enum import Enum
+from enum import StrEnum
 from functools import lru_cache
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Final
@@ -25,7 +26,7 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 
-@lru_cache
+@lru_cache(maxsize=256)
 def _get_cached_route_data(clean_key: str) -> dict[str, Any]:
     """Apply internal cached routing logic.
 
@@ -60,7 +61,7 @@ def _get_cached_route_data(clean_key: str) -> dict[str, Any]:
     return {"version": APIVersion.V3.value, "keys": tuple(route_parts)}
 
 
-class APIVersion(str, Enum):
+class APIVersion(StrEnum):
     """Constants for Mailgun API versions."""
 
     V1 = "v1"
@@ -70,13 +71,52 @@ class APIVersion(str, Enum):
     V5 = "v5"
 
 
+class RetryPolicy:
+    """Deterministic exponential backoff engine."""
+
+    __slots__ = ("base_delay", "max_delay", "max_retries", "respect_retry_after")
+
+    def __init__(
+        self,
+        max_retries: int = 3,
+        base_delay: float = 1.0,
+        max_delay: float = 10.0,
+        *,
+        respect_retry_after: bool = True,
+    ) -> None:
+        """Initialize the RetryPolicy engine.
+
+        Args:
+            max_retries: The maximum number of retry attempts.
+            base_delay: The base multiplier for exponential backoff in seconds.
+            max_delay: The absolute maximum delay cap in seconds.
+            respect_retry_after: Whether to parse and respect 429 Retry-After headers.
+        """
+        self.max_retries: Final = max_retries
+        self.base_delay: Final = base_delay
+        self.max_delay: Final = max_delay
+        self.respect_retry_after: Final = respect_retry_after
+
+    def calculate_delay(self, attempt: int) -> float:
+        """Calculates exponential backoff with random jitter to prevent collisions.
+
+        Args:
+            attempt: The current retry attempt number (0-indexed).
+
+        Returns:
+            A float representing the sleep delay in seconds before the next attempt.
+        """
+        backoff = min(self.max_delay, self.base_delay * (2**attempt))
+        return random.uniform(0, backoff)  # noqa: S311 - Randomness used for network jitter, not crypto.
+
+
 class Config:
     """Configuration engine for the Mailgun API client.
 
     Using a data-driven routing approach.
     """
 
-    __slots__ = ("_baked_urls", "api_url", "dry_run", "ex_handler")
+    __slots__ = ("_baked_urls", "api_url", "dry_run", "ex_handler", "retry_policy")
 
     DEFAULT_API_URL: Final[str] = "https://api.mailgun.net"
     USER_AGENT: Final[str] = f"mailgun-api-python/{__version__}"
@@ -102,7 +142,15 @@ class Config:
     _V3_ENDPOINTS: Final[frozenset[str]] = frozenset(routes.DOMAIN_ENDPOINTS["v3"])
     _V4_ENDPOINTS: Final[frozenset[str]] = frozenset(routes.DOMAIN_ENDPOINTS.get("v4", []))
 
-    def __init__(self, api_url: str | None = None, *, dry_run: bool = False) -> None:
+    _audit_hook_enabled: bool = False
+
+    def __init__(
+        self,
+        api_url: str | None = None,
+        *,
+        dry_run: bool = False,
+        retry_policy: RetryPolicy | None = None,
+    ) -> None:
         """Initialize the configuration engine.
 
         Args:
@@ -110,9 +158,11 @@ class Config:
             dry_run: Prevents network execution and intercepts requests locally.
         """
         self.ex_handler: bool = True
-        self.dry_run: bool = dry_run
-        base_url_input: str = api_url or self.DEFAULT_API_URL
 
+        self.dry_run: bool = dry_run
+        self.retry_policy: RetryPolicy = retry_policy or RetryPolicy()
+
+        base_url_input: str = api_url or self.DEFAULT_API_URL
         self.api_url: str = self._normalize_api_url(base_url_input)
 
         self._baked_urls: Final[dict[str, str]] = {
@@ -274,6 +324,8 @@ class Config:
         Enterprise security teams can enable this during SDK boot to gain instant
         visibility into API requests sent via the SDK without altering standard logs.
         """
+        if cls._audit_hook_enabled:
+            return
 
         def audit_hook(event: str, args: tuple[Any, ...]) -> None:
             if event == "mailgun.api.request":
@@ -281,4 +333,5 @@ class Config:
                 logger.info("SECURITY AUDIT: Outbound API call tracked - %s %s", method, url)
 
         sys.addaudithook(audit_hook)
+        cls._audit_hook_enabled = True
         logger.info("Mailgun Security Audit Hooks Enabled.")

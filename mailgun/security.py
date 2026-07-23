@@ -1,13 +1,15 @@
 import hashlib
 import hmac
+import json
 import math
 import re
 import ssl
 import sys
+import time
 import unicodedata
-import warnings
+from html.parser import HTMLParser
 from pathlib import Path
-from typing import Any, Final
+from typing import Any, Final, TypedDict
 from urllib.parse import quote, unquote, urlparse
 
 from requests.adapters import HTTPAdapter
@@ -40,13 +42,33 @@ class SecureHTTPAdapter(HTTPAdapter):
     Mitigates CWE-319.
     """
 
-    def init_poolmanager(self, *args: Any, **kwargs: Any) -> None:
-        """Initialize the pool manager with a secure TLS context."""
+    @staticmethod
+    def _get_secure_ssl_context() -> ssl.SSLContext:
+        """Create and return a hardened SSL context enforcing TLS 1.2+.
+
+        Returns:
+            ssl.SSLContext: A hardened SSL context.
+        """
         context = ssl.create_default_context()
         context.minimum_version = ssl.TLSVersion.TLSv1_2
-        kwargs["ssl_context"] = context
+        return context
+
+    def init_poolmanager(self, *args: Any, **kwargs: Any) -> None:
+        """Initialize the pool manager with a secure TLS context."""
+        kwargs["ssl_context"] = self._get_secure_ssl_context()
         # HTTPAdapter lacks strict static types for this internal method.
         super().init_poolmanager(*args, **kwargs)
+
+    def proxy_manager_for(self, proxy: str, **proxy_kwargs: Any) -> Any:
+        """Ensure proxy connections also strictly enforce TLS 1.2+.
+
+        Returns:
+            Any: The proxy manager instance.
+        """
+        # Inject our hardened SSL context into the proxy kwargs
+        proxy_kwargs["ssl_context"] = self._get_secure_ssl_context()
+        # Pass it up to the parent class to actually construct the ProxyManager
+        return super().proxy_manager_for(proxy, **proxy_kwargs)
 
 
 class SecretAuth(tuple):  # type: ignore[type-arg]
@@ -214,6 +236,7 @@ class SecurityGuard:
 
         Strict Creation-Time Timeout Constraints & Float Validation.
         Prevents thread pool exhaustion from infinite blocking (CWE-400).
+        Enforces a strict maximum boundary of 300 seconds.
 
         Args:
             timeout: The requested timeout value.
@@ -222,18 +245,18 @@ class SecurityGuard:
             The safely verified timeout value.
 
         Raises:
-            ValueError: If the timeout is a negative number, zero, non-finite,
-                or a tuple with an incorrect number of elements.
+            ValueError: If the timeout is None, negative, zero, non-finite,
+                exceeds 300 seconds, or a tuple with an incorrect number of elements.
         """
         if timeout is None:
-            # Soft Deprecation
-            warnings.warn(
-                "Passing 'timeout=None' allows infinite socket blocking (CWE-400). "
-                "This will be removed in a future major release. Please provide an explicit timeout.",
-                DeprecationWarning,
-                stacklevel=3,
+            msg = (
+                "Security Alert (CWE-400): Infinite timeouts are forbidden. Provide a finite value."
             )
-            return None
+            raise ValueError(msg)
+
+        # Extract values from httpx.Timeout object cleanly
+        if hasattr(timeout, "read") and hasattr(timeout, "connect"):
+            timeout = (getattr(timeout, "connect", 60.0), getattr(timeout, "read", 60.0))
 
         def _validate_float(val: Any) -> float:
             """Validate float value.
@@ -246,7 +269,7 @@ class SecurityGuard:
 
             Raises:
                 TypeError: If the timeout is not a numeric type.
-                ValueError: If the timeout is NaN, Infinity, or less than or equal to zero.
+                ValueError: If the timeout is NaN, Infinity, less than/equal to zero, or exceeds 300.
             """
             if isinstance(val, bool) or not isinstance(val, (int, float)):
                 msg = f"Timeout must be a numeric value, got {type(val).__name__}"
@@ -258,6 +281,11 @@ class SecurityGuard:
                 raise ValueError("Timeout must be a finite number.")
             if f_val <= 0:
                 raise ValueError("Timeout must be a strictly positive finite number.")
+            if f_val > 300.0:  # noqa: PLR2004
+                raise ValueError(
+                    "Security Alert: Timeout exceeds maximum allowed boundary of 300 seconds."
+                )
+
             return f_val
 
         if isinstance(timeout, tuple):
@@ -266,7 +294,7 @@ class SecurityGuard:
                 raise ValueError(
                     "Timeout must be a tuple containing exactly two elements: (connect, read)."
                 )
-            return (_validate_float(timeout[0]), _validate_float(timeout[1]))
+            return _validate_float(timeout[0]), _validate_float(timeout[1])
 
         return _validate_float(timeout)
 
@@ -424,24 +452,32 @@ class SecurityGuard:
 
         Raises:
             ValueError: If the resolved path escapes the safe base directory.
-            FileNotFoundError: If the file does not exist.
         """
-        target = Path(file_path).resolve()
-        base = Path(safe_base_dir).resolve()
+        original_path = str(file_path)
+        target_path = Path(file_path).resolve()
 
-        if not target.is_relative_to(base):
-            sys.audit("mailgun.security.path_traversal_attempt", str(target))
-            msg = (
-                f"Security Alert (CWE-22): Path traversal blocked. "
-                f"File {target} is outside of safe directory {base}."
-            )
+        if not target_path.exists() or not target_path.is_file():
+            msg = f"Security Alert: Invalid attachment path or not a file: {file_path}"
             raise ValueError(msg)
 
-        if not target.exists() or not target.is_file():
-            msg = f"Attachment not found or is not a file: {target}"
-            raise FileNotFoundError(msg)
+        if safe_base_dir:
+            base_path = Path(safe_base_dir).resolve()
+            if not target_path.is_relative_to(base_path):
+                raise ValueError("Security Alert (CWE-22): Path traversal attempt detected.")
+        else:
+            # Fallback zero-trust checks if no specific sandbox is provided
+            if ".." in original_path:
+                raise ValueError(
+                    "Security Alert (CWE-22): Path traversal tokens ('..') are explicitly forbidden."
+                )
 
-        return target
+            forbidden_roots = ("/etc", "/var", "/root", "/boot", "C:\\Windows", "C:\\System32")
+            if any(str(target_path).lower().startswith(root.lower()) for root in forbidden_roots):
+                raise ValueError(
+                    "Security Alert: Access to sensitive OS system directories is explicitly forbidden."
+                )
+
+        return target_path
 
     @staticmethod
     def check_file_size(file_path: str | Path, max_size_mb: int = 25) -> None:
@@ -454,7 +490,13 @@ class SecurityGuard:
             ValueError: If the file exceeds the maximum allowed size.
         """
         path = Path(file_path)
-        size_bytes = Path(path).stat().st_size
+
+        # MUST assert it's a regular file to reject infinite /dev/zero or FIFOs
+        if not path.is_file():
+            msg = f"Security Alert (CWE-400): Path is not a regular file: {path}"
+            raise ValueError(msg)
+
+        size_bytes = path.stat().st_size
         max_bytes = max_size_mb * 1024 * 1024
 
         if size_bytes > max_bytes:
@@ -477,45 +519,233 @@ class SecurityGuard:
         return _PATH_CONTROL_CHAR_RE.sub("_", safe_str)
 
     @staticmethod
-    def verify_webhook(signing_key: str, token: str, timestamp: str, signature: str) -> bool:
+    def verify_webhook(
+        signing_key: str | bytes,
+        token: str,
+        timestamp: str | int,
+        signature: str,
+        max_age_seconds: int = 300,
+    ) -> bool:
         """Cryptographically verify a Mailgun webhook signature.
 
-        Protects against CWE-347 (Improper Verification) and CWE-208 (Timing Attacks).
+        Protects against CWE-347 (Improper Verification), CWE-208 (Timing Attacks),
+        and CWE-294 (Capture-Replay Attacks).
 
         Args:
             signing_key: The Mailgun webhook signing key from the dashboard.
             token: The token provided in the webhook payload.
             timestamp: The timestamp provided in the webhook payload.
             signature: The signature provided in the webhook payload.
+            max_age_seconds: Maximum allowed age of the webhook in seconds.
 
         Returns:
-            True if the signature mathematically matches the payload, False otherwise.
+            True if the signature mathematically matches and is within TTL, False otherwise.
 
         Raises:
-            TypeError: If any of the signature components are not strictly strings.
-            ValueError: If the cryptographic payload is malformed or undecodable.
+            TypeError: If the signature components are invalid types.
         """
-        # 1. Type Guard: Prevent AttributeError if a developer or attacker
-        # passes None, an int, or a list instead of a string.
-        if (
-            not isinstance(signing_key, str)
-            or not isinstance(token, str)
-            or not isinstance(timestamp, str)
-            or not isinstance(signature, str)
-        ):
-            raise TypeError("Webhook signature components must be strictly strings.")
+        # 1. Type Guard: Prevent AttributeError and Type Confusion
+        if not isinstance(token, str) or not isinstance(signature, str):
+            raise TypeError("Security Alert: Webhook token and signature must be strings.")
+
+        if not isinstance(signing_key, (str, bytes)):
+            raise TypeError("Security Alert: Signing key must be a string or bytes.")
+
+        # 2. Extract integer for math, but DO NOT mutate the raw timestamp string
+        try:
+            ts_math = int(timestamp)
+        except (ValueError, TypeError) as e:
+            raise TypeError("Security Alert: Webhook timestamp must be a valid integer.") from e
+
+        # 3. TTL/Replay Attack Prevention (CWE-294)
+        if abs(time.time() - ts_math) > max_age_seconds:
+            logger.warning("Security Alert (CWE-294): Webhook timestamp expired.")
+            return False
+
+        # 4. Canonicalization: Encode securely
+        if isinstance(signing_key, str):
+            signing_key = signing_key.encode("utf-8")
+
+        # Hash the exact raw string representation, not the integer cast.
+        raw_timestamp = str(timestamp)
+        msg = f"{raw_timestamp}{token}".encode()
+
+        # 5. Cryptographic Hashing
+        expected_mac = hmac.new(key=signing_key, msg=msg, digestmod=hashlib.sha256).hexdigest()
+
+        # 6. Timing Attack Prevention (CWE-208): NEVER use '==' for crypto comparisons.
+        return hmac.compare_digest(expected_mac, signature)
+
+    @staticmethod
+    def normalize_domain(domain: str | None) -> str:
+        """Natively convert internationalized domain names (IDN) to Punycode (RFC 3490).
+
+        This prevents UnicodeEncodeError when HTTP clients (like requests/httpx)
+        attempt to route to or build URLs with non-ASCII domains (e.g., Cyrillic).
+
+        Args:
+            domain: The target domain name
+
+        Returns:
+            The ASCII-safe Punycode string
+
+        Raises:
+            ValueError: If invalid domain name encoding.
+        """
+        if not domain:
+            return ""
 
         try:
-            # 2. Canonicalization: Encode strings to bytes safely
-            msg = f"{timestamp}{token}".encode()
-            key = signing_key.encode("utf-8")
+            # Encode the Unicode string to IDNA bytes, then decode to an ASCII string.
+            # If the domain is already ASCII (e.g., 'example.com'), it remains unchanged.
+            return domain.encode("idna").decode("ascii")
+        except UnicodeError as e:
+            # Fallback or raise a clear validation error if the domain is completely malformed
+            msg = f"Invalid domain name encoding: {domain}"
+            raise ValueError(msg) from e
 
-            # 3. Cryptographic Hashing
-            expected_mac = hmac.new(key, msg, hashlib.sha256).hexdigest()
 
-            # 4. Timing Attack Prevention: NEVER use '==' for crypto comparisons.
-            return hmac.compare_digest(expected_mac, signature)
+class SpamReport(TypedDict):
+    """Schema for the local deliverability check report."""
 
-        except AttributeError as e:
-            # Fail-closed if underlying C-extensions reject malformed encodings
-            raise ValueError("Malformed cryptographic payload.") from e
+    score: float
+    issues: list[str]
+    is_safe: bool
+
+
+class _SpamGuardParser(HTMLParser):
+    """Internal lightning-fast HTML parser for detecting structural spam triggers."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.issues: list[str] = []
+        self.has_alt_tags = True
+        self.image_count = 0
+        self.has_scripts = False
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        attr_dict = dict(attrs)
+
+        if tag == "img":
+            self.image_count += 1
+            if "alt" not in attr_dict or not attr_dict["alt"]:
+                self.has_alt_tags = False
+
+        if tag == "script":
+            self.has_scripts = True
+            self.issues.append("CRITICAL: <script> tags are strictly forbidden in email clients.")
+
+
+class SpamGuard:
+    """Local static analyzer for email HTML templates."""
+
+    __slots__ = ()
+
+    MAX_HTML_SIZE: Final[int] = 5242880  # 5MB
+
+    @staticmethod
+    def check_html(html_content: str) -> SpamReport:
+        """Natively parse HTML and detect known spam/delivery triggers under 1ms.
+
+        This prevents obvious deliverability penalties without requiring network
+        requests to premium 3rd-party validation APIs.
+
+        Returns:
+            Dictionary with score, issues, and is_safe keys.
+
+        Raises:
+            ValueError: If the payload exceeds absolute safety limits for static analysis.
+        """
+        if not html_content or not html_content.strip():
+            return {"score": 0.0, "issues": ["HTML content cannot be empty."], "is_safe": False}
+
+        # 1. Fail-fast on >5MB before parsing
+        if len(html_content) > SpamGuard.MAX_HTML_SIZE:
+            raise ValueError("Payload exceeds absolute safety limits for static analysis.")
+
+        # 2. Fail-fast memory/CPU protection (MUST occur before parsing)
+        byte_size = len(html_content.encode("utf-8"))
+        byte_size_limit = 102400  # 100KB
+
+        if byte_size > byte_size_limit:
+            return {
+                "score": 0.0,
+                "issues": [
+                    f"Payload exceeds 100KB ({byte_size / 1024:.1f}KB). Validation aborted."
+                ],
+                "is_safe": False,
+            }
+
+        # 3. Safe to execute synchronous parsing
+        parser = _SpamGuardParser()
+        try:
+            parser.feed(html_content)
+        except Exception as e:  # noqa: BLE001
+            return {"score": 0.0, "issues": [f"Fatal HTML parsing error: {e}"], "is_safe": False}
+
+        issues = parser.issues
+        score = 100.0
+        safe_score = 80.0
+
+        if parser.image_count > 0 and not parser.has_alt_tags:
+            issues.append("Missing 'alt' attributes on images. This triggers spam filters.")
+            score -= 15.0
+
+        if parser.has_scripts:
+            score -= 50.0
+
+        score = max(0.0, score)
+
+        return {"score": score, "issues": issues, "is_safe": score >= safe_score}
+
+
+class IdempotencyGuard:
+    """Deterministic idempotency key generator for protection against duplicate requests."""
+
+    __slots__ = ()
+
+    @staticmethod
+    def generate_key(domain: str, payload: dict[str, Any], files: list[Any] | None = None) -> str:
+        """Generates a unique, collision-resistant SHA-256 fingerprint of the message payload.
+
+        Returns:
+            SHA-256 fingerprint.
+        """
+        # Filtering only core fields
+        fingerprint_data = {
+            "domain": domain,
+            "to": payload.get("to"),
+            "cc": payload.get("cc"),
+            "bcc": payload.get("bcc"),
+            "subject": payload.get("subject"),
+            "template": payload.get("template"),
+            "text": payload.get("text"),
+            "html": payload.get("html"),
+            "v_variables": {k: v for k, v in payload.items() if str(k).startswith("v:")},
+        }
+
+        # Include attachment signatures to prevent false-positive deduplication
+        if files:
+            file_signatures = []
+            for f_tuple in files:
+                if len(f_tuple) > 1 and f_tuple[1]:
+                    file_data = f_tuple[1]
+
+                    # Safely extract a signature without indexing IO streams
+                    if isinstance(file_data, tuple):
+                        sig = str(file_data[0])
+                    elif isinstance(file_data, str):
+                        sig = file_data  # Use the literal path string
+                    elif hasattr(file_data, "name"):
+                        sig = str(file_data.name)
+                    elif isinstance(file_data, (bytes, bytearray)):
+                        # Hash the first 512 bytes to guarantee unique idempotency keys for raw byte streams
+                        sig = hashlib.sha256(file_data[:512]).hexdigest()
+                    else:
+                        sig = str(id(file_data))  # Absolute fallback to memory address
+
+                    file_signatures.append(f"{f_tuple[0]}_{sig}")
+            fingerprint_data["files"] = file_signatures
+
+        serialized = json.dumps(fingerprint_data, sort_keys=True, default=str)
+        return hashlib.sha256(serialized.encode("utf-8")).hexdigest()

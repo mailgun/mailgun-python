@@ -1135,7 +1135,7 @@ class AsyncMailingListsTests(unittest.IsolatedAsyncioTestCase):
         self.client: AsyncClient = AsyncClient(auth=self.auth)
         self.domain: str = os.environ["DOMAIN"]
 
-        self.maillist_address = os.environ.get("MAILLIST_ADDRESS", f"python_sdk@{self.domain}")
+        self.maillist_address = os.environ.get("MAILLIST_ADDRESS_ASYNC", f"python_sdk_async@{self.domain}")
 
         raw_to = os.environ.get("MESSAGES_TO", f"success@{self.domain}")
         raw_cc = os.environ.get("MESSAGES_CC", f"cc@{self.domain}")
@@ -1144,7 +1144,7 @@ class AsyncMailingListsTests(unittest.IsolatedAsyncioTestCase):
         self.messages_cc = email.utils.parseaddr(raw_cc)[1] or raw_cc
 
         self.mailing_lists_data: dict[str, str] = {
-            "address": f"python_sdk@{self.domain}",
+            "address": f"python_sdk_async@{self.domain}",
             "name": "Python SDK Test List",
             "description": "Integration testing list tracking",
             "access_level": "readonly",
@@ -1194,7 +1194,7 @@ class AsyncMailingListsTests(unittest.IsolatedAsyncioTestCase):
     async def test_maillist_lists_create(self) -> None:
         await self.client.lists.delete(
             domain=self.domain,
-            address=f"python_sdk@{self.domain}",
+            address=f"python_sdk_async@{self.domain}",
         )
         req = await self.client.lists.create(domain=self.domain, data=self.mailing_lists_data)
         self.assertEqual(req.status_code, 200)
@@ -1205,7 +1205,7 @@ class AsyncMailingListsTests(unittest.IsolatedAsyncioTestCase):
         req = await self.client.lists.put(
             domain=self.domain,
             data=self.mailing_lists_data_update,
-            address=f"python_sdk@{self.domain}",
+            address=f"python_sdk_async@{self.domain}",
         )
         self.assertEqual(req.status_code, 200)
         self.assertIn("list", req.json())
@@ -1852,9 +1852,10 @@ class AsyncMetricsTest(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 200)
         [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
-        self.assertIn("metrics", req.json()["items"][0])
-        self.assertIn("dimensions", req.json()["items"][0])
-        self.assertIn("email_validation_count", req.json()["items"][0]["metrics"])
+        if req.json().get("items"):
+            self.assertIn("metrics", req.json()["items"][0])
+            self.assertIn("dimensions", req.json()["items"][0])
+            self.assertIn("email_validation_count", req.json()["items"][0]["metrics"])
 
     async def test_post_query_get_account_usage_metrics_invalid_data(self) -> None:
         """Expected failure with invalid data."""

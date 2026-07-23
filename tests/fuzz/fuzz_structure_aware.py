@@ -7,8 +7,10 @@ This fuzzer targets dynamic structural boundaries and state sequences.
 import asyncio
 import logging
 import sys
+from typing import Any
 
 import atheris
+from mailgun._httpx_compat import httpx as compat_httpx
 from mailgun.client import AsyncClient
 from mailgun.handlers.error_handler import ApiError
 from mailgun.security import SecurityGuard
@@ -20,6 +22,19 @@ logging.disable(logging.CRITICAL)
 # 2. Use a persistent event loop to avoid overhead and resource leaks
 _FUZZ_LOOP = asyncio.new_event_loop()
 asyncio.set_event_loop(_FUZZ_LOOP)
+
+# --- Inject Mock Transport to prevent live API DDOS ---
+class MockAsyncTransport(compat_httpx.AsyncBaseTransport):
+    async def handle_async_request(self, request: compat_httpx.Request) -> compat_httpx.Response:
+        return compat_httpx.Response(200, content=b'{"items": []}', request=request)
+
+original_init = compat_httpx.AsyncClient.__init__
+
+def secure_init(self: compat_httpx.AsyncClient, *args: Any, **kwargs: Any) -> None:
+    kwargs["transport"] = MockAsyncTransport()
+    original_init(self, *args, **kwargs)
+
+compat_httpx.AsyncClient.__init__ = secure_init  # type: ignore[method-assign]
 
 # 3. Instantiate a global client to prevent repeated initialization overhead
 _ASYNC_CLIENT = AsyncClient(auth=("api", "key"))

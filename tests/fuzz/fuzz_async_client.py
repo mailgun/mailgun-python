@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import atheris
-import httpx
+from mailgun._httpx_compat import httpx as compat_httpx
 
 from mailgun import routes
 from mailgun.client import AsyncClient
@@ -46,7 +46,7 @@ async def _async_fuzz_target(data: bytes) -> None:
         RuntimeError,
         TypeError,
         ValueError,
-        httpx.RequestError,
+        compat_httpx.RequestError,
     ):
         # Expected under fuzzed inputs: ignore and continue exploring execution paths.
         pass
@@ -58,23 +58,23 @@ def TestOneInput(data: bytes) -> None:
     _FUZZ_LOOP.run_until_complete(_async_fuzz_target(data))
 
 
-class MockAsyncTransport(httpx.AsyncBaseTransport):
-    _static_resp = httpx.Response(200, content=b"{}")
+class MockAsyncTransport(compat_httpx.AsyncBaseTransport):
+    _static_resp = compat_httpx.Response(200, content=b"{}")
 
-    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+    async def handle_async_request(self, request: compat_httpx.Request) -> compat_httpx.Response:
         return self._static_resp
 
 
-original_init = httpx.AsyncClient.__init__
+original_init = compat_httpx.AsyncClient.__init__
 
 
-def secure_init(self: httpx.AsyncClient, *args: Any, **kwargs: Any) -> None:
+def secure_init(self: compat_httpx.AsyncClient, *args: Any, **kwargs: Any) -> None:
     kwargs["transport"] = MockAsyncTransport()
     original_init(self, *args, **kwargs)
 
 
 if __name__ == "__main__":
-    httpx.AsyncClient.__init__ = secure_init  # type: ignore[method-assign]
+    compat_httpx.AsyncClient.__init__ = secure_init  # type: ignore[method-assign]
 
     if len(sys.argv) == 2 and os.path.isdir(sys.argv[1]):
         corpus_dir = Path(sys.argv[1])

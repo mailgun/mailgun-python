@@ -15,6 +15,9 @@ with atheris.instrument_imports():
     from mailgun.endpoints import Endpoint
     from mailgun.handlers.error_handler import ApiError
 
+
+_DEVNULL = sys.stderr
+
 logging.disable(logging.CRITICAL)
 
 
@@ -52,9 +55,7 @@ def TestOneInput(data: bytes) -> None:
 
             num_operations = fdp.ConsumeIntInRange(1, 15)
 
-            with Path(os.devnull).open("w") as devnull, contextlib.redirect_stdout(
-                devnull
-            ), contextlib.redirect_stderr(devnull):
+            with contextlib.redirect_stdout(_DEVNULL), contextlib.redirect_stderr(_DEVNULL):
                 for _ in range(num_operations):
                     op = fdp.ConsumeIntInRange(0, 3)
 

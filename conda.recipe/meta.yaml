@@ -16,7 +16,7 @@ source:
 
 build:
   number: 0
-  skip: True  # [py<310]
+  skip: True  # [py<311]
   script: {{ PYTHON }} -m pip install . --no-deps --no-build-isolation -vv
 
 requirements:
@@ -28,6 +28,7 @@ requirements:
     {% endfor %}
   run:
     - python
+    - httpx2 >=2.7.0
     - httpx >=0.24
     - requests >=2.33.0
     - typing-extensions >=4.7.1  # [py<311]
