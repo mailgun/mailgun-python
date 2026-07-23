@@ -104,3 +104,23 @@ class TestRedactingFilter:
         )
         assert filter_.filter(record) is True
         assert record.args == (200,)
+
+    def test_redacting_filter_max_recursion_depth(self) -> None:
+        """Verify that deeply nested structures exceeding MAX_REDACTION_DEPTH are safely truncated."""
+        from typing import Any
+
+        filter_ = RedactingFilter()
+        nested_dict: dict[str, Any] = {"key-secret": "val"}
+        for _ in range(6):
+            nested_dict = {"inner": nested_dict}
+
+        sanitized = filter_._deep_redact(nested_dict)
+
+        def find_redacted(obj: Any) -> bool:
+            if obj == "<MAX_DEPTH_REDACTED>":
+                return True
+            if isinstance(obj, dict):
+                return any(find_redacted(v) for v in obj.values())
+            return False
+
+        assert find_redacted(sanitized) is True

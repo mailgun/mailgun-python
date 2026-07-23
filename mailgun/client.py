@@ -16,6 +16,7 @@ Classes:
 
 from __future__ import annotations
 
+import contextlib
 import ssl
 import warnings
 from http import HTTPStatus
@@ -239,6 +240,17 @@ class Client(BaseClient):
     ) -> None:
         """Exit the synchronous context manager, ensuring connection pools are closed."""
         self.close()
+
+    def __del__(self) -> None:
+        """Emit a ResourceWarning if the client is garbage-collected without being closed."""
+        if getattr(self, "_session", None) is not None:
+            warnings.warn(
+                "Unclosed Client detected. Please use the client as a context manager or call client.close() explicitly.",
+                ResourceWarning,
+                stacklevel=2,
+            )
+            with contextlib.suppress(Exception):
+                self.close()
 
     def ping(self) -> bool:
         """Perform a fast, low-overhead health check to verify API credentials.

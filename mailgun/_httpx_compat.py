@@ -11,6 +11,8 @@ if TYPE_CHECKING:
     # For static analysis (Mypy/Pyright), we import from httpx since the APIs are identical
     import httpx
     from httpx import AsyncClient, HTTPError, Response, Timeout
+
+    HAS_HTTPX2: bool
 else:
     try:
         import httpx2 as httpx

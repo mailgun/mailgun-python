@@ -354,6 +354,13 @@ class TestAsyncClient:
 
         await client.aclose()
 
+    def test_async_client_unclosed_resource_warning(self) -> None:
+        """Verify that leaving an AsyncClient unclosed triggers a ResourceWarning upon deletion."""
+        client = AsyncClient(auth=("api", "key"))
+        _ = client._client
+        with pytest.warns(ResourceWarning, match="Unclosed AsyncClient detected"):
+            client.__del__()
+
 
 class TestAsyncEndpoint:
     @staticmethod

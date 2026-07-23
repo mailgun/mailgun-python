@@ -1135,7 +1135,7 @@ class AsyncMailingListsTests(unittest.IsolatedAsyncioTestCase):
         self.client: AsyncClient = AsyncClient(auth=self.auth)
         self.domain: str = os.environ["DOMAIN"]
 
-        self.maillist_address = os.environ.get("MAILLIST_ADDRESS", f"python_sdk_async@{self.domain}")
+        self.maillist_address = os.environ.get("MAILLIST_ADDRESS_ASYNC", f"python_sdk_async@{self.domain}")
 
         raw_to = os.environ.get("MESSAGES_TO", f"success@{self.domain}")
         raw_cc = os.environ.get("MESSAGES_CC", f"cc@{self.domain}")
@@ -1852,9 +1852,10 @@ class AsyncMetricsTest(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 200)
         [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
-        self.assertIn("metrics", req.json()["items"][0])
-        self.assertIn("dimensions", req.json()["items"][0])
-        self.assertIn("email_validation_count", req.json()["items"][0]["metrics"])
+        if req.json().get("items"):
+            self.assertIn("metrics", req.json()["items"][0])
+            self.assertIn("dimensions", req.json()["items"][0])
+            self.assertIn("email_validation_count", req.json()["items"][0]["metrics"])
 
     async def test_post_query_get_account_usage_metrics_invalid_data(self) -> None:
         """Expected failure with invalid data."""

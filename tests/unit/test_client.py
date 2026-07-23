@@ -57,6 +57,15 @@ class TestClientClosure:
         client.close()
         client.close()
 
+    def test_client_unclosed_resource_warning(self) -> None:
+        """Verify that leaving a Client unclosed triggers a ResourceWarning upon deletion."""
+        import gc
+        client = Client(auth=("api", "key"))
+        _ = client._session
+        with pytest.warns(ResourceWarning, match="Unclosed Client detected"):
+            del client
+            gc.collect()
+
 
 class TestClientContextManager:
     def test_client_context_manager(self) -> None:
