@@ -166,7 +166,7 @@ class TestSecurityGuardResourceExhaustion:
     """CWE-400 and file size limits."""
 
     def test_infinite_timeout_raises_value_error(self) -> None:
-        with pytest.raises(ValueError, match="prevent socket blocking \\(CWE-400\\)"):
+        with pytest.raises(ValueError, match="Infinite timeouts are forbidden"):
             SecurityGuard.sanitize_timeout(None)
 
     def test_valid_timeout_passes_cleanly(self) -> None:

@@ -249,9 +249,8 @@ class TestChunkedStreamer:
         test_file = tmp_path / "large_attachment.pdf"
         test_file.write_bytes(b"X" * 1024)
 
-        # Configure the streamer to read precisely 256 bytes at a time
-        streamer = ChunkedStreamer(test_file, chunk_size=256)
-
+        # Configure the streamer with safe_base_dir set to tmp_path to read precisely 256 bytes at a time
+        streamer = ChunkedStreamer(test_file, safe_base_dir=tmp_path, chunk_size=256)
         chunks = []
         # Simulate the requests/httpx network transport calling .read()
         while True:

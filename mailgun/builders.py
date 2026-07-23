@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import mimetypes
+from contextlib import suppress
 from pathlib import Path
 from typing import IO, TYPE_CHECKING, Any, Self, Union
 
@@ -115,13 +116,16 @@ class ChunkedStreamer:
         This method is automatically called by requests/httpx after the
         multipart payload has been fully transmitted.
         """
-        if self._file is not None:
-            self._file.close()
+        file_obj = getattr(self, "_file", None)
+        if file_obj is not None:
+            with suppress(Exception):
+                file_obj.close()
             self._file = None
 
     def __del__(self) -> None:
         """Safety net to prevent FD leaks if the object is garbage collected before being explicitly closed."""
-        self.close()
+        with suppress(Exception):
+            self.close()
 
     @property
     def name(self) -> str:
