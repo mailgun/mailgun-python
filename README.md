@@ -33,7 +33,6 @@ Check out all the resources and Python code examples in the official
     - [API Response Codes](#api-response-codes)
     - [IDE Autocompletion & DX](#ide-autocompletion--dx)
     - [Zero-Leak Development Mode](#zero-leak-development-mode)
-    - [Local Email Previews (LocalSandbox)](#local-email-previews-localsandbox)
     - [Strict Payload Schemas](#strict-payload-schemas)
     - [Strict Typed Schemas (mailgun.ext)](#strict-typed-schemas-mailgunext)
     - [Memory-Safe Attachments (ChunkedStreamer)](#memory-safe-attachments-chunkedstreamer)
@@ -265,7 +264,7 @@ import os
 from mailgun.client import Client
 
 client = Client(auth=("api", os.environ["APIKEY"]))
-client.messages.create(data={"to": "user@example.com"})
+client.messages.create(domain="your-domain.com", data={"to": "user@example.com"})
 ```
 
 > [!WARNING]
@@ -432,13 +431,12 @@ During local development and automated CI/CD test runs, you can instantiate the 
 import os
 from mailgun.client import Client
 
-# dry_run=True intercepts the network call and prevents actual delivery
-with Client(auth=("api", "key"), dry_run=True) as client:
+# dry_run=True intercepts the network call and prevents actual delivery.
+# Network requests will be skipped, returning a synthetic 200 OK MockResponse
+with Client(auth=("api", "API_KEY"), dry_run=True) as client:
     client.messages.create(
-        os.environ["DOMAIN"],
-        to="user@example.com",
-        subject="Safe Local Testing",
-        text="This email will be mocked and will not hit the live internet.",
+        domain=os.environ["DOMAIN"],
+        data={"from": "test@test.com", "to": "user@test.com"},
     )
 ```
 
@@ -448,43 +446,6 @@ Key Behaviors in `dry_run` Mode:
 - Security sanitization and path segment rules still execute.
 - Deprecation warnings will still be raised if you use an outdated endpoint.
 - `sys.audit` events and standard `logging` messages are still emitted, clearly marked with `DRY RUN: Intercepting request...`.
-
-### Local Email Previews (LocalSandbox)
-
-Combine `dry_run=True` with `LocalSandbox` to automatically write email payloads to local `.html` files and preview them instantly in your default browser without needing paid external tools:
-
-```python
-from mailgun.client import Client
-from mailgun.builders import MailgunMessageBuilder
-from mailgun.ext.sandbox import LocalSandbox
-
-# Intercepts the delivery and opens the rendered HTML in a new browser tab
-payload, _ = (
-    MailgunMessageBuilder("test@my-company.com")
-    .add_recipient("customer@gmail.com")
-    .set_subject("🎉 Your report is ready (Layout Test)")
-    .set_html("""
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto;">
-                <h2 style="color: #3B82F6;">Hello, this is a local test!</h2>
-                <p>This email never left your computer.</p>
-                <div style="padding: 20px; background: #F3F4F6; border-radius: 8px;">
-                    <strong>LocalSandbox</strong> is completely decoupled from the HTTP client.
-                </div>
-            </div>
-        """)
-    .build()
-)
-
-# 1. Preview the layout using the external sandbox explicitly
-sandbox = LocalSandbox(open_browser=True)
-sandbox.intercept_and_preview(payload)
-
-# 2. Safely verify the HTTP pipeline logic using standard dry_run
-with Client(auth=("api", "fake-key"), dry_run=True) as client:
-    response = client.messages.create(domain="my-company.com", data=payload)
-    print("\nSystem response (HTML Email):")
-    print(response.json())
-```
 
 ### Strict Payload Schemas
 
@@ -695,7 +656,7 @@ data = {
 }
 
 with Client(auth=("api", os.environ["APIKEY"])) as client:
-    req = client.messages.create(data=data)
+    req = client.messages.create(domain=os.environ["DOMAIN"], data=data)
 ```
 
 #### Send an email with advanced parameters (Tags, Testmode, STO)
@@ -718,7 +679,7 @@ data = {
 }
 
 with Client(auth=("api", os.environ["APIKEY"])) as client:
-    req = client.messages.create(data=data)
+    req = client.messages.create(domain=os.environ["DOMAIN"], data=data)
 ```
 
 #### Send an email with attachments
@@ -733,7 +694,7 @@ from mailgun import Client
 with Client(auth=("api", os.environ["APIKEY"])) as client:
     files = [("attachment", ("report.pdf", Path("report.pdf").read_bytes()))]
     # Assuming `data` is predefined like in the previous example
-    req = client.messages.create(data=data, files=files)
+    req = client.messages.create(domain=os.environ["DOMAIN"], data=data, files=files)
 ```
 
 #### Send a scheduled message
@@ -892,15 +853,15 @@ def get_dkim_keys() -> None:
     GET /v1/dkim/keys
     :return:
     """
-    data = {
+    query = {
         "page": "string",
         "limit": "0",
-        "signing_domain": "python.test.domain5",
+        "signing_domain": os.environ["DOMAIN"],
         "selector": "smtp",
     }
 
     with Client(auth=("api", os.environ["APIKEY"])) as client:
-        request = client.dkim_keys.get(data=data)
+        request = client.dkim_keys.get(filters=query)
         print(request.json())
 ```
 
@@ -951,10 +912,8 @@ def post_dkim_keys() -> None:
         "pem": files,
     }
 
-    headers = {"Content-Type": "multipart/form-data"}
-
     with Client(auth=("api", os.environ["APIKEY"])) as client:
-        request = client.dkim_keys.create(data=data, headers=headers, files=files)
+        request = client.dkim_keys.create(data=data, files=files)
         print(request.json())
 ```
 
@@ -1016,7 +975,7 @@ data = {
 }
 
 with Client(auth=("api", os.environ["APIKEY"])) as client:
-    req = client.domains_webhooks.create(data=data)
+    client.domains_webhooks.create(domain=os.environ["DOMAIN"], data=data)
 ```
 
 #### Get all webhooks
@@ -1026,7 +985,7 @@ import os
 from mailgun import Client
 
 with Client(auth=("api", os.environ["APIKEY"])) as client:
-    req = client.domains_webhooks.get()
+    client.domains_webhooks.get(domain=os.environ["DOMAIN"])
 ```
 
 #### Create Account-Level Webhooks (v1)
@@ -1462,7 +1421,7 @@ data = {
 }
 
 with Client(auth=("api", os.environ["APIKEY"])) as client:
-    req = client.routes.create(domain=domain, data=data)
+    req = client.routes.create(data=data)
     print(req.json())
 ```
 
@@ -1518,7 +1477,7 @@ from mailgun import Client
 domain: str = os.environ["DOMAIN"]
 
 with Client(auth=("api", os.environ["APIKEY"])) as client:
-    req = client.lists.delete(domain=domain, address=f"python_sdk2@{domain}")
+    req = client.lists.delete(address=f"python_sdk2@{domain}")
     print(req.json())
 ```
 
@@ -1794,7 +1753,7 @@ data = {"address": "test2@gmail.com"}
 params = {"provider_lookup": "false"}
 
 with Client(auth=("api", os.environ["APIKEY"])) as client:
-    req = client.addressvalidate.create(domain=domain, data=data, filters=params)
+    req = client.addressvalidate.create(data=data, filters=params)
     print(req.json())
 ```
 
