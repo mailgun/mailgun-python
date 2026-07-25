@@ -13,45 +13,45 @@ from mailgun.client import AsyncClient, Client
 # ==============================================================================
 
 
-def delete_route_sync(api_key: str, domain: str, route_id: str) -> None:
+def delete_route_sync(api_key: str, route_id: str) -> None:
     """
     DELETE /routes/<id>
     :return: None
     """
     with Client(auth=("api", api_key)) as client:
-        response = client.routes.delete(domain=domain, route_id=route_id)
+        response = client.routes.delete(route_id=route_id)
         print("DELETE Route (Sync):", response.json())
 
 
-def get_route_by_id_sync(api_key: str, domain: str, route_id: str) -> None:
+def get_route_by_id_sync(api_key: str, route_id: str) -> None:
     """
     GET /routes/<id>
     :return: None
     """
     with Client(auth=("api", api_key)) as client:
-        response = client.routes.get(domain=domain, route_id=route_id)
+        response = client.routes.get(route_id=route_id)
         print("GET Route By ID (Sync):", response.json())
 
 
-def get_routes_match_sync(api_key: str, domain: str, sender: str) -> None:
+def get_routes_match_sync(api_key: str, sender: str) -> None:
     """
     GET /routes/match
     :return: None
     """
     filters: dict[str, str] = {"address": sender}
     with Client(auth=("api", api_key)) as client:
-        response = client.routes_match.get(domain=domain, filters=filters)
+        response = client.routes_match.get(filters=filters)
         print("GET Routes Match (Sync):", response.json())
 
 
-def get_routes_sync(api_key: str, domain: str) -> None:
+def get_routes_sync(api_key: str) -> None:
     """
     GET /routes
     :return: None
     """
     filters: dict[str, int] = {"skip": 0, "limit": 1}
     with Client(auth=("api", api_key)) as client:
-        response = client.routes.get(domain=domain, filters=filters)
+        response = client.routes.get(filters=filters)
         print("GET Routes (Sync):", response.json())
 
 
@@ -67,7 +67,7 @@ def post_routes_sync(api_key: str, domain: str) -> None:
         "action": ["forward('http://myhost.com/messages/')", "stop()"],
     }
     with Client(auth=("api", api_key)) as client:
-        response = client.routes.create(domain=domain, data=data)
+        response = client.routes.create(data=data)
         print("POST Routes (Sync):", response.json())
 
 
@@ -83,7 +83,7 @@ def put_route_sync(api_key: str, domain: str, route_id: str) -> None:
         "action": ["forward('http://myhost.com/messages/')", "stop()"],
     }
     with Client(auth=("api", api_key)) as client:
-        response = client.routes.put(domain=domain, data=data, route_id=route_id)
+        response = client.routes.put(data=data, route_id=route_id)
         print("PUT Route (Sync):", response.json())
 
 
@@ -92,45 +92,45 @@ def put_route_sync(api_key: str, domain: str, route_id: str) -> None:
 # ==============================================================================
 
 
-async def delete_route_async(api_key: str, domain: str, route_id: str) -> None:
+async def delete_route_async(api_key: str, route_id: str) -> None:
     """
     DELETE /routes/<id> (Asynchronous)
     :return: None
     """
     async with AsyncClient(auth=("api", api_key)) as client:
-        response = await client.routes.delete(domain=domain, route_id=route_id)
+        response = await client.routes.delete(route_id=route_id)
         print("DELETE Route (Async):", response.json())
 
 
-async def get_route_by_id_async(api_key: str, domain: str, route_id: str) -> None:
+async def get_route_by_id_async(api_key: str, route_id: str) -> None:
     """
     GET /routes/<id> (Asynchronous)
     :return: None
     """
     async with AsyncClient(auth=("api", api_key)) as client:
-        response = await client.routes.get(domain=domain, route_id=route_id)
+        response = await client.routes.get(route_id=route_id)
         print("GET Route By ID (Async):", response.json())
 
 
-async def get_routes_async(api_key: str, domain: str) -> None:
+async def get_routes_async(api_key: str) -> None:
     """
     GET /routes (Asynchronous)
     :return: None
     """
     filters: dict[str, int] = {"skip": 0, "limit": 1}
     async with AsyncClient(auth=("api", api_key)) as client:
-        response = await client.routes.get(domain=domain, filters=filters)
+        response = await client.routes.get(filters=filters)
         print("GET Routes (Async):", response.json())
 
 
-async def get_routes_match_async(api_key: str, domain: str, sender: str) -> None:
+async def get_routes_match_async(api_key: str, sender: str) -> None:
     """
     GET /routes/match (Asynchronous)
     :return: None
     """
     filters: dict[str, str] = {"address": sender}
     async with AsyncClient(auth=("api", api_key)) as client:
-        response = await client.routes_match.get(domain=domain, filters=filters)
+        response = await client.routes_match.get(filters=filters)
         print("GET Routes Match (Async):", response.json())
 
 
@@ -146,7 +146,7 @@ async def post_routes_async(api_key: str, domain: str) -> None:
         "action": ["forward('http://myhost.com/messages/')", "stop()"],
     }
     async with AsyncClient(auth=("api", api_key)) as client:
-        response = await client.routes.create(domain=domain, data=data)
+        response = await client.routes.create(data=data)
         print("POST Routes (Async):", response.json())
 
 
@@ -162,7 +162,7 @@ async def put_route_async(api_key: str, domain: str, route_id: str) -> None:
         "action": ["forward('http://myhost.com/messages/')", "stop()"],
     }
     async with AsyncClient(auth=("api", api_key)) as client:
-        response = await client.routes.put(domain=domain, data=data, route_id=route_id)
+        response = await client.routes.put(data=data, route_id=route_id)
         print("PUT Route (Async):", response.json())
 
 
@@ -183,6 +183,6 @@ if __name__ == "__main__":
         print("Please set the 'APIKEY' and 'DOMAIN' environment variables to run examples.")
     else:
         print("--- Running Synchronous Examples ---")
-        get_routes_match_sync(api_key=API_KEY, domain=DOMAIN, sender=SENDER)
-        # get_routes_sync(api_key=API_KEY, domain=DOMAIN)
-        # get_route_by_id_sync(api_key
+        get_routes_match_sync(api_key=API_KEY, sender=SENDER)
+        # get_routes_sync(api_key=API_KEY)
+        # get_route_by_id_sync(api_key=API_KEY)

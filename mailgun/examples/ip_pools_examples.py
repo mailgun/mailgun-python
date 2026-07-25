@@ -14,17 +14,17 @@ from mailgun.client import AsyncClient, Client
 # ==============================================================================
 
 
-def get_ippools_sync(api_key: str, domain: str) -> None:
+def get_ippools_sync(api_key: str) -> None:
     """
     GET /v1/ip_pools
     :return: None
     """
     with Client(auth=("api", api_key)) as client:
-        response = client.ippools.get(domain=domain)
+        response = client.ippools.get()
         print("GET IP Pools (Sync):", response.json())
 
 
-def create_ippool_sync(api_key: str, domain: str) -> None:
+def create_ippool_sync(api_key: str) -> None:
     """
     POST /v1/ip_pools
     :return: None
@@ -35,11 +35,11 @@ def create_ippool_sync(api_key: str, domain: str) -> None:
         "ips": ["1.2.3.4"],
     }
     with Client(auth=("api", api_key)) as client:
-        response = client.ippools.create(domain=domain, data=post_data)
+        response = client.ippools.create(data=post_data)
         print("POST Create IP Pool (Sync):", response.json())
 
 
-def update_ippool_sync(api_key: str, domain: str, pool_id: str) -> None:
+def update_ippool_sync(api_key: str, pool_id: str) -> None:
     """
     PATCH /v1/ip_pools/{pool_id}
     :return: None
@@ -49,17 +49,17 @@ def update_ippool_sync(api_key: str, domain: str, pool_id: str) -> None:
         "description": "Test3",
     }
     with Client(auth=("api", api_key)) as client:
-        response = client.ippools.patch(domain=domain, data=data, pool_id=pool_id)
+        response = client.ippools.patch(data=data, pool_id=pool_id)
         print("PATCH Update IP Pool (Sync):", response.json())
 
 
-def delete_ippool_sync(api_key: str, domain: str, pool_id: str) -> None:
+def delete_ippool_sync(api_key: str, pool_id: str) -> None:
     """
     DELETE /v1/ip_pools/{pool_id}
     :return: None
     """
     with Client(auth=("api", api_key)) as client:
-        response = client.ippools.delete(domain=domain, pool_id=pool_id)
+        response = client.ippools.delete(pool_id=pool_id)
         print("DELETE IP Pool (Sync):", response.json())
 
 

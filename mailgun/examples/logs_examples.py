@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 from typing import Any
 
@@ -40,7 +41,8 @@ def post_analytics_logs_sync(api_key: str, domain: str) -> None:
     }
 
     with Client(auth=("api", api_key)) as client:
-        response = client.analytics_logs.create(data=data)
+        headers = {"Content-Type": "application/json"}
+        response = client.analytics_logs.create(data=json.dumps(data), headers=headers)
         print("POST Analytics Logs (Sync):", response.json())
 
 
@@ -75,7 +77,8 @@ async def post_analytics_logs_async(api_key: str, domain: str) -> None:
     }
 
     async with AsyncClient(auth=("api", api_key)) as client:
-        response = await client.analytics_logs.create(data=data)
+        headers = {"Content-Type": "application/json"}
+        response = await client.analytics_logs.create(data=json.dumps(data), headers=headers)
         print("POST Analytics Logs (Async):", response.json())
 
 

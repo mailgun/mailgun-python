@@ -13,24 +13,24 @@ from mailgun.client import AsyncClient, Client
 # ==============================================================================
 
 
-def get_ips_sync(api_key: str, domain: str) -> None:
+def get_ips_sync(api_key: str) -> None:
     """
     GET /ips
     :return: None
     """
     filters: dict[str, str] = {"dedicated": "true"}
     with Client(auth=("api", api_key)) as client:
-        response = client.ips.get(domain=domain, filters=filters)
+        response = client.ips.get(filters=filters)
         print("GET IPs (Sync):", response.json())
 
 
-def get_single_ip_sync(api_key: str, domain: str, target_ip: str) -> None:
+def get_single_ip_sync(api_key: str, target_ip: str) -> None:
     """
     GET /ips/<ip>
     :return: None
     """
     with Client(auth=("api", api_key)) as client:
-        response = client.ips.get(domain=domain, ip=target_ip)
+        response = client.ips.get(ip=target_ip)
         print("GET Single IP (Sync):", response.json())
 
 
@@ -75,24 +75,24 @@ def delete_domain_ip_sync(api_key: str, domain: str, target_ip: str) -> None:
 # ==============================================================================
 
 
-async def get_ips_async(api_key: str, domain: str) -> None:
+async def get_ips_async(api_key: str) -> None:
     """
     GET /ips (Asynchronous)
     :return: None
     """
     filters: dict[str, str] = {"dedicated": "true"}
     async with AsyncClient(auth=("api", api_key)) as client:
-        response = await client.ips.get(domain=domain, filters=filters)
+        response = await client.ips.get(filters=filters)
         print("GET IPs (Async):", response.json())
 
 
-async def get_single_ip_async(api_key: str, domain: str, target_ip: str) -> None:
+async def get_single_ip_async(api_key: str, target_ip: str) -> None:
     """
     GET /ips/<ip> (Asynchronous)
     :return: None
     """
     async with AsyncClient(auth=("api", api_key)) as client:
-        response = await client.ips.get(domain=domain, ip=target_ip)
+        response = await client.ips.get(ip=target_ip)
         print("GET Single IP (Async):", response.json())
 
 
@@ -148,15 +148,15 @@ if __name__ == "__main__":
         print("Please set the 'APIKEY' and 'DOMAIN' environment variables to run examples.")
     else:
         print("--- Running Synchronous Examples ---")
-        get_ips_sync(api_key=API_KEY, domain=DOMAIN)
-        # get_single_ip_sync(api_key=API_KEY, domain=DOMAIN, target_ip=TARGET_IP)
+        get_ips_sync(api_key=API_KEY)
+        # get_single_ip_sync(api_key=API_KEY, target_ip=TARGET_IP)
         # get_domain_ips_sync(api_key=API_KEY, domain=DOMAIN)
         # post_domains_ip_sync(api_key=API_KEY, domain=DOMAIN, target_ip=TARGET_IP)
         # delete_domain_ip_sync(api_key=API_KEY, domain=DOMAIN, target_ip=TARGET_IP)
 
         print("\n--- Running Asynchronous Examples ---")
-        asyncio.run(get_ips_async(api_key=API_KEY, domain=DOMAIN))
-        # asyncio.run(get_single_ip_async(api_key=API_KEY, domain=DOMAIN, target_ip=TARGET_IP))
+        asyncio.run(get_ips_async(api_key=API_KEY))
+        # asyncio.run(get_single_ip_async(api_key=API_KEY, target_ip=TARGET_IP))
         # asyncio.run(get_domain_ips_async(api_key=API_KEY, domain=DOMAIN))
         # asyncio.run(post_domains_ip_async(api_key=API_KEY, domain=DOMAIN, target_ip=TARGET_IP))
         # asyncio.run(delete_domain_ip_async(api_key=API_KEY, domain=DOMAIN, target_ip=TARGET_IP))

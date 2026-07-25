@@ -19,7 +19,7 @@ def delete_list_sync(api_key: str, domain: str, list_address: str) -> None:
     :return: None
     """
     with Client(auth=("api", api_key)) as client:
-        response = client.lists.delete(domain=domain, address=list_address)
+        response = client.lists.delete(address=list_address)
         print("DELETE List (Sync):", response.json())
 
 
@@ -29,7 +29,7 @@ def get_list_pages_sync(api_key: str, domain: str) -> None:
     :return: None
     """
     with Client(auth=("api", api_key)) as client:
-        response = client.lists_pages.get(domain=domain)
+        response = client.lists_pages.get()
         print("GET List Pages (Sync):", response.json())
 
 

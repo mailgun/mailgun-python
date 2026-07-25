@@ -22,7 +22,7 @@ def delete_analytics_tags_sync(api_key: str, tag_name: str) -> None:
     """
     data: dict[str, str] = {"tag": tag_name}
     with Client(auth=("api", api_key)) as client:
-        response = client.analytics_tags.delete(data=data)
+        response = client.analytics_tags.delete(filters=data)
         print("DELETE Analytics Tags (Sync):", response.json())
 
 
