@@ -400,15 +400,18 @@ class Endpoint(BaseEndpoint):
 
         SecurityGuard.validate_no_control_characters(target_url, context="Endpoint URL")
 
-        # --- DRY RUN INTERCEPTOR (Zero-Leak Sandbox Mode) ---
+        # --- DRY RUN INTERCEPTOR (SYNC) ---
         if self.dry_run:
             logger.info(
-                "DRY RUN: Intercepting %s request to %s", safe_method.upper(), safe_url_for_log
+                "DRY RUN: Intercepting sync %s request to %s",
+                safe_method.upper(),
+                safe_url_for_log,
             )
             mock_resp = Response()
             mock_resp.status_code = HTTPStatus.OK
-            mock_resp.encoding = "utf-8"
             mock_resp._content = b'{"message": "Dry run successful - request intercepted", "id": "<dry-run-mock-id>"}'  # noqa: SLF001
+            mock_resp.encoding = "utf-8"
+            mock_resp.url = target_url
             return mock_resp
 
         # Ensure protocol consistency: HTTP libraries MUST generate their own multipart boundaries

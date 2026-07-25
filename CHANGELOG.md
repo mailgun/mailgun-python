@@ -10,7 +10,6 @@ We [keep a changelog.](http://keepachangelog.com/)
 - **RetryPolicy**: Introduced a flexible retry configuration with stateless exponential backoff and jitter to mitigate the "Thundering Herd" effect.
 - **`httpx2` Compatibility**: Added native support for the modern `httpx2` engine via the `mailgun._httpx_compat.py` bridge, with graceful fallbacks.
 - **`mailgun.ext` Ecosystem**: Introduced strict Pydantic v2 payload schemas (e.g., `SendMessageSchema`).
-- **LocalSandbox Email Preview**: Standard routes now natively intercept email payloads when `dry_run=True` to generate local browser previews without executing network calls.
 - **ChunkedStreamer**: Added memory-safe lazy streaming for large file attachments (up to 25MB) using 512KB partitions.
 - **SpamGuard**: Added a zero-network static HTML analyzer to preemptively flag deliverability risks (XSS, missing alt tags) before dispatching to Mailgun.
 - **IDN Routing**: Implemented `normalize_domain` to natively convert Internationalized Domain Names to safe RFC 3490 Punycode.

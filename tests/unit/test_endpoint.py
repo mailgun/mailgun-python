@@ -133,6 +133,7 @@ class TestEndpointDryRun:
 
         asyncio.run(run_test())
 
+
 class TestEndpointEdgeCases:
     def test_build_path_from_keys_empty_and_iterables(self) -> None:
         assert build_path_from_keys([]) == ""
