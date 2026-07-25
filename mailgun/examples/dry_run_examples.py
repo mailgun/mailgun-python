@@ -1,5 +1,5 @@
 import logging
-from mailgun.client import Client, AsyncClient
+from mailgun.client import Client
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
