@@ -339,6 +339,7 @@ To enable detailed logging in your application, configure the logger before init
 
 ```python
 import logging
+import os
 from mailgun import Client
 
 # Enable DEBUG level for the Mailgun SDK logger
@@ -351,7 +352,7 @@ logging.basicConfig(format="%(levelname)s - %(name)s - %(message)s")
 with Client(auth=("api", "key-super-secret-12345")) as client:
     # API keys will be redacted:
     # "Sending request to https://api.mailgun.net/v3/messages with auth ('api', 'key-[REDACTED]')"
-    client.domains.get()
+    client.domains.get(domain=os.environ["DOMAIN"])
 ```
 
 ### Timeout Configuration
@@ -361,12 +362,13 @@ By default, the SDK relies on the underlying HTTP client's standard timeouts. To
 Timeouts can be passed as a single `float` (seconds for both connect and read) or a tuple (connect_timeout, read_timeout):
 
 ```python
+import os
 from mailgun import Client
 
 # 3.5 seconds to connect, 15 seconds to wait for the server response
 with Client(auth=("api", "your-key"), timeout=(3.5, 15.0)) as client:
     # Execute safely timed API calls here
-    client.domains.get()
+    client.domains.get(domain=os.environ["DOMAIN"])
 ```
 
 ### Exactly-Once Delivery & Retry Policies
@@ -782,7 +784,7 @@ from mailgun import Client
 domain_name = "python.test.com"
 
 with Client(auth=("api", os.environ["APIKEY"])) as client:
-    data = client.domains.get(domain_name=domain_name)
+    data = client.domains.get(domain=domain_name)
     print(data.json())
 ```
 
@@ -1040,6 +1042,7 @@ with Client(auth=("api", os.environ["APIKEY"])) as client:
 Items that have no bounces and no delays (`classified_failures_count==0`) are not returned.
 
 ```python
+import json
 import os
 from mailgun import Client
 
@@ -1079,7 +1082,7 @@ payload = {
 headers = {"Content-Type": "application/json"}
 
 with Client(auth=("api", os.environ["APIKEY"])) as client:
-    req = client.bounceclassification_metrics.create(data=payload, headers=headers)
+    req = client.bounceclassification_metrics.create(data=json.dumps(payload), headers=headers)
     print(req.json())
 ```
 
@@ -1175,6 +1178,7 @@ filtered to provide insights into the health of your email infrastructure
 Gets customer event logs for an account.
 
 ```python
+import json
 import os
 from mailgun import Client
 
@@ -1187,7 +1191,7 @@ def post_analytics_logs() -> None:
     """
     domain: str = os.environ["DOMAIN"]
 
-    data = {
+    nested_dict = {
         "start": "Wed, 24 Sep 2025 00:00:00 +0000",
         "end": "Thu, 25 Sep 2025 00:00:00 +0000",
         "filter": {
@@ -1206,8 +1210,10 @@ def post_analytics_logs() -> None:
         },
     }
 
+    headers = {"Content-Type": "application/json"}
+
     with Client(auth=("api", os.environ["APIKEY"])) as client:
-        req = client.analytics_logs.create(data=data)
+        req = client.analytics_logs.create(data=json.dumps(nested_dict), headers=headers)
         print(req.json())
 ```
 
@@ -1748,7 +1754,6 @@ Thanks to the dynamic routing engine, the SDK natively supports Mailgun's supple
 import os
 from mailgun import Client
 
-domain: str = os.environ["DOMAIN"]
 data = {"address": "test2@gmail.com"}
 params = {"provider_lookup": "false"}
 
@@ -1854,16 +1859,22 @@ with Client(auth=("api", os.environ.get("APIKEY", "your-api-key"))) as client:
 The SDK includes a zero-network static analyzer called **SpamGuard**. It evaluates your payload *before* making an HTTP request. If your HTML contains known spam triggers (like invalid tags) or if you attempt to send to malformed Internationalized Domain Names (IDN), the SDK fails fast locally.
 
 ```python
+import os
 from mailgun.client import Client
 from mailgun.handlers.error_handler import DeliverabilityError
+
+domain = os.environ["DOMAIN"]
 
 with Client(auth=("api", "YOUR_API_KEY")) as client:
     try:
         client.messages.create(
-            "YOUR_DOMAIN_NAME",
-            to=["test@example.com"],
-            subject="Hello",
-            html="<html><script>alert('bad');</script></html>",  # Will trigger SpamGuard
+            domain=domain,
+            data={
+                "from": "sender@YOUR_DOMAIN_NAME",
+                "to": ["test@example.com"],
+                "subject": "Hello",
+                "html": "<html><script>alert('bad');</script></html>",  # Will trigger SpamGuard
+            },
         )
     except DeliverabilityError as e:
         print(f"Pre-flight check failed! Risk score: {e.score}. Issues: {e.issues}")
