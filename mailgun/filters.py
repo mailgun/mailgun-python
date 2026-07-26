@@ -51,26 +51,31 @@ class RedactingFilter(logging.Filter):
         if depth > self.MAX_REDACTION_DEPTH:
             return "<MAX_DEPTH_REDACTED>"
 
-        if isinstance(data, dict):
-            return {k: self._deep_redact(v, depth + 1) for k, v in data.items()}
-        if isinstance(data, list):
-            return [self._deep_redact(item, depth + 1) for item in data]
-        if isinstance(data, tuple):
-            if hasattr(data, "_fields"):
-                return type(data)(*(self._deep_redact(item, depth + 1) for item in data))
-            return tuple(self._deep_redact(item, depth + 1) for item in data)
+        # 1. Fast-Path: Handle the most common logging data types first
         if isinstance(data, str):
             return self.SECRET_PATTERN.sub(r"\1[REDACTED]", data)
         if isinstance(data, (int, float, bool, type(None))):
             return data
 
-        # CWE-316: Prevent "Late Stringification" bypass on custom objects
+        # 2. Collections: Use your robust NamedTuple logic + set support
+        if isinstance(data, dict):
+            return {k: self._deep_redact(v, depth + 1) for k, v in data.items()}
+        if isinstance(data, list):
+            return [self._deep_redact(item, depth + 1) for item in data]
+        if isinstance(data, set):
+            return {self._deep_redact(item, depth + 1) for item in data}
+        if isinstance(data, tuple):
+            if hasattr(data, "_fields"):  # Safely unpack NamedTuples
+                return type(data)(*(self._deep_redact(item, depth + 1) for item in data))
+            return tuple(self._deep_redact(item, depth + 1) for item in data)
+
+        # 3. Custom Objects: Prevent "Late Stringification" bypass on custom objects
         if hasattr(data, "model_dump") and callable(data.model_dump):
             return self._deep_redact(data.model_dump(), depth + 1)
         if hasattr(data, "__dict__"):
             return self._deep_redact(vars(data), depth + 1)
 
-        # Catch-all for Pydantic, Dataclasses, and custom objects
+        # 4. Catch-all for Pydantic, Dataclasses, and custom objects
         # Force stringification to prevent "Late Stringification" bypass
         return self.SECRET_PATTERN.sub(r"\1[REDACTED]", str(data))
 
