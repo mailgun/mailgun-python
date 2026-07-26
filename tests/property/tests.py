@@ -254,7 +254,7 @@ class ClientLifecycleMachine(RuleBasedStateMachine):
                 self.client.domains.get(domain="test.com")
                 self.is_connected = True
             except (requests.exceptions.RequestException, ApiError):
-                pass
+                self.is_connected = False
 
     @rule()  # type: ignore[untyped-decorator]
     def network_drop(self) -> None:
