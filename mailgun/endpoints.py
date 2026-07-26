@@ -274,36 +274,14 @@ class BaseEndpoint:
             MailgunTimeoutError: If the request times out.
             ApiError: If network routing fails or the API request fails.
         """
-        safe_url_for_log = SecurityGuard.sanitize_log_trace(target_url)
         if isinstance(e, (requests.Timeout, httpx.TimeoutException)):
-            logger.error(
-                "Request timed out for %s %s: %s",
-                method.upper(),
-                safe_url_for_log,
-                e,
-                exc_info=e,
-            )
             msg = f"Request timed out for {method.upper()} {target_url}"
             raise MailgunTimeoutError(msg) from e
         if isinstance(e, ApiError):
             raise e
         if isinstance(e, (requests.ConnectionError, httpx.ConnectError, httpx.NetworkError)):
-            logger.error(
-                "Network routing failed for %s %s: %s",
-                method.upper(),
-                safe_url_for_log,
-                e,
-                exc_info=e,
-            )
             msg = f"Network routing failed for {method.upper()} {target_url}: {e}"
             raise ApiError(msg) from e
-        logger.error(
-            "API request failed for %s %s: %s",
-            method.upper(),
-            safe_url_for_log,
-            e,
-            exc_info=e,
-        )
         msg = f"API request failed for {method.upper()} {target_url}: {e}"
         raise ApiError(msg) from e
 
@@ -563,6 +541,28 @@ class Endpoint(BaseEndpoint):
                     time.sleep(delay)
 
                     continue
+
+                if isinstance(e, requests.Timeout):
+                    logger.exception(
+                        "Request timed out for %s %s",
+                        safe_method.upper(),
+                        safe_url_for_log,
+                    )
+
+                elif isinstance(e, requests.ConnectionError):
+                    logger.critical(
+                        "Network routing failed for %s %s: %s",
+                        safe_method.upper(),
+                        safe_url_for_log,
+                        e,
+                    )
+
+                else:
+                    logger.exception(
+                        "API request failed for %s %s",
+                        safe_method.upper(),
+                        safe_url_for_log,
+                    )
 
                 self._handle_api_error(e, safe_method, target_url)
 
@@ -963,6 +963,28 @@ class AsyncEndpoint(BaseEndpoint):
                     await asyncio.sleep(delay)
 
                     continue
+
+                if isinstance(e, httpx.TimeoutException):
+                    logger.exception(
+                        "Request timed out for %s %s",
+                        safe_method.upper(),
+                        safe_url_for_log,
+                    )
+
+                elif isinstance(e, (httpx.ConnectError, httpx.NetworkError)):
+                    logger.critical(
+                        "Network routing failed for %s %s: %s",
+                        safe_method.upper(),
+                        safe_url_for_log,
+                        e,
+                    )
+
+                else:
+                    logger.exception(
+                        "API request failed for %s %s",
+                        safe_method.upper(),
+                        safe_url_for_log,
+                    )
 
                 self._handle_api_error(e, safe_method, target_url)
 
