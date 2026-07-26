@@ -649,9 +649,11 @@ class SpamGuard:
     __slots__ = ()
 
     MAX_HTML_SIZE: Final[int] = 5242880  # 5MB
+    # 100KB max payload threshold to prevent ReDoS / Memory Exhaustion
+    MAX_HTML_SIZE_BYTES: Final[int] = 100 * 1024
 
-    @staticmethod
-    def check_html(html_content: str) -> SpamReport:
+    @classmethod
+    def check_html(cls, html_content: str) -> SpamReport:
         """Natively parse HTML and detect known spam/delivery triggers under 1ms.
 
         This prevents obvious deliverability penalties without requiring network
@@ -663,18 +665,18 @@ class SpamGuard:
         Raises:
             ValueError: If the payload exceeds absolute safety limits for static analysis.
         """
-        if not html_content or not html_content.strip():
+        # Memory Optimization: isspace() avoids allocating a new string copy in RAM
+        if not html_content or html_content.isspace():
             return {"score": 0.0, "issues": ["HTML content cannot be empty."], "is_safe": False}
 
         # 1. Fail-fast on >5MB before parsing
-        if len(html_content) > SpamGuard.MAX_HTML_SIZE:
+        if len(html_content) > cls.MAX_HTML_SIZE:
             raise ValueError("Payload exceeds absolute safety limits for static analysis.")
 
         # 2. Fail-fast memory/CPU protection (MUST occur before parsing)
         byte_size = len(html_content.encode("utf-8"))
-        byte_size_limit = 102400  # 100KB
 
-        if byte_size > byte_size_limit:
+        if byte_size > cls.MAX_HTML_SIZE_BYTES:
             return {
                 "score": 0.0,
                 "issues": [
@@ -735,21 +737,39 @@ class IdempotencyGuard:
         if files:
             file_signatures = []
             for f_tuple in files:
-                if len(f_tuple) > 1 and f_tuple[1]:
+                if len(f_tuple) > 1 and f_tuple[1] is not None:
                     file_data = f_tuple[1]
 
-                    # Safely extract a signature without indexing IO streams
+                    # Safe, deterministic content-based hashing
                     if isinstance(file_data, tuple):
-                        sig = str(file_data[0])
-                    elif isinstance(file_data, str):
-                        sig = file_data  # Use the literal path string
-                    elif hasattr(file_data, "name"):
-                        sig = str(file_data.name)
+                        # Extract the actual file payload from nested tuples
+                        content = file_data[1] if len(file_data) > 1 else b""
+                        sig = hashlib.sha256(
+                            content if isinstance(content, bytes) else str(content).encode("utf-8")
+                        ).hexdigest()
+
                     elif isinstance(file_data, (bytes, bytearray)):
-                        # Hash the first 512 bytes to guarantee unique idempotency keys for raw byte streams
-                        sig = hashlib.sha256(file_data[:512]).hexdigest()
+                        # Hash the entire byte array
+                        sig = hashlib.sha256(file_data).hexdigest()
+
+                    elif hasattr(file_data, "read") and callable(file_data.read):
+                        # Safely hash file-like objects (e.g., io.BytesIO)
+                        current_pos = file_data.tell()
+                        file_data.seek(0)
+
+                        file_hash = hashlib.sha256()
+                        # Bind file_data as a default argument to prevent late-binding closure bugs
+                        for chunk in iter(lambda fd=file_data: fd.read(8192), b""):
+                            file_hash.update(
+                                chunk if isinstance(chunk, bytes) else chunk.encode("utf-8")
+                            )
+
+                        file_data.seek(current_pos)  # Reset pointer for HTTP transport
+                        sig = file_hash.hexdigest()
+
                     else:
-                        sig = str(id(file_data))  # Absolute fallback to memory address
+                        # Absolute fallback: Hash the stringified payload representation
+                        sig = hashlib.sha256(str(file_data).encode("utf-8")).hexdigest()
 
                     file_signatures.append(f"{f_tuple[0]}_{sig}")
             fingerprint_data["files"] = file_signatures

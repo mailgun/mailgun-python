@@ -1,3 +1,5 @@
+import pytest
+
 from mailgun.security import IdempotencyGuard, SpamGuard
 
 class TestIdempotencyGuard:
@@ -22,6 +24,15 @@ class TestIdempotencyGuard:
 
         assert IdempotencyGuard.generate_key(domain, payload_1) == IdempotencyGuard.generate_key(domain, payload_2)
 
+    def test_idempotency_chunked_stream(self) -> None:
+        """Hits the hasattr(file_data, 'read') BytesIO chunking branch."""
+        import io
+        stream = io.BytesIO(b"Secure binary attachment data")
+        key = IdempotencyGuard.generate_key("test.com", {}, files=[("report.pdf", stream)])
+
+        assert len(key) == 64
+        assert stream.tell() == 0  # Proves the pointer was rewound
+
 
 class TestSpamGuard:
     """Verifies the Pre-Flight Static HTML analyzer fails correctly."""
@@ -40,3 +51,17 @@ class TestSpamGuard:
         result = SpamGuard.check_html(html_without_alt)
 
         assert any("Missing 'alt' attributes" in issue for issue in result["issues"])
+
+    def test_spam_guard_absolute_memory_limit(self) -> None:
+        """Hits the > 5MB ValueError exception branch."""
+        massive_payload = "a" * (SpamGuard.MAX_HTML_SIZE + 10)
+        with pytest.raises(ValueError, match="Payload exceeds absolute safety limits"):
+            SpamGuard.check_html(massive_payload)
+
+    def test_spam_guard_parser_exception(self) -> None:
+        """Hits the try/except block around parser.feed()."""
+        with pytest.MonkeyPatch.context() as m:
+            m.setattr("mailgun.security._SpamGuardParser.feed", lambda self, data: (_ for _ in ()).throw(RuntimeError("Simulated Parsing Crash")))
+            report = SpamGuard.check_html("<html>Broken</html>")
+            assert report["is_safe"] is False
+            assert "Fatal HTML parsing error" in report["issues"][0]
