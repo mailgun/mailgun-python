@@ -13,16 +13,16 @@ if TYPE_CHECKING:
     from mailgun._httpx_compat import Timeout as HttpxTimeout
 
 __all__ = [
-    "TimeoutType",
     "APIResponseType",
     "AsyncAPIResponseType",
-    "ExactRouteType",
-    "PrefixRoutesType",
+    "DeprecatedRoutesType",
+    "DomainConfig",
     "DomainsAliasType",
     "DomainsEndpointsType",
-    "DeprecatedRoutesType",
+    "ExactRouteType",
+    "PrefixRoutesType",
     "SendMessagePayload",
-    "DomainConfig",
+    "TimeoutType",
 ]
 
 # ---------------------------------------------------------
