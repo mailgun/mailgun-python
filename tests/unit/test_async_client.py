@@ -370,6 +370,7 @@ class TestAsyncClient:
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             client = AsyncClient(auth=("api", "key"))
+            _ = client._client  # Ensure underlying client/transport is initialized
             client.__del__() # Explicit destructor trigger
 
             assert len(w) == 1

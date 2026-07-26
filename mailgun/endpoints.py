@@ -231,6 +231,82 @@ class BaseEndpoint:
                 elif hasattr(file_obj, "seek"):
                     file_obj.seek(0)
 
+    @staticmethod
+    def _prepare_payload(
+        data: Any | None, files: Any | None, headers: dict[str, str]
+    ) -> tuple[Any | None, dict[str, str]]:
+        """Prepares headers and minifies JSON payloads or handles multipart files safely.
+
+        Args:
+            data: Payload data (form data or JSON).
+            files: Files to upload.
+            headers: Request headers.
+
+        Returns:
+            A tuple containing the prepared data and working headers.
+        """
+        working_headers = dict(headers)
+        if files and working_headers:
+            working_headers = {
+                k: v for k, v in working_headers.items() if k.lower() != "content-type"
+            }
+
+        is_json_request = any(
+            k.lower() == "content-type" and "application/json" in str(v).lower()
+            for k, v in working_headers.items()
+        )
+
+        if is_json_request and data is not None and not isinstance(data, (str, bytes)):
+            data = json.dumps(data, separators=(",", ":"))
+
+        return data, working_headers
+
+    @staticmethod
+    def _handle_api_error(e: Exception, method: str, target_url: str) -> None:
+        """Encapsulates low-level transport exceptions into custom SDK errors.
+
+        Args:
+            e: The caught exception.
+            method: The HTTP method.
+            target_url: The target URL.
+
+        Raises:
+            MailgunTimeoutError: If the request times out.
+            ApiError: If network routing fails or the API request fails.
+        """
+        safe_url_for_log = SecurityGuard.sanitize_log_trace(target_url)
+        if isinstance(e, (requests.Timeout, httpx.TimeoutException)):
+            logger.error(
+                "Request timed out for %s %s: %s",
+                method.upper(),
+                safe_url_for_log,
+                e,
+                exc_info=e,
+            )
+            msg = f"Request timed out for {method.upper()} {target_url}"
+            raise MailgunTimeoutError(msg) from e
+        if isinstance(e, ApiError):
+            raise e
+        if isinstance(e, (requests.ConnectionError, httpx.ConnectError, httpx.NetworkError)):
+            logger.error(
+                "Network routing failed for %s %s: %s",
+                method.upper(),
+                safe_url_for_log,
+                e,
+                exc_info=e,
+            )
+            msg = f"Network routing failed for {method.upper()} {target_url}: {e}"
+            raise ApiError(msg) from e
+        logger.error(
+            "API request failed for %s %s: %s",
+            method.upper(),
+            safe_url_for_log,
+            e,
+            exc_info=e,
+        )
+        msg = f"API request failed for {method.upper()} {target_url}: {e}"
+        raise ApiError(msg) from e
+
     def __repr__(self) -> str:
         """DX: Show the actual resolved target route instead of memory address.
 
@@ -389,16 +465,15 @@ class Endpoint(BaseEndpoint):
 
         Returns:
             The HTTP response object from the server.
-
-        Raises:
-            MailgunTimeoutError: If the request times out.
-            ApiError: If the server returns a 4xx or 5xx status code or a network error occurs.
         """
         safe_method, target_url, safe_url_for_log, safe_timeout, safe_headers, safe_kwargs = (
             self._prepare_request(method, url, domain, timeout, headers, kwargs)
         )
 
         SecurityGuard.validate_no_control_characters(target_url, context="Endpoint URL")
+
+        # Prepare payload & headers via BaseEndpoint helper
+        data, safe_headers = self._prepare_payload(data, files, safe_headers)
 
         # --- DRY RUN INTERCEPTOR (SYNC) ---
         if self.dry_run:
@@ -414,28 +489,13 @@ class Endpoint(BaseEndpoint):
             mock_resp.url = target_url
             return mock_resp
 
-        # Ensure protocol consistency: HTTP libraries MUST generate their own multipart boundaries
-        if files and safe_headers:
-            safe_headers = {k: v for k, v in safe_headers.items() if k.lower() != "content-type"}
-
-        # Case-insensitive validation for Content-Type to conform with RFC 7230
-        is_json_request = any(
-            k.lower() == "content-type" and "application/json" in str(v).lower()
-            for k, v in safe_headers.items()
-        )
-
-        if is_json_request and data is not None and not isinstance(data, (str, bytes)):
-            data = json.dumps(data, separators=(",", ":"))
-
         req_method = getattr(self._session, safe_method.lower())
-
         policy = getattr(self, "retry_policy", None) or RetryPolicy()
         max_attempts = policy.max_retries + 1
 
         sys.audit("mailgun.api.request", safe_method.upper(), safe_url_for_log)
         logger.debug("Sending Request: %s %s", safe_method.upper(), safe_url_for_log)
 
-        # Initialize response to guarantee it exists
         response = None
 
         for attempt in range(max_attempts):
@@ -457,14 +517,11 @@ class Endpoint(BaseEndpoint):
                 status_code = getattr(response, "status_code", 200)
                 is_transient_error = status_code in {429, 500, 502, 503, 504}
 
-                # Retry Policy
                 if is_transient_error and attempt < max_attempts - 1:
                     delay = policy.calculate_delay(attempt)
-
                     if status_code == HTTPStatus.TOO_MANY_REQUESTS and policy.respect_retry_after:
                         retry_after = response.headers.get("Retry-After")
                         if retry_after and retry_after.isdigit():
-                            # Clamp the delay to prevent infinite sleeping (CWE-400)
                             delay = min(float(retry_after), policy.max_delay)
 
                     logger.warning(
@@ -488,8 +545,6 @@ class Endpoint(BaseEndpoint):
                     logger.debug(
                         "API Success %s | %s %s", status_code, safe_method.upper(), safe_url_for_log
                     )
-
-                # Break the loop when we receive a final answer (Success or 400 Client error)
                 break
 
             except requests.RequestException as e:
@@ -497,29 +552,20 @@ class Endpoint(BaseEndpoint):
                     delay = policy.calculate_delay(attempt)
 
                     logger.warning(
-                        "Network Error: %s | Retrying in %.2fs (Attempt %d/%d) | URL: %s",
+                        "Network Error: %s | Retrying in %.2fs | URL: %s",
                         e,
                         delay,
-                        attempt + 1,
-                        policy.max_retries,
                         safe_url_for_log,
                     )
 
                     self._reset_stream_pointers(files)
+
                     time.sleep(delay)
+
                     continue
 
-                if isinstance(e, requests.exceptions.Timeout):
-                    logger.exception("Timeout Error: %s %s", safe_method.upper(), safe_url_for_log)
-                    raise MailgunTimeoutError("Request timed out") from e
+                self._handle_api_error(e, safe_method, target_url)
 
-                logger.critical(
-                    "Connection Failed (DNS/Network): %s | URL: %s", e, safe_url_for_log
-                )
-                msg = f"Network routing failed: {e}"
-                raise ApiError(msg) from e
-
-        # Ensure the response evaluates outside the loop block
         return response
 
     def get(
@@ -798,16 +844,14 @@ class AsyncEndpoint(BaseEndpoint):
 
         Returns:
             The HTTP response object from the server.
-
-        Raises:
-            MailgunTimeoutError: If the request times out.
-            ApiError: If the server returns a 4xx or 5xx status code or a network error occurs.
         """
         safe_method, target_url, safe_url_for_log, safe_timeout, safe_headers, safe_kwargs = (
             self._prepare_request(method, url, domain, timeout, headers, kwargs)
         )
 
         SecurityGuard.validate_no_control_characters(target_url, context="Endpoint URL")
+
+        data, safe_headers = self._prepare_payload(data, files, safe_headers)
 
         # --- DRY RUN INTERCEPTOR (ASYNC) ---
         if self.dry_run:
@@ -822,17 +866,6 @@ class AsyncEndpoint(BaseEndpoint):
                 request=mock_request,
                 content=b'{"message": "Dry run successful - request intercepted", "id": "<dry-run-mock-id>"}',
             )
-
-        if files and safe_headers:
-            safe_headers = {k: v for k, v in safe_headers.items() if k.lower() != "content-type"}
-
-        is_json_request = any(
-            k.lower() == "content-type" and "application/json" in str(v).lower()
-            for k, v in safe_headers.items()
-        )
-
-        if is_json_request and data is not None and not isinstance(data, (str, bytes)):
-            data = json.dumps(data, separators=(",", ":"))
 
         if isinstance(safe_timeout, tuple) and len(safe_timeout) == 2:  # noqa: PLR2004
             safe_timeout = httpx.Timeout(safe_timeout[1], connect=safe_timeout[0])
@@ -915,6 +948,7 @@ class AsyncEndpoint(BaseEndpoint):
             except httpx.RequestError as e:
                 if attempt < max_attempts - 1:
                     delay = policy.calculate_delay(attempt)
+
                     logger.warning(
                         "Async Network Error: %s | Retrying in %.2fs (Attempt %d/%d) | URL: %s",
                         e,
@@ -923,21 +957,14 @@ class AsyncEndpoint(BaseEndpoint):
                         policy.max_retries,
                         safe_url_for_log,
                     )
+
                     self._reset_stream_pointers(files)
+
                     await asyncio.sleep(delay)
+
                     continue
 
-                if isinstance(e, httpx.TimeoutException):
-                    logger.exception(
-                        "Async Timeout Error: %s %s", safe_method.upper(), safe_url_for_log
-                    )
-                    raise MailgunTimeoutError("Request timed out") from e
-
-                logger.critical(
-                    "Async Connection Failed (DNS/Network): %s | URL: %s", e, safe_url_for_log
-                )
-                msg = f"Network routing failed: {e}"
-                raise ApiError(msg) from e
+                self._handle_api_error(e, safe_method, target_url)
 
         return response
 
