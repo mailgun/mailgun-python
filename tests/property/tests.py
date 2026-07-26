@@ -62,7 +62,8 @@ class TestConfigProperties:
     def test_property_url_normalization_no_duplication(self, base_url: str, path: str) -> None:
         """INVARIANT: URL concatenation must never produce double slashes (//) outside the scheme."""
         base = base_url.rstrip("/")
-        path_seg = path.strip("/")
+        path_parts = [p for p in path.split("/") if p]
+        path_seg = "/".join(path_parts)
         final_url = f"{base}/v3/{path_seg}" if path_seg else f"{base}/v3"
         stripped_scheme = final_url.replace("https://", "").replace("http://", "")
         assert "//" not in stripped_scheme
