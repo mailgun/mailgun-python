@@ -214,18 +214,22 @@ class TestSecurityGuardProperties:
         else:
             SecurityGuard.validate_no_control_characters(dirty_input)
 
-    @given(st.text())  # type: ignore[untyped-decorator]
+    @given(  # type: ignore[untyped-decorator]
+        st.text(),
+        st.characters(
+            blacklist_categories=("Cs",),  # type: ignore[arg-type]
+            blacklist_characters=["\t"],
+        ),
+    )
     def test_sanitize_path_segment_idempotency(self, input_str: str) -> None:
-        """
-        INVARIANT: Path sanitization should be idempotent.
-        sanitize(sanitize(x)) == sanitize(x)
-        """
+        """Property: Sanitizing a string twice yields the same result as sanitizing it once."""
+        cleaned: str = ""
         try:
-            first_pass = SecurityGuard.sanitize_path_segment(input_str)
-            second_pass = SecurityGuard.sanitize_path_segment(first_pass)
-            assert first_pass == second_pass
-        except ValueError:
-            pass
+            cleaned = SecurityGuard.sanitize_path_segment(input_str)
+        except (ValueError, TypeError):
+            assume(False)
+
+        assert SecurityGuard.sanitize_path_segment(cleaned) == cleaned
 
     @given(st.text())  # type: ignore[untyped-decorator]
     def test_sanitize_path_segment_property(self, input_str: str) -> None:
