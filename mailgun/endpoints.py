@@ -717,7 +717,23 @@ class Endpoint(BaseEndpoint):
                 if not v:
                     continue
                 # If Mailgun returned multiple values (e.g., multiple tags), preserve the list
-                current_filters[k] = v[0] if len(v) == 1 else v
+                parsed_str_val = v[0] if len(v) == 1 else v
+
+                # Prevent Query Parameter Type Drift
+                if k in current_filters:
+                    original_val = current_filters[k]
+
+                    # Dynamically cast to the developer's original type
+                    if isinstance(original_val, bool):
+                        current_filters[k] = str(v[0]).lower() in {"true", "1", "yes"}
+                    elif isinstance(original_val, int):
+                        current_filters[k] = int(v[0])
+                    elif isinstance(original_val, float):
+                        current_filters[k] = float(v[0])
+                    else:
+                        current_filters[k] = parsed_str_val
+                else:
+                    current_filters[k] = parsed_str_val
 
 
 # ==============================================================================
@@ -1110,4 +1126,20 @@ class AsyncEndpoint(BaseEndpoint):
             for k, v in query_params.items():
                 if not v:
                     continue
-                current_filters[k] = v[0] if len(v) == 1 else v
+                parsed_str_val = v[0] if len(v) == 1 else v
+
+                # Prevent Query Parameter Type Drift
+                if k in current_filters:
+                    original_val = current_filters[k]
+
+                    # Dynamically cast to the developer's original type
+                    if isinstance(original_val, bool):
+                        current_filters[k] = str(v[0]).lower() in {"true", "1", "yes"}
+                    elif isinstance(original_val, int):
+                        current_filters[k] = int(v[0])
+                    elif isinstance(original_val, float):
+                        current_filters[k] = float(v[0])
+                    else:
+                        current_filters[k] = parsed_str_val
+                else:
+                    current_filters[k] = parsed_str_val
