@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, Final, TypedDict
 from urllib.parse import quote, unquote, urlparse
 
-from requests.adapters import HTTPAdapter
+from requests.adapters import HTTPAdapter  # pyright: ignore[reportMissingModuleSource]
 
 from mailgun.logger import get_logger
 from mailgun.types import TimeoutType
@@ -543,6 +543,7 @@ class SecurityGuard:
 
         Raises:
             TypeError: If the signature components are invalid types.
+            ValueError: If the cryptographic payload or timestamp is invalid or out of bounds.
         """
         # 1. Type Guard: Prevent AttributeError and Type Confusion
         if not isinstance(token, str) or not isinstance(signature, str):
@@ -558,9 +559,15 @@ class SecurityGuard:
             raise TypeError("Security Alert: Webhook timestamp must be a valid integer.") from e
 
         # 3. TTL/Replay Attack Prevention (CWE-294)
-        if abs(time.time() - ts_math) > max_age_seconds:
-            logger.warning("Security Alert (CWE-294): Webhook timestamp expired.")
-            return False
+        try:
+            if abs(time.time() - ts_math) > max_age_seconds:
+                logger.warning("Security Alert (CWE-294): Webhook timestamp expired.")
+                return False
+        except (TypeError, ValueError, OverflowError) as e:
+            # If the timestamp is wildly out of bounds, it's invalid.
+            raise ValueError(
+                "Security Alert: Invalid cryptographic payload or timestamp out of bounds."
+            ) from e
 
         # 4. Canonicalization: Encode securely
         if isinstance(signing_key, str):
