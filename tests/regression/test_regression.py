@@ -304,3 +304,32 @@ class TestBuilderSecurityRegression:
 
         with pytest.raises(ValueError, match=r"Security Alert \(CWE-20\)"):
             builder.set_subject("Monthly Report\nContent-Type: text/html")
+
+
+# Add this class to your tests/test_regression.py
+
+class TestSecurityGuardRegression:
+    def test_verify_webhook_rejects_huge_timestamp_overflow(self) -> None:
+        """
+        Regression test for Fuzzer-discovered OverflowError.
+        Validates that passing a massive integer (exceeding IEEE 754 64-bit float limit)
+        as a timestamp doesn't crash the application with an OverflowError.
+        """
+        huge_timestamp = 10 ** 310  # 10^310 safely exceeds the max float size (~1.79e+308)
+
+        # The SDK should fail gracefully (catch OverflowError and raise ValueError,
+        # or just return False) instead of crashing.
+        try:
+            result = SecurityGuard.verify_webhook(
+                signing_key="safe_key",
+                token="safe_token",
+                timestamp=huge_timestamp,
+                signature="safe_signature"
+            )
+            # If your SDK returns False on failure rather than raising
+            assert result is False
+        except ValueError:
+            # If your SDK raises ValueError on malformed payloads, this is a success.
+            pass
+        except OverflowError:
+            pytest.fail("Regression: SecurityGuard leaked an OverflowError on a massive timestamp.")
