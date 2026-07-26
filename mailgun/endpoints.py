@@ -435,6 +435,9 @@ class Endpoint(BaseEndpoint):
         sys.audit("mailgun.api.request", safe_method.upper(), safe_url_for_log)
         logger.debug("Sending Request: %s %s", safe_method.upper(), safe_url_for_log)
 
+        # Initialize response to guarantee it exists
+        response = None
+
         for attempt in range(max_attempts):
             try:
                 response = req_method(
@@ -454,7 +457,7 @@ class Endpoint(BaseEndpoint):
                 status_code = getattr(response, "status_code", 200)
                 is_transient_error = status_code in {429, 500, 502, 503, 504}
 
-                # Логіка Retry Policy
+                # Retry Policy
                 if is_transient_error and attempt < max_attempts - 1:
                     delay = policy.calculate_delay(attempt)
 
@@ -476,7 +479,6 @@ class Endpoint(BaseEndpoint):
                     time.sleep(delay)
                     continue
 
-                # Фінальна обробка після виходу з циклу ретраїв
                 is_error = isinstance(status_code, int) and status_code >= _HTTP_ERROR_THRESHOLD
                 if is_error:
                     logger.error(
@@ -484,8 +486,11 @@ class Endpoint(BaseEndpoint):
                     )
                 else:
                     logger.debug(
-                        "API Success %s | %s %s", status_code, safe_method.upper(), target_url
+                        "API Success %s | %s %s", status_code, safe_method.upper(), safe_url_for_log
                     )
+
+                # Break the loop when we receive a final answer (Success or 400 Client error)
+                break
 
             except requests.RequestException as e:
                 if attempt < max_attempts - 1:
@@ -501,9 +506,7 @@ class Endpoint(BaseEndpoint):
                     )
 
                     self._reset_stream_pointers(files)
-
                     time.sleep(delay)
-
                     continue
 
                 if isinstance(e, requests.exceptions.Timeout):
@@ -515,9 +518,9 @@ class Endpoint(BaseEndpoint):
                 )
                 msg = f"Network routing failed: {e}"
                 raise ApiError(msg) from e
-            return response
 
-        return None
+        # Ensure the response evaluates outside the loop block
+        return response
 
     def get(
         self,
@@ -750,7 +753,7 @@ class AsyncEndpoint(BaseEndpoint):
         super().__init__(url, headers, auth, timeout=timeout, dry_run=dry_run)
         self._client = client or httpx.AsyncClient()
 
-    async def api_call(  # noqa: PLR0914, PLR0915
+    async def api_call(  # noqa: PLR0912, PLR0914, PLR0915
         self,
         auth: tuple[str, str] | None,
         method: str,
@@ -762,7 +765,7 @@ class AsyncEndpoint(BaseEndpoint):
         files: Any | None = None,
         domain: str | None = None,
         **kwargs: Any,
-    ) -> AsyncAPIResponseType:  # noqa: PLR0914, PLR0915
+    ) -> AsyncAPIResponseType:  # noqa: PLR0912, PLR0914, PLR0915
         """Execute the asynchronous HTTP request to the Mailgun API.
 
         Args:
@@ -797,19 +800,16 @@ class AsyncEndpoint(BaseEndpoint):
                 safe_method.upper(),
                 safe_url_for_log,
             )
+            mock_request = httpx.Request(safe_method.upper(), target_url)
             return httpx.Response(
-                status_code=200,
-                json={
-                    "message": "Dry run successful - request intercepted",
-                    "id": "<dry-run-mock-id>",
-                },
-                request=httpx.Request(method=safe_method.upper(), url=target_url),
+                HTTPStatus.OK,
+                request=mock_request,
+                content=b'{"message": "Dry run successful - request intercepted", "id": "<dry-run-mock-id>"}',
             )
 
-        if isinstance(safe_timeout, tuple):
-            safe_timeout = httpx.Timeout(safe_timeout[1], connect=safe_timeout[0])
+        if files and safe_headers:
+            safe_headers = {k: v for k, v in safe_headers.items() if k.lower() != "content-type"}
 
-        # Case-insensitive validation for Content-Type to conform with RFC 7230
         is_json_request = any(
             k.lower() == "content-type" and "application/json" in str(v).lower()
             for k, v in safe_headers.items()
@@ -818,11 +818,13 @@ class AsyncEndpoint(BaseEndpoint):
         if is_json_request and data is not None and not isinstance(data, (str, bytes)):
             data = json.dumps(data, separators=(",", ":"))
 
+        if isinstance(safe_timeout, tuple) and len(safe_timeout) == 2:  # noqa: PLR2004
+            safe_timeout = httpx.Timeout(safe_timeout[1], connect=safe_timeout[0])
+
         request_kwargs: dict[str, Any] = {
             "method": safe_method.upper(),
             "url": target_url,
             "params": filters,
-            "files": files,
             "headers": safe_headers,
             "auth": auth,
             "timeout": safe_timeout,
@@ -832,17 +834,22 @@ class AsyncEndpoint(BaseEndpoint):
         # Safe kwargs passthrough (e.g., allow_redirects)
         request_kwargs.update(safe_kwargs)
 
-        if isinstance(data, (str, bytes)):
-            request_kwargs["content"] = data
-        else:
-            request_kwargs["data"] = data
+        if data is not None:
+            if isinstance(data, (str, bytes)):
+                request_kwargs["content"] = data
+            else:
+                request_kwargs["data"] = data
+
+        if files is not None:
+            request_kwargs["files"] = files
 
         policy = getattr(self, "retry_policy", None) or RetryPolicy()
         max_attempts = policy.max_retries + 1
 
-        # PEP 578 and protection against Log Forging (CWE-117)
         sys.audit("mailgun.api.request", safe_method.upper(), safe_url_for_log)
         logger.debug("Sending Async Request: %s %s", safe_method.upper(), safe_url_for_log)
+
+        response = None
 
         for attempt in range(max_attempts):
             try:
@@ -857,15 +864,15 @@ class AsyncEndpoint(BaseEndpoint):
                     if status_code == HTTPStatus.TOO_MANY_REQUESTS and policy.respect_retry_after:
                         retry_after = response.headers.get("Retry-After")
                         if retry_after and retry_after.isdigit():
-                            # Clamp the delay to prevent infinite sleeping (CWE-400)
                             delay = min(float(retry_after), policy.max_delay)
 
                     logger.warning(
-                        "API Transient Error %s | Async Retrying in %.2fs (Attempt %d/%d)",
+                        "API Async Transient Error %s | Retrying in %.2fs (Attempt %d/%d) | URL: %s",
                         status_code,
                         delay,
                         attempt + 1,
                         policy.max_retries,
+                        safe_url_for_log,
                     )
                     self._reset_stream_pointers(files)
                     await asyncio.sleep(delay)
@@ -874,38 +881,49 @@ class AsyncEndpoint(BaseEndpoint):
                 is_error = isinstance(status_code, int) and status_code >= _HTTP_ERROR_THRESHOLD
                 if is_error:
                     logger.error(
-                        "API Error %s | %s %s", status_code, safe_method.upper(), safe_url_for_log
+                        "API Async Error %s | %s %s",
+                        status_code,
+                        safe_method.upper(),
+                        safe_url_for_log,
                     )
                 else:
                     logger.debug(
-                        "API Success %s | %s %s", status_code, safe_method.upper(), target_url
+                        "API Async Success %s | %s %s",
+                        status_code,
+                        safe_method.upper(),
+                        safe_url_for_log,
                     )
 
-            except (httpx.TimeoutException, httpx.ConnectError, httpx.RequestError) as e:
+                break
+
+            except httpx.RequestError as e:
                 if attempt < max_attempts - 1:
                     delay = policy.calculate_delay(attempt)
                     logger.warning(
-                        "Async Network Error: %s | Retrying in %.2fs (Attempt %d/%d)",
+                        "Async Network Error: %s | Retrying in %.2fs (Attempt %d/%d) | URL: %s",
                         e,
                         delay,
                         attempt + 1,
                         policy.max_retries,
+                        safe_url_for_log,
                     )
                     self._reset_stream_pointers(files)
                     await asyncio.sleep(delay)
                     continue
 
                 if isinstance(e, httpx.TimeoutException):
-                    logger.exception("Timeout Error: %s %s", safe_method.upper(), safe_url_for_log)
+                    logger.exception(
+                        "Async Timeout Error: %s %s", safe_method.upper(), safe_url_for_log
+                    )
                     raise MailgunTimeoutError("Request timed out") from e
 
-                logger.critical("Async Connection Failed: %s | URL: %s", e, safe_url_for_log)
+                logger.critical(
+                    "Async Connection Failed (DNS/Network): %s | URL: %s", e, safe_url_for_log
+                )
                 msg = f"Network routing failed: {e}"
                 raise ApiError(msg) from e
 
-            return response
-
-        return None
+        return response
 
     async def get(
         self,
