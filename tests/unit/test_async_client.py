@@ -363,6 +363,19 @@ class TestAsyncClient:
             del client
             gc.collect()
 
+    @pytest.mark.asyncio
+    async def test_async_unclosed_warning(self, recwarn: pytest.WarningsRecorder) -> None:
+        """Hits the __del__ warning for unclosed async clients."""
+        import warnings
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            client = AsyncClient(auth=("api", "key"))
+            client.__del__() # Explicit destructor trigger
+
+            assert len(w) == 1
+            assert issubclass(w[-1].category, ResourceWarning)
+            assert "Unclosed AsyncClient detected" in str(w[-1].message)
+
 
 class TestAsyncEndpoint:
     @staticmethod
@@ -645,3 +658,26 @@ class TestStreamPagination:
         results = list(endpoint.stream())
         assert results == [{"id": "event_1"}]
         assert mock_get.call_count == 1
+
+    def test_stream_pagination_type_drift(self) -> None:
+        """Hits the type-casting logic inside Endpoint.stream()"""
+        class MockResponse:
+            def __init__(self, items: list[dict[str, Any]], next_url: str | None) -> None:
+                self._items = items
+                self._next_url = next_url
+
+            def raise_for_status(self) -> None:
+                pass
+
+            def json(self) -> dict[str, Any]:
+                return {"items": self._items, "paging": {"next": self._next_url}}
+
+        responses = [
+            MockResponse([{"id": 1}], "https://api.mailgun.net/v3/domain/events?limit=1&ascending=yes"),
+            MockResponse([], None)
+        ]
+
+        ep = Endpoint(url={"base": "https://test", "keys": ["events"]}, headers={}, auth=("api", "key"))
+        with patch.object(Endpoint, "get", side_effect=responses):
+            results = list(ep.stream())
+            assert len(results) == 1

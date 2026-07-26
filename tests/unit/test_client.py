@@ -1,6 +1,8 @@
 import pytest
 
 from mailgun.client import Client, Config, Endpoint
+from requests.exceptions import ReadTimeout as SyncReadTimeout
+from mailgun.handlers.error_handler import MailgunTimeoutError
 
 
 class TestClientAttributeAccess:
@@ -98,3 +100,32 @@ class TestClientInitialization:
     def test_client_init_with_auth(self) -> None:
         client = Client(auth=("api", "key-123"))
         assert client.auth == ("api", "key-123")
+
+    def test_sync_ping_network_failure(self) -> None:
+        """Hits the except Exception branch inside ping()."""
+        with pytest.MonkeyPatch.context() as m:
+            m.setattr("requests.Session.request", lambda *a, **k: (_ for _ in ()).throw(ConnectionError("Network Down")))
+            client = Client(auth=("api", "key"))
+            assert client.ping() is False
+
+
+class TestErrorHandler:
+    """Hits the missing branches in error mapping."""
+
+    def test_timeout_mapping_sync(self) -> None:
+        """Ensure requests.exceptions.ReadTimeout maps to MailgunTimeoutError."""
+        from mailgun.client import Client
+        from mailgun.handlers.error_handler import MailgunTimeoutError
+        from requests.exceptions import ReadTimeout
+
+        client = Client(auth=("api", "key-12345"))
+
+        with pytest.raises(MailgunTimeoutError):
+            with pytest.MonkeyPatch.context() as m:
+                # Force the underlying requests session to throw a ReadTimeout
+                m.setattr(
+                    "requests.Session.request",
+                    lambda *args, **kwargs: (_ for _ in ()).throw(ReadTimeout("Timeout"))
+                )
+
+                client.domains.get(domain="test.com")
