@@ -173,7 +173,8 @@ class TestHandlerProperties:
         except (ValueError, TypeError):
             return
 
-        assert "api.mailgun.net" in url_result
+        parsed_url = urlparse(url_result)
+        assert parsed_url.hostname == "api.mailgun.net"
 
 
 class TestSecurityGuardProperties:
