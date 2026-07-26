@@ -1,7 +1,6 @@
 import pytest
 
 from mailgun.client import Client, Config, Endpoint
-from mailgun.handlers.error_handler import MailgunTimeoutError
 
 
 class TestClientAttributeAccess:
