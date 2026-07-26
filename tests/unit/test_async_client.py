@@ -371,7 +371,8 @@ class TestAsyncClient:
             warnings.simplefilter("always")
             client = AsyncClient(auth=("api", "key"))
             _ = client._client  # Ensure underlying client/transport is initialized
-            client.__del__() # Explicit destructor trigger
+            del client
+            gc.collect()
 
             assert len(w) == 1
             assert issubclass(w[-1].category, ResourceWarning)
