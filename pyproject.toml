@@ -260,7 +260,7 @@ exclude_lines = [
 strict = true
 # Adapted from this StackOverflow post:
 # https://stackoverflow.com/questions/55944201/python-type-hinting-how-do-i-enforce-that-project-wide
-python_version = "3.11"
+python_version = "3.12"
 mypy_path = "type_stubs"
 namespace_packages = true
 # This flag enhances the user feedback for error messages
