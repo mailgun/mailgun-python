@@ -243,14 +243,19 @@ class Client(BaseClient):
 
     def __del__(self) -> None:
         """Emit a ResourceWarning if the client is garbage-collected without being closed."""
-        if getattr(self, "_session", None) is not None:
-            warnings.warn(
-                "Unclosed Client detected. Please use the client as a context manager or call client.close() explicitly.",
-                ResourceWarning,
-                stacklevel=2,
-            )
-            with contextlib.suppress(Exception):
-                self.close()
+        # Use object.__getattribute__ to avoid triggering custom __getattr__ recursion loops
+        try:
+            session = object.__getattribute__(self, "_session")
+            if session is not None:
+                warnings.warn(
+                    "Unclosed Client detected. Please use the client as a context manager or call client.close() explicitly.",
+                    ResourceWarning,
+                    stacklevel=2,
+                )
+                with contextlib.suppress(Exception):
+                    self.close()
+        except AttributeError:
+            pass
 
     def ping(self) -> bool:
         """Perform a fast, low-overhead health check to verify API credentials.
@@ -316,7 +321,7 @@ class AsyncClient(BaseClient):
         Raises:
             AttributeError: If the requested route is unknown or a magic Python method is invoked.
         """
-        if name.startswith("__") and name.endswith("__"):
+        if name.startswith("_") or name in {"config", "auth"}:
             msg = f"'{self.__class__.__name__}' object has no attribute '{name}'"
             raise AttributeError(msg)
 
@@ -404,7 +409,9 @@ class AsyncClient(BaseClient):
 
     def __del__(self) -> None:
         """Safety net for unclosed sockets (CWE-400) if context managers are skipped."""
-        if self._httpx_client is not None and not self._httpx_client.is_closed:
+        client = getattr(self, "_httpx_client", None)
+
+        if client is not None and not client.is_closed:
             warnings.warn(
                 f"Unclosed {self.__class__.__name__} detected. You must explicitly "
                 "call '.aclose()' or use the 'async with' context manager to prevent "
