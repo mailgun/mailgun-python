@@ -36,6 +36,7 @@ class ChunkedStreamer:
     def __init__(
         self,
         file_path: str | Path,
+        *,
         safe_base_dir: str | Path | None = None,
         chunk_size: int = CHUNK_SIZE,
     ) -> None:
