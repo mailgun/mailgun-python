@@ -6,24 +6,24 @@ We [keep a changelog.](http://keepachangelog.com/)
 
 ### Added
 
-- **IdempotencyGuard**: Implemented exactly-once email delivery mechanisms (SHA-256 fingerprinting) to prevent duplicate sends during network partitions.
-- **RetryPolicy**: Introduced a flexible retry configuration with stateless exponential backoff and jitter to mitigate the "Thundering Herd" effect.
-- **`httpx2` Compatibility**: Added native support for the modern `httpx2` engine via the `mailgun._httpx_compat.py` bridge, with graceful fallbacks.
-- **`mailgun.ext` Ecosystem**: Introduced strict Pydantic v2 payload schemas (e.g., `SendMessageSchema`).
-- **ChunkedStreamer**: Added memory-safe lazy streaming for large file attachments (up to 25MB) using 512KB partitions.
-- **SpamGuard**: Added a zero-network static HTML analyzer to preemptively flag deliverability risks (XSS, missing alt tags) before dispatching to Mailgun.
+- **IdempotencyGuard**: Implemented exactly-once email delivery mechanisms (SHA-256 fingerprinting on payloads and stream buffers) to prevent duplicate sends during network partitions.
+- **RetryPolicy**: Introduced a flexible retry configuration with stateless exponential backoff and full jitter to mitigate the "Thundering Herd" effect.
+- **`httpx2` Compatibility**: Added native support for the modern `httpx2` engine via the `mailgun._httpx_compat.py` bridge, featuring a transparent fallback mechanism for legacy `httpx` environments.
+- **`mailgun.ext` Ecosystem**: Introduced strict Pydantic v2 payload schemas (e.g., `SendMessageSchema`) and framework-bound extensions.
+- **ChunkedStreamer**: Added memory-safe lazy streaming for large file attachments (up to 25MB) using 512KB partitions to lock memory usage to $O(1)$.
+- **SpamGuard**: Added a zero-network static HTML analyzer to preemptively flag deliverability risks (XSS, missing alt tags) before dispatching requests to Mailgun.
 - **IDN Routing**: Implemented `normalize_domain` to natively convert Internationalized Domain Names to safe RFC 3490 Punycode.
 - Added `DeliverabilityError` exception to handle SpamGuard rule violations.
 
 ### Changed
 
-- **[BREAKING CHANGE]** Dropped support for Python 3.10. The SDK now strictly requires Python 3.11 or higher.
+- **[BREAKING CHANGE]** Dropped support for Python 3.10. The SDK now strictly requires Python 3.11 through 3.14.
 - Purged the `typing-extensions` dependency from the package, replacing it with standard library `typing` equivalents (`Self`, `TypedDict`, `NotRequired`).
 
 ### Fixed
 
-- Fixed strict typing issues and circular import risks by routing response contracts (`MockResponse`) strictly through `mailgun/types.py`.
-- Updated GitHub Actions CI workflows to explicitly test against Python 3.14.
+- Fixed strict typing issues, circular import risks, and unawaited coroutines in `AsyncClient.ping()`.
+- Hardened `SecurityGuard.sanitize_timeout` against infinite/NaN injection (CWE-400) and cleaned up exception handling blocks to eliminate silent failure anti-patterns.
 
 ## v1.8.0 - 2026-07-20
 
