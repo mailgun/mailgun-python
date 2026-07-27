@@ -2,7 +2,9 @@
 
 We [keep a changelog.](http://keepachangelog.com/)
 
-## [Unreleased] (v1.9.0)
+## [Unreleased]
+
+## v1.9.0 - 2026-07-XX
 
 ### Added
 
@@ -24,6 +26,16 @@ We [keep a changelog.](http://keepachangelog.com/)
 
 - Fixed strict typing issues, circular import risks, and unawaited coroutines in `AsyncClient.ping()`.
 - Hardened `SecurityGuard.sanitize_timeout` against infinite/NaN injection (CWE-400) and cleaned up exception handling blocks to eliminate silent failure anti-patterns.
+
+### Pull Requests Merged
+
+- [PR_51](https://github.com/mailgun/mailgun-python/pull/51) - Phase 2 Modernization: httpx2, Pydantic v2, Retry Engine, and Security Guards.
+- [PR_52](https://github.com/mailgun/mailgun-python/pull/52) - Add Scorecard workflow for supply-chain security.
+- [PR_53](https://github.com/mailgun/mailgun-python/pull/53) - build(deps): Bump ossf/scorecard-action from 2.4.1 to 2.4.3 in the minor-and-patch group.
+- [PR_54](https://github.com/mailgun/mailgun-python/pull/54) - build(deps): Bump actions/checkout from 4.2.2 to 7.0.1.
+- [PR_55](https://github.com/mailgun/mailgun-python/pull/55) - build(deps): Bump actions/upload-artifact from 4.6.1 to 7.0.1.
+- [PR_56](https://github.com/mailgun/mailgun-python/pull/56) - build(deps): Bump github/codeql-action/upload-sarif from 3.37.2 to 4.37.1
+- [PR_57](https://github.com/mailgun/mailgun-python/pull/57) - Release 1.9.0.
 
 ## v1.8.0 - 2026-07-20
 
