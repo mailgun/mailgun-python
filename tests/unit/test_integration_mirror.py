@@ -76,7 +76,7 @@ class DomainTests(unittest.TestCase):
         self.put_domain_tracking_data = {"active": "yes", "skip_verification": "false"}
         self.put_domain_unsubscribe_data = {
             "active": "yes",
-            "html_footer": "\n<br>\n<p><a href=\"%unsubscribe_url%\">UnSuBsCrIbE</a></p>\n",
+            "html_footer": '\n<br>\n<p><a href="%unsubscribe_url%">UnSuBsCrIbE</a></p>\n',
             "text_footer": "\n\nTo unsubscribe here click: <%unsubscribe_url%>\n\n",
         }
         self.put_domain_dkim_authority_data = {"self": "false"}

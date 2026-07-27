@@ -5,6 +5,7 @@ import sys
 
 import atheris
 
+
 with atheris.instrument_imports():
     from mailgun.config import Config
     from mailgun.handlers.error_handler import ApiError

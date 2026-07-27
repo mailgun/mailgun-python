@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Fuzz test for Mailgun Custom Logger and Formatters.
+"""Fuzz test for Mailgun Custom Logger and Formatters.
 Focus: String interpolation crashes, Log Forging (CRLF), and encoding failures.
 """
 
@@ -10,6 +9,7 @@ from io import StringIO
 from typing import Any
 
 import atheris
+
 
 with atheris.instrument_imports():
     from mailgun.logger import get_logger
@@ -58,7 +58,7 @@ def TestOneInput(data: bytes) -> None:
                     val = fdp.ConsumeBytes(16)
                 extra_context[key] = val
 
-        log_level(msg, extra=extra_context if extra_context else None)
+        log_level(msg, extra=extra_context or None)
 
     except KeyError as e:
         # Python's stdlib logging explicitly blocks 'message', 'name', 'args', etc.

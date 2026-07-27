@@ -145,6 +145,7 @@ fuzz_all() {
     local corpus_dir="tests/fuzz/corpus"
     local log_dir="logs"
     local python_bin="$(which python)"
+    export MAILGUN_DISABLE_BROWSER=1
 
     mkdir -p "$log_dir"
 

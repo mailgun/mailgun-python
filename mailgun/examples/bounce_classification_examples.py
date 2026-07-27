@@ -1,6 +1,7 @@
 """Examples for Mailgun Bounce Classification API."""
 
 import asyncio
+import json
 import os
 from typing import Any
 
@@ -47,7 +48,7 @@ def post_list_statistic_v2_sync(api_key: str, domain: str) -> None:
     headers: dict[str, str] = {"Content-Type": "application/json"}
 
     with Client(auth=("api", api_key)) as client:
-        req = client.bounce_classification.create(data=payload, headers=headers)
+        req = client.bounce_classification.create(data=json.dumps(payload), headers=headers)
         print(req.json())
 
 

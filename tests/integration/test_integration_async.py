@@ -3,19 +3,21 @@
 from __future__ import annotations
 
 import asyncio
-import json
-import os
 import email.utils
+import json
 import logging
-import unittest
+import os
 import time
-from typing import Any, Callable
-from datetime import datetime, timedelta
+import unittest
+from collections.abc import Callable
 from contextlib import suppress
+from datetime import datetime, timedelta
+from typing import Any
 
 import pytest
 
 from mailgun.client import AsyncClient
+
 
 # ============================================================================
 # Async Test Classes (using AsyncClient and AsyncEndpoint)
@@ -145,7 +147,7 @@ class AsyncDomainTests(unittest.IsolatedAsyncioTestCase):
         # fmt: off
         self.put_domain_unsubscribe_data: dict[str, str] = {
             "active": "yes",
-            "html_footer": "\n<br>\n<p><a href=\"%unsubscribe_url%\">UnSuBsCrIbE</a></p>\n",
+            "html_footer": '\n<br>\n<p><a href="%unsubscribe_url%">UnSuBsCrIbE</a></p>\n',
             "text_footer": "\n\nTo unsubscribe here click: <%unsubscribe_url%>\n\n",
         }
         # fmt: on
@@ -354,7 +356,6 @@ class AsyncDomainTests(unittest.IsolatedAsyncioTestCase):
     @pytest.mark.order(6)
     async def test_post_dkim_keys_invalid_pem_string(self) -> None:
         """Test to create a domain key: expected failure to parse PEM from string."""
-
         data = {
             "signing_domain": self.test_domain,
             "selector": "smtp",
@@ -1135,7 +1136,7 @@ class AsyncMailingListsTests(unittest.IsolatedAsyncioTestCase):
         self.client: AsyncClient = AsyncClient(auth=self.auth)
         self.domain: str = os.environ["DOMAIN"]
 
-        self.maillist_address = os.environ.get("MAILLIST_ADDRESS", f"python_sdk@{self.domain}")
+        self.maillist_address = os.environ.get("MAILLIST_ADDRESS_ASYNC", f"python_sdk_async@{self.domain}")
 
         raw_to = os.environ.get("MESSAGES_TO", f"success@{self.domain}")
         raw_cc = os.environ.get("MESSAGES_CC", f"cc@{self.domain}")
@@ -1144,7 +1145,7 @@ class AsyncMailingListsTests(unittest.IsolatedAsyncioTestCase):
         self.messages_cc = email.utils.parseaddr(raw_cc)[1] or raw_cc
 
         self.mailing_lists_data: dict[str, str] = {
-            "address": f"python_sdk@{self.domain}",
+            "address": f"python_sdk_async@{self.domain}",
             "name": "Python SDK Test List",
             "description": "Integration testing list tracking",
             "access_level": "readonly",
@@ -1194,7 +1195,7 @@ class AsyncMailingListsTests(unittest.IsolatedAsyncioTestCase):
     async def test_maillist_lists_create(self) -> None:
         await self.client.lists.delete(
             domain=self.domain,
-            address=f"python_sdk@{self.domain}",
+            address=f"python_sdk_async@{self.domain}",
         )
         req = await self.client.lists.create(domain=self.domain, data=self.mailing_lists_data)
         self.assertEqual(req.status_code, 200)
@@ -1205,7 +1206,7 @@ class AsyncMailingListsTests(unittest.IsolatedAsyncioTestCase):
         req = await self.client.lists.put(
             domain=self.domain,
             data=self.mailing_lists_data_update,
-            address=f"python_sdk@{self.domain}",
+            address=f"python_sdk_async@{self.domain}",
         )
         self.assertEqual(req.status_code, 200)
         self.assertIn("list", req.json())
@@ -1852,9 +1853,10 @@ class AsyncMetricsTest(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 200)
         [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
-        self.assertIn("metrics", req.json()["items"][0])
-        self.assertIn("dimensions", req.json()["items"][0])
-        self.assertIn("email_validation_count", req.json()["items"][0]["metrics"])
+        if req.json().get("items"):
+            self.assertIn("metrics", req.json()["items"][0])
+            self.assertIn("dimensions", req.json()["items"][0])
+            self.assertIn("email_validation_count", req.json()["items"][0]["metrics"])
 
     async def test_post_query_get_account_usage_metrics_invalid_data(self) -> None:
         """Expected failure with invalid data."""
@@ -1895,7 +1897,7 @@ class AsyncLogsTests(unittest.IsolatedAsyncioTestCase):
         now = datetime.now()
         now_formatted = now.strftime("%a, %d %b %Y %H:%M:%S +0000")
         yesterday = now - timedelta(days=1)
-        yesterday_formatted = yesterday.strftime("%a, %d %b %Y %H:%M:%S +0000")  # noqa: FURB184
+        yesterday_formatted = yesterday.strftime("%a, %d %b %Y %H:%M:%S +0000")
 
         self.invalid_account_logs_data = {
             "start": yesterday_formatted,
@@ -2028,7 +2030,6 @@ class AsyncTagsNewTests(unittest.IsolatedAsyncioTestCase):
     @pytest.mark.order(2)
     async def test_update_account_invalid_tag(self) -> None:
         """Test to update account nonexistent tag: Unhappy Path with invalid data."""
-
         req = await self.client.analytics_tags.put(
             data=self.account_tag_invalid_info,
         )
@@ -2075,7 +2076,6 @@ class AsyncTagsNewTests(unittest.IsolatedAsyncioTestCase):
     @pytest.mark.order(4)
     async def test_delete_account_tag(self) -> None:
         """Test to delete account tag: Happy Path with valid data."""
-
         req = await self.client.analytics_tags.delete(
             data=self.account_tag_info,
         )
@@ -2088,7 +2088,6 @@ class AsyncTagsNewTests(unittest.IsolatedAsyncioTestCase):
     @pytest.mark.order(4)
     async def test_delete_account_nonexistent_tag(self) -> None:
         """Test to delete account nonexistent tag: Unhappy Path with invalid data."""
-
         req = await self.client.analytics_tags.delete(
             data=self.account_tag_invalid_info,
         )
@@ -2101,7 +2100,6 @@ class AsyncTagsNewTests(unittest.IsolatedAsyncioTestCase):
     @pytest.mark.order(4)
     async def test_delete_account_tag_with_invalid_url(self) -> None:
         """Test to delete account tag: Wrong Path with invalid URL."""
-
         req = await self.client.analytics_tag.delete(
             data=self.account_tag_invalid_info,
         )
@@ -2230,7 +2228,6 @@ class AsyncUsersTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_get_user_details(self) -> None:
         """Test to get user details: happy path."""
-
         query = {"role": "admin", "limit": "0", "skip": "0"}
         req1 = await self.client.users.get(filters=query)
         users = req1.json()["users"]

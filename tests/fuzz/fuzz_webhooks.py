@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import sys
+
 import atheris
+
 
 with atheris.instrument_imports():
     # Adjust import based on your actual path

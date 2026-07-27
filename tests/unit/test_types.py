@@ -8,8 +8,7 @@ import pytest
 class TestTypesCompatibility:
     @pytest.mark.skipif(sys.version_info >= (3, 11), reason="typing_extensions is not installed in >=3.11 test environments")
     def test_types_python_310_fallback(self) -> None:
-        """
-        Ensures that the SDK correctly imports `TypedDict` and `NotRequired`
+        """Ensures that the SDK correctly imports `TypedDict` and `NotRequired`
         from `typing_extensions` on Python versions older than 3.11.
         """
         import mailgun.types

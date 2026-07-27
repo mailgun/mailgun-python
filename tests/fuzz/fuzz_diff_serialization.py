@@ -7,9 +7,11 @@ from typing import Any
 
 import atheris
 
+
 with atheris.instrument_imports():
     import requests
-    import httpx
+
+    from mailgun._httpx_compat import httpx as compat_httpx
 
 
 logging.disable(logging.CRITICAL)
@@ -42,7 +44,7 @@ def TestOneInput(data: bytes) -> None:
             )
 
     sync_req = requests.Request("POST", "https://api.mailgun.net/v3/fuzz", data=payload)
-    async_req = httpx.Request("POST", "https://api.mailgun.net/v3/fuzz", data=payload)
+    async_req = compat_httpx.Request("POST", "https://api.mailgun.net/v3/fuzz", data=payload)
 
     sync_error = None
     async_error = None

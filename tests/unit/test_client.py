@@ -1,6 +1,16 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
 
-from mailgun.client import Client, Config, Endpoint
+from mailgun.client import BaseClient, Client, Config, Endpoint
+
+
+class TestBaseClientDunders:
+    def test_base_client_repr_str_dir(self) -> None:
+        client = BaseClient(auth=("api", "key-123"))
+        assert repr(client) == "<BaseClient api_url='https://api.mailgun.net'>"
+        assert str(client) == "Mailgun BaseClient"
+        assert "messages" in dir(client)
 
 
 class TestClientAttributeAccess:
@@ -57,6 +67,50 @@ class TestClientClosure:
         client.close()
         client.close()
 
+    def test_client_unclosed_resource_warning(self) -> None:
+        """Verify that leaving a Client unclosed triggers a ResourceWarning upon deletion."""
+        import gc
+        client = Client(auth=("api", "key"))
+        _ = client._session
+        with pytest.warns(ResourceWarning, match="Unclosed Client detected"):
+            del client
+            gc.collect()
+
+    def test_sync_client_close_clears_auth_and_headers(self) -> None:
+        client = Client(auth=("api", "key-123"))
+        session = client._session
+        client.close()
+
+        assert client._session is None
+        assert client.auth is None  # pyright: ignore[reportOptionalMemberAccess]
+        assert session.auth is None  # pyright: ignore[reportOptionalMemberAccess]
+
+    def test_client_del_attribute_error(self) -> None:
+        """Coverage: Silently catch AttributeError during GC deletion."""
+        import gc
+        client = Client(auth=("api", "key"))
+        del client._session  # Force the attribute lookup/get_attribute to fail
+        del client
+        gc.collect()  # Trigger finalization via GC; must pass silently without crashing
+
+class TestClientPing:
+    def test_sync_client_ping_success(self) -> None:
+        client = Client(auth=("api", "key-123"))
+        mock_resp = MagicMock(status_code=200)
+
+        with patch("mailgun.client.Endpoint.get", return_value=mock_resp):
+            assert client.ping() is True
+
+    def test_sync_ping_network_failure(self) -> None:
+        """Hits the except Exception branch inside ping()."""
+        client = Client(auth=("api", "key"))
+        with patch("mailgun.client.Endpoint.get", side_effect=ConnectionError("Network Down")):
+            assert client.ping() is False
+
+    def test_client_init_int_timeout_warning(self) -> None:
+        with pytest.warns(DeprecationWarning, match="integer for 'timeout' is deprecated"):
+            Client(auth=("api", "key"), timeout=10)
+
 
 class TestClientContextManager:
     def test_client_context_manager(self) -> None:
@@ -75,7 +129,7 @@ class TestClientContextManager:
 class TestClientInitialization:
     def test_client_init_default(self) -> None:
         client = Client()
-        assert client.auth is None
+        assert client.auth is None  # pyright: ignore[reportOptionalMemberAccess]
         assert client.config.api_url == Config.DEFAULT_API_URL
 
     def test_client_init_emits_deprecation_warning_for_api_version(self) -> None:
@@ -88,4 +142,41 @@ class TestClientInitialization:
 
     def test_client_init_with_auth(self) -> None:
         client = Client(auth=("api", "key-123"))
-        assert client.auth == ("api", "key-123")
+        assert client.auth == ("api", "key-123")  # pyright: ignore[reportOptionalMemberAccess]
+
+    def test_sync_ping_network_failure(self) -> None:
+        """Hits the except Exception branch inside ping()."""
+        with pytest.MonkeyPatch.context() as m:
+            m.setattr("requests.Session.request", lambda *a, **k: (_ for _ in ()).throw(ConnectionError("Network Down")))
+            client = Client(auth=("api", "key"))
+            assert client.ping() is False
+
+
+class TestErrorHandler:
+    """Hits the missing branches in error mapping."""
+
+    def test_timeout_mapping_sync(self) -> None:
+        """Ensure requests.exceptions.ReadTimeout maps to MailgunTimeoutError."""
+        from requests.exceptions import ReadTimeout  # pyright: ignore[reportMissingModuleSource]
+
+        from mailgun.client import Client
+        from mailgun.handlers.error_handler import MailgunTimeoutError
+
+        client = Client(auth=("api", "key-12345"))
+
+        with pytest.raises(MailgunTimeoutError), pytest.MonkeyPatch.context() as m:
+            # Force the underlying requests session to throw a ReadTimeout
+            m.setattr(
+                "requests.Session.request",
+                lambda *args, **kwargs: (_ for _ in ()).throw(ReadTimeout("Timeout"))
+            )
+
+            client.domains.get(domain="test.com")
+
+    def test_deliverability_error_formatting(self) -> None:
+        """Coverage: Ensure the custom SpamGuard exception formats output correctly."""
+        from mailgun.handlers.error_handler import DeliverabilityError
+        error = DeliverabilityError(score=45.0, issues=["Missing alt tags"])
+
+        assert "Score: 45.0/100" in str(error)
+        assert "- Missing alt tags" in str(error)

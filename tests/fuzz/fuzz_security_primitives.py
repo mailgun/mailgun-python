@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""
-Fuzz test for Core Security Primitives (CWE-20, CWE-22, CWE-79, CWE-116, CWE-918).
+"""Fuzz test for Core Security Primitives (CWE-20, CWE-22, CWE-79, CWE-116, CWE-918).
 Replaces fuzz_url.py and fuzz_timeout.py with a unified, high-performance boundary fuzzer.
 """
-import sys
 import logging
+import sys
+
 import atheris
+
 
 with atheris.instrument_imports():
     # Adjust import paths if you placed these in mailgun.security instead

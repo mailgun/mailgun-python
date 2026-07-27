@@ -10,22 +10,35 @@ If you are contributing to this repository, please review these principles befor
 
 String manipulation, dynamic imports (`importlib`), and sequential regex evaluations are historically slow in Python.
 
-- **Static Dispatch:** Base API URLs (`/v3`, `/v4`, etc.) and handler functions are pre-mapped in immutable dictionaries (`EXACT_ROUTES`, `PREFIX_ROUTES`).
-- **Impact:** The SDK completely avoids string concatenation and dynamic resolution during high-volume request loops, increasing routing speed by over **12x**.
+- **Static Dispatch:** Base API URLs and handler functions are pre-mapped in immutable dictionaries (`EXACT_ROUTES`, `PREFIX_ROUTES`).
+- **Impact:** The SDK completely avoids string concatenation and dynamic resolution during high-volume request loops, sustaining over **1 million routing operations per second**.
 
 ### 2. High-Concurrency Transport Layer (`httpx` & `__slots__`)
 
 - **Native AsyncIO & Connection Pooling:** The `AsyncClient` allows for true non-blocking throughput. Both clients enforce connection pooling to prevent OS socket exhaustion.
-- **Memory Density (`__slots__`):** By defining `__slots__` on `Endpoint` and `Client` classes, we block Python from creating dynamic `__dict__` hash tables. This drastically reduces the RAM footprint of each instantiated client and lowers *Garbage Collection (GC)* pauses during concurrent workloads.
+- **Memory Density (`__slots__`):** By defining `__slots__` on `Endpoint` and `Client` classes, we block Python from creating dynamic `__dict__` hash tables, minimizing RAM footprint and garbage collection pauses.
 
-### 3. Cold-Boot Initialization & Lazy Loading
+### 3. Streamlined Cold-Boot Initialization
 
-- **Deferred Regex Compilation:** Legacy SDK versions compiled multiple `re.Pattern` objects upon module import. By wrapping these in `@functools.lru_cache(maxsize=1)` and returning an immutable `MappingProxyType`, the SDK defers expensive AST parsing until the exact moment it is needed, shaving ~15-30ms off the initial application startup time.
+- **Optimized Import Paths:** By reducing unnecessary module imports and lazy-loading heavy components, the initialization sequence executes **~45,000 fewer function calls** than baseline versions.
+- **Impact:** Speeds up cold starts, making the SDK exceptionally well-suited for serverless environments (AWS Lambda, Google Cloud Functions).
 
-### 4. Zero-Regression Security & Context Generation (v1.8.0+)
+### 4. Zero-Regression Security Guardrails
 
-- **Centralized Pre-computation:** The `Config` object and unified `_prepare_request` architecture consolidate header merging, authentication resolution, and schema logging into a single invariant block, dropping per-request CPU cycles.
-- **Enterprise-Grade TLS Latency Tradeoff:** The SDK explicitly generates a hardened `ssl.SSLContext()` to enforce `TLSv1.2+` and mitigate MITM downgrade attacks. This introduces a strict, one-time boot cost (loading OS certificates via `set_default_verify_paths`), but ensures the active event loop and hot path remain exceptionally fast and safe.
+- Core request preparation incorporates `SecurityGuard`, `IdempotencyGuard`, and `RetryPolicy` with virtually zero performance penalty (~78 ns security tax on routing). We intentionally trade these microscopic CPU cycles to provide enterprise-grade safety.
+
+______________________________________________________________________
+
+## Benchmarks (v1.8.0 vs. v1.9.0)
+
+| Metric                      | v1.8.0 (Baseline) | v1.9.0 (Current) | Delta / Notes                          |
+| :-------------------------- | :---------------- | :--------------- | :------------------------------------- |
+| **Cold Boot Time**          | ~0.316 s          | **~0.230 s**     | **~27.2% Faster** (Optimized imports)  |
+| **Routing Speed (Mean)**    | ~0.84 µs          | **~0.92 µs**     | **+78 ns** (Security validation tax)   |
+| **Async Throughput (Mean)** | ~3.72 ms          | **~3.68 ms**     | **Stable** (Parity)                    |
+| **Sync Throughput (Mean)**  | ~9.84 ms          | **~10.39 ms**    | **+0.55 ms** (Thread coordination tax) |
+
+*Note: Tests were executed on CPython 3.13 (Apple M4 Pro, Darwin ARM64-bit) in an isolated environment.*
 
 ______________________________________________________________________
 

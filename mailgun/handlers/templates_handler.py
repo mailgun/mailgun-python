@@ -36,15 +36,21 @@ def handle_templates(
     base_url_str = str(url["base"])
 
     if domain:
-        if "/v4/" in base_url_str:
-            base_url_str = base_url_str.replace("/v4/", "/v3/")
+        # Safely downgrade version targeting ONLY the suffix
+        if base_url_str.endswith("/v4/"):
+            base_url_str = base_url_str[:-4] + "/v3/"
+        elif base_url_str.endswith("/v4"):
+            base_url_str = base_url_str[:-3] + "/v3/"
 
         base_url_str = base_url_str if base_url_str.endswith("/") else f"{base_url_str}/"
         safe_domain = SecurityGuard.sanitize_path_segment(domain)
         domain_url = f"{base_url_str}{safe_domain}{final_keys}"
     else:
-        if "/v3/" in base_url_str:
-            base_url_str = base_url_str.replace("/v3/", "/v4/")
+        # Safely upgrade version targeting ONLY the suffix
+        if base_url_str.endswith("/v3/"):
+            base_url_str = base_url_str[:-4] + "/v4/"
+        elif base_url_str.endswith("/v3"):
+            base_url_str = base_url_str[:-3] + "/v4"
 
         base_url_str = base_url_str.rstrip("/")
         domain_url = f"{base_url_str}{final_keys}"

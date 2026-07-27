@@ -1,11 +1,14 @@
 import logging
+import unittest
 from pathlib import Path
 
 import pytest
 
+from mailgun.builders import MailgunMessageBuilder
 from mailgun.client import AsyncClient, Client, Config
 from mailgun.logger import get_logger
 from mailgun.security import SecurityGuard
+from mailgun.filters import RedactingFilter
 
 CORPUS_ROOT = Path("tests/fuzz/corpus")
 
@@ -44,8 +47,7 @@ class TestConfigRegression:
         ],
     )
     def test_api_url_with_trailing_version(self, api_url: str) -> None:
-        """
-        Regression test for #40: v1.7.0 silently broke api_url values containing /v3.
+        """Regression test for #40: v1.7.0 silently broke api_url values containing /v3.
         Tests that an explicitly passed version segment does not result in duplication.
         """
         config = Config(api_url=api_url)
@@ -59,8 +61,7 @@ class TestConfigRegression:
 class TestControlCharacters:
     @pytest.mark.asyncio
     async def test_async_endpoint_rejects_control_characters(self) -> None:
-        """
-        Ensure the asynchronous client intercepts control characters injected
+        """Ensure the asynchronous client intercepts control characters injected
         via endpoint kwargs before they crash httpx.
         """
         client = AsyncClient(auth=("api", "key"))
@@ -73,8 +74,7 @@ class TestControlCharacters:
 
     @pytest.mark.asyncio
     async def test_semantic_divergence_on_control_chars(self) -> None:
-        """
-        Regression test for Semantic Divergence between Sync and Async clients
+        """Regression test for Semantic Divergence between Sync and Async clients
         caused by control characters in path segments (e.g., \x00, \x0b).
         Both must fail-closed natively with a ValueError, not a library-specific error.
         """
@@ -104,8 +104,7 @@ class TestControlCharacters:
         assert async_exc is not None, "Async client failed to reject control characters."
 
     def test_sync_endpoint_rejects_control_characters(self) -> None:
-        """
-        Ensure the synchronous client intercepts control characters injected
+        """Ensure the synchronous client intercepts control characters injected
         via endpoint kwargs before they reach the requests library.
         """
         client = Client(auth=("api", "key"))
@@ -144,8 +143,7 @@ class TestControlCharacters:
 
 class TestLoggerRegression:
     def test_logger_rejects_reserved_extra_keys(self) -> None:
-        """
-        Regression Test: Prove that Python's logging module natively rejects
+        """Regression Test: Prove that Python's logging module natively rejects
         reserved keys in the `extra` dictionary (like 'message', 'name', 'args').
 
         This validates that the fuzzer crash was a standard library defensive
@@ -197,8 +195,7 @@ class TestPathTraversal:
 
     @pytest.mark.asyncio
     async def test_regression_cve_22_unhandled_path_parameter(self) -> None:
-        """
-        Proves that dynamic path parameters (like list_id or ip)
+        """Proves that dynamic path parameters (like list_id or ip)
         are bypassing sanitize_path_segment() in the routing handlers.
         """
         # This exact combination creates the 31-character offset seen in the fuzzer crash
@@ -208,12 +205,11 @@ class TestPathTraversal:
         async with AsyncClient(auth=("api", "key"), api_url=api_url) as client:
             with pytest.raises(ValueError, match=r"Security Alert \(CWE-20\)"):
                 # The fuzzer did this dynamically via **kwargs
-                await client.ips.delete(**{"ip": malicious_ip})
+                await client.ips.delete(ip=malicious_ip)
 
     @pytest.mark.asyncio
     async def test_regression_tags_domain_sanitization(self) -> None:
-        """
-        Regression Test for Differential Fuzzer Crash:
+        """Regression Test for Differential Fuzzer Crash:
         Ensures that the 'domain' parameter in the tags handler is routed
         through sanitize_path_segment() to prevent InvalidURL crashes.
         """
@@ -250,8 +246,7 @@ class TestPathTraversal:
     def test_sanitize_path_segment_prevents_traversal(
         self, malicious_input: str
     ) -> None:
-        """
-        Regression test for path traversal vulnerabilities.
+        """Regression test for path traversal vulnerabilities.
         Ensures that encoded and raw traversal attempts are either
         stripped or raise a ValueError (fail-closed).
         """
@@ -279,3 +274,104 @@ class TestPathTraversal:
 
         with pytest.raises(ValueError, match=r"Security Alert \(CWE-20\)"):
             client.bounces.get(domain=malicious_domain)
+
+
+class TestBuilderSecurityRegression:
+    def test_add_custom_header_rejects_control_characters(self) -> None:
+        """Regression test for CWE-20/CWE-113: Block Header Injection.
+        Validates the fuzzer-discovered payload containing the \\x08 Backspace char.
+        """
+        builder = MailgunMessageBuilder("test@domain.com")
+
+        # 1. Test the exact fuzzer artifact (Backspace character)
+        with pytest.raises(ValueError, match=r"Security Alert \(CWE-20\)"):
+            builder.add_custom_header("ains\x08o", "safe_value")
+
+        # 2. Test standard CRLF Header Injection
+        with pytest.raises(ValueError, match=r"Security Alert \(CWE-20\)"):
+            builder.add_custom_header("X-Custom", "safe\r\nBcc: evil@hacker.com")
+
+    def test_set_subject_rejects_control_characters(self) -> None:
+        """Ensure subject lines cannot be used for MIME boundary manipulation."""
+        builder = MailgunMessageBuilder("test@domain.com")
+
+        with pytest.raises(ValueError, match=r"Security Alert \(CWE-20\)"):
+            builder.set_subject("Monthly Report\nContent-Type: text/html")
+
+
+class TestSecurityGuardRegression:
+    def test_verify_webhook_rejects_huge_timestamp_overflow(self) -> None:
+        """Regression test for Fuzzer-discovered OverflowError.
+        Validates that passing a massive integer (exceeding IEEE 754 64-bit float limit)
+        as a timestamp doesn't crash the application with an OverflowError.
+        """
+        huge_timestamp = 10 ** 310  # 10^310 safely exceeds the max float size (~1.79e+308)
+
+        # The SDK should fail gracefully (catch OverflowError and raise ValueError,
+        # or just return False) instead of crashing.
+        try:
+            result = SecurityGuard.verify_webhook(
+                signing_key="safe_key",
+                token="safe_token",
+                timestamp=huge_timestamp,
+                signature="safe_signature"
+            )
+            # If your SDK returns False on failure rather than raising
+            assert result is False
+        except ValueError:
+            # If your SDK raises ValueError on malformed payloads, this is a success.
+            pass
+        except OverflowError:
+            pytest.fail("Regression: SecurityGuard leaked an OverflowError on a massive timestamp.")
+
+
+class FaultyStringObject:
+    """An object whose string representation explicitly crashes."""
+    def __str__(self) -> str:
+        raise AttributeError("Simulated stringification failure")
+
+
+class SecretContainer:
+    """A helper class whose instances have a __dict__ containing secrets."""
+    def __init__(self, key: str) -> None:
+        self.key = key
+
+
+class RegressionRedactionTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.filter = RedactingFilter()
+
+    def test_faulty_stringification_object(self) -> None:
+        record = logging.LogRecord(
+            name="test",
+            level=logging.INFO,
+            pathname="test.py",
+            lineno=1,
+            msg="User login %s",
+            args=(FaultyStringObject(),),
+            exc_info=None,
+        )
+        # Should not raise an exception
+        result = self.filter.filter(record)
+        self.assertTrue(result)
+
+    def test_unhashable_set_redaction(self) -> None:
+        record = logging.LogRecord(
+            name="test",
+            level=logging.INFO,
+            pathname="test.py",
+            lineno=1,
+            msg="Data payload",
+            args=({"key-secret": {"nested": "dict"}},),
+            exc_info=None,
+        )
+        # Set containing a custom object with __dict__ that becomes unhashable when redacted
+        record.extra_set = {SecretContainer("key-token-123")}
+
+        # Should not crash and should fall back safely
+        result = self.filter.filter(record)
+        self.assertTrue(result)
+
+
+if __name__ == "__main__":
+    unittest.main()

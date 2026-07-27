@@ -6,8 +6,9 @@ import os
 import unittest
 from typing import Any
 
-from mailgun.client import Client, AsyncClient
+from mailgun.client import AsyncClient, Client
 from mailgun.handlers.error_handler import ApiError
+
 
 class CoverageIntegrationTests(unittest.TestCase):
     """Sync integration tests targeting missing coverage branches."""

@@ -4,13 +4,12 @@ from pathlib import Path
 
 import pytest
 
-from mailgun.builders import MailgunMessageBuilder, MailgunTemplateBuilder
+from mailgun.builders import ChunkedStreamer, MailgunMessageBuilder, MailgunTemplateBuilder
 
 
 class TestBuildersFailSafeMechanisms:
     def test_message_builder_converts_existing_string_recipient_to_list(self) -> None:
-        """
-        Coverage: builders.py (Lines 95->99).
+        """Coverage: builders.py (Lines 95->99).
         If a user bypasses the fluent API and directly injects a string into the payload,
         `add_recipient` must successfully detect the string, wrap it in a list, and append.
         """
@@ -23,8 +22,7 @@ class TestBuildersFailSafeMechanisms:
         assert builder._payload["to"] == ["first@example.com", "second@example.com"]
 
     def test_template_builder_raises_value_error_on_empty_payload(self) -> None:
-        """
-        Coverage: builders.py (Lines 111-113).
+        """Coverage: builders.py (Lines 111-113).
         Prevents the SDK from sending an empty dict to the Mailgun API.
         """
         builder = MailgunTemplateBuilder()
@@ -168,6 +166,76 @@ class TestMailgunMessageBuilder:
         assert payload["t:text"] == "yes"
         assert payload["t:variables"] == '{"key":"value"}'
 
+    def test_attach_file_and_inline_with_defaults(self, tmp_path: Path) -> None:
+        test_file = tmp_path / "receipt.pdf"
+        test_file.write_bytes(b"PDF Content")
+
+        builder = MailgunMessageBuilder("sender@example.com")
+        builder.attach_file(test_file)
+        builder.attach_inline(test_file, cid="custom_logo")
+
+        payload, files = builder.build()
+        assert files is not None
+        assert len(files) == 2
+        assert files[0][0] == "attachment"
+        assert files[1][0] == "inline"
+        assert files[1][1][0] == "custom_logo"
+
+    def test_attach_stream(self, tmp_path: Path) -> None:
+        test_file = tmp_path / "big_export.csv"
+        test_file.write_bytes(b"col1,col2\nval1,val2")
+
+        builder = MailgunMessageBuilder("sender@example.com")
+        builder.attach_stream(test_file, safe_base_dir=tmp_path, chunk_size=10)
+
+        _, files = builder.build()
+        assert files is not None
+        assert isinstance(files[0][1][1], ChunkedStreamer)
+
+    def test_check_deliverability_with_html_payload(self) -> None:
+        builder = MailgunMessageBuilder("sender@example.com")
+
+        # Empty HTML check
+        report_empty = builder.check_deliverability()
+        assert report_empty["is_safe"] is True
+
+        # Malformed/Risky HTML check
+        builder.set_html("<html><body><script>alert('xss');</script></body></html>")
+        report_risky = builder.check_deliverability()
+        assert report_risky["is_safe"] is False
+        issues = report_risky["issues"]
+        assert isinstance(issues, list)
+        assert any("CRITICAL" in issue for issue in issues)
+
+    def test_idempotency_safe_toggle_and_key_generation(self) -> None:
+        builder = MailgunMessageBuilder("sender@domain.com")
+        builder.set_subject("Invoice").set_text("Paid")
+
+        # Key automatically injected when enabled
+        payload1, _ = builder.build()
+        assert "h:X-Idempotency-Key" in payload1
+
+        # Key omitted when force disabled
+        builder.set_idempotency_safe(enabled=False)
+        payload2, _ = builder.build()
+        assert "h:X-Idempotency-Key" not in payload2
+
+    def test_attach_file_unknown_mimetype(self, tmp_path: Path) -> None:
+        """Coverage: Fallback branch for unknown file extensions."""
+        test_file = tmp_path / "unknown.xyz123"
+        test_file.write_bytes(b"data")
+
+        builder = MailgunMessageBuilder("test@test.com")
+        builder.attach_file(test_file, safe_base_dir=tmp_path)
+        builder.attach_stream(test_file, safe_base_dir=tmp_path)
+        builder.attach_inline(test_file, safe_base_dir=tmp_path)
+
+        _, files = builder.build()
+        assert files is not None
+        assert files[0][1][2] == "application/octet-stream"
+        assert files[1][1][2] == "application/octet-stream"
+        assert files[2][1][2] == "application/octet-stream"
+
 
 class TestMailgunTemplateBuilder:
     def test_template_builder_copy_requests(self) -> None:
@@ -238,3 +306,61 @@ class TestMailgunTemplateBuilder:
         assert "name" not in payload
         assert payload["description"] == "Updated description"
         assert payload["active"] == "no"
+
+
+class TestChunkedStreamer:
+    """Verifies safe, memory-bounded lazy loading of file attachments."""
+
+    def test_chunked_streamer_reads_in_exact_bounds(self, tmp_path: Path) -> None:
+        """Verify the generator reads files explicitly at the configured chunk sizes."""
+        # Create a dummy 1KB file
+        test_file = tmp_path / "large_attachment.pdf"
+        test_file.write_bytes(b"X" * 1024)
+
+        # Configure the streamer with safe_base_dir set to tmp_path to read precisely 256 bytes at a time
+        streamer = ChunkedStreamer(test_file, safe_base_dir=tmp_path, chunk_size=256)
+        chunks = []
+        # Simulate the requests/httpx network transport calling .read()
+        while True:
+            chunk = streamer.read(256)
+            if not chunk:
+                break
+            chunks.append(chunk)
+
+        assert len(chunks) == 4
+        assert all(len(c) == 256 for c in chunks)
+        assert b"".join(chunks) == b"X" * 1024
+
+    @pytest.mark.asyncio
+    async def test_chunked_streamer_async_aiter(self, tmp_path: Path) -> None:
+        test_file = tmp_path / "async_stream_test.txt"
+        test_file.write_bytes(b"AsyncDataStream")
+
+        streamer = ChunkedStreamer(test_file, safe_base_dir=tmp_path, chunk_size=5)
+        chunks = [chunk async for chunk in streamer]
+
+        assert chunks == [b"Async", b"DataS", b"tream"]
+
+    def test_chunked_streamer_close_and_del(self, tmp_path: Path) -> None:
+        test_file = tmp_path / "stream_close.txt"
+        test_file.write_bytes(b"Sample Content")
+
+        streamer = ChunkedStreamer(test_file, safe_base_dir=tmp_path)
+        _ = streamer.read(4)
+        assert streamer._file is not None
+
+        streamer.close()
+        assert streamer._file is None
+
+        # Ensure close is safe to call twice
+        streamer.close()
+        assert streamer.name == "stream_close.txt"
+
+    def test_chunked_streamer_sync_iter(self, tmp_path: Path) -> None:
+        """Coverage: Synchronous loop iteration over ChunkedStreamer."""
+        test_file = tmp_path / "sync_stream.txt"
+        test_file.write_bytes(b"SyncDataStream")
+        streamer = ChunkedStreamer(test_file, safe_base_dir=tmp_path, chunk_size=4)
+
+        chunks = list(streamer)
+        assert chunks == [b"Sync", b"Data", b"Stre", b"am"]

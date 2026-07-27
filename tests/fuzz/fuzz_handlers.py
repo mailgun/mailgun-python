@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
-"""
-Fuzz test for Mailgun API Route Handlers.
+"""Fuzz test for Mailgun API Route Handlers.
 Focus: Deep Path Traversal, Template Injection, and Structure-Aware Type Confusion.
 """
 
 import atexit
 import logging
 import sys
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import atheris
+
 
 with atheris.instrument_imports():
     from mailgun.handlers.bounce_classification_handler import (
@@ -108,8 +109,7 @@ _KNOWN_KWARGS = [
 
 
 def _generate_chaotic_value(fdp: atheris.FuzzedDataProvider, depth: int = 0) -> Any:
-    """
-    Structure-Aware Fuzzing Breakthrough:
+    """Structure-Aware Fuzzing Breakthrough:
     Generates valid Python structures (dicts, lists, primitives) filled with chaotic data.
     This bypasses initial type-checkers to penetrate deep URL interpolation logic.
     """
@@ -119,24 +119,23 @@ def _generate_chaotic_value(fdp: atheris.FuzzedDataProvider, depth: int = 0) -> 
     choice = fdp.ConsumeIntInRange(0, 5)
     if choice == 0:
         return fdp.ConsumeUnicodeNoSurrogates(64)  # XSS/Path Traversal Strings
-    elif choice == 1:
+    if choice == 1:
         return fdp.ConsumeInt(1000)  # Overflows/Negative ints
-    elif choice == 2:
+    if choice == 2:
         return fdp.ConsumeBool()  # Booleans
-    elif choice == 3:
+    if choice == 3:
         return None  # Null injection
-    elif choice == 4:
+    if choice == 4:
         # Fuzzed List
         return [
             _generate_chaotic_value(fdp, depth + 1)
             for _ in range(fdp.ConsumeIntInRange(0, 3))
         ]
-    else:
-        # Fuzzed Dictionary
-        return {
-            fdp.ConsumeUnicodeNoSurrogates(10): _generate_chaotic_value(fdp, depth + 1)
-            for _ in range(fdp.ConsumeIntInRange(0, 3))
-        }
+    # Fuzzed Dictionary
+    return {
+        fdp.ConsumeUnicodeNoSurrogates(10): _generate_chaotic_value(fdp, depth + 1)
+        for _ in range(fdp.ConsumeIntInRange(0, 3))
+    }
 
 
 def TestOneInput(data: bytes) -> None:
@@ -201,7 +200,8 @@ def TestOneInput(data: bytes) -> None:
                 f"CRASH: Handler {handler_name} returned non-string: {type(result)}"
             )
 
-    except (ApiError, AttributeError, KeyError, TypeError, ValueError):
+    # REMOVED: AttributeError, KeyError
+    except (ApiError, TypeError, ValueError):
         # SECURITY SUCCESS: Intercepted malformed path combinations
         pass
     except Exception as e:

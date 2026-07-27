@@ -16,7 +16,7 @@ def handle_bounces(
     domain: str | None,
     _method: str | None,
     **kwargs: Any,
-) -> Any:
+) -> str:
     """Handle Bounces URL construction.
 
     Args:
@@ -46,7 +46,7 @@ def handle_unsubscribes(
     domain: str | None,
     _method: str | None,
     **kwargs: Any,
-) -> Any:
+) -> str:
     """Handle Unsubscribes URL construction.
 
     Args:
@@ -76,7 +76,7 @@ def handle_complaints(
     domain: str | None,
     _method: str | None,
     **kwargs: Any,
-) -> Any:
+) -> str:
     """Handle Complaints URL construction.
 
     Args:

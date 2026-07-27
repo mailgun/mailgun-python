@@ -1,15 +1,19 @@
 """Unit tests for the new Security Guardrails and Performance optimizations in client.py."""
 
+import hashlib
+import hmac
 import logging
 import ssl
 import sys
+import time
+from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import httpx
 import pytest
-import requests
+import requests  # pyright: ignore[reportMissingModuleSource]
 
+from mailgun._httpx_compat import httpx as compat_httpx
 from mailgun.client import (
     AsyncClient,
     Client,
@@ -19,7 +23,7 @@ from mailgun.client import (
     SecurityGuard,
 )
 from mailgun.handlers.error_handler import ApiError
-from mailgun.security import SecretAuth
+from mailgun.security import SecretAuth, SpamGuard
 
 
 class TestSecurityGuardGeneral:
@@ -75,6 +79,143 @@ class TestSecurityGuardGeneral:
         with pytest.raises(ValueError, match="CRLF injection detected"):
             SecurityGuard.sanitize_headers({"Evil-Header": "value\nInject: bad"})
 
+    def test_secure_http_adapter_proxy_manager_for(self) -> None:
+        adapter = SecureHTTPAdapter()
+        proxy_manager = adapter.proxy_manager_for("http://proxy.local:8080")
+        assert "ssl_context" in proxy_manager.connection_pool_kw
+        assert proxy_manager.connection_pool_kw["ssl_context"].minimum_version.name == "TLSv1_2"
+
+    def test_sanitize_timeout_httpx_obj_and_limit_exceeded(self) -> None:
+        class DummyHttpxTimeout:
+            connect = 5.0
+            read = 15.0
+
+        res = SecurityGuard.sanitize_timeout(DummyHttpxTimeout())
+        assert res == (5.0, 15.0)
+
+        with pytest.raises(ValueError, match="exceeds maximum allowed boundary"):
+            SecurityGuard.sanitize_timeout(350.0)
+
+    def test_validate_attachment_path_fallbacks(self, tmp_path: Any) -> None:
+        test_file = tmp_path / "valid.txt"
+        test_file.write_bytes(b"data")
+
+        # Valid resolution without safe_base_dir
+        res = SecurityGuard.validate_attachment_path(test_file, safe_base_dir=None)  # pyright: ignore[reportArgumentType]
+        assert res == test_file.resolve()
+
+        # Reject path traversal tokens
+        # Use a string that passes the OS .exists() check but contains explicit ../ tokens
+        traversal_path = str(test_file.parent) + "/../" + test_file.parent.name + "/valid.txt"
+        with pytest.raises(ValueError, match="Path traversal tokens"):
+            SecurityGuard.validate_attachment_path(traversal_path, safe_base_dir=None)  # pyright: ignore[reportArgumentType]
+
+    def test_check_file_size_validations(self, tmp_path: Path) -> None:
+        # Non-regular file (directory)
+        with pytest.raises(ValueError, match="Path is not a regular file"):
+            SecurityGuard.check_file_size(tmp_path)
+
+        # File exceeding MB limit
+        large_file = tmp_path / "large.bin"
+        large_file.write_bytes(b"X" * (2 * 1024 * 1024))
+        with pytest.raises(ValueError, match="File exceeds Mailgun's 1MB limit"):
+            SecurityGuard.check_file_size(large_file, max_size_mb=1)
+
+    def test_verify_webhook_crypto_math_and_expiration(self) -> None:
+        signing_key = "secret_key"
+        token = "token123"
+        now = int(time.time())
+        msg = f"{now}{token}".encode()
+        sig = hmac.new(signing_key.encode("utf-8"), msg, hashlib.sha256).hexdigest()
+
+        # Valid webhook
+        assert SecurityGuard.verify_webhook(signing_key, token, now, sig) is True
+
+        # Expired webhook (TTL exceeded)
+        expired_ts = now - 600
+        assert SecurityGuard.verify_webhook(signing_key, token, expired_ts, sig) is False
+
+    def test_normalize_domain_punycode(self) -> None:
+        assert SecurityGuard.normalize_domain("укр.net") == "xn--j1amh.net"
+        assert SecurityGuard.normalize_domain(None) == ""
+
+    def test_check_file_size_directory(self, tmp_path: Path) -> None:
+        """Coverage: Fails on non-regular files."""
+        with pytest.raises(ValueError, match="not a regular file"):
+            SecurityGuard.check_file_size(tmp_path)
+
+    def test_verify_webhook_coverage(self) -> None:
+        """Coverage: Hits type errors and expiration."""
+        with pytest.raises(TypeError, match="must be a valid integer"):
+            SecurityGuard.verify_webhook(b"key", "token", "invalid", "sig")
+        assert SecurityGuard.verify_webhook(b"key", "token", 0, "sig") is False
+
+    def test_normalize_domain_error(self) -> None:
+        """Coverage: Hits UnicodeError fallback."""
+        with pytest.raises(ValueError, match="Invalid domain name encoding"):
+            # IDNA labels are strictly limited to 63 characters.
+            # 64 characters deterministically triggers a UnicodeError.
+            SecurityGuard.normalize_domain("a" * 64 + ".com")
+
+    def test_validate_attachment_path_does_not_exist(self, tmp_path: Path) -> None:
+        """Coverage: Files that do not exist."""
+        with pytest.raises(ValueError, match="Invalid attachment path or not a file"):
+            SecurityGuard.validate_attachment_path(tmp_path / "ghost.txt", safe_base_dir=tmp_path)
+
+    def test_validate_attachment_path_forbidden_roots(self) -> None:
+        """Coverage: Hardcoded forbidden roots fallback across OS environments."""
+        with patch("mailgun.security.Path") as mock_path_cls:
+            mock_target = MagicMock()
+            mock_target.exists.return_value = True
+            mock_target.is_file.return_value = True
+            mock_target.parts = ("/", "etc", "sensitive_system_config.conf")
+            mock_target.__str__.return_value = "/etc/sensitive_system_config.conf"  # type: ignore[attr-defined]
+            mock_target.is_relative_to.return_value = False  # Prevent mock short-circuiting
+
+            mock_path_cls.return_value.resolve.return_value = mock_target
+
+            with pytest.raises(ValueError, match="Access to sensitive OS system directories"):
+                SecurityGuard.validate_attachment_path("/etc/sensitive_system_config.conf", safe_base_dir=None)  # pyright: ignore[reportArgumentType]
+
+    def test_verify_webhook_overflow_error(self) -> None:
+        """Coverage: Massive timestamps triggering an OverflowError in the math blocks."""
+        massive_ts = 10**310
+        with pytest.raises(ValueError, match="Invalid cryptographic payload or timestamp out of bounds"):
+            SecurityGuard.verify_webhook(b"key", "token", massive_ts, "sig")
+
+    def test_analyze_html_image_with_alt_tag(self) -> None:
+        """Coverage: Branches where the image is present and DOES have an alt tag."""
+        report = SpamGuard.check_html("<html><body><img src='test.png' alt='logo'/></body></html>")
+        assert report["score"] == 100.0
+        assert report["is_safe"] is True
+
+    def test_redacting_filter_deep_redact_types(self) -> None:
+        """Coverage: Execute the deep redaction tree for all edge-case Python types."""
+        from collections import namedtuple
+        log_filter = RedactingFilter()
+        LogData = namedtuple("LogData", ["key"])
+
+        class CustomObj:
+            def __init__(self) -> None:
+                self.key = "key-secret"
+
+        # Primitive Types
+        assert log_filter._deep_redact(123) == 123
+        assert log_filter._deep_redact(None) is None
+
+        # NamedTuple
+        nt = LogData(key="key-secret")
+        res_nt = log_filter._deep_redact(nt)
+        assert res_nt.key == "key-[REDACTED]"
+
+        # Custom Class Object
+        co = CustomObj()
+        res_co = log_filter._deep_redact(co)
+        assert res_co["key"] == "key-[REDACTED]"
+
+        # Iterables
+        assert log_filter._deep_redact(["key-123"]) == ["key-[REDACTED]"]
+        assert log_filter._deep_redact({"key-123"}) == {"key-[REDACTED]"}
 
 class TestSecurityGuardSSRFAndURL:
     """CWE-319, CWE-918, and URL validation logic."""
@@ -165,9 +306,9 @@ class TestSecurityGuardPathSegments:
 class TestSecurityGuardResourceExhaustion:
     """CWE-400 and file size limits."""
 
-    def test_infinite_timeout_emits_deprecation_warning(self) -> None:
-        with pytest.warns(DeprecationWarning, match="allows infinite socket blocking \\(CWE-400\\)"):
-            assert SecurityGuard.sanitize_timeout(None) is None
+    def test_infinite_timeout_raises_value_error(self) -> None:
+        with pytest.raises(ValueError, match="Infinite timeouts are forbidden"):
+            SecurityGuard.sanitize_timeout(None)
 
     def test_valid_timeout_passes_cleanly(self) -> None:
         assert SecurityGuard.sanitize_timeout((10.0, 60.0)) == (10.0, 60.0)
@@ -282,7 +423,7 @@ class TestTransportSecurity:
 
             # Ensure handle_async_request is an AsyncMock that returns a valid response
             mock_transport_instance.handle_async_request = AsyncMock(
-                return_value=httpx.Response(200)
+                return_value=compat_httpx.Response(200)
             )
 
             await client.domains.get()
@@ -309,13 +450,13 @@ class TestExceptionSafety:
         """Verify that when an async network failure occurs, the logger uses safe_url_for_log."""
         client = AsyncClient(auth=("api", "key"))
 
-        with patch("httpx.AsyncHTTPTransport") as mock_transport_class:
+        with patch("mailgun.client.httpx.AsyncHTTPTransport") as mock_transport_class:
             mock_transport_instance = AsyncMock()
             mock_transport_class.return_value = mock_transport_instance
 
             # Set the side_effect on the async handler
             mock_transport_instance.handle_async_request = AsyncMock(
-                side_effect=httpx.ConnectError("DNS failure")
+                side_effect=compat_httpx.ConnectError("DNS failure")
             )
 
             with pytest.raises(ApiError, match="Network routing failed"):

@@ -2,23 +2,26 @@
 """Fuzz test for PEP 578 sys.audit Runtime Security boundary."""
 
 import sys
+
 import atheris
+
 
 with atheris.instrument_imports():
     # Replace with the actual module where your audit emissions happen
-    import mailgun.client
+    pass
 
 def TestOneInput(data: bytes) -> None:
     if len(data) < 5:
         return
 
     fdp = atheris.FuzzedDataProvider(data)
+    fuzzed_method = fdp.ConsumeUnicodeNoSurrogates(16)
     fuzzed_url = fdp.ConsumeUnicodeNoSurrogates(256)
 
     try:
         # Simulate the SDK's internal emission of an audit event
         # If fuzzed_url contains '\x00', sys.audit will throw a native ValueError
-        sys.audit("mailgun.api.request", "GET", fuzzed_url)
+        sys.audit("mailgun.api.request", fuzzed_method, fuzzed_url)
 
     except ValueError as e:
         if "embedded null" in str(e).lower():

@@ -5,6 +5,7 @@ from typing import Any
 
 import atheris
 
+
 with atheris.instrument_imports():
     from mailgun.builders import MailgunMessageBuilder, MailgunTemplateBuilder
 
@@ -130,6 +131,8 @@ def TestOneInput(data: bytes) -> None:
             "Cannot build template payload without template content",
             "Exceeds the limit",
             "Invalid recipient type",
+            "Security Alert (CWE-20)",
+            "Security Alert (CWE-113)",
             "Security Alert (CWE-400)",
             "Template content cannot be empty",
             "Template name cannot be empty",

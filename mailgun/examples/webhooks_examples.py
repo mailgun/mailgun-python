@@ -60,9 +60,7 @@ def put_webhook_sync(api_key: str, domain: str) -> None:
     PUT /v3/domains/<domain>/webhooks/<webhook_name>
     :return: None
     """
-    data: dict[str, Any] = {
-        "url": ["https://facebook.com", "https://google.com"],
-    }
+    data = [("url", "https://facebook.com"), ("url", "https://google.com")]
     with Client(auth=("api", api_key)) as client:
         response = client.domains_webhooks.put(domain=domain, webhook_name="clicked", data=data)
         print("PUT Webhook (Sync):", response.json())
@@ -119,9 +117,7 @@ async def put_webhook_async(api_key: str, domain: str) -> None:
     PUT /v3/domains/<domain>/webhooks/<webhook_name> (Asynchronous)
     :return: None
     """
-    data: dict[str, Any] = {
-        "url": ["https://facebook.com", "https://google.com"],
-    }
+    data = [("url", "https://facebook.com"), ("url", "https://google.com")]
     async with AsyncClient(auth=("api", api_key)) as client:
         response = await client.domains_webhooks.put(
             domain=domain, webhook_name="clicked", data=data

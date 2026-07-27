@@ -120,9 +120,14 @@ def handle_sending_queues(
     """
     keys = url.get("keys", [])
     if "sending_queues" in keys or "sendingqueues" in keys:
-        base_clean = str(url["base"]).replace("domains/", "").replace("domains", "").rstrip("/")
+        # Safely strip the trailing suffix without mangling custom proxy hosts
+        base_clean = str(url["base"]).rstrip("/")
+        if base_clean.endswith("/domains"):
+            base_clean = base_clean.removesuffix("/domains")
+
         safe_domain = SecurityGuard.sanitize_path_segment(domain) if domain else ""
         return f"{base_clean}/{safe_domain}/sending_queues"
+
     return str(url["base"])
 
 
@@ -199,6 +204,8 @@ def handle_webhooks(  # noqa: PLR0914
     url: dict[str, Any],
     domain: str | None,
     method: str | None,
+    data: dict[str, Any] | None = None,
+    filters: dict[str, Any] | None = None,
     **kwargs: Any,
 ) -> str:
     """Dynamically route webhooks to v1, v3, or v4 based on domain and payload.
@@ -232,12 +239,12 @@ def handle_webhooks(  # noqa: PLR0914
         webhook_name = webhook_name or keys[1]
         keys = [keys[0]]
 
-    data = kwargs.get("data") or {}
-    filters = kwargs.get("filters") or {}
+    data_dict = data or {}
+    filters_dict = filters or {}
 
     # Payload Detection (Content-Based Routing)
-    has_event_types = isinstance(data, dict) and "event_types" in data
-    has_url_query = isinstance(filters, dict) and "url" in filters
+    has_event_types = isinstance(data_dict, dict) and "event_types" in data_dict
+    has_url_query = isinstance(filters_dict, dict) and "url" in filters_dict
     method_lower = (method or "").lower()
 
     is_v4 = False

@@ -41,6 +41,7 @@ from tests.conftest import (
     TEST_EMAIL,
 )
 
+
 BASE_URL_V5 = "https://api.mailgun.net/v5"
 
 

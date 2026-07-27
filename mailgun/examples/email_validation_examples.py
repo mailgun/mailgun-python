@@ -213,11 +213,11 @@ if __name__ == "__main__":
         get_bulk_validate_sync(api_key=API_KEY)
         post_bulk_list_validate_sync(api_key=API_KEY, csv_filepath=VALIDATION_CSV)
         get_bulk_list_validate_sync(api_key=API_KEY)
-        # delete_bulk_list_validate_sync(api_key=API_KEY, domain=DOMAIN)
+        # delete_bulk_list_validate_sync(api_key=API_KEY)
 
         get_preview_sync(api_key=API_KEY)
         post_preview_sync(api_key=API_KEY, csv_filepath=PREVIEW_CSV)
-        # delete_preview_sync(api_key=API_KEY, domain=DOMAIN)
+        # delete_preview_sync(api_key=API_KEY)
 
         print("\n--- Running Asynchronous Examples ---")
         asyncio.run(post_single_validate_async(api_key=API_KEY))

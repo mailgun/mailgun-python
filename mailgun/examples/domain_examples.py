@@ -50,7 +50,7 @@ def get_simple_domain_sync(api_key: str, domain_name: str) -> None:
     :return: None
     """
     with Client(auth=("api", api_key)) as client:
-        response = client.domains.get(domain_name=domain_name)
+        response = client.domains.get(domain=domain_name)
         print("GET Simple Domain:", response.json())
 
 
@@ -221,14 +221,14 @@ def get_dkim_keys_sync(api_key: str, domain_name: str) -> None:
     GET /v1/dkim/keys
     :return: None
     """
-    data: dict[str, str] = {
+    params = {
         "page": "string",
         "limit": "0",
         "signing_domain": domain_name,
         "selector": "smtp",
     }
     with Client(auth=("api", api_key)) as client:
-        response = client.dkim_keys.get(data=data)
+        response = client.dkim_keys.get(filters=params)
         print("GET DKIM Keys:", response.json())
 
 

@@ -1,5 +1,7 @@
 import asyncio
+import io
 import logging
+from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -7,7 +9,9 @@ import httpx
 import pytest
 import requests  # pyright: ignore[reportMissingModuleSource]
 
+from mailgun.builders import ChunkedStreamer
 from mailgun.client import BaseEndpoint, Endpoint
+from mailgun.config import RetryPolicy
 from mailgun.endpoints import AsyncEndpoint, build_path_from_keys
 from mailgun.handlers.error_handler import ApiError
 from tests.conftest import BASE_URL_V3, BASE_URL_V4
@@ -35,8 +39,7 @@ class TestBaseEndpointBuildUrl:
 
 class TestEndpointCoreMechanics:
     def test_build_path_from_keys_returns_empty_string_for_empty_input(self) -> None:
-        """
-        Coverage: endpoints.py (Lines 76-78).
+        """Coverage: endpoints.py (Lines 76-78).
         Ensures the path builder safely bypasses URL segment processing if empty.
         """
         assert build_path_from_keys([]) == ""
@@ -60,7 +63,7 @@ class TestEndpointCoreMechanics:
 
 class TestEndpointDryRun:
     def test_api_call_dry_run_intercepts_request(self) -> None:
-        """Ensure Sandbox mode prevents networking from executing."""
+        """Ensure dry_run mode intercepts email messages and returns a mock response."""
         url = {"base": f"{BASE_URL_V3}/", "keys": ["messages"]}
         ep = Endpoint(url=url, headers={}, auth=("api", "key"), dry_run=True)
         with patch.object(requests.Session, "request") as mock_req:
@@ -68,6 +71,19 @@ class TestEndpointDryRun:
 
             mock_req.assert_not_called()
             assert resp.status_code == 200
+            # The messages endpoint returns a standard dry run mock
+            assert "Dry run successful" in resp.json()["message"]
+
+    def test_api_call_dry_run_standard_route(self) -> None:
+        """Ensure standard routes fallback to the generic JSON mock."""
+        url = {"base": f"{BASE_URL_V3}/", "keys": ["domains"]}
+        ep = Endpoint(url=url, headers={}, auth=("api", "key"), dry_run=True)
+        with patch.object(requests.Session, "request") as mock_req:
+            resp = ep.get()
+
+            mock_req.assert_not_called()
+            assert resp.status_code == 200
+            # Standard routes still return the basic dry run message
             assert "Dry run successful" in resp.json()["message"]
 
     def test_api_call_dry_run_logs_interception(
@@ -83,6 +99,7 @@ class TestEndpointDryRun:
         )
 
     def test_async_api_call_dry_run_intercepts_request(self) -> None:
+        """Ensure Async dry_run mode intercepts email messages and returns a mock response."""
         url = {"base": f"{BASE_URL_V3}/", "keys": ["messages"]}
 
         mock_client = AsyncMock(spec=httpx.AsyncClient)
@@ -91,15 +108,34 @@ class TestEndpointDryRun:
         )
 
         async def run_test() -> None:
-            # We don't need to patch.object because ep uses mock_client natively now
             resp = await ep.create(
                 domain="test.com", data={"to": "test@example.com"}
             )
             mock_client.request.assert_not_called()
             assert resp.status_code == 200
+            # The messages endpoint returns a standard dry run mock
             assert "Dry run successful" in resp.json()["message"]
 
         asyncio.run(run_test())
+
+    def test_async_api_call_dry_run_standard_route(self) -> None:
+        """Ensure standard async routes fallback to the generic JSON mock."""
+        url = {"base": f"{BASE_URL_V3}/", "keys": ["domains"]}
+
+        mock_client = AsyncMock(spec=httpx.AsyncClient)
+        ep = AsyncEndpoint(
+            url=url, headers={}, auth=("api", "key"), dry_run=True, client=mock_client
+        )
+
+        async def run_test() -> None:
+            resp = await ep.get()
+            mock_client.request.assert_not_called()
+            assert resp.status_code == 200
+            # Standard routes still return the basic dry run message
+            assert "Dry run successful" in resp.json()["message"]
+
+        asyncio.run(run_test())
+
 
 class TestEndpointEdgeCases:
     def test_build_path_from_keys_empty_and_iterables(self) -> None:
@@ -154,18 +190,16 @@ class TestEndpointErrorHandling:
             requests.Session,
             "request",
             side_effect=requests.exceptions.RequestException("Boom"),
-        ):
-            with pytest.raises(ApiError, match="Boom"):
-                ep.get()
+        ), pytest.raises(ApiError, match="Boom"):
+            ep.get()
 
     def test_api_call_raises_timeout_error_on_timeout(self) -> None:
         url = {"base": "https://api.mailgun.net/v4/", "keys": ["domainlist"]}
         ep = Endpoint(url=url, headers={}, auth=None)
         with patch.object(
             requests.Session, "request", side_effect=requests.exceptions.Timeout()
-        ):
-            with pytest.raises(TimeoutError):
-                ep.get()
+        ), pytest.raises(TimeoutError):
+            ep.get()
 
     @patch("mailgun.endpoints.logger.error")
     def test_api_call_truncates_long_error_response(
@@ -188,8 +222,7 @@ class TestEndpointErrorHandling:
 
 class TestEndpointHTTPMethods:
     def test_async_endpoint_put_delete_methods(self) -> None:
-        """
-        Coverage: endpoints.py (Lines 612->615, 716, 832, 949->952).
+        """Coverage: endpoints.py (Lines 612->615, 716, 832, 949->952).
         Covers the direct method proxy functions for put and delete edge cases.
         """
         url = {"base": "https://api.mailgun.net/v3/", "keys": ["domains"]}
@@ -358,8 +391,7 @@ class TestEndpointSerialization:
             assert sent_data == '{"name":"test.com","spam_action":"disabled"}'
 
     def test_endpoint_request_ignores_invalid_custom_headers_type(self) -> None:
-        """
-        Coverage: endpoints.py (Lines 108-110, 136-138).
+        """Coverage: endpoints.py (Lines 108-110, 136-138).
         Ensures `_merge_headers` falls back safely to default headers if invalid.
         """
         url = {"base": "https://api.mailgun.net/v3/", "keys": ["messages"]}
@@ -434,3 +466,53 @@ class TestEndpointSerialization:
             assert (
                 mock_req.call_args[1]["headers"]["Content-Type"] == "application/json"
             )
+
+class TestEndpointRetryAndStreamPointers:
+    def test_reset_stream_pointers(self, tmp_path: Path) -> None:
+        test_file = tmp_path / "test.txt"
+        test_file.write_bytes(b"content")
+
+        streamer = ChunkedStreamer(test_file, safe_base_dir=tmp_path)
+        _ = streamer.read(2)
+
+        buffer = io.BytesIO(b"data")
+        buffer.read(2)
+
+        files = [
+            ("file1", ("test.txt", streamer, "text/plain")),
+            ("file2", ("buffer.bin", buffer, "application/octet-stream")),
+        ]
+
+        BaseEndpoint._reset_stream_pointers(files)
+        assert buffer.tell() == 0
+
+    def test_sync_endpoint_retries_transient_500_and_429(self) -> None:
+        url = {"base": "https://api.mailgun.net/v3/", "keys": ["messages"]}
+        policy = RetryPolicy(max_retries=1, base_delay=0.01)
+        ep = Endpoint(url=url, headers={}, auth=("api", "key"))
+        ep.retry_policy = policy  # type: ignore[assignment]
+
+        resp_500 = MagicMock(status_code=500)
+        resp_200 = MagicMock(status_code=200)
+
+        with patch.object(requests.Session, "request", side_effect=[resp_500, resp_200]):
+            res = ep.create(domain="test.com", data={"to": "user@test.com"})
+            assert res.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_async_endpoint_retries_transient_error(self) -> None:
+        url = {"base": "https://api.mailgun.net/v3/", "keys": ["messages"]}
+        policy = RetryPolicy(max_retries=1, base_delay=0.01)
+
+        mock_client = AsyncMock(spec=httpx.AsyncClient)
+        ep = AsyncEndpoint(url=url, headers={}, auth=("api", "key"), client=mock_client)
+        ep.retry_policy = policy  # type: ignore[assignment]
+
+        resp_503 = MagicMock(status_code=503)
+        resp_200 = MagicMock(status_code=200)
+
+        mock_client.request.side_effect = [resp_503, resp_200]
+        res = await ep.create(domain="test.com", data={"to": "user@test.com"})
+
+        assert res.status_code == 200
+        assert mock_client.request.call_count == 2
