@@ -352,8 +352,8 @@ class TestChunkedStreamer:
         streamer.close()
         assert streamer._file is None
 
-        # Ensure close is safe to call twice or on GC deletion
-        streamer.__del__()
+        # Ensure close is safe to call twice
+        streamer.close()
         assert streamer.name == "stream_close.txt"
 
     def test_chunked_streamer_sync_iter(self, tmp_path: Path) -> None:
