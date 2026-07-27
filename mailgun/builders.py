@@ -316,7 +316,7 @@ class MailgunMessageBuilder:
         if not content_type:
             content_type = "application/octet-stream"
 
-        streamer = ChunkedStreamer(path, chunk_size=chunk_size)
+        streamer = ChunkedStreamer(path, safe_base_dir=safe_base_dir, chunk_size=chunk_size)
 
         self._files.append(("attachment", (path.name, streamer, content_type)))
 
