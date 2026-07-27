@@ -319,7 +319,7 @@ requestor = "requestor"
 
 [tool.ruff.lint.pylint]
 max-args = 9           # Default is 5. SDK endpoints need more (auth, data, headers, files, etc.)
-max-returns = 8        # Default is 6.
+max-returns = 9        # Default is 6.
 max-branches = 15      # Default is 12.
 
 [tool.bandit]

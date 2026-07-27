@@ -1,4 +1,5 @@
 import logging
+import unittest
 from pathlib import Path
 
 import pytest
@@ -7,7 +8,7 @@ from mailgun.builders import MailgunMessageBuilder
 from mailgun.client import AsyncClient, Client, Config
 from mailgun.logger import get_logger
 from mailgun.security import SecurityGuard
-
+from mailgun.filters import RedactingFilter
 
 CORPUS_ROOT = Path("tests/fuzz/corpus")
 
@@ -298,8 +299,6 @@ class TestBuilderSecurityRegression:
             builder.set_subject("Monthly Report\nContent-Type: text/html")
 
 
-# Add this class to your tests/test_regression.py
-
 class TestSecurityGuardRegression:
     def test_verify_webhook_rejects_huge_timestamp_overflow(self) -> None:
         """Regression test for Fuzzer-discovered OverflowError.
@@ -324,3 +323,55 @@ class TestSecurityGuardRegression:
             pass
         except OverflowError:
             pytest.fail("Regression: SecurityGuard leaked an OverflowError on a massive timestamp.")
+
+
+class FaultyStringObject:
+    """An object whose string representation explicitly crashes."""
+    def __str__(self) -> str:
+        raise AttributeError("Simulated stringification failure")
+
+
+class SecretContainer:
+    """A helper class whose instances have a __dict__ containing secrets."""
+    def __init__(self, key: str) -> None:
+        self.key = key
+
+
+class RegressionRedactionTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.filter = RedactingFilter()
+
+    def test_faulty_stringification_object(self) -> None:
+        record = logging.LogRecord(
+            name="test",
+            level=logging.INFO,
+            pathname="test.py",
+            lineno=1,
+            msg="User login %s",
+            args=(FaultyStringObject(),),
+            exc_info=None,
+        )
+        # Should not raise an exception
+        result = self.filter.filter(record)
+        self.assertTrue(result)
+
+    def test_unhashable_set_redaction(self) -> None:
+        record = logging.LogRecord(
+            name="test",
+            level=logging.INFO,
+            pathname="test.py",
+            lineno=1,
+            msg="Data payload",
+            args=({"key-secret": {"nested": "dict"}},),
+            exc_info=None,
+        )
+        # Set containing a custom object with __dict__ that becomes unhashable when redacted
+        record.extra_set = {SecretContainer("key-token-123")}
+
+        # Should not crash and should fall back safely
+        result = self.filter.filter(record)
+        self.assertTrue(result)
+
+
+if __name__ == "__main__":
+    unittest.main()
