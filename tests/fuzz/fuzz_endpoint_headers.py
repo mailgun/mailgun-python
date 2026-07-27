@@ -7,6 +7,7 @@ from typing import Any
 
 import atheris
 
+
 with atheris.instrument_imports():
     from mailgun.endpoints import BaseEndpoint
     from mailgun.security import SecretAuth

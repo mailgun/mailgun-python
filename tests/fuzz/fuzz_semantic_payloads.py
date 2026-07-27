@@ -8,6 +8,7 @@ from typing import Any
 
 import atheris  # pyright: ignore[reportMissingModuleSource]
 
+
 with atheris.instrument_imports():
     from mailgun.client import Client
     from mailgun.handlers.error_handler import ApiError
@@ -15,8 +16,7 @@ with atheris.instrument_imports():
 logging.disable(logging.CRITICAL)
 
 def _generate_structured_payload(fdp: atheris.FuzzedDataProvider) -> dict[str, Any]:
-    """
-    Generates a deeply nested, semantically valid dictionary.
+    """Generates a deeply nested, semantically valid dictionary.
     Instead of random bytes, we generate structured Python objects
     that map to JSON boundaries (ints, floats, strings, lists, dicts).
     """

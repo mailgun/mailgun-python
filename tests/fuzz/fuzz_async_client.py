@@ -8,11 +8,12 @@ from pathlib import Path
 from typing import Any
 
 import atheris
-from mailgun._httpx_compat import httpx as compat_httpx
 
 from mailgun import routes
+from mailgun._httpx_compat import httpx as compat_httpx
 from mailgun.client import AsyncClient
 from mailgun.handlers.error_handler import ApiError
+
 
 _FUZZ_LOOP = asyncio.new_event_loop()
 _VALID_ENDPOINTS = list(routes.EXACT_ROUTES.keys()) + list(routes.PREFIX_ROUTES.keys())

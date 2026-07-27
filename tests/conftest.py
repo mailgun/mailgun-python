@@ -5,6 +5,7 @@ from urllib.parse import urlparse
 
 import pytest
 
+
 BASE_URL_V1: str = "https://api.mailgun.net/v1"
 BASE_URL_V2: str = "https://api.mailgun.net/v2"
 BASE_URL_V3: str = "https://api.mailgun.net/v3"

@@ -17,8 +17,7 @@ class TestLoggerInitialization:
         assert len(redacting_filters) == 1
 
     def test_get_logger_non_mailgun_namespace(self) -> None:
-        """
-        Coverage: logger.py (Lines 29->34).
+        """Coverage: logger.py (Lines 29->34).
         Ensures that if the logger is requested by an external module,
         the RedactingFilter is still applied, but we bypass adding the root NullHandler.
         """

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Structure-Aware Fuzz Test for Mailgun AsyncClient.
+"""Structure-Aware Fuzz Test for Mailgun AsyncClient.
 This fuzzer targets dynamic structural boundaries and state sequences.
 """
 
@@ -10,10 +9,12 @@ import sys
 from typing import Any
 
 import atheris
+
 from mailgun._httpx_compat import httpx as compat_httpx
 from mailgun.client import AsyncClient
 from mailgun.handlers.error_handler import ApiError
 from mailgun.security import SecurityGuard
+
 
 # 1. Disable logging to maximize fuzzer throughput (executions/sec)
 # Muting stdout increases executions from ~40k/sec to ~100k+/sec

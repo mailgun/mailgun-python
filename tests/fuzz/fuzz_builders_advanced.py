@@ -9,6 +9,7 @@ from pathlib import Path
 
 import atheris  # pyright: ignore[reportMissingModuleSource]
 
+
 with atheris.instrument_imports():
     from mailgun.builders import MailgunMessageBuilder
 
@@ -44,12 +45,18 @@ def TestOneInput(data: bytes) -> None:
                 # Fuzz the Deliverability static analyzer through the builder
                 builder.check_deliverability()
             elif op_code == 2:
-                # Fuzz the new Chunked Streamer (CWE-400 mitigation)
-                chunk_size = fdp.ConsumeIntInRange(-10, 100000)
-                builder.attach_stream(
-                    file_path=tmp_path,
-                    chunk_size=chunk_size
-                )
+                # Fuzz the Chunked Streamer with aggressive chunk bounds
+                # Testing 0, negative integers, and extreme buffer sizes
+                chunk_size = fdp.ConsumeIntInRange(-1000, 10000000)
+
+                try:
+                    builder.attach_stream(
+                        file_path=tmp_path,
+                        chunk_size=chunk_size
+                    )
+                except (ValueError, TypeError):
+                    # We expect the builder to reject <= 0 chunk sizes safely
+                    pass
             elif op_code == 3:
                 # Fuzz inline attachments
                 custom_cid = fdp.ConsumeUnicodeNoSurrogates(16) if fdp.ConsumeBool() else None

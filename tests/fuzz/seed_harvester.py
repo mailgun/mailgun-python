@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Mailgun Enhanced Fuzzer Seed Harvester
+"""Mailgun Enhanced Fuzzer Seed Harvester
 Harvests successful AND error-case payloads to seed the fuzzing corpus.
 """
 
@@ -10,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import requests
+
 
 # Ensure configuration is robust
 API_KEY = os.environ.get("APIKEY")
@@ -39,10 +39,27 @@ TARGETS: list[dict[str, Any]] = [
         "params": {"address": "test@example.com"},
         "url": "https://api.mailgun.net/v4/address/validate",
     },
+    # NEW ENDPOINTS ADDED BELOW
     {
         "method": "GET",
         "name": "webhooks_get",
         "url": f"https://api.mailgun.net/v3/domains/{DOMAIN}/webhooks",
+    },
+    {
+        "method": "GET",
+        "name": "domains_get",
+        "url": "https://api.mailgun.net/v4/domains",
+    },
+    {
+        "method": "GET",
+        "name": "events_get",
+        "params": {"limit": 5},
+        "url": f"https://api.mailgun.net/v3/{DOMAIN}/events",
+    },
+    {
+        "method": "GET",
+        "name": "lists_get",
+        "url": "https://api.mailgun.net/v3/lists",
     },
     {
         "method": "GET",
@@ -51,29 +68,40 @@ TARGETS: list[dict[str, Any]] = [
     },
     {
         "method": "GET",
-        "name": "lists_get",
-        "url": "https://api.mailgun.net/v3/lists/pages",
+        "name": "ips_get",
+        "url": "https://api.mailgun.net/v3/ips",
     },
     {
         "method": "GET",
-        "name": "domains_get",
-        "url": f"https://api.mailgun.net/v3/domains/{DOMAIN}",
+        "name": "ip_pools_get",
+        "url": "https://api.mailgun.net/v3/ip_pools",
     },
+    {
+        "method": "GET",
+        "name": "stats_get",
+        "params": {"event": ["accepted", "delivered", "failed"]},
+        "url": f"https://api.mailgun.net/v3/{DOMAIN}/stats/total",
+    }
 ]
 
-# Target corpus directories mapped to all active fuzzers
+# Map specific API targets to their respective fuzzer corpus directories
 CORPUS_MAP: dict[str, list[str]] = {
-    "fuzz_async_client": ["messages_post", "validate_get"],
-    "fuzz_client": ["messages_post"],
-    "fuzz_handlers": ["routes_get", "webhooks_get", "templates_get", "lists_get", "domains_get"],
-    "fuzz_pydantic_models": ["messages_post"],  # Seeds schema validator with real payloads
-    "fuzz_webhooks": ["webhooks_get"],          # Seeds webhook parsers
+    "fuzz_handlers": [
+        "bounces_get", "routes_get", "webhooks_get", "domains_get",
+        "lists_get", "templates_get", "ips_get", "ip_pools_get", "stats_get"
+    ],
+    "fuzz_async_client": [
+        "messages_post", "events_get", "validate_get", "domains_get"
+    ],
+    "fuzz_error_parser": [
+        # Allows the error parser to learn from any 400/401/404 payloads returned
+        "messages_post", "validate_get", "templates_get"
+    ]
 }
-
 
 def harvest_seeds() -> None:
     if not API_KEY:
-        print("❌ ERROR: Set the APIKEY environment variable")
+        print("❌ Error: APIKEY environment variable is missing.")
         return
 
     auth = ("api", API_KEY)
@@ -97,7 +125,13 @@ def harvest_seeds() -> None:
             # Save the raw JSON payload
             # We save the status code in the filename so the fuzzer learns
             # to distinguish between success and error schemas
-            payload = json.dumps(resp.json(), indent=2).encode("utf-8")
+            try:
+                parsed_json = resp.json()
+            except ValueError:
+                print(f"  ⚠️ Warning: Non-JSON response for {target['name']} (HTTP {resp.status_code})")
+                parsed_json = {"raw_text": resp.text}
+
+            payload = json.dumps(parsed_json, indent=2).encode("utf-8")
 
             for folder, target_names in CORPUS_MAP.items():
                 if target["name"] in target_names:
@@ -112,7 +146,6 @@ def harvest_seeds() -> None:
 
         except Exception as e:  # noqa: BLE001
             print(f"  ❌ Failed {target['name']}: {e}")
-
 
 if __name__ == "__main__":
     harvest_seeds()

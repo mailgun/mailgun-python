@@ -2,11 +2,13 @@
 """Fuzz test for PEP 578 sys.audit Runtime Security boundary."""
 
 import sys
+
 import atheris
+
 
 with atheris.instrument_imports():
     # Replace with the actual module where your audit emissions happen
-    import mailgun.client
+    pass
 
 def TestOneInput(data: bytes) -> None:
     if len(data) < 5:

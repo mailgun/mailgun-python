@@ -5,6 +5,7 @@ from typing import Any
 
 import atheris
 
+
 with atheris.instrument_imports():
     from mailgun.builders import MailgunMessageBuilder, MailgunTemplateBuilder
 

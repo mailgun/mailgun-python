@@ -4,8 +4,7 @@ import pstats
 
 class TestBootPerformance:
     def test_client_boot_profile(self) -> None:
-        """
-        Profile the SDK boot time.
+        """Profile the SDK boot time.
 
         Placing the import INSIDE the profiled function ensures we capture
         the exact cost of Python crawling the disk to compile the modules

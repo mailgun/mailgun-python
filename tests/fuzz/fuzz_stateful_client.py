@@ -8,6 +8,7 @@ from typing import Any
 import atheris
 import requests
 
+
 with atheris.instrument_imports():
     from mailgun.client import Client
     from mailgun.handlers.error_handler import ApiError

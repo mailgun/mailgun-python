@@ -3,10 +3,13 @@
 
 import sys
 from typing import Any
+
 import atheris
+
 
 with atheris.instrument_imports():
     from pydantic import ValidationError
+
     from mailgun.ext.pydantic.models import SendMessageSchema
 
 

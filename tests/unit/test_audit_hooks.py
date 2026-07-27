@@ -1,5 +1,6 @@
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from mailgun.config import Config
 from mailgun.security import SecurityGuard

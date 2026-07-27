@@ -2,17 +2,18 @@
 
 from __future__ import annotations
 
-import json
-import os
 import email.utils
+import json
 import logging
-import unittest
+import os
 import subprocess
 import time
-from pathlib import Path
-from typing import Any, Callable
-from datetime import datetime, timedelta
+import unittest
+from collections.abc import Callable
 from contextlib import suppress
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -144,7 +145,7 @@ class DomainTests(unittest.TestCase):
         # fmt: off
         self.put_domain_unsubscribe_data: dict[str, str] = {
             "active": "yes",
-            "html_footer": "\n<br>\n<p><a href=\"%unsubscribe_url%\">UnSuBsCrIbE</a></p>\n",
+            "html_footer": '\n<br>\n<p><a href="%unsubscribe_url%">UnSuBsCrIbE</a></p>\n',
             "text_footer": "\n\nTo unsubscribe here click: <%unsubscribe_url%>\n\n",
         }
         # fmt: on
@@ -420,7 +421,6 @@ class DomainTests(unittest.TestCase):
     @pytest.mark.order(6)
     def test_post_dkim_keys_invalid_pem_string(self) -> None:
         """Test to create a domain key: expected failure to parse PEM from string."""
-
         data = {
             "signing_domain": self.test_domain,
             "selector": "smtp",
@@ -1287,7 +1287,6 @@ class RoutesTests(unittest.TestCase):
 
     def test_get_routes_match(self) -> None:
         """Test to match address to route: Happy Path with valid data."""
-
         query = {"address": self.sender}
         req = self.client.routes_match.get(domain=self.domain, filters=query)
 
@@ -2167,7 +2166,7 @@ class LogsTests(unittest.TestCase):
         now = datetime.now()
         now_formatted = now.strftime("%a, %d %b %Y %H:%M:%S +0000")
         yesterday = now - timedelta(days=1)
-        yesterday_formatted = yesterday.strftime("%a, %d %b %Y %H:%M:%S +0000")  # noqa: FURB184
+        yesterday_formatted = yesterday.strftime("%a, %d %b %Y %H:%M:%S +0000")
 
         self.invalid_account_logs_data = {
             "start": yesterday_formatted,
@@ -2333,7 +2332,6 @@ class TagsNewTests(unittest.TestCase):
     @pytest.mark.xfail(reason="Shared state: tag may have already been deleted by async tests")
     def test_delete_account_tag(self) -> None:
         """Test to delete account tag: Happy Path with valid data."""
-
         req = self.client.analytics_tags.delete(
             data=self.account_tag_info,
         )
@@ -2346,7 +2344,6 @@ class TagsNewTests(unittest.TestCase):
     @pytest.mark.order(4)
     def test_delete_account_nonexistent_tag(self) -> None:
         """Test to delete account nonexistent tag: Unhappy Path with invalid data."""
-
         req = self.client.analytics_tags.delete(
             data=self.account_tag_invalid_info,
         )
@@ -2359,7 +2356,6 @@ class TagsNewTests(unittest.TestCase):
     @pytest.mark.order(4)
     def test_delete_account_tag_with_invalid_url(self) -> None:
         """Test to delete account tag: Wrong Path with invalid URL."""
-
         req = self.client.analytics_tag.delete(
             data=self.account_tag_invalid_info,
         )
@@ -2412,7 +2408,7 @@ class BounceClassificationTests(unittest.TestCase):
         now = datetime.now()
         now_formatted = now.strftime("%a, %d %b %Y %H:%M:%S +0000")
         yesterday = now - timedelta(days=1)
-        yesterday_formatted = yesterday.strftime("%a, %d %b %Y %H:%M:%S +0000")  # noqa: FURB184
+        yesterday_formatted = yesterday.strftime("%a, %d %b %Y %H:%M:%S +0000")
 
         self.payload = {
             "start": yesterday_formatted,

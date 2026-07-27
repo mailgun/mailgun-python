@@ -1,6 +1,7 @@
 """Unit tests verifying that deprecated endpoints trigger appropriate SDK warnings."""
 
 import warnings
+
 import pytest
 
 from mailgun.client import Client

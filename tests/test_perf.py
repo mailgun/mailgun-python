@@ -1,14 +1,15 @@
 import asyncio
-from collections.abc import Generator
+from collections.abc import Coroutine, Generator
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Coroutine, cast
+from typing import Any, cast
 
-from mailgun._httpx_compat import httpx
 import pytest
 import requests  # pyright: ignore[reportMissingModuleSource]
 import responses
 
+from mailgun._httpx_compat import httpx
 from mailgun.client import AsyncClient, Client
+
 
 # ------------------------------------------------------------------------
 # FIXTURES
@@ -16,8 +17,7 @@ from mailgun.client import AsyncClient, Client
 
 @pytest.fixture
 def mocked_mailgun() -> Generator[responses.RequestsMock, None, None]:
-    """
-    Intercepts Mailgun API calls at the urllib3 layer for synchronous tests.
+    """Intercepts Mailgun API calls at the urllib3 layer for synchronous tests.
     assert_all_requests_are_fired=False prevents teardown errors if a test fails early.
     """
     with responses.RequestsMock(assert_all_requests_are_fired=False) as rsps:
@@ -35,8 +35,7 @@ def mocked_mailgun() -> Generator[responses.RequestsMock, None, None]:
 # ------------------------------------------------------------------------
 
 def test_client_routing_speed(benchmark: Any) -> None:
-    """
-    Measures the pure CPU overhead of the __getattr__ dynamic router.
+    """Measures the pure CPU overhead of the __getattr__ dynamic router.
     This proves the efficiency of the lru_cache and magic-method short-circuits.
     """
     client = Client(auth=("api", "key"))
@@ -54,8 +53,7 @@ def test_client_routing_speed(benchmark: Any) -> None:
 # ------------------------------------------------------------------------
 
 def test_sync_client_concurrent_throughput(benchmark: Any, mocked_mailgun: responses.RequestsMock) -> None:
-    """
-    Measures how fast the synchronous Client can dispatch concurrent requests.
+    """Measures how fast the synchronous Client can dispatch concurrent requests.
     This proves that pool_maxsize=100 prevents ThreadPoolExecutor bottlenecks.
     """
     BATCH_SIZE = 50
@@ -91,8 +89,7 @@ def test_sync_client_concurrent_throughput(benchmark: Any, mocked_mailgun: respo
 # ------------------------------------------------------------------------
 
 def test_async_client_concurrent_throughput(benchmark: Any) -> None:
-    """
-    Measures how fast the AsyncClient can dispatch concurrent requests.
+    """Measures how fast the AsyncClient can dispatch concurrent requests.
     This proves that httpx.Limits(max_connections=100) prevents asyncio bottlenecks.
     """
     BATCH_SIZE = 50
@@ -166,5 +163,5 @@ def test_async_client_concurrent_throughput(benchmark: Any) -> None:
         # Safely close the async client
         aclose_method = getattr(client, "aclose", None)
         if callable(aclose_method):
-            coro = cast(Coroutine[Any, Any, None], cast(object, aclose_method()))
+            coro = cast("Coroutine[Any, Any, None]", cast("object", aclose_method()))
             asyncio.run(coro)

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Fuzz test for Network Resilience and 'Evil Server' payload handling (Async/HTTPX)."""
 
 import asyncio
 import atexit
@@ -12,6 +13,7 @@ from typing import Any
 
 import atheris
 
+
 with atheris.instrument_imports():
     from mailgun._httpx_compat import httpx as compat_httpx
     from mailgun.client import AsyncClient
@@ -23,7 +25,7 @@ asyncio.set_event_loop(_FUZZ_LOOP)
 
 
 def TestOneInput(data: bytes) -> None:
-    if len(data) < 10:
+    if len(data) < 20:
         return
 
     fdp = atheris.FuzzedDataProvider(data)
@@ -40,13 +42,32 @@ def TestOneInput(data: bytes) -> None:
                 compat_httpx.NetworkError("Fuzzed Network Error"),
                 compat_httpx.ProtocolError("Fuzzed Protocol Error"),
                 compat_httpx.ReadTimeout("Fuzzed Timeout"),
+                compat_httpx.TooManyRedirects("Infinite Redirect Loop"),
             ]
             raise fdp.PickValueInList(exceptions)
 
-        status = fdp.PickValueInList([200, 400, 401, 403, 404, 500, 502, 504])
+        # ASYNC EVIL PAYLOAD INJECTION
+        status = fdp.PickValueInList([200, 429, 500, 502, 503, 504])
+
+        # Fuzz the headers with garbage, massive floats, and negatives
+        headers = {
+            b"content-type": fdp.PickValueInList([b"application/json", b"image/png", b"text/html"]),
+            b"content-length": str(fdp.ConsumeIntInRange(-100, 10000)).encode(),
+            b"Retry-After": (
+                fdp.ConsumeUnicodeNoSurrogates(16).encode(errors="ignore")
+                if fdp.ConsumeBool()
+                else str(fdp.ConsumeFloat()).encode()
+            )
+        }
         garbage_bytes = fdp.ConsumeBytes(1024)
 
-        return compat_httpx.Response(status, content=garbage_bytes, request=request)
+        # Pass headers into the mocked HTTPX response
+        return compat_httpx.Response(
+            status,
+            headers=headers,
+            content=garbage_bytes,
+            request=request
+        )
 
     compat_httpx.AsyncClient.send = evil_send  # type: ignore[method-assign]
 
@@ -66,13 +87,10 @@ def TestOneInput(data: bytes) -> None:
                 TypeError,
                 ValueError,
                 compat_httpx.RequestError,
+                json.JSONDecodeError,
             ):
                 # Expected under fuzzed transport/inputs: keep exploring inputs
-                # and only fail on truly unexpected exceptions below.
-                return
-            except json.JSONDecodeError:
-                # Malformed fuzzed payloads are expected in this harness.
-                return
+                pass
             except Exception as e:
                 raise RuntimeError(
                     f"SDK crashed handling Async Evil Server response: {e}"

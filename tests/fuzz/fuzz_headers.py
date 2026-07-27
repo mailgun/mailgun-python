@@ -8,6 +8,7 @@ from typing import Any
 
 import atheris
 
+
 with atheris.instrument_imports():
     from mailgun.security import SecurityGuard
 

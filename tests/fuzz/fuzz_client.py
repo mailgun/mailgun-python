@@ -8,6 +8,7 @@ from typing import Any
 import atheris
 import requests
 
+
 with atheris.instrument_imports():
     from mailgun import routes
     from mailgun.client import Client

@@ -7,6 +7,7 @@ from typing import Any
 
 import atheris  # pyright: ignore[reportMissingModuleSource]
 
+
 with atheris.instrument_imports():
     from mailgun.security import SecurityGuard
 
@@ -18,12 +19,11 @@ def _get_fuzzed_type(fdp: atheris.FuzzedDataProvider) -> Any:
     choice = fdp.ConsumeIntInRange(0, 3)
     if choice == 0:
         return fdp.ConsumeUnicodeNoSurrogates(32)
-    elif choice == 1:
+    if choice == 1:
         return fdp.ConsumeInt(10000)
-    elif choice == 2:
+    if choice == 2:
         return None
-    else:
-        return fdp.ConsumeBytes(16)
+    return fdp.ConsumeBytes(16)
 
 
 def TestOneInput(data: bytes) -> None:

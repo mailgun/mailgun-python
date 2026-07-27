@@ -7,10 +7,12 @@ import sys
 
 import atheris
 
+
 with atheris.instrument_imports():
     from mailgun._httpx_compat import httpx as compat_httpx
+
     # Adjust import path based on your exact handler location
-    from mailgun.handlers.error_handler import ApiError
+    from mailgun.handlers.error_handler import ApiError, DeliverabilityError
 
 logging.disable(logging.CRITICAL)
 
@@ -20,6 +22,22 @@ def TestOneInput(data: bytes) -> None:
 
     fdp = atheris.FuzzedDataProvider(data)
 
+    if fdp.ConsumeBool():
+        try:
+            # Generate chaotic scores and massive arrays
+            score = fdp.ConsumeFloat()
+            issues = [
+                fdp.ConsumeUnicodeNoSurrogates(32)
+                for _ in range(fdp.ConsumeIntInRange(0, 1000))
+            ]
+
+            # Trigger object creation and string formatting
+            error = DeliverabilityError(score=score, issues=issues)
+            _ = str(error)
+
+        except (ValueError, TypeError, OverflowError):
+            # Safe rejection
+            pass
     # 1. Fuzz typical API error status codes
     status_code = fdp.PickValueInList([400, 401, 403, 404, 413, 429, 500, 502, 503, 504])
 
@@ -41,10 +59,10 @@ def TestOneInput(data: bytes) -> None:
 
     try:
         # The SDK should wrap ALL parsing errors inside ApiError safely
-        error = ApiError(response)
+        api_error = ApiError(response)
 
         # Test the string representation to ensure formatters don't crash on missing keys
-        _ = str(error)
+        _ = str(api_error)
 
     except (json.JSONDecodeError, UnicodeDecodeError) as e:
         # If these leak, it's a security/reliability bug! The SDK should catch and wrap them.

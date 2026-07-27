@@ -7,8 +7,10 @@ from typing import Any
 
 import atheris
 
+
 with atheris.instrument_imports():
     import requests
+
     from mailgun._httpx_compat import httpx as compat_httpx
 
 

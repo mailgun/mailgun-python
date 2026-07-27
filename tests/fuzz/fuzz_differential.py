@@ -7,8 +7,10 @@ import sys
 from typing import Any
 
 import atheris
-from mailgun._httpx_compat import httpx as compat_httpx
 import requests
+
+from mailgun._httpx_compat import httpx as compat_httpx
+
 
 with atheris.instrument_imports():
     from mailgun import routes

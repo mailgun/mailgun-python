@@ -8,6 +8,7 @@ from typing import Any
 
 import atheris
 
+
 with atheris.instrument_imports():
     from mailgun.filters import RedactingFilter
 
@@ -30,21 +31,20 @@ def generate_complex_args(
     choice = fdp.ConsumeIntInRange(0, 4)
     if choice == 0:
         return fdp.ConsumeUnicodeNoSurrogates(64)
-    elif choice == 1:
+    if choice == 1:
         return fdp.ConsumeInt(1000)
-    elif choice == 2:
+    if choice == 2:
         return [
             generate_complex_args(fdp, depth + 1, state)
             for _ in range(fdp.ConsumeIntInRange(1, 3))
         ]
-    elif choice == 3:
+    if choice == 3:
         return {
             fdp.ConsumeUnicodeNoSurrogates(16): generate_complex_args(
                 fdp, depth + 1, state
             )
         }
-    else:
-        return None
+    return None
 
 
 def TestOneInput(data: bytes) -> None:

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
+import importlib
 import re
 import sys
-import importlib
 from pathlib import Path
+
 
 def main() -> None:
     if len(sys.argv) < 3:

@@ -32,8 +32,7 @@ class TestConfigProperties:
         api_url=st.text(),
     )  # type: ignore[untyped-decorator]
     def test_property_config_robustness(self, timeout: Any, api_url: str) -> None:
-        """
-        INVARIANT: Config must be defensive. It must either coerce the input
+        """INVARIANT: Config must be defensive. It must either coerce the input
         correctly or raise a controlled exception (ValueError/TypeError).
         It must never crash with an unhandled exception.
         """
@@ -44,8 +43,7 @@ class TestConfigProperties:
 
     @given(endpoint_key=st.text(min_size=1, max_size=100))  # type: ignore[untyped-decorator]
     def test_property_config_route_fallback(self, endpoint_key: str) -> None:
-        """
-        INVARIANT: Regardless of what string is requested from the route map,
+        """INVARIANT: Regardless of what string is requested from the route map,
         the caching engine and path generator must safely return a tuple
         or valid dictionary without causing an unhandled internal exception.
         """
@@ -77,8 +75,7 @@ class TestHandlerProperties:
         )
     )  # type: ignore[untyped-decorator]
     def test_inbox_handler_defensive_errors(self, kwargs: dict[str, Any]) -> None:
-        """
-        INVARIANT: Handlers must process optional dictionary kwargs defensively.
+        """INVARIANT: Handlers must process optional dictionary kwargs defensively.
         If essential kwargs are missing, they should raise a controlled ValueError
         or KeyError instead of crashing the URL builder logic.
         """
@@ -96,8 +93,7 @@ class TestHandlerProperties:
     def test_mailinglists_handler_invariants(
         self, domain: str, address: str, method: str
     ) -> None:
-        """
-        INVARIANT: mailinglists_handler must gracefully construct URL paths
+        """INVARIANT: mailinglists_handler must gracefully construct URL paths
         regardless of what strings are provided for address or domain, relying
         on SecurityGuard to trap hostile values before string concatenation.
         """
@@ -114,8 +110,7 @@ class TestHandlerProperties:
     def test_property_ips_handler_robustness(
         self, dirty_domain: str, dirty_ip: str
     ) -> None:
-        """
-        INVARIANT: The IPs handler must process any printable string without
+        """INVARIANT: The IPs handler must process any printable string without
         an unhandled exception, filtering invalid domains/IPs strictly via
         ValueError.
         """
@@ -132,8 +127,7 @@ class TestHandlerProperties:
         tag=st.text(alphabet=string.printable),
     )  # type: ignore[untyped-decorator]
     def test_tags_handler_sanitization_invariants(self, tag: str) -> None:
-        """
-        INVARIANT: Tags handler must reject control characters and properly
+        """INVARIANT: Tags handler must reject control characters and properly
         URL-encode valid parameters to avoid path traversal.
         """
         url = {"base": "https://api.mailgun.net/v3", "keys": ["tags"]}
@@ -189,8 +183,7 @@ class TestSecurityGuardProperties:
         )
     )  # type: ignore[untyped-decorator]
     def test_property_header_injection_prevention(self, dirty_input: str) -> None:
-        """
-        INVARIANT: Any string containing an ASCII control character MUST raise a ValueError.
+        """INVARIANT: Any string containing an ASCII control character MUST raise a ValueError.
         This ensures HTTP Header Injection (CWE-113) and Log Forging (CWE-117) are impossible.
         """
         if _PATH_CONTROL_CHAR_RE.search(dirty_input):
@@ -212,8 +205,7 @@ class TestSecurityGuardProperties:
 
     @given(st.text())  # type: ignore[untyped-decorator]
     def test_sanitize_path_segment_property(self, input_str: str) -> None:
-        """
-        INVARIANT: The sanitized path segment MUST NOT contain a forward slash '/'
+        """INVARIANT: The sanitized path segment MUST NOT contain a forward slash '/'
         or backward slash '\\' to completely mitigate Path Traversal (CWE-22).
         """
         try:
@@ -225,8 +217,7 @@ class TestSecurityGuardProperties:
 
 
 class ClientLifecycleMachine(RuleBasedStateMachine):
-    """
-    Models the lifecycle of the Mailgun Client to ensure that connections
+    """Models the lifecycle of the Mailgun Client to ensure that connections
     and resources are managed defensively even through network interruptions.
     """
     def __init__(self) -> None:

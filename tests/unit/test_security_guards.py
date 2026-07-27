@@ -1,6 +1,9 @@
+from unittest.mock import patch
+
 import pytest
 
 from mailgun.security import IdempotencyGuard, SpamGuard
+
 
 class TestIdempotencyGuard:
     """Verifies deterministic SHA-256 fingerprinting for Exactly-Once Delivery."""
@@ -32,6 +35,18 @@ class TestIdempotencyGuard:
 
         assert len(key) == 64
         assert stream.tell() == 0  # Proves the pointer was rewound
+
+    def test_idempotency_guard_coverage(self) -> None:
+        """Coverage: Hits all raw bytes and string fallback hashes."""
+        key1 = IdempotencyGuard.generate_key("test.com", {}, files=[("test.txt", b"raw_bytes")])
+        assert key1
+
+        key2 = IdempotencyGuard.generate_key("test.com", {}, files=[("test.txt", "string_val")])
+        assert key2
+
+        # Edge case: tuple with length 1 (no byte content at index 1)
+        key3 = IdempotencyGuard.generate_key("test.com", {}, files=[("test.txt", ("test.txt",))])
+        assert key3
 
 
 class TestSpamGuard:
@@ -65,3 +80,10 @@ class TestSpamGuard:
             report = SpamGuard.check_html("<html>Broken</html>")
             assert report["is_safe"] is False
             assert "Fatal HTML parsing error" in report["issues"][0]
+
+    def test_spam_guard_parser_error(self) -> None:
+        """Coverage: Hits the parser try/except block."""
+        with patch("mailgun.security._SpamGuardParser.feed", side_effect=Exception("Boom")):
+            res = SpamGuard.check_html("<html></html>")
+            assert res["is_safe"] is False
+            assert "Fatal HTML parsing error" in res["issues"][0]

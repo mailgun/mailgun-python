@@ -3,11 +3,11 @@
 import copy
 import gc
 from typing import Any
-
-from mailgun._httpx_compat import httpx as compat_httpx
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
+from mailgun._httpx_compat import httpx as compat_httpx
 from mailgun.client import AsyncClient, AsyncEndpoint, Config, SecurityGuard
 from mailgun.endpoints import Endpoint
 from mailgun.handlers.error_handler import ApiError
@@ -96,7 +96,6 @@ class TestAsyncClient:
         self, _mock_httpx: MagicMock, _mock_transport: MagicMock
     ) -> None:
         """Cover clean AsyncClient __aexit__."""
-
         _mock_httpx.return_value.aclose = AsyncMock()
 
         client = AsyncClient(auth=("api", "key"))
@@ -292,8 +291,7 @@ class TestAsyncClient:
 
     @pytest.mark.asyncio
     async def test_async_client_property_lazy_initialization_happy_path(self) -> None:
-        """
-        [Happy Path] Verify that _client lazily initializes and returns the same
+        """[Happy Path] Verify that _client lazily initializes and returns the same
         active instance on subsequent calls, proving the CWE-400 hotfix works.
         """
         client = AsyncClient(auth=("api", "key"))
@@ -312,8 +310,7 @@ class TestAsyncClient:
 
     @pytest.mark.asyncio
     async def test_async_client_context_manager_retains_connection_edge_case(self) -> None:
-        """
-        [Edge Case] Verify that inside an async context manager, multiple accesses
+        """[Edge Case] Verify that inside an async context manager, multiple accesses
         to _client return the same open connection pool. This was the exact scenario
         that triggered the socket leak bug.
         """
@@ -331,8 +328,7 @@ class TestAsyncClient:
 
     @pytest.mark.asyncio
     async def test_async_client_property_reinitializes_if_closed_unhappy_path(self) -> None:
-        """
-        [Unhappy Path] Verify that if the underlying httpx client is forcefully closed
+        """[Unhappy Path] Verify that if the underlying httpx client is forcefully closed
         (e.g., dropped connection or aggressive GC), accessing the property spins up
         a fresh connection pool rather than failing or returning None.
         """
@@ -378,6 +374,45 @@ class TestAsyncClient:
             assert issubclass(w[-1].category, ResourceWarning)
             assert "Unclosed AsyncClient detected" in str(w[-1].message)
 
+    def test_async_client_getattr_forbidden_attribute_raises(self) -> None:
+        client = AsyncClient(auth=("api", "key-123"))
+        with pytest.raises(AttributeError):
+            _ = client._private_attribute
+
+    @pytest.mark.asyncio
+    async def test_async_client_ping_success_and_failure(self) -> None:
+        client = AsyncClient(auth=("api", "key-123"))
+        mock_resp = MagicMock(status_code=200)
+
+        with patch("mailgun.client.AsyncEndpoint.get", return_value=mock_resp):
+            assert await client.ping() is True
+
+        with patch("mailgun.client.AsyncEndpoint.get", side_effect=Exception("Network Failure")):
+            assert await client.ping() is False
+
+    @pytest.mark.asyncio
+    async def test_async_endpoint_stream_type_casting(self) -> None:
+        """Coverage: Endpoints.stream parameter type drift normalization."""
+        class MockResp:
+            def raise_for_status(self) -> None: pass
+            def json(self) -> dict:
+                return {
+                    "items": [{"id": 1}],
+                    "paging": {"next": "http://test?limit=10.5&ascending=true&str_val=hello"}
+                }
+
+        mock_client = AsyncMock()
+        ep = AsyncEndpoint({"base": "http://test", "keys": []}, {}, None, client=mock_client)
+
+        # Force the generator to break
+        mock_client.request.side_effect = [
+            MockResp(),
+            MagicMock(json=lambda: {"items": []}, raise_for_status=lambda: None)
+        ]
+
+        filters = {"limit": 5.0, "ascending": False, "str_val": "old"}
+        res = [i async for i in ep.stream(filters=filters)]  # pyright: ignore[reportGeneralTypeIssues]
+        assert len(res) == 1
 
 class TestAsyncEndpoint:
     @staticmethod

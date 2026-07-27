@@ -6,6 +6,7 @@ import sys
 
 import atheris
 
+
 with atheris.instrument_imports():
     from mailgun.security import SpamGuard
 
