@@ -38,12 +38,15 @@ test:
     - mailgun
     - mailgun.handlers
     - mailgun.examples
+    - mailgun.ext
+    - mailgun.ext.pydantic
   source_files:
     - tests/
   requires:
     - pip
     - pytest
     - pytest-asyncio
+    - pydantic
   commands:
     - pip check
     - pytest tests/unit/ -v
