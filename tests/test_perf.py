@@ -4,7 +4,7 @@ import asyncio
 from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor
 import tracemalloc
-from typing import Any, cast
+from typing import Any
 
 import pytest
 import requests  # pyright: ignore[reportMissingModuleSource]
