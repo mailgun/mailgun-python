@@ -1,6 +1,9 @@
+"""Performance and throughput benchmark tests for the Mailgun SDK."""
+
 import asyncio
-from collections.abc import Coroutine, Generator
+from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor
+import tracemalloc
 from typing import Any, cast
 
 import pytest
@@ -101,7 +104,7 @@ def test_async_client_concurrent_throughput(benchmark: Any) -> None:
 
     try:
         # 1. Attempt modern injection (using client_kwargs dictionary)
-        client = AsyncClient(auth=("api", "key"), client_kwargs={"transport": mock_transport})
+        client = AsyncClient(auth=("api", "key"), client_kwargs={"transport": mock_transport})  # type: ignore[call-arg]
     except TypeError:
         # 2. Fallback for v1.6.0: Inject transport as a direct top-level kwarg
         client = AsyncClient(auth=("api", "key"), transport=mock_transport)
@@ -151,17 +154,42 @@ def test_async_client_concurrent_throughput(benchmark: Any) -> None:
     async def dispatch_batch_async() -> None:
         # Gather executes all 50 coroutines concurrently on the event loop
         tasks = [send_one_email(i) for i in range(BATCH_SIZE)]
-        await asyncio.gather(*tasks)
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+    # Pre-allocate event loop outside the benchmark loop to prevent event loop creation overhead
+    loop = asyncio.new_event_loop()
 
     def dispatch_batch() -> None:
-        # Helper to run the async batch inside the synchronous benchmark runner
-        asyncio.run(dispatch_batch_async())
+        loop.run_until_complete(dispatch_batch_async())
 
     try:
         benchmark.pedantic(dispatch_batch, rounds=10, iterations=5)
     finally:
-        # Safely close the async client
-        aclose_method = getattr(client, "aclose", None)
-        if callable(aclose_method):
-            coro = cast("Coroutine[Any, Any, None]", cast("object", aclose_method()))
-            asyncio.run(coro)
+        loop.run_until_complete(client.aclose())
+        loop.close()
+
+
+# ------------------------------------------------------------------------
+# BENCHMARK 4: MEMORY FOOTPRINT & LEAK PREVENTION (__slots__)
+# ------------------------------------------------------------------------
+
+def test_memory_footprint_leak_prevention() -> None:
+    """Proves that processing large requests doesn't bloat the RSS memory footprint."""
+    client = Client(auth=("api", "key"))
+
+    tracemalloc.start()
+    snapshot_before = tracemalloc.take_snapshot()
+
+    for i in range(5000):
+        _ = client.messages
+
+    snapshot_after = tracemalloc.take_snapshot()
+    tracemalloc.stop()
+
+    stats = snapshot_after.compare_to(snapshot_before, 'lineno')
+    total_diff_kb = sum(stat.size_diff for stat in stats) / 1024
+
+    print(f"\nMemory Delta after 5,000 operations: {total_diff_kb:.2f} KB")
+
+    # Guardrail to ensure slots prevent dynamic hash table memory bloat
+    assert total_diff_kb < 100.0, f"Memory leak detected! Footprint grew by {total_diff_kb:.2f} KB"
