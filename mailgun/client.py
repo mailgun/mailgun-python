@@ -255,6 +255,7 @@ class Client(BaseClient):
                 with contextlib.suppress(Exception):
                     self.close()
         except AttributeError:
+            # _session may be missing during partial initialization or interpreter shutdown.
             pass
 
     def ping(self) -> bool:
