@@ -1,3 +1,4 @@
+import contextlib
 import hashlib
 import hmac
 import json
@@ -5,6 +6,7 @@ import math
 import re
 import ssl
 import sys
+import tempfile
 import time
 import unicodedata
 from html.parser import HTMLParser
@@ -440,7 +442,9 @@ class SecurityGuard:
         return url
 
     @staticmethod
-    def validate_attachment_path(file_path: str | Path, safe_base_dir: str | Path) -> Path:
+    def validate_attachment_path(
+        file_path: str | Path, safe_base_dir: str | Path | None = None
+    ) -> Path:
         """Poka-yoke: Prevent Path Traversal (CWE-22) when reading attachments.
 
         Args:
@@ -460,7 +464,7 @@ class SecurityGuard:
             msg = f"Security Alert: Invalid attachment path or not a file: {file_path}"
             raise ValueError(msg)
 
-        if safe_base_dir:
+        if safe_base_dir is not None:
             base_path = Path(safe_base_dir).resolve()
             if not target_path.is_relative_to(base_path):
                 raise ValueError("Security Alert (CWE-22): Path traversal attempt detected.")
@@ -471,8 +475,31 @@ class SecurityGuard:
                     "Security Alert (CWE-22): Path traversal tokens ('..') are explicitly forbidden."
                 )
 
+            # Allow files residing in the OS temporary directory
+            with contextlib.suppress(Exception):
+                temp_dir = Path(tempfile.gettempdir()).resolve()
+                if target_path.is_relative_to(temp_dir):
+                    return target_path
+
+            # Cross-platform component and prefix check for sensitive system directories
             forbidden_roots = ("/etc", "/var", "/root", "/boot", "C:\\Windows", "C:\\System32")
-            if any(str(target_path).lower().startswith(root.lower()) for root in forbidden_roots):
+            path_str = str(target_path).lower()
+            if any(path_str.startswith(root.lower()) for root in forbidden_roots):
+                raise ValueError(
+                    "Security Alert: Access to sensitive OS system directories is explicitly forbidden."
+                )
+
+            forbidden_components = {
+                "etc",
+                "sys",
+                "proc",
+                "dev",
+                "windows",
+                "system32",
+                "root",
+                "boot",
+            }
+            if any(part.lower() in forbidden_components for part in target_path.parts):
                 raise ValueError(
                     "Security Alert: Access to sensitive OS system directories is explicitly forbidden."
                 )

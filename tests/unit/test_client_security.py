@@ -164,9 +164,16 @@ class TestSecurityGuardGeneral:
 
     def test_validate_attachment_path_forbidden_roots(self) -> None:
         """Coverage: Hardcoded forbidden roots fallback across OS environments."""
-        with patch.object(Path, "exists", return_value=True), \
-             patch.object(Path, "is_file", return_value=True), \
-             patch.object(Path, "resolve", return_value=Path("/etc/sensitive_system_config.conf")):
+        with patch("mailgun.security.Path") as mock_path_cls:
+            mock_target = MagicMock()
+            mock_target.exists.return_value = True
+            mock_target.is_file.return_value = True
+            mock_target.parts = ("/", "etc", "sensitive_system_config.conf")
+            mock_target.__str__.return_value = "/etc/sensitive_system_config.conf"  # type: ignore[attr-defined]
+            mock_target.is_relative_to.return_value = False  # Prevent mock short-circuiting
+
+            mock_path_cls.return_value.resolve.return_value = mock_target
+
             with pytest.raises(ValueError, match="Access to sensitive OS system directories"):
                 SecurityGuard.validate_attachment_path("/etc/sensitive_system_config.conf", safe_base_dir=None)  # pyright: ignore[reportArgumentType]
 

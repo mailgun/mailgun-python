@@ -89,22 +89,11 @@ class TestClientClosure:
 
     def test_client_del_attribute_error(self) -> None:
         """Coverage: Silently catch AttributeError during GC deletion."""
+        import gc
         client = Client(auth=("api", "key"))
-        del client._session  # Force the __getattribute__ lookup to fail
-        client.__del__()  # Must pass without crashing
-
-    def __del__(self) -> None:
-        """Emit a ResourceWarning if the async client is garbage-collected without being closed."""
-        with contextlib.suppress(Exception):
-            client = object.__getattribute__(self, "_httpx_client")
-            if client is not None and not client.is_closed:
-                warnings.warn(
-                    f"Unclosed {self.__class__.__name__} detected. You must explicitly "
-                    "call '.aclose()' or use the 'async with' context manager to prevent "
-                    "socket and memory leaks.",
-                    ResourceWarning,
-                    stacklevel=2,
-                )
+        del client._session  # Force the attribute lookup/get_attribute to fail
+        del client
+        gc.collect()  # Trigger finalization via GC; must pass silently without crashing
 
 class TestClientPing:
     def test_sync_client_ping_success(self) -> None:
