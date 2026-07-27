@@ -243,8 +243,8 @@ class Client(BaseClient):
 
     def __del__(self) -> None:
         """Emit a ResourceWarning if the client is garbage-collected without being closed."""
-        # Use object.__getattribute__ to avoid triggering custom __getattr__ recursion loops
-        try:
+        with contextlib.suppress(Exception):
+            # Use object.__getattribute__ to avoid triggering custom __getattr__ recursion loops
             session = object.__getattribute__(self, "_session")
             if session is not None:
                 warnings.warn(
@@ -252,11 +252,6 @@ class Client(BaseClient):
                     ResourceWarning,
                     stacklevel=2,
                 )
-                with contextlib.suppress(Exception):
-                    self.close()
-        except AttributeError:
-            # _session may be missing during partial initialization or interpreter shutdown.
-            pass
 
     def ping(self) -> bool:
         """Perform a fast, low-overhead health check to verify API credentials.
@@ -409,17 +404,17 @@ class AsyncClient(BaseClient):
         await self.aclose()
 
     def __del__(self) -> None:
-        """Safety net for unclosed sockets (CWE-400) if context managers are skipped."""
-        client = getattr(self, "_httpx_client", None)
-
-        if client is not None and not client.is_closed:
-            warnings.warn(
-                f"Unclosed {self.__class__.__name__} detected. You must explicitly "
-                "call '.aclose()' or use the 'async with' context manager to prevent "
-                "socket and memory leaks.",
-                ResourceWarning,
-                stacklevel=2,
-            )
+        """Emit a ResourceWarning if the async client is garbage-collected without being closed."""
+        with contextlib.suppress(Exception):
+            client = object.__getattribute__(self, "_httpx_client")
+            if client is not None and not client.is_closed:
+                warnings.warn(
+                    f"Unclosed {self.__class__.__name__} detected. You must explicitly "
+                    "call '.aclose()' or use the 'async with' context manager to prevent "
+                    "socket and memory leaks.",
+                    ResourceWarning,
+                    stacklevel=2,
+                )
 
     async def ping(self) -> bool:
         """Perform a fast, low-overhead health check to verify API credentials.
