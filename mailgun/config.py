@@ -130,7 +130,7 @@ class RetryPolicy:
             A float representing the sleep delay in seconds before the next attempt.
         """
         backoff = min(self.max_delay, self.base_delay * (2**attempt))
-        return random.uniform(0, backoff)  # ruff: ignore[suspicious-non-cryptographic-random-usage] - Randomness used for network jitter, not crypto.
+        return random.uniform(0, backoff)  # ruff: ignore[suspicious-non-cryptographic-random-usage]
 
 
 class Config:
