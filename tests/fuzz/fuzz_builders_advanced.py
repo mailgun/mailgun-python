@@ -40,7 +40,7 @@ def TestOneInput(data: bytes) -> None:
 
             if op_code == 0:
                 # Fuzz idempotency toggle
-                builder.set_idempotency_safe(enabled=fdp.ConsumeBool())
+                builder.set_idempotency_safe(safe=fdp.ConsumeBool())
             elif op_code == 1:
                 # Fuzz the Deliverability static analyzer through the builder
                 builder.check_deliverability()
