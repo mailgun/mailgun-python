@@ -108,15 +108,18 @@ def handle_domains(  # noqa: PLR0914
         safe_webhook = SecurityGuard.sanitize_path_segment(webhook_name)
         return f"{final_url}/{safe_webhook}"
 
-    # B. Credentials Logins (CRITICAL FIX: Preserve literal '@')
+    # B. Credentials Logins (CRITICAL FIX: Correct path segment handling)
     login_val = kwargs.pop("login", None)
     if "credentials" in keys and login_val is not None:
         login_str = str(login_val)
 
-        # Mailgun's API router explicitly requires an unencoded '@' symbol for this endpoint
+        # If the login includes the domain, strip the extra domain part if it duplicates the target domain
         if "@" in login_str:
             local_part, domain_part = login_str.split("@", 1)
-            safe_login = f"{SecurityGuard.sanitize_path_segment(local_part)}@{SecurityGuard.sanitize_path_segment(domain_part)}"
+            if domain and domain_part == domain:
+                safe_login = SecurityGuard.sanitize_path_segment(local_part)
+            else:
+                safe_login = f"{SecurityGuard.sanitize_path_segment(local_part)}@{SecurityGuard.sanitize_path_segment(domain_part)}"
         else:
             safe_login = SecurityGuard.sanitize_path_segment(login_str)
 
