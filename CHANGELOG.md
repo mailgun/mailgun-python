@@ -4,7 +4,7 @@ We [keep a changelog.](http://keepachangelog.com/)
 
 ## [Unreleased]
 
-## v1.9.0 - 2026-07-XX
+## v1.9.0 - 2026-08-04
 
 ### Added
 
@@ -21,11 +21,15 @@ We [keep a changelog.](http://keepachangelog.com/)
 
 - **[BREAKING CHANGE]** Dropped support for Python 3.10. The SDK now strictly requires Python 3.11 through 3.14.
 - Purged the `typing-extensions` dependency from the package, replacing it with standard library `typing` equivalents (`Self`, `TypedDict`, `NotRequired`).
+- **Credential Path Resolution**: Refactored `handle_domains` in `domains_handler.py` to correctly append credential login handles as path segments.
+- **Smoke Test Resilience**: Updated `smoke_test.py` and test assertion suites to gracefully accommodate expected `400 Bad Request` responses from sandbox API keys on advanced live endpoints.
 
 ### Fixed
 
+- **URL Canonicalization Aliases (`DOMAIN_ALIASES`)**: Fixed strict mapping in `routes.py` and `config.py` to transparently translate camel/hyphenated properties (`dkimauthority`, `dkimselector`, `webprefix`, `sendingqueues`) to their physical underscored Mailgun equivalents (`dkim_authority`, `dkim_selector`, etc.).
 - Fixed strict typing issues, circular import risks, and unawaited coroutines in `AsyncClient.ping()`.
 - Hardened `SecurityGuard.sanitize_timeout` against infinite/NaN injection (CWE-400) and cleaned up exception handling blocks to eliminate silent failure anti-patterns.
+- Cleared all strict Ruff linter, Mypy type-checking, and docstring coverage errors across core handlers and tests.
 
 ### Pull Requests Merged
 
@@ -36,6 +40,8 @@ We [keep a changelog.](http://keepachangelog.com/)
 - [PR_55](https://github.com/mailgun/mailgun-python/pull/55) - build(deps): Bump actions/upload-artifact from 4.6.1 to 7.0.1.
 - [PR_56](https://github.com/mailgun/mailgun-python/pull/56) - build(deps): Bump github/codeql-action/upload-sarif from 3.37.2 to 4.37.1
 - [PR_57](https://github.com/mailgun/mailgun-python/pull/57) - Release 1.9.0.
+- [PR_58](https://github.com/mailgun/mailgun-python/pull/58) - build(deps): Bump the minor-and-patch group with 2 updates.
+- [PR_59](https://github.com/mailgun/mailgun-python/pull/59) - build(deps): Bump actions/setup-python from 6.3.0 to 7.0.0.
 
 ## v1.8.0 - 2026-07-20
 
