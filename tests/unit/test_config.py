@@ -9,7 +9,6 @@ import pytest
 
 import mailgun.config
 from mailgun.client import Config, SecurityGuard
-from mailgun.config import RetryPolicy
 
 
 @pytest.fixture(autouse=True)
@@ -396,7 +395,7 @@ class TestRetryPolicy:
 
     def test_retry_policy_initialization_and_slots(self) -> None:
         """Verify immutable properties and memory-efficient __slots__ usage."""
-        policy = RetryPolicy(max_retries=5, base_delay=2.0, max_delay=20.0, respect_retry_after=False)
+        policy = mailgun.config.RetryPolicy(max_retries=5, base_delay=2.0, max_delay=20.0, respect_retry_after=False)
         assert policy.max_retries == 5
         assert policy.base_delay == 2.0
         assert policy.max_delay == 20.0
@@ -410,7 +409,7 @@ class TestRetryPolicy:
     def test_calculate_delay_applies_full_jitter(self, mock_uniform: MagicMock) -> None:
         """Coverage: Verifies random.uniform is called precisely between 0 and the exponential bound."""
         mock_uniform.return_value = 1.5
-        policy = RetryPolicy(base_delay=1.0, max_delay=10.0)
+        policy = mailgun.config.RetryPolicy(base_delay=1.0, max_delay=10.0)
 
         delay = policy.calculate_delay(attempt=1)
 
@@ -422,7 +421,7 @@ class TestRetryPolicy:
     def test_calculate_delay_respects_max_delay_ceiling(self, mock_uniform: MagicMock) -> None:
         """Coverage: Ensure exponential growth never breaches the `max_delay` cap."""
         mock_uniform.return_value = 10.0
-        policy = RetryPolicy(base_delay=1.0, max_delay=10.0)
+        policy = mailgun.config.RetryPolicy(base_delay=1.0, max_delay=10.0)
 
         # attempt = 5 -> base(1.0) * 2^5 = 32.0. Math should cap it safely at max_delay (10.0).
         delay = policy.calculate_delay(attempt=5)
