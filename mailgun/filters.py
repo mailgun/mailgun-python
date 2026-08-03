@@ -44,7 +44,7 @@ class RedactingFilter(logging.Filter):
     def _redact_str(self, data: str) -> str:
         try:
             return self.SECRET_PATTERN.sub(r"\1[REDACTED]", data)
-        except Exception:  # noqa: BLE001
+        except Exception:  # ruff: ignore[blind-except]
             return data
 
     def _redact_dict(self, data: dict[Any, Any], depth: int) -> dict[Any, Any]:
@@ -64,7 +64,7 @@ class RedactingFilter(logging.Filter):
         if hasattr(data, "_fields"):  # Safely unpack NamedTuples
             try:
                 return type(data)(*(self._deep_redact(item, depth + 1) for item in data))
-            except Exception:  # noqa: BLE001, S110
+            except Exception:  # ruff: ignore[blind-except, try-except-pass]
                 pass
         return tuple(self._deep_redact(item, depth + 1) for item in data)
 
@@ -72,18 +72,18 @@ class RedactingFilter(logging.Filter):
         if hasattr(data, "model_dump") and callable(data.model_dump):
             try:
                 return self._deep_redact(data.model_dump(), depth + 1)
-            except Exception:  # noqa: BLE001, S110
+            except Exception:  # ruff: ignore[blind-except, try-except-pass]
                 pass
 
         if hasattr(data, "__dict__"):
             try:
                 return self._deep_redact(vars(data), depth + 1)
-            except Exception:  # noqa: BLE001, S110
+            except Exception:  # ruff: ignore[blind-except, try-except-pass]
                 pass
 
         try:
             str_val = str(data)
-        except Exception:  # noqa: BLE001
+        except Exception:  # ruff: ignore[blind-except]
             str_val = "<UNSTRINGIFIABLE_OBJECT>"
 
         return self._redact_str(str_val)
@@ -113,7 +113,7 @@ class RedactingFilter(logging.Filter):
                 return self._redact_tuple(data, depth)
 
             return self._redact_object(data, depth)
-        except Exception:  # noqa: BLE001, S110
+        except Exception:  # ruff: ignore[blind-except, try-except-pass]
             pass
 
         return data
@@ -137,7 +137,7 @@ class RedactingFilter(logging.Filter):
             for attr_name, attr_value in record.__dict__.items():
                 if attr_name not in self._STANDARD_ATTRS:
                     record.__dict__[attr_name] = self._deep_redact(attr_value)
-        except Exception:  # noqa: BLE001, S110
+        except Exception:  # ruff: ignore[blind-except, try-except-pass]
             # Never let logging filters crash application execution
             pass
 

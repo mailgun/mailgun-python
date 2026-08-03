@@ -268,7 +268,7 @@ class Client(BaseClient):
         try:
             # Query the domains endpoint with a strict limit of 1
             response = self.domains.get(filters={"limit": 1})
-        except Exception:  # noqa: BLE001 - Explicitly failing closed on readiness probe
+        except Exception:  # ruff: ignore[blind-except] - Explicitly failing closed on readiness probe
             return False
         else:
             if hasattr(response, "status_code"):
@@ -431,7 +431,7 @@ class AsyncClient(BaseClient):
         try:
             # Query the domains endpoint with a strict limit of 1
             response = await self.domains.get(filters={"limit": 1})
-        except Exception:  # noqa: BLE001 - Explicitly failing closed on readiness probe
+        except Exception:  # ruff: ignore[blind-except] - Explicitly failing closed on readiness probe
             return False
         else:
             if hasattr(response, "status_code"):
