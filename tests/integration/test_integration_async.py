@@ -1834,7 +1834,7 @@ class AsyncMetricsTest(unittest.IsolatedAsyncioTestCase):
     async def test_post_query_get_account_metrics_invalid_url_without_underscore(self) -> None:
         """Expected failure with an invalid URL dynamically handled by Catch-All"""
         with self.assertRaises(AttributeError):
-            req = await self.client.analyticsmetric.get(filters={"limit": "0", "skip": "0"})
+            await self.client.analyticsmetric.get(filters={"limit": "0", "skip": "0"})
 
     async def test_post_query_get_account_usage_metrics(self) -> None:
         req = await self.client.analytics_usage_metrics.create(
@@ -1880,7 +1880,7 @@ class AsyncMetricsTest(unittest.IsolatedAsyncioTestCase):
     async def test_post_query_get_account_usage_metrics_invalid_url_without_underscore(self) -> None:
         """Expected failure with an invalid URL dynamically handled by Catch-All"""
         with self.assertRaises(AttributeError):
-            req = await self.client.analyticsusagemetrics.get(filters={"limit": "0", "skip": "0"})
+            await self.client.analyticsusagemetrics.get(filters={"limit": "0", "skip": "0"})
 
 
 class AsyncLogsTests(unittest.IsolatedAsyncioTestCase):
@@ -1988,7 +1988,7 @@ class AsyncLogsTests(unittest.IsolatedAsyncioTestCase):
     async def test_post_query_get_account_logs_invalid_url_without_underscore(self) -> None:
         """Expected failure with an invalid URL dynamically handled by Catch-All"""
         with self.assertRaises(AttributeError):
-            req = await self.client.analyticslogs.get(filters={"limit": "0", "skip": "0"})
+            await self.client.analyticslogs.get(filters={"limit": "0", "skip": "0"})
 
 
 class AsyncTagsNewTests(unittest.IsolatedAsyncioTestCase):
@@ -2193,7 +2193,7 @@ class AsyncUsersTests(unittest.IsolatedAsyncioTestCase):
         """Test to get account's users details: expected failure with invalid URL."""
         query = {"role": "admin", "limit": "0", "skip": "0"}
         with self.assertRaises(AttributeError):
-            req = await self.client.user.get(filters=query)
+            await self.client.user.get(filters=query)
 
     @pytest.mark.xfail
     async def test_own_user_details(self) -> None:
@@ -2315,7 +2315,7 @@ class AsyncKeysTests(unittest.IsolatedAsyncioTestCase):
         """Test to get the list of Mailgun API keys: expected failure with invalid URL."""
         query = {"domain_name": self.domain, "kind": "web"}
         with self.assertRaises(AttributeError):
-            req = await self.client.key.get(filters=query)
+            await self.client.key.get(filters=query)
 
     async def test_get_keys_without_filtering_data(self) -> None:
         """Test to get the list of Mailgun API keys: Happy Path without filtering data."""
