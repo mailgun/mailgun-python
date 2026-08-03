@@ -136,15 +136,11 @@ class TestConfigRouting:
         except Exception:
             pass
 
-    def test_config_route_resolution_defaults_to_v3_for_unregistered_keys(self) -> None:
+    def test_config_route_resolution_raises_keyerror_for_unregistered_keys(self) -> None:
+        """Verify strict routing engine rejects unknown endpoints instantly."""
         config = Config()
-        url_config, _ = config["UNREGISTERED_FUTURE_ENDPOINT"]
-
-        assert url_config["base"].endswith("/v3/")
-        assert isinstance(url_config["keys"], list)
-        assert "endpoint" in url_config["keys"]
-        assert "future" in url_config["keys"]
-        assert "unregistered" in url_config["keys"]
+        with pytest.raises(KeyError, match="Invalid API endpoint requested"):
+            _ = config["UNREGISTERED_FUTURE_ENDPOINT"]
 
     def test_getitem_addressvalidate(self) -> None:
         config = Config()
@@ -178,12 +174,10 @@ class TestConfigRouting:
         assert url1 == url2
 
     def test_getitem_coverage_enhancement(self) -> None:
+        """Verify the routing engine safely blocks non-existent routes."""
         config = Config()
-        url_config, headers = config["NON_EXISTENT_ROUTE_XYZ"]
-
-        assert url_config["base"].endswith("/v3/")
-        assert isinstance(url_config["keys"], list)
-        assert "User-agent" in headers
+        with pytest.raises(KeyError, match="Invalid API endpoint requested"):
+            _ = config["NON_EXISTENT_ROUTE_XYZ"]
 
     def test_getitem_dkim(self) -> None:
         config = Config()
@@ -231,10 +225,10 @@ class TestConfigRouting:
         assert url["keys"] == ["messages"]
 
     def test_getitem_resendmessage(self) -> None:
+        """Verify the EXACT_ROUTES alias for resending messages maps correctly."""
         config = Config()
-        url, _ = config["resendmessage"]
-        assert "base" in url
-        assert "resendmessage" in url["keys"]
+        url, _ = config["resend_message"]  # Correctly mapped key
+        assert url["keys"] == ["resendmessage"]
 
     def test_getitem_tags(self) -> None:
         config = Config()
@@ -267,6 +261,22 @@ class TestConfigRouting:
     def test_resolve_domains_route_v4_fallback(self) -> None:
         res = Config()._resolve_domains_route(["domains", "unknown_new_feature"])
         assert "v3/domains" in res["base"]
+
+    def test_get_cached_route_data_raises_keyerror_on_invalid_route(self) -> None:
+        """Coverage: Ensure typo'd endpoints raise a descriptive KeyError instead of returning None."""
+        from mailgun.config import _get_cached_route_data
+        from mailgun import routes
+
+        bad_key = "messages_typo"
+
+        with pytest.raises(KeyError) as exc_info:
+            _get_cached_route_data(bad_key)
+
+        error_msg = str(exc_info.value)
+
+        assert f"Invalid API endpoint requested: {bad_key}" in error_msg
+        assert "Available endpoints:" in error_msg
+        assert list(routes.EXACT_ROUTES.keys())[0] in error_msg
 
 
 class TestConfigSanitization:

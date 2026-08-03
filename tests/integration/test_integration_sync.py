@@ -569,7 +569,7 @@ class DomainTests(unittest.TestCase):
         )
         request = self.client.domains_credentials.delete(
             domain=self.domain,
-            login="alice_bob",
+            login=f"alice_bob@{self.domain}",  # Explicitly append the domain
         )
 
         self.assertEqual(request.status_code, 200)

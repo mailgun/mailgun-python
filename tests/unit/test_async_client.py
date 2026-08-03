@@ -190,13 +190,11 @@ class TestAsyncClient:
     def test_async_client_getattr_invalid_route(
         self, _mock_httpx: MagicMock, _mock_transport: MagicMock
     ) -> None:
-        """Test that unknown routes in AsyncClient fallback to dynamic v3 endpoints."""
+        """Test that unknown routes in AsyncClient safely throw an AttributeError."""
         client = AsyncClient(auth=("api", "key"))
-        ep = client.some_unknown_feature
 
-        assert isinstance(ep, AsyncEndpoint)
-        assert ep._url["base"].endswith("v3/")
-        assert ep._url["keys"] == ["some", "unknown", "feature"]
+        with pytest.raises(AttributeError, match="'AsyncClient' object has no attribute 'some_unknown_feature'"):
+            _ = client.some_unknown_feature
 
     def test_async_client_getattr_magic_methods(self) -> None:
         """Test that AsyncClient.__getattr__ strictly rejects magic methods."""
