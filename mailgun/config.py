@@ -37,6 +37,9 @@ def _get_cached_route_data(clean_key: str) -> dict[str, Any]:
 
     Returns:
         A dictionary containing versioning and path data for the route.
+
+    Raises:
+        KeyError: If an invalid API endpoint requested.
     """
     # Resolve virtual property aliases before processing
     clean_key = routes.ROUTE_ALIASES.get(clean_key, clean_key)
@@ -46,19 +49,39 @@ def _get_cached_route_data(clean_key: str) -> dict[str, Any]:
         return {"version": version, "keys": tuple(route_keys)}
 
     route_parts = clean_key.split("_")
-    primary_resource = route_parts[0]
 
-    if primary_resource == "domains":
+    # Explicitly check for exact matches in PREFIX_ROUTES before splitting
+    if clean_key in routes.PREFIX_ROUTES:
+        version, suffix, key_override = routes.PREFIX_ROUTES[clean_key]
+        return {
+            "version": version,
+            "suffix": suffix,
+            "keys": (key_override or clean_key,),
+        }
+
+    # Intercept domain endpoints BEFORE the prefix router swallows them!
+    # This ensures Config._resolve_domains_route is triggered to apply DOMAIN_ALIASES.
+    if route_parts[0] == "domains":
         return {"type": "domain", "parts": tuple(route_parts)}
 
-    if primary_resource in routes.PREFIX_ROUTES:
-        version, suffix, key_override = routes.PREFIX_ROUTES[primary_resource]
-        final_parts = route_parts.copy()
+    # Fallback to prefix matching
+    if route_parts[0] in routes.PREFIX_ROUTES:
+        version, suffix, key_override = routes.PREFIX_ROUTES[route_parts[0]]
+        keys = list(route_parts)
         if key_override:
-            final_parts[0] = key_override
-        return {"version": version, "suffix": suffix, "keys": tuple(final_parts)}
+            keys[0] = key_override
+        return {
+            "version": version,
+            "suffix": suffix,
+            "keys": tuple(keys),
+        }
 
-    return {"version": APIVersion.V3.value, "keys": tuple(route_parts)}
+    # Explicitly reject typo'd endpoints and provide available options for DX
+    available = sorted(list(routes.EXACT_ROUTES.keys()) + list(routes.PREFIX_ROUTES.keys()))
+    error_msg = (
+        f"Invalid API endpoint requested: {clean_key}. Available endpoints: {', '.join(available)}"
+    )
+    raise KeyError(error_msg)
 
 
 class APIVersion(StrEnum):
@@ -107,7 +130,7 @@ class RetryPolicy:
             A float representing the sleep delay in seconds before the next attempt.
         """
         backoff = min(self.max_delay, self.base_delay * (2**attempt))
-        return random.uniform(0, backoff)  # noqa: S311 - Randomness used for network jitter, not crypto.
+        return random.uniform(0, backoff)  # ruff: ignore[suspicious-non-cryptographic-random-usage] - Randomness used for network jitter, not crypto.
 
 
 class Config:
