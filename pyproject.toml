@@ -178,25 +178,25 @@ docstring-code-format = true
 select = [ "ALL" ]
 ignore = [
     # --- Formatter Conflicts ---
-    "COM812", # Missing trailing comma (Conflicts with ruff-format)
-    "ISC001", # Implicit string concatenation (Conflicts with ruff-format)
-    "D203",   # one-blank-line-before-class (conflicts with D211)
-    "D213",   # multi-line-summary-second-line (conflicts with D212)
+    "missing-trailing-comma", # Missing trailing comma (Conflicts with ruff-format)
+    "single-line-implicit-string-concatenation", # Implicit string concatenation (Conflicts with ruff-format)
+    "incorrect-blank-line-before-class",   # one-blank-line-before-class (conflicts with D211)
+    "multi-line-summary-second-line",   # multi-line-summary-second-line (conflicts with D212)
 
     # --- SDK Realities ---
-    "ANN401", # Dynamically typed expressions. (An HTTP SDK REQUIRES `Any` for JSON data, files, and kwargs)
-    "TRY003", # Avoid specifying long messages outside exception classes (Causes massive file bloat)
-    "EM101",  # Exception must not use a string literal (Causes massive file bloat)
-    "E501",   # Line too long (Let the formatter handle wrapping)
+    "any-type", # Dynamically typed expressions. (An HTTP SDK REQUIRES `Any` for JSON data, files, and kwargs)
+    "raise-vanilla-args", # Avoid specifying long messages outside exception classes (Causes massive file bloat)
+    "raw-string-in-exception",  # Exception must not use a string literal (Causes massive file bloat)
+    "line-too-long",   # Line too long (Let the formatter handle wrapping)
 
     # --- Docstring ---
-    "D417", "D100", "D104",
+    "undocumented-param", "undocumented-public-module", "undocumented-public-package",
 
     # --- Keep existing TODO ignores ---
-    "C901",
-    "PLR0913",
-    "CPY001",
-    "PLW0717", # too-many-statements-in-try-clause (PLW0717)
+    "complex-structure",
+    "too-many-arguments",
+    "missing-copyright-notice",
+    "too-many-statements-in-try-clause", # too-many-statements-in-try-clause (PLW0717)
 ]
 exclude = [ "mailgun/examples/*", "tests" ]
 fixable = [ "ALL" ]
@@ -206,8 +206,8 @@ external = [ "DOC", "PLR" ]
 preview = true
 
 [tool.ruff.lint.per-file-ignores]
-"__init__.py" = [ "E402" ]
-"mailgun/endpoints.py" = ["PLC0415"]
+"__init__.py" = [ "module-import-not-at-top-of-file" ]
+"mailgun/endpoints.py" = ["import-outside-top-level"]
 
 [tool.ruff.lint.pylint]
 max-args = 9           # Default is 5. SDK endpoints need more (auth, data, headers, files, etc.)
