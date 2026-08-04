@@ -105,7 +105,7 @@ repos:
         name: "🔒 security · Detect private keys"
 
   - repo: https://github.com/commitizen-tools/commitizen
-    rev: v4.16.4
+    rev: v4.17.0
     hooks:
       - id: commitizen
         name: "🌳 git · Validate commit message"
@@ -134,7 +134,7 @@ repos:
         additional_dependencies: [".[toml]"]
 
   - repo: https://github.com/semgrep/pre-commit
-    rev: 'v1.168.0'
+    rev: 'v1.171.0'
     hooks:
       - id: semgrep
         name: "🔒 security · Static analysis (semgrep)"
@@ -159,7 +159,7 @@ repos:
         files: ^\.github/workflows/.*\.ya?ml$
 
   - repo: https://github.com/ariebovenberg/slotscheck
-    rev: v0.20.0
+    rev: v0.20.1
     hooks:
       - id: slotscheck
         name: "🔍 check · slotscheck"
@@ -171,7 +171,7 @@ repos:
           - responses
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.20
+    rev: v0.16.1
     hooks:
       - id: ruff-check
         name: "🐍 lint · Check with Ruff"
@@ -190,7 +190,7 @@ repos:
 
   # Python type checking
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v2.1.0
+    rev: v2.3.0
     hooks:
       - id: mypy
         name: "🐍 types · Check with mypy"

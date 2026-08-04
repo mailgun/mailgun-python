@@ -64,104 +64,104 @@ def _load_handler(endpoint_key: str) -> Callable[..., str]:  # noqa: PLR0911, PL
     """
     # Group 1: Domains Handler (Most common aliases grouped for speed)
     if endpoint_key in {"domains", "dkim_authority", "dkim_selector", "web_prefix"}:
-        from mailgun.handlers.domains_handler import handle_domains  # noqa: PLC0415
+        from mailgun.handlers.domains_handler import handle_domains
 
         return handle_domains
     if endpoint_key == "domainlist":
-        from mailgun.handlers.domains_handler import handle_domainlist  # noqa: PLC0415
+        from mailgun.handlers.domains_handler import handle_domainlist
 
         return handle_domainlist
     if endpoint_key == "dkim":
-        from mailgun.handlers.domains_handler import handle_dkimkeys  # noqa: PLC0415
+        from mailgun.handlers.domains_handler import handle_dkimkeys
 
         return handle_dkimkeys
     if endpoint_key == "sending_queues":
-        from mailgun.handlers.domains_handler import handle_sending_queues  # noqa: PLC0415
+        from mailgun.handlers.domains_handler import handle_sending_queues
 
         return handle_sending_queues
     if endpoint_key == "mailboxes":
-        from mailgun.handlers.domains_handler import handle_mailboxes_credentials  # noqa: PLC0415
+        from mailgun.handlers.domains_handler import handle_mailboxes_credentials
 
         return handle_mailboxes_credentials
     if endpoint_key == "webhooks":
-        from mailgun.handlers.domains_handler import handle_webhooks  # noqa: PLC0415
+        from mailgun.handlers.domains_handler import handle_webhooks
 
         return handle_webhooks
 
     # Group 2: Suppressions
     if endpoint_key == "bounces":
-        from mailgun.handlers.suppressions_handler import handle_bounces  # noqa: PLC0415
+        from mailgun.handlers.suppressions_handler import handle_bounces
 
         return handle_bounces
     if endpoint_key == "unsubscribes":
-        from mailgun.handlers.suppressions_handler import handle_unsubscribes  # noqa: PLC0415
+        from mailgun.handlers.suppressions_handler import handle_unsubscribes
 
         return handle_unsubscribes
     if endpoint_key == "whitelists":
-        from mailgun.handlers.suppressions_handler import handle_whitelists  # noqa: PLC0415
+        from mailgun.handlers.suppressions_handler import handle_whitelists
 
         return handle_whitelists
     if endpoint_key == "complaints":
-        from mailgun.handlers.suppressions_handler import handle_complaints  # noqa: PLC0415
+        from mailgun.handlers.suppressions_handler import handle_complaints
 
         return handle_complaints
 
     # Group 3: Specific Services
     if endpoint_key == "resendmessage":
-        from mailgun.handlers.messages_handler import handle_resend_message  # noqa: PLC0415
+        from mailgun.handlers.messages_handler import handle_resend_message
 
         return handle_resend_message
     if endpoint_key == "ips":
-        from mailgun.handlers.ips_handler import handle_ips  # noqa: PLC0415
+        from mailgun.handlers.ips_handler import handle_ips
 
         return handle_ips
     if endpoint_key == "ip_pools":
-        from mailgun.handlers.ip_pools_handler import handle_ippools  # noqa: PLC0415
+        from mailgun.handlers.ip_pools_handler import handle_ippools
 
         return handle_ippools
     if endpoint_key == "tags":
-        from mailgun.handlers.tags_handler import handle_tags  # noqa: PLC0415
+        from mailgun.handlers.tags_handler import handle_tags
 
         return handle_tags
     if endpoint_key == "routes":
-        from mailgun.handlers.routes_handler import handle_routes  # noqa: PLC0415
+        from mailgun.handlers.routes_handler import handle_routes
 
         return handle_routes
     if endpoint_key == "lists":
-        from mailgun.handlers.mailinglists_handler import handle_lists  # noqa: PLC0415
+        from mailgun.handlers.mailinglists_handler import handle_lists
 
         return handle_lists
     if endpoint_key == "templates":
-        from mailgun.handlers.templates_handler import handle_templates  # noqa: PLC0415
+        from mailgun.handlers.templates_handler import handle_templates
 
         return handle_templates
     if endpoint_key == "addressvalidate":
-        from mailgun.handlers import email_validation_handler as evh  # noqa: PLC0415
+        from mailgun.handlers import email_validation_handler as evh
 
         return evh.handle_address_validate
     if endpoint_key == "inbox":
-        from mailgun.handlers.inbox_placement_handler import handle_inbox  # noqa: PLC0415
+        from mailgun.handlers.inbox_placement_handler import handle_inbox
 
         return handle_inbox
     if endpoint_key == "analytics":
-        from mailgun.handlers.metrics_handler import handle_metrics  # noqa: PLC0415
+        from mailgun.handlers.metrics_handler import handle_metrics
 
         return handle_metrics
     if endpoint_key == "bounce-classification":
-        from mailgun.handlers import bounce_classification_handler as bch  # noqa: PLC0415
+        from mailgun.handlers import bounce_classification_handler as bch
 
         return bch.handle_bounce_classification
     if endpoint_key == "users":
-        from mailgun.handlers.users_handler import handle_users  # noqa: PLC0415
+        from mailgun.handlers.users_handler import handle_users
 
         return handle_users
     if endpoint_key == "keys":
-        from mailgun.handlers.keys_handler import handle_keys  # noqa: PLC0415
+        from mailgun.handlers.keys_handler import handle_keys
 
         return handle_keys
 
     # Group 4: Fallback for "messages", "messages.mime", "events", and unknown routes
-    from mailgun.handlers.default_handler import handle_default  # noqa: PLC0415
+    from mailgun.handlers.default_handler import handle_default
 
     return handle_default
 
@@ -462,7 +462,7 @@ class Endpoint(BaseEndpoint):
             )
             mock_resp = Response()
             mock_resp.status_code = HTTPStatus.OK
-            mock_resp._content = b'{"message": "Dry run successful - request intercepted", "id": "<dry-run-mock-id>"}'  # noqa: SLF001
+            mock_resp._content = b'{"message": "Dry run successful - request intercepted", "id": "<dry-run-mock-id>"}'  # ruff: ignore[private-member-access]
             mock_resp.encoding = "utf-8"
             mock_resp.url = target_url
             return mock_resp
@@ -634,7 +634,11 @@ class Endpoint(BaseEndpoint):
         )
 
     def put(
-        self, data: Any | None = None, filters: Mapping[str, str | Any] | None = None, **kwargs: Any
+        self,
+        data: Any | None = None,
+        filters: Mapping[str, str | Any] | None = None,
+        domain: str | None = None,
+        **kwargs: Any,
     ) -> APIResponseType:
         """Send a PUT request to update or replace a resource.
 
@@ -651,6 +655,7 @@ class Endpoint(BaseEndpoint):
             self._auth,
             "put",
             self._url,
+            domain=domain,
             headers=merged_headers,
             data=data,
             filters=filters,
@@ -658,7 +663,11 @@ class Endpoint(BaseEndpoint):
         )
 
     def patch(
-        self, data: Any | None = None, filters: Mapping[str, str | Any] | None = None, **kwargs: Any
+        self,
+        data: Any | None = None,
+        filters: Mapping[str, str | Any] | None = None,
+        domain: str | None = None,
+        **kwargs: Any,
     ) -> APIResponseType:
         """Send a PATCH request to partially update a resource.
 
@@ -675,6 +684,7 @@ class Endpoint(BaseEndpoint):
             self._auth,
             "patch",
             self._url,
+            domain=domain,
             data=data,
             headers=merged_headers,
             filters=filters,
@@ -682,7 +692,11 @@ class Endpoint(BaseEndpoint):
         )
 
     def update(
-        self, data: Any | None, filters: Mapping[str, str | Any] | None = None, **kwargs: Any
+        self,
+        data: Any | None,
+        filters: Mapping[str, str | Any] | None = None,
+        domain: str | None = None,
+        **kwargs: Any,
     ) -> APIResponseType:
         """Send a PUT request specifically structured for updating resources with dynamic headers.
 
@@ -699,6 +713,7 @@ class Endpoint(BaseEndpoint):
             self._auth,
             "put",
             self._url,
+            domain=domain,
             headers=merged_headers,
             data=data,
             filters=filters,
@@ -762,7 +777,8 @@ class Endpoint(BaseEndpoint):
             for k, v in query_params.items():
                 if not v:
                     continue
-                # If Mailgun returned multiple values (e.g., multiple tags), preserve the list
+
+                # Default flatten logic for unknown or string parameters
                 parsed_str_val = v[0] if len(v) == 1 else v
 
                 # Prevent Query Parameter Type Drift
@@ -776,6 +792,12 @@ class Endpoint(BaseEndpoint):
                         current_filters[k] = int(v[0])
                     elif isinstance(original_val, float):
                         current_filters[k] = float(v[0])
+                    elif isinstance(original_val, list):
+                        current_filters[k] = v  # Always keep as list
+                    elif isinstance(original_val, tuple):
+                        current_filters[k] = tuple(v)  # Always keep as tuple
+                    elif isinstance(original_val, set):
+                        current_filters[k] = set(v)  # Always keep as set
                     else:
                         current_filters[k] = parsed_str_val
                 else:
@@ -823,7 +845,7 @@ class AsyncEndpoint(BaseEndpoint):
         headers: dict[str, str],
         data: Any | None = None,
         filters: Mapping[str, str | Any] | None = None,
-        timeout: TimeoutType = None,  # noqa: ASYNC109
+        timeout: TimeoutType = None,  # ruff: ignore[async-function-with-timeout]
         files: Any | None = None,
         domain: str | None = None,
         **kwargs: Any,
@@ -1056,7 +1078,11 @@ class AsyncEndpoint(BaseEndpoint):
         )
 
     async def put(
-        self, data: Any | None = None, filters: Mapping[str, str | Any] | None = None, **kwargs: Any
+        self,
+        data: Any | None = None,
+        filters: Mapping[str, str | Any] | None = None,
+        domain: str | None = None,
+        **kwargs: Any,
     ) -> AsyncAPIResponseType:
         """Send an asynchronous PUT request to update or replace a resource.
 
@@ -1073,6 +1099,7 @@ class AsyncEndpoint(BaseEndpoint):
             self._auth,
             "put",
             self._url,
+            domain=domain,
             headers=merged_headers,
             data=data,
             filters=filters,
@@ -1080,7 +1107,11 @@ class AsyncEndpoint(BaseEndpoint):
         )
 
     async def patch(
-        self, data: Any | None = None, filters: Mapping[str, str | Any] | None = None, **kwargs: Any
+        self,
+        data: Any | None = None,
+        filters: Mapping[str, str | Any] | None = None,
+        domain: str | None = None,
+        **kwargs: Any,
     ) -> AsyncAPIResponseType:
         """Send an asynchronous PATCH request to partially update a resource.
 
@@ -1097,6 +1128,7 @@ class AsyncEndpoint(BaseEndpoint):
             self._auth,
             "patch",
             self._url,
+            domain=domain,
             headers=merged_headers,
             data=data,
             filters=filters,
@@ -1104,7 +1136,11 @@ class AsyncEndpoint(BaseEndpoint):
         )
 
     async def update(
-        self, data: Any | None, filters: Mapping[str, str | Any] | None = None, **kwargs: Any
+        self,
+        data: Any | None,
+        filters: Mapping[str, str | Any] | None = None,
+        domain: str | None = None,
+        **kwargs: Any,
     ) -> AsyncAPIResponseType:
         """Send an asynchronous PUT request specifically structured for updating resources with dynamic headers.
 
@@ -1122,6 +1158,7 @@ class AsyncEndpoint(BaseEndpoint):
             self._auth,
             "put",
             self._url,
+            domain=domain,
             headers=merged_headers,
             data=data,
             filters=filters,

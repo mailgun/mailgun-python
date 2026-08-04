@@ -716,7 +716,7 @@ class SpamGuard:
         parser = _SpamGuardParser()
         try:
             parser.feed(html_content)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:  # ruff: ignore[blind-except]
             return {"score": 0.0, "issues": [f"Fatal HTML parsing error: {e}"], "is_safe": False}
 
         issues = parser.issues

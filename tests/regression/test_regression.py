@@ -58,6 +58,48 @@ class TestConfigRegression:
             assert config._baked_urls["v4"] == "https://api.eu.mailgun.net/v4"
 
 
+class TestConfigRouter:
+    @pytest.mark.parametrize(
+        "api_url",
+        [
+            "https://api.mailgun.net",
+            "https://api.eu.mailgun.net",
+        ],
+    )
+    def test_invalid_endpoint_key_raises_correct_keyerror(self, api_url: str) -> None:
+        """
+        Ensure that requesting a non-existent endpoint from the Config router
+        raises a KeyError with the correctly formatted 'Invalid API endpoint' message.
+        """
+        config = Config(api_url=api_url)
+        invalid_key = "non_existent_fuzz_key"
+
+        with pytest.raises(KeyError) as exc_info:
+            _ = config[invalid_key]
+
+        assert "Invalid API endpoint requested" in str(exc_info.value)
+        assert invalid_key in str(exc_info.value)
+
+    @pytest.mark.parametrize(
+        "api_url",
+        [
+            "https://api.mailgun.net",
+            "https://api.eu.mailgun.net",
+        ],
+    )
+    def test_empty_or_sanitized_endpoint_key_raises_keyerror(self, api_url: str) -> None:
+        """
+        Ensure that requesting a completely invalid/empty endpoint from the Config
+        router safely fails early with the 'Invalid endpoint key' message.
+        """
+        config = Config(api_url=api_url)
+
+        # Simulating the fuzzer's "A@[1:d::1]" dropping to an empty route after sanitization
+        with pytest.raises(KeyError) as exc_info:
+            _ = config[""]
+
+        assert "Invalid endpoint key" in str(exc_info.value)
+
 class TestControlCharacters:
     @pytest.mark.asyncio
     async def test_async_endpoint_rejects_control_characters(self) -> None:

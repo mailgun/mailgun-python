@@ -275,7 +275,7 @@ def test_idempotency_guard_in_action(domain: str) -> None:
     # Scenario 4: Developer explicitly disables protection
     builder4 = (
         MailgunMessageBuilder(f"mailgun@{domain}")
-        .set_idempotency_safe(False)  # DISABLED!
+        .set_idempotency_safe(safe=False)  # DISABLED!
         .add_recipient("customer@example.com")
         .set_subject("Invoice Payment #1024")
     )

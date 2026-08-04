@@ -31,7 +31,6 @@ requirements:
     - httpx2 >=2.7.0
     - httpx >=0.24
     - requests >=2.33.0
-    - typing-extensions >=4.7.1  # [py<311]
 
 test:
   imports:

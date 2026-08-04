@@ -122,10 +122,9 @@ _DOMAIN_ALIASES: DomainsAliasType = {
     "dkimselector": "dkim_selector",
     "webprefix": "web_prefix",
     "sendingqueues": "sending_queues",
+    "domainlist": "domains",
 }
-
 DOMAIN_ALIASES: Final = MappingProxyType(_DOMAIN_ALIASES)
-
 
 # --- DOMAIN_ENDPOINTS ---
 # Grouping endpoints by versions for smart routing.
@@ -137,6 +136,8 @@ _DOMAIN_ENDPOINTS: DomainsEndpointsType = {
         "click",
         "complaints",
         "credentials",
+        "dkim_authority",
+        "dkim_selector",
         "dynamic_pools",
         "events",
         "ip_pools",
@@ -152,13 +153,12 @@ _DOMAIN_ENDPOINTS: DomainsEndpointsType = {
         "unsubscribe",
         "unsubscribes",
         "verify",
+        "web_prefix",
         "webhooks",
         "whitelists",
     ),
 }
-
 DOMAIN_ENDPOINTS: Final = MappingProxyType(_DOMAIN_ENDPOINTS)
-
 
 # --- ROUTE_ALIASES ---
 # Maps virtual SDK properties to their actual routing resources.

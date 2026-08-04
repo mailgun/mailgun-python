@@ -43,7 +43,9 @@ def TestOneInput(data: bytes) -> None:
         # Expected for malformed fuzz input; ignore and continue fuzzing.
         pass
     except KeyError as e:
-        if "Invalid endpoint key" in str(e):
+        error_msg = str(e)
+        # Allow BOTH legitimate fail-closed security rejections
+        if "Invalid API endpoint requested" in error_msg or "Invalid endpoint key" in error_msg:
             return
 
         raise RuntimeError(f"CRASH: Unexpected KeyError in router fallback: {e}") from e

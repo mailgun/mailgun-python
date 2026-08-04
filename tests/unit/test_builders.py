@@ -216,7 +216,7 @@ class TestMailgunMessageBuilder:
         assert "h:X-Idempotency-Key" in payload1
 
         # Key omitted when force disabled
-        builder.set_idempotency_safe(enabled=False)
+        builder.set_idempotency_safe(safe=False)
         payload2, _ = builder.build()
         assert "h:X-Idempotency-Key" not in payload2
 

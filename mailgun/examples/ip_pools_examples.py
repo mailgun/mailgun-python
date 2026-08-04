@@ -189,13 +189,13 @@ if __name__ == "__main__":
         print("Please set the 'APIKEY' and 'DOMAIN' environment variables to run examples.")
     else:
         print("--- Running Synchronous Examples ---")
-        get_ippools_sync(api_key=API_KEY, domain=DOMAIN)
-        # create_ippool_sync(api_key=API_KEY, domain=DOMAIN)
-        # update_ippool_sync(api_key=API_KEY, domain=DOMAIN, pool_id=POOL_ID)
-        # delete_ippool_sync(api_key=API_KEY, domain=DOMAIN, pool_id=POOL_ID)
+        get_ippools_sync(api_key=API_KEY)
+        # create_ippool_sync(api_key=API_KEY)
+        # update_ippool_sync(api_key=API_KEY, pool_id=POOL_ID)
+        # delete_ippool_sync(api_key=API_KEY, pool_id=POOL_ID)
 
-        # link_ippool_sync(api_key=API_KEY, domain=DOMAIN, pool_id=LINK_POOL_ID)
-        # unlink_ippool_sync(api_key=API_KEY, domain=DOMAIN, pool_id=UNLINK_POOL_ID)
+        # link_ippool_sync(api_key=API_KEY, pool_id=LINK_POOL_ID)
+        # unlink_ippool_sync(api_key=API_KEY, pool_id=UNLINK_POOL_ID)
 
         print("\n--- Running Asynchronous Examples ---")
         asyncio.run(get_ippools_async(api_key=API_KEY, domain=DOMAIN))

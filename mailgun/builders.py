@@ -59,7 +59,7 @@ class ChunkedStreamer:
             A byte string containing the read data.
         """
         if self._file is None:
-            self._file = Path(self._file_path).open("rb")  # noqa: SIM115
+            self._file = Path(self._file_path).open("rb")  # ruff: ignore[open-file-with-context-handler]
 
         chunk = self._file.read(size)
 
@@ -79,7 +79,7 @@ class ChunkedStreamer:
         try:
             # Sync the iterator with the class-level _file descriptor
             if self._file is None:
-                self._file = Path(self._file_path).open("rb")  # noqa: SIM115
+                self._file = Path(self._file_path).open("rb")  # ruff: ignore[open-file-with-context-handler]
 
             while True:
                 chunk = self._file.read(self.chunk_size)
@@ -408,13 +408,16 @@ class MailgunMessageBuilder:
 
         return SpamGuard.check_html(html_payload)
 
-    def set_idempotency_safe(self, *, enabled: bool) -> Self:
-        """Allows you to force-disable the automatic generation of the idempotency key.
+    def set_idempotency_safe(self, *, safe: bool = True) -> Self:
+        """Enable or disable automatic idempotency key generation.
+
+        Args:
+            safe: Whether to automatically generate and attach an X-Idempotency-Key.
 
         Returns:
             The builder instance.
         """
-        self._idempotency_safe = enabled
+        self._idempotency_safe = safe
         return self
 
     def build(self) -> tuple[dict[str, Any], list[tuple[str, FileTuple]] | None]:

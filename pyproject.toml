@@ -127,11 +127,10 @@ write_to_template = '__version__ = "{version}"'
 #fallback_version = "X.Y.ZrcN.postN.devN"  # Explicit fallback
 
 [tool.ruff]
-#indent-width = 4
-
-# Assume Python 3.11.
+# Assume Python 3.11+
 target-version = "py311"
 line-length = 100
+
 # Exclude a variety of commonly ignored directories.
 exclude = [
   ".bzr",
@@ -166,78 +165,76 @@ extend-exclude = [ "test", "tests" ]
 # Enumerate all fixed violations.
 show-fixes = true
 
-# Like Black, indent with spaces, rather than tabs.
-format.indent-style = "space"
-# Like Black, use double quotes for strings.
-format.quote-style = "double"
-# Like Black, automatically detect the appropriate line ending.
-format.line-ending = "auto"
-# Like Black, respect magic trailing commas.
-format.skip-magic-trailing-comma = false
-# Set the line length limit used when formatting code snippets in
-# docstrings.
-#
-# This only has an effect when the `docstring-code-format` setting is
-# enabled.
-format.docstring-code-line-length = "dynamic"
-format.exclude = [ "*.pyi" ]
-# Enable auto-formatting of code examples in docstrings. Markdown,
-# reStructuredText code/literal blocks and doctests are all supported.
-#
-# This is currently disabled by default, but it is planned for this
-# to be opt-out in the future.
-format.docstring-code-format = true
-# Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
-# McCabe complexity (`C901`) by default.
-# Enable pycodestyle (`E`) and Pyflakes (`F`) codes by default, ('UP') is pyupgrade.
-# "ERA" - Found commented-out code
-# see https://docs.astral.sh/ruff/rules/#rules
-lint.select = [ "ALL" ]
-#extend-select = ["W", "N", "UP", "B", "A", "C4", "PT", "SIM", "PD", "PLE", "RUF"]
-# Never enforce `E501` (line length violations).
-lint.ignore = [
+[tool.ruff.format]
+indent-style = "space"
+quote-style = "double"
+line-ending = "auto"
+skip-magic-trailing-comma = false
+docstring-code-line-length = "dynamic"
+exclude = [ "*.pyi" ]
+docstring-code-format = true
+
+[tool.ruff.lint]
+select = [ "ALL" ]
+ignore = [
     # --- Formatter Conflicts ---
-    "COM812", # Missing trailing comma (Conflicts with ruff-format)
-    "ISC001", # Implicit string concatenation (Conflicts with ruff-format)
-    "D203",   # one-blank-line-before-class (conflicts with D211)
-    "D213",   # multi-line-summary-second-line (conflicts with D212)
+    "missing-trailing-comma", # Missing trailing comma (Conflicts with ruff-format)
+    "single-line-implicit-string-concatenation", # Implicit string concatenation (Conflicts with ruff-format)
+    "incorrect-blank-line-before-class",   # one-blank-line-before-class (conflicts with D211)
+    "multi-line-summary-second-line",   # multi-line-summary-second-line (conflicts with D212)
 
     # --- SDK Realities ---
-    "ANN401", # Dynamically typed expressions. (An HTTP SDK REQUIRES `Any` for JSON data, files, and kwargs)
-    "TRY003", # Avoid specifying long messages outside exception classes (Causes massive file bloat)
-    "EM101",  # Exception must not use a string literal (Causes massive file bloat)
-    "E501",   # Line too long (Let the formatter handle wrapping)
+    "any-type", # Dynamically typed expressions. (An HTTP SDK REQUIRES `Any` for JSON data, files, and kwargs)
+    "raise-vanilla-args", # Avoid specifying long messages outside exception classes (Causes massive file bloat)
+    "raw-string-in-exception",  # Exception must not use a string literal (Causes massive file bloat)
+    "line-too-long",   # Line too long (Let the formatter handle wrapping)
 
     # --- Docstring ---
-    "D417", "D100", "D104",
+    "undocumented-param", "undocumented-public-module", "undocumented-public-package",
 
     # --- Keep existing TODO ignores ---
-    "C901",
-    "PLR0913",
-    "CPY001",
-    "PLW0717", # too-many-statements-in-try-clause (PLW0717)
+    "complex-structure",
+    "too-many-arguments",
+    "missing-copyright-notice",
+    "too-many-statements-in-try-clause", # too-many-statements-in-try-clause (PLW0717)
 ]
-lint.exclude = [ "mailgun/examples/*", "tests" ]
-lint.per-file-ignores."__init__.py" = [ "E402" ]
-# Allow fix for all enabled rules (when `--fix`) is provided.
-lint.fixable = [ "ALL" ]
-lint.unfixable = [ "B" ]
-# Allow unused variables when underscore-prefixed.
-lint.dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
-#select = ["A", "ARG", "B", "C4", "DTZ", "E", "EM", "ERA", "EXE", "F", "FA", "FLY", "FURB", "G", "ICN", "INP", "INT", "LOG", "N", "PD", "PERF", "PIE", "PLC", "PLE", "PLW", "PT", "PTH", "PYI", "Q", "RET", "RSE", "RUF", "S", "SIM", "T10", "TID", "TRY", "UP", "W"]
-lint.external = [ "DOC", "PLR" ]
-lint.flake8-annotations.allow-star-arg-any = false
-lint.flake8-annotations.ignore-fully-untyped = false
-lint.flake8-quotes.docstring-quotes = "double"
-#"path/to/file.py" = ["E402"]
-lint.isort.force-single-line = false
-lint.isort.force-sort-within-sections = false
-lint.isort.lines-after-imports = 2
-lint.mccabe.max-complexity = 13
-lint.pycodestyle.ignore-overlong-task-comments = true
-# Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
-lint.pydocstyle.convention = "google"
+exclude = [ "mailgun/examples/*", "tests" ]
+fixable = [ "ALL" ]
+unfixable = [ "B" ]
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+external = [ "DOC", "PLR" ]
+preview = true
 
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = [ "module-import-not-at-top-of-file" ]
+"mailgun/endpoints.py" = ["import-outside-top-level"]
+
+[tool.ruff.lint.pylint]
+max-args = 9           # Default is 5. SDK endpoints need more (auth, data, headers, files, etc.)
+max-returns = 9        # Default is 6.
+max-branches = 15      # Default is 12.
+
+
+[tool.ruff.lint.flake8-annotations]
+allow-star-arg-any = false
+ignore-fully-untyped = false
+
+[tool.ruff.lint.flake8-quotes]
+docstring-quotes = "double"
+
+[tool.ruff.lint.isort]
+force-single-line = false
+force-sort-within-sections = false
+lines-after-imports = 2
+
+[tool.ruff.lint.mccabe]
+max-complexity = 13
+
+[tool.ruff.lint.pycodestyle]
+ignore-overlong-task-comments = true
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 [tool.coverage.run]
 source_pkgs = [ "mailgun" ]
 branch = true
@@ -316,11 +313,6 @@ reportMissingImports = false
 
 [tool.typos.default.extend-words]
 requestor = "requestor"
-
-[tool.ruff.lint.pylint]
-max-args = 9           # Default is 5. SDK endpoints need more (auth, data, headers, files, etc.)
-max-returns = 9        # Default is 6.
-max-branches = 15      # Default is 12.
 
 [tool.bandit]
 # usage: bandit -c pyproject.toml -r .

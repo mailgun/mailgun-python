@@ -9,7 +9,6 @@ import pytest
 
 import mailgun.config
 from mailgun.client import Config, SecurityGuard
-from mailgun.config import RetryPolicy
 
 
 @pytest.fixture(autouse=True)
@@ -136,15 +135,11 @@ class TestConfigRouting:
         except Exception:
             pass
 
-    def test_config_route_resolution_defaults_to_v3_for_unregistered_keys(self) -> None:
+    def test_config_route_resolution_raises_keyerror_for_unregistered_keys(self) -> None:
+        """Verify strict routing engine rejects unknown endpoints instantly."""
         config = Config()
-        url_config, _ = config["UNREGISTERED_FUTURE_ENDPOINT"]
-
-        assert url_config["base"].endswith("/v3/")
-        assert isinstance(url_config["keys"], list)
-        assert "endpoint" in url_config["keys"]
-        assert "future" in url_config["keys"]
-        assert "unregistered" in url_config["keys"]
+        with pytest.raises(KeyError, match="Invalid API endpoint requested"):
+            _ = config["UNREGISTERED_FUTURE_ENDPOINT"]
 
     def test_getitem_addressvalidate(self) -> None:
         config = Config()
@@ -178,12 +173,10 @@ class TestConfigRouting:
         assert url1 == url2
 
     def test_getitem_coverage_enhancement(self) -> None:
+        """Verify the routing engine safely blocks non-existent routes."""
         config = Config()
-        url_config, headers = config["NON_EXISTENT_ROUTE_XYZ"]
-
-        assert url_config["base"].endswith("/v3/")
-        assert isinstance(url_config["keys"], list)
-        assert "User-agent" in headers
+        with pytest.raises(KeyError, match="Invalid API endpoint requested"):
+            _ = config["NON_EXISTENT_ROUTE_XYZ"]
 
     def test_getitem_dkim(self) -> None:
         config = Config()
@@ -231,10 +224,10 @@ class TestConfigRouting:
         assert url["keys"] == ["messages"]
 
     def test_getitem_resendmessage(self) -> None:
+        """Verify the EXACT_ROUTES alias for resending messages maps correctly."""
         config = Config()
-        url, _ = config["resendmessage"]
-        assert "base" in url
-        assert "resendmessage" in url["keys"]
+        url, _ = config["resend_message"]  # Correctly mapped key
+        assert url["keys"] == ["resendmessage"]
 
     def test_getitem_tags(self) -> None:
         config = Config()
@@ -267,6 +260,22 @@ class TestConfigRouting:
     def test_resolve_domains_route_v4_fallback(self) -> None:
         res = Config()._resolve_domains_route(["domains", "unknown_new_feature"])
         assert "v3/domains" in res["base"]
+
+    def test_get_cached_route_data_raises_keyerror_on_invalid_route(self) -> None:
+        """Coverage: Ensure typo'd endpoints raise a descriptive KeyError instead of returning None."""
+        from mailgun.config import _get_cached_route_data
+        from mailgun import routes
+
+        bad_key = "messages_typo"
+
+        with pytest.raises(KeyError) as exc_info:
+            _get_cached_route_data(bad_key)
+
+        error_msg = str(exc_info.value)
+
+        assert f"Invalid API endpoint requested: {bad_key}" in error_msg
+        assert "Available endpoints:" in error_msg
+        assert list(routes.EXACT_ROUTES.keys())[0] in error_msg
 
 
 class TestConfigSanitization:
@@ -386,7 +395,7 @@ class TestRetryPolicy:
 
     def test_retry_policy_initialization_and_slots(self) -> None:
         """Verify immutable properties and memory-efficient __slots__ usage."""
-        policy = RetryPolicy(max_retries=5, base_delay=2.0, max_delay=20.0, respect_retry_after=False)
+        policy = mailgun.config.RetryPolicy(max_retries=5, base_delay=2.0, max_delay=20.0, respect_retry_after=False)
         assert policy.max_retries == 5
         assert policy.base_delay == 2.0
         assert policy.max_delay == 20.0
@@ -400,7 +409,7 @@ class TestRetryPolicy:
     def test_calculate_delay_applies_full_jitter(self, mock_uniform: MagicMock) -> None:
         """Coverage: Verifies random.uniform is called precisely between 0 and the exponential bound."""
         mock_uniform.return_value = 1.5
-        policy = RetryPolicy(base_delay=1.0, max_delay=10.0)
+        policy = mailgun.config.RetryPolicy(base_delay=1.0, max_delay=10.0)
 
         delay = policy.calculate_delay(attempt=1)
 
@@ -412,7 +421,7 @@ class TestRetryPolicy:
     def test_calculate_delay_respects_max_delay_ceiling(self, mock_uniform: MagicMock) -> None:
         """Coverage: Ensure exponential growth never breaches the `max_delay` cap."""
         mock_uniform.return_value = 10.0
-        policy = RetryPolicy(base_delay=1.0, max_delay=10.0)
+        policy = mailgun.config.RetryPolicy(base_delay=1.0, max_delay=10.0)
 
         # attempt = 5 -> base(1.0) * 2^5 = 32.0. Math should cap it safely at max_delay (10.0).
         delay = policy.calculate_delay(attempt=5)
