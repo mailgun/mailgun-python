@@ -364,3 +364,37 @@ class TestChunkedStreamer:
 
         chunks = list(streamer)
         assert chunks == [b"Sync", b"Data", b"Stre", b"am"]
+
+    def test_chunked_streamer_invalid_chunk_size_raises(self, tmp_path: Path) -> None:
+        """Covers builders.py: chunk_size <= 0 validation."""
+        test_file = tmp_path / "stream_invalid.txt"
+        test_file.write_bytes(b"Data")
+
+        with pytest.raises(ValueError, match="chunk_size must be a strictly positive integer"):
+            ChunkedStreamer(test_file, safe_base_dir=tmp_path, chunk_size=0)
+
+        with pytest.raises(ValueError, match="chunk_size must be a strictly positive integer"):
+            ChunkedStreamer(test_file, safe_base_dir=tmp_path, chunk_size=-10)
+
+    def test_chunked_streamer_eof_state_and_seek_tell(self, tmp_path: Path) -> None:
+        """Covers builders.py: _eof return, tell(), and seek()."""
+        test_file = tmp_path / "stream_seek.txt"
+        test_file.write_bytes(b"0123456789")
+
+        streamer = ChunkedStreamer(test_file, safe_base_dir=tmp_path, chunk_size=5)
+        assert streamer.tell() == 0
+
+        # Read to EOF
+        chunk1 = streamer.read(5)
+        chunk2 = streamer.read(5)
+        chunk_eof = streamer.read(5)
+        assert chunk1 == b"01234"
+        assert chunk2 == b"56789"
+        assert chunk_eof == b""
+        assert streamer.read(5) == b""  # Hits if self._eof: return b""
+
+        # Test seek and tell rewinding
+        streamer.seek(2)
+        assert streamer.tell() == 2
+        assert streamer.read(3) == b"234"
+        streamer.close()
