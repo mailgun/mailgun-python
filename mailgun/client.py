@@ -187,7 +187,7 @@ class Client(BaseClient):
             AttributeError: If the requested route is unknown or a magic Python method is invoked.
         """
         # Protect Data Model: Ignore magic Python methods
-        if name.startswith("__") and name.endswith("__"):
+        if (name.startswith("__") and name.endswith("__")) or name in {"config", "auth"}:
             msg = f"'{self.__class__.__name__}' object has no attribute '{name}'"
             raise AttributeError(msg)
 
