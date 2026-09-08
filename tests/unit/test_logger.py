@@ -1,5 +1,6 @@
 import logging
 from collections import namedtuple
+from typing import Any
 
 from mailgun.filters import RedactingFilter
 from mailgun.logger import get_logger
@@ -158,3 +159,79 @@ class TestRedactingFilter:
 
         assert "safe-string" in redacted
         assert "key-[REDACTED]" in redacted
+
+    def test_redacting_filter_args_as_list_and_arbitrary_object(self) -> None:
+        """Covers filters.py lines 198-201: record.args as list or custom object."""
+        filtr = RedactingFilter()
+
+        # args as list
+        record_list = logging.LogRecord(
+            "test",
+            logging.INFO,
+            "",
+            0,
+            "Log: %s",
+            ["key-12345secret"],  # type: ignore[arg-type]
+            None,
+        )
+        assert filtr.filter(record_list) is True
+        raw_list_args: Any = record_list.args
+        assert raw_list_args == ["key-[REDACTED]"]
+
+        # args as single primitive
+        record_obj = logging.LogRecord(
+            "test",
+            logging.INFO,
+            "",
+            0,
+            "Log: %s",
+            "key-singlearg",  # type: ignore[arg-type]
+            None,
+        )
+        assert filtr.filter(record_obj) is True
+        raw_obj_args: Any = record_obj.args
+        assert raw_obj_args == "key-[REDACTED]"
+
+    def test_redact_set_unhashable_fallback(self) -> None:
+        """Covers filters.py lines 94-96: sets containing items that become unhashable after redaction."""
+        filtr = RedactingFilter()
+
+        class HashableItemWithDict:
+            def __init__(self) -> None:
+                self.key = "key-secret"
+
+        # Hashable upon set creation, but converts to an unhashable dict during redaction
+        valid_set = {HashableItemWithDict()}
+        redacted = filtr._deep_redact(valid_set)
+        assert isinstance(redacted, list)
+        assert redacted[0]["key"] == "key-[REDACTED]"
+
+    def test_redact_object_throwing_exceptions(self) -> None:
+        """Covers filters.py lines 128-129, 134-135, 139-140: throwing objects."""
+        filtr = RedactingFilter()
+
+        class ThrowingModel:
+            __slots__ = ()
+
+            def model_dump(self) -> None:
+                raise RuntimeError("Pydantic dump failed")
+
+            def __str__(self) -> str:
+                raise RuntimeError("str() failed")
+
+        accessed = False
+
+        class ThrowingVars:
+            @property
+            def __dict__(self) -> dict[str, Any]:  # type: ignore[override]
+                nonlocal accessed
+                if not accessed:
+                    accessed = True
+                    return {}
+                raise RuntimeError("vars failed")
+
+            def __str__(self) -> str:
+                raise RuntimeError("str() failed")
+
+        assert filtr._deep_redact(ThrowingModel()) == "<UNSTRINGIFIABLE_OBJECT>"
+        assert filtr._deep_redact(ThrowingVars()) == "<UNSTRINGIFIABLE_OBJECT>"

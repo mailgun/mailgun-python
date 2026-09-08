@@ -1,6 +1,7 @@
 import logging
 import unittest
 from pathlib import Path
+import base64
 
 import pytest
 
@@ -413,6 +414,50 @@ class RegressionRedactionTests(unittest.TestCase):
         # Should not crash and should fall back safely
         result = self.filter.filter(record)
         self.assertTrue(result)
+
+    def test_unbounded_exception(self) -> None:
+        """Verify the exact libFuzzer crash artifact cannot raise unhandled exceptions."""
+        raw_b64 = (
+            b"QDU1NTU1NTU1N+jo6Ojo6OgY6AAAAAAAAAH0v7/0j7+/APSAgIDEswAlKnMlJSUlIm1lbUBiZXJz"  # pragma: allowlist secret
+            b"IjoiW3vo6Ojo6Ojo6Ojg6OhHRw=="
+        )
+        payload_bytes = base64.b64decode(raw_b64)
+        malicious_msg = payload_bytes.decode("latin1")
+
+        filter_instance = RedactingFilter()
+
+        # Test Case 1: Message contains %*s and formatting operators
+        record1 = logging.LogRecord(
+            name="test_logger",
+            level=logging.INFO,
+            pathname=__file__,
+            lineno=10,
+            msg=malicious_msg,
+            args=(),
+            exc_info=None,
+        )
+        assert filter_instance.filter(record1) is True
+        # Emulate getMessage() formatting check from the fuzzer
+        try:
+            _ = record1.getMessage()
+        except (TypeError, ValueError, OverflowError, KeyError):
+            pass
+
+        # Test Case 2: Injected formatting args with unescaped specifiers
+        record2 = logging.LogRecord(
+            name="test_logger",
+            level=logging.INFO,
+            pathname=__file__,
+            lineno=20,
+            msg="%*s%%%%\"mem@bers\":",
+            args=(5, malicious_msg),
+            exc_info=None,
+        )
+        assert filter_instance.filter(record2) is True
+        try:
+            _ = record2.getMessage()
+        except (TypeError, ValueError, OverflowError, KeyError):
+            pass
 
 
 if __name__ == "__main__":
