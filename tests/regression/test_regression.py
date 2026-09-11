@@ -441,6 +441,7 @@ class RegressionRedactionTests(unittest.TestCase):
         try:
             _ = record1.getMessage()
         except (TypeError, ValueError, OverflowError, KeyError):
+            # Expected for malformed fuzzer-derived format strings; ensure nothing escapes.
             pass
 
         # Test Case 2: Injected formatting args with unescaped specifiers
@@ -457,6 +458,8 @@ class RegressionRedactionTests(unittest.TestCase):
         try:
             _ = record2.getMessage()
         except (TypeError, ValueError, OverflowError, KeyError):
+            # Expected for malformed fuzzed format strings; this test only verifies
+            # no unhandled exception escapes the redaction/filtering path.
             pass
 
 
@@ -498,6 +501,7 @@ class TestRedactionFuzzCrash032af5:
         try:
             _ = record1.getMessage()
         except (TypeError, ValueError, OverflowError, KeyError):
+            # Fuzz payload may trigger formatting/parsing errors; test only asserts no unsafe crash.
             pass
 
     def test_exploding_object_in_record_args_and_extra(self) -> None:
@@ -518,7 +522,9 @@ class TestRedactionFuzzCrash032af5:
         try:
             _ = record.getMessage()
         except (TypeError, ValueError, OverflowError, KeyError):
-            pass
+            # Expected for fuzzed/hostile formatting inputs; this test only verifies
+            # the redaction filter path does not crash.
+            return
 
 
 if __name__ == "__main__":

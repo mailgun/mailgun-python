@@ -113,6 +113,7 @@ class TestHandlerProperties:
         try:
             handle_inbox(url_dict, "example.com", "GET", **kwargs)
         except (ValueError, KeyError, TypeError, ApiError):
+            # Expected defensive failure modes for hostile/invalid generated kwargs.
             pass
 
     @given(
@@ -131,6 +132,7 @@ class TestHandlerProperties:
         try:
             handle_lists(url_dict, domain, method, address=address)
         except (ValueError, TypeError, ApiError):
+            # Expected fail-closed behavior for hostile/fuzzed inputs in this invariant test.
             pass
 
     @given(
@@ -146,6 +148,7 @@ class TestHandlerProperties:
             url_result = handle_ips(url, dirty_domain, "GET", ip=dirty_ip)
             assert url_result.startswith("https://api.mailgun.net/v3/")
         except (ValueError, TypeError, ApiError):
+            # Expected for hostile/property-generated input: defensive rejection is acceptable.
             pass
 
     @given(tag=st.text(alphabet=string.printable))  # type: ignore[untyped-decorator]

@@ -85,6 +85,7 @@ def TestOneInput(data: bytes) -> None:
                     try:
                         IdempotencyGuard.generate_key(target_domain, msg_payload)
                     except (ValueError, TypeError):
+                        # Expected for malformed/circular fuzz payloads; continue exercising state transitions.
                         pass
 
                     client.messages.create(domain=target_domain, data=msg_payload)
@@ -154,6 +155,7 @@ def TestOneInput(data: bytes) -> None:
                         report = SpamGuard.check_html(fuzzed_html)
                         assert isinstance(report, dict)
                     except ValueError:
+                        # Expected for malformed fuzz inputs; continue fuzzing.
                         pass
 
                 # Action 7: Timeout Overflow & Chaos Bounds
@@ -162,6 +164,7 @@ def TestOneInput(data: bytes) -> None:
                     try:
                         SecurityGuard.sanitize_timeout(timeout_val)
                     except (ValueError, TypeError):
+                        # Invalid fuzzed timeout values are expected; continue fuzzing.
                         pass
 
     except (ApiError, ValueError, TypeError, KeyError, UnicodeEncodeError, StopIteration):
