@@ -460,5 +460,66 @@ class RegressionRedactionTests(unittest.TestCase):
             pass
 
 
+class ExplodingRepr:
+    """Simulates an object whose __repr__ or __str__ raises during formatting."""
+
+    def __str__(self) -> str:
+        raise AttributeError("Dynamic property lookup failed")
+
+    def __repr__(self) -> str:
+        raise RuntimeError("Exploding repr")
+
+
+class TestRedactionFuzzCrash032af5:
+    def test_crash_032af53f_fuzz_payload(self) -> None:
+        """Verify crash-032af53f76502e96d7e1a7cc0c98017d0ab36d90 is handled safely."""
+        raw_b64 = (
+            b"QG11bHRpcGFydC9tYWlsZ3VpJSpyb19f"
+            b"/////7///+np6enp+ekb6W3FAQAAAG3FAQAA"
+            b"AOgYlQ7o6P7+6sXF"
+            b"GA6V6P7+6v476uz+"
+        )
+        payload_bytes = base64.b64decode(raw_b64)
+        msg_str = payload_bytes.decode("latin1")
+        filter_instance = RedactingFilter()
+
+        # Case 1: Payload as log record message with arbitrary complex args
+        record1 = logging.LogRecord(
+            name="test",
+            level=logging.INFO,
+            pathname="fake.py",
+            lineno=1,
+            msg=msg_str,
+            args=(10, ExplodingRepr(), "extra"),
+            exc_info=None,
+        )
+
+        assert filter_instance.filter(record1) is True
+        try:
+            _ = record1.getMessage()
+        except (TypeError, ValueError, OverflowError, KeyError):
+            pass
+
+    def test_exploding_object_in_record_args_and_extra(self) -> None:
+        """Verify custom objects raising in __repr__ or __str__ do not crash filter."""
+        filter_instance = RedactingFilter()
+        record = logging.LogRecord(
+            name="test",
+            level=logging.INFO,
+            pathname="fake.py",
+            lineno=1,
+            msg="Formatting with dynamic width: %*r",
+            args=(5, ExplodingRepr()),
+            exc_info=None,
+        )
+        record.__dict__["custom_extra"] = ExplodingRepr()
+
+        assert filter_instance.filter(record) is True
+        try:
+            _ = record.getMessage()
+        except (TypeError, ValueError, OverflowError, KeyError):
+            pass
+
+
 if __name__ == "__main__":
     unittest.main()

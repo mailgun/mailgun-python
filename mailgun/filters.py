@@ -66,7 +66,7 @@ class RedactingFilter(logging.Filter):
             A sanitized dictionary with redacted values.
         """
         try:
-            return {k: self._deep_redact(v, depth + 1) for k, v in data.items()}
+            return {k: self._deep_redact(v, depth + 1) for k, v in list(data.items())}
         except Exception:  # ruff: ignore[blind-except]
             return data
 
@@ -117,12 +117,12 @@ class RedactingFilter(logging.Filter):
         Returns:
             A sanitized tuple or NamedTuple instance with redacted values.
         """
-        if hasattr(data, "_fields"):  # Safely unpack NamedTuples
-            try:
-                return type(data)(*(self._deep_redact(item, depth + 1) for item in data))
-            except Exception:  # ruff: ignore[blind-except, try-except-pass]
-                pass
         try:
+            if hasattr(data, "_fields"):  # Safely unpack NamedTuples
+                try:
+                    return type(data)(*(self._deep_redact(item, depth + 1) for item in data))
+                except Exception:  # ruff: ignore[blind-except, try-except-pass]
+                    pass
             return tuple(self._deep_redact(item, depth + 1) for item in data)
         except Exception:  # ruff: ignore[blind-except]
             return data
@@ -137,22 +137,28 @@ class RedactingFilter(logging.Filter):
         Returns:
             A sanitized representation of the object.
         """
-        if hasattr(data, "model_dump") and callable(data.model_dump):
-            try:
-                return self._deep_redact(data.model_dump(), depth + 1)
-            except Exception:  # ruff: ignore[blind-except, try-except-pass]
-                pass
+        try:
+            if hasattr(data, "model_dump") and callable(data.model_dump):
+                try:
+                    return self._deep_redact(data.model_dump(), depth + 1)
+                except Exception:  # ruff: ignore[blind-except, try-except-pass]
+                    pass
+        except Exception:  # ruff: ignore[blind-except, try-except-pass]
+            pass
 
-        if hasattr(data, "__dict__"):
-            try:
-                return self._deep_redact(vars(data), depth + 1)
-            except Exception:  # ruff: ignore[blind-except, try-except-pass]
-                pass
+        try:
+            if hasattr(data, "__dict__"):
+                try:
+                    return self._deep_redact(vars(data), depth + 1)
+                except Exception:  # ruff: ignore[blind-except, try-except-pass]
+                    pass
+        except Exception:  # ruff: ignore[blind-except, try-except-pass]
+            pass
 
         try:
             str_val = str(data)
         except Exception:  # ruff: ignore[blind-except]
-            str_val = "<UNSTRINGIFIABLE_OBJECT>"
+            return "<UNSTRINGIFIABLE_OBJECT>"
 
         return self._redact_str(str_val)
 
@@ -210,14 +216,14 @@ class RedactingFilter(logging.Filter):
                 if isinstance(raw_args, tuple):
                     record.args = tuple(self._deep_redact(arg, 0) for arg in raw_args)
                 elif isinstance(raw_args, dict):
-                    record.args = {k: self._deep_redact(v, 0) for k, v in raw_args.items()}
+                    record.args = {k: self._deep_redact(v, 0) for k, v in list(raw_args.items())}
                 elif isinstance(raw_args, list):
                     record.args = [self._deep_redact(item, 0) for item in raw_args]  # type: ignore[assignment]
                 else:
                     record.args = self._deep_redact(raw_args, 0)
 
             # 3. Redact dynamically injected 'extra' attributes
-            extra_keys = [k for k in record.__dict__ if k not in self._STANDARD_ATTRS]
+            extra_keys = [k for k in list(record.__dict__.keys()) if k not in self._STANDARD_ATTRS]
             for attr_name in extra_keys:
                 record.__dict__[attr_name] = self._deep_redact(record.__dict__[attr_name], 0)
         except Exception:  # ruff: ignore[blind-except, try-except-pass]
