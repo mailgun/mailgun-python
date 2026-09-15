@@ -130,9 +130,9 @@ DOMAIN_ALIASES: Final = MappingProxyType(_DOMAIN_ALIASES)
 # --- DOMAIN_ENDPOINTS ---
 # Grouping endpoints by versions for smart routing.
 _DOMAIN_ENDPOINTS: DomainsEndpointsType = {
-    "v1": ("dkim", "dkim_management", "monitoring", "security"),
+    "v1": ("dkim_management", "monitoring", "security"),
     "v2": ("x509",),
-    "v4": ("connections", "ips", "keys", "webhooks"),
+    "v4": ("connections", "ips", "keys"),
     "v3": (
         "bounces",
         "click",
