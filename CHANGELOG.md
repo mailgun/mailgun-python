@@ -2,7 +2,35 @@
 
 We [keep a changelog.](http://keepachangelog.com/)
 
-## [Unreleased]
+## [Unreleased] (1.9.1)
+
+### Security
+
+- **SSRF and Scheme Whitelisting (CWE-918):** Enforced `ALLOWED_SCHEMES` validation (`https`, `http`) in `SecurityGuard.validate_mailgun_url()` and extended trusted hosts to include `.mailgun.com`.
+- **Multi-Pass URL Encoding and Path Traversal (CWE-116 / CWE-22):** Hardened `SecurityGuard.sanitize_domain()` to iterate recursive `unquote()` checks up to 3 passes, apply NFKC Unicode normalization, and strip CRLF/slash sequences before evaluating `..` traversal sequences.
+- **Replay Attack Window Verification (CWE-294):** Updated default webhook timestamp TTL in `SecurityGuard.verify_webhook()` to 900 seconds (15 minutes), rejecting expired requests while permitting `<= 0` to selectively bypass clock checks in test environments.
+- **Pre-Flight Deliverability & XSS Detection (CWE-79 / CWE-400):** Extended `SpamGuard` with `_BLOCKED_TAGS` (`iframe`, `object`, `embed`, `applet`) and automated regex detection for inline event handlers (`on*`), and added pre-parsing length boundary checks.
+- **Log Redaction Hardening (CWE-316 / CWE-117):** Increased `MAX_REDACTION_DEPTH` to 5 in `RedactingFilter`. Preserved original `record.args` types (tuple, dict, list) to prevent string formatting crashes, wrapped object inspection in defensive guards, and added fallback handling for sets containing unhashable elements.
+- **Payload Cycle & Recursion Protection:** Added `_deep_sanitize()` with a 50-level depth limit to `IdempotencyGuard` to prevent recursion overflow and handle cyclic data references.
+- **Header Injection Boundaries (CWE-113 / RFC 9110):** Enforced ASCII control character checks across header keys and values in `SecurityGuard.sanitize_headers()` and guarded runtime telemetry calls with `sys in sys.modules`.
+
+### Fixed
+
+- **Stream Seek Pointer Displacement in Idempotency Checks:** Fixed `IdempotencyGuard.generate_key()` to record `stream.tell()` before reading file objects and restore the original pointer offset via `seek()` after computing hashes.
+- **ChunkedStreamer Seeking & Pointer Handling:** Implemented `seek()` and `tell()` methods on `ChunkedStreamer`, strictly validated positive `chunk_size` values, and introduced explicit `_eof` state tracking to prevent duplicate reads.
+- **Stream Pagination Query Parameter Type Drift:** Added `_cast_query_param()` in `BaseEndpoint` to preserve developer filter types (`int`, `float`, `bool`, `list`, `tuple`, `set`) during cursor pagination, and added guardrails for missing next cursors or non-dict payloads.
+- **Safe Serialization in Builders:** Added `default=str` to `json.dumps()` across `MailgunMessageBuilder`, `MailgunTemplateBuilder`, and `BaseEndpoint` to safely serialize custom objects (e.g., UUID, datetime) without throwing `TypeError`.
+- **Message Builder File Payload Mutation:** Returned a shallow copy of `self._files` in `MailgunMessageBuilder.build()` to prevent external consumers from mutating internal builder state.
+- **Protected Attribute Routing Collisions:** Blocked routing fallbacks for `config` and `auth` in `Client.__getattr__()`, explicitly raising `AttributeError` instead of constructing invalid endpoints.
+- **Domain Route Alias Canonicalization:** Normalized domain route aliases (`DOMAIN_ALIASES`) directly in `handle_domains()` and preserved literal `@` separators during credentials route generation.
+- **Timeout Float Capacity Overflow:** Added `OverflowError` trapping during float conversion in `SecurityGuard.sanitize_timeout()`, mapping out-of-capacity numbers to standard `ValueError` exceptions.
+- **Punycode Email Address Normalization:** Updated `SecurityGuard.normalize_domain()` to partition email addresses and apply IDNA Punycode encoding specifically to the host domain.
+
+### Changed
+
+- **Route Registry Definitions:** Registered `routes_match` under the v3 endpoint mapping, added `reputationanalytics_v2` under v2 prefix routes, and mapped `v1/spamtraps` deprecation warnings.
+- **Dependency Specifications:** Removed direct `conda-forge::` channel pinning for `httpx2` in `environment.yaml` and `environment-dev.yaml`, and synchronized `.pre-commit-config.yaml` dependency constraints.
+- **Manage Script Permissions:** Updated `manage.sh` file mode to executable (`100755`).
 
 ## v1.9.0 - 2026-08-04
 

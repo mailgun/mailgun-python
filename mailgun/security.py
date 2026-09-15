@@ -33,7 +33,7 @@ _PATH_CONTROL_CHAR_RE: Final = re.compile(r"[\x00-\x1f\x7f]")
 _XSS_PATTERN: Final = re.compile(r"<(script|svg)|javascript:|onload=", re.IGNORECASE)
 
 ALLOWED_HOSTS: Final = frozenset(
-    {"mailgun.net", "mailgun.org", "mailgun.com", "localhost", "127.0.0.1"}
+    {"mailgun.net", "mailgun.org", "mailgun.com", "localhost", "127.0.0.1"},
 )
 ALLOWED_SUFFIXES: Final = (".mailgun.net", ".mailgun.org", ".mailgun.com")
 ALLOWED_SCHEMES: Final = frozenset({"https", "http"})
@@ -91,7 +91,7 @@ class SecurityGuard:
 
     ALLOWED_SCHEMES: Final[frozenset[str]] = frozenset({"https", "http"})
     ALLOWED_HTTP_METHODS: Final[frozenset[str]] = frozenset(
-        {"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"}
+        {"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"},
     )
     ALLOWED_API_HOSTS: Final[tuple[str, ...]] = (
         "mailgun.net",
@@ -225,7 +225,7 @@ class SecurityGuard:
         # Check path traversal after removing slashes ("mytest.com/....//path" -> "mytest.com....path")
         if ".." in safe_domain:
             raise ValueError(
-                "CRITICAL SECURITY: Path traversal characters detected in domain parameter."
+                "CRITICAL SECURITY: Path traversal characters detected in domain parameter.",
             )
 
         return safe_domain
@@ -305,7 +305,7 @@ class SecurityGuard:
                 raise ValueError("Timeout must be a strictly positive finite number.")
             if f_val > 300.0:  # noqa: PLR2004
                 raise ValueError(
-                    "Security Alert: Timeout exceeds maximum allowed boundary of 300 seconds."
+                    "Security Alert: Timeout exceeds maximum allowed boundary of 300 seconds.",
                 )
 
             return f_val
@@ -314,7 +314,7 @@ class SecurityGuard:
             expected_tuple_length = 2
             if len(timeout) != expected_tuple_length:
                 raise ValueError(
-                    "Timeout must be a tuple containing exactly two elements: (connect, read)."
+                    "Timeout must be a tuple containing exactly two elements: (connect, read).",
                 )
             return _validate_float(timeout[0]), _validate_float(timeout[1])
 
@@ -453,7 +453,7 @@ class SecurityGuard:
 
         if scheme == "http" and hostname not in {"localhost", "127.0.0.1"}:
             raise ValueError(
-                "Security Alert (CWE-319): Plaintext HTTP is forbidden for external URLs."
+                "Security Alert (CWE-319): Plaintext HTTP is forbidden for external URLs.",
             )
 
         is_safe = hostname in ALLOWED_HOSTS or hostname.endswith(ALLOWED_SUFFIXES)
@@ -468,7 +468,8 @@ class SecurityGuard:
 
     @staticmethod
     def validate_attachment_path(
-        file_path: str | Path, safe_base_dir: str | Path | None = None
+        file_path: str | Path,
+        safe_base_dir: str | Path | None = None,
     ) -> Path:
         """Poka-yoke: Prevent Path Traversal (CWE-22) when reading attachments.
 
@@ -497,7 +498,7 @@ class SecurityGuard:
             # Fallback zero-trust checks if no specific sandbox is provided
             if ".." in original_path:
                 raise ValueError(
-                    "Security Alert (CWE-22): Path traversal tokens ('..') are explicitly forbidden."
+                    "Security Alert (CWE-22): Path traversal tokens ('..') are explicitly forbidden.",
                 )
 
             # Allow files residing in the OS temporary directory
@@ -511,7 +512,7 @@ class SecurityGuard:
             path_str = str(target_path).lower()
             if any(path_str.startswith(root.lower()) for root in forbidden_roots):
                 raise ValueError(
-                    "Security Alert: Access to sensitive OS system directories is explicitly forbidden."
+                    "Security Alert: Access to sensitive OS system directories is explicitly forbidden.",
                 )
 
             forbidden_components = {
@@ -526,7 +527,7 @@ class SecurityGuard:
             }
             if any(part.lower() in forbidden_components for part in target_path.parts):
                 raise ValueError(
-                    "Security Alert: Access to sensitive OS system directories is explicitly forbidden."
+                    "Security Alert: Access to sensitive OS system directories is explicitly forbidden.",
                 )
 
         return target_path
@@ -618,7 +619,7 @@ class SecurityGuard:
             except (TypeError, ValueError, OverflowError) as e:
                 # If the timestamp is wildly out of bounds, it's invalid.
                 raise ValueError(
-                    "Security Alert: Invalid cryptographic payload or timestamp out of bounds."
+                    "Security Alert: Invalid cryptographic payload or timestamp out of bounds.",
                 ) from e
 
         # 4. Canonicalization: Encode securely
@@ -698,7 +699,7 @@ class _SpamGuardParser(HTMLParser):
             self.has_scripts = True
             if tag_lower == "script":
                 self.issues.append(
-                    "CRITICAL: <script> tags are strictly forbidden in email clients."
+                    "CRITICAL: <script> tags are strictly forbidden in email clients.",
                 )
             else:
                 self.issues.append(f"CRITICAL: Blocked executable tag: <{tag_lower}>")
@@ -744,7 +745,7 @@ class SpamGuard:
             return {
                 "score": 0.0,
                 "issues": [
-                    f"Payload exceeds 100KB ({len(html_content) / 1024:.1f}KB). Validation aborted."
+                    f"Payload exceeds 100KB ({len(html_content) / 1024:.1f}KB). Validation aborted.",
                 ],
                 "is_safe": False,
             }
@@ -754,7 +755,7 @@ class SpamGuard:
             return {
                 "score": 0.0,
                 "issues": [
-                    f"Payload exceeds 100KB ({byte_size / 1024:.1f}KB). Validation aborted."
+                    f"Payload exceeds 100KB ({byte_size / 1024:.1f}KB). Validation aborted.",
                 ],
                 "is_safe": False,
             }
@@ -867,7 +868,7 @@ class IdempotencyGuard:
                     file_hash = hashlib.sha256()
                     while chunk := file_obj.read(65536):
                         file_hash.update(
-                            chunk if isinstance(chunk, bytes) else str(chunk).encode("utf-8")
+                            chunk if isinstance(chunk, bytes) else str(chunk).encode("utf-8"),
                         )
 
                     if hasattr(file_obj, "seek") and callable(file_obj.seek):

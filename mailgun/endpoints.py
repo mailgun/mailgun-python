@@ -233,7 +233,9 @@ class BaseEndpoint:
 
     @staticmethod
     def _prepare_payload(
-        data: Any | None, files: Any | None, headers: dict[str, str]
+        data: Any | None,
+        files: Any | None,
+        headers: dict[str, str],
     ) -> tuple[Any | None, dict[str, str]]:
         """Prepares headers and minifies JSON payloads or handles multipart files safely.
 
@@ -376,7 +378,10 @@ class BaseEndpoint:
         safe_timeout = SecurityGuard.sanitize_timeout(actual_timeout)
 
         target_url = self.build_url(
-            url, domain=target_domain_normalized, method=safe_method, **kwargs
+            url,
+            domain=target_domain_normalized,
+            method=safe_method,
+            **kwargs,
         )
         self._warn_if_deprecated(safe_method, target_url)
 
@@ -544,11 +549,17 @@ class Endpoint(BaseEndpoint):
                 is_error = isinstance(status_code, int) and status_code >= _HTTP_ERROR_THRESHOLD
                 if is_error:
                     logger.error(
-                        "API Error %s | %s %s", status_code, safe_method.upper(), safe_url_for_log
+                        "API Error %s | %s %s",
+                        status_code,
+                        safe_method.upper(),
+                        safe_url_for_log,
                     )
                 else:
                     logger.debug(
-                        "API Success %s | %s %s", status_code, safe_method.upper(), safe_url_for_log
+                        "API Success %s | %s %s",
+                        status_code,
+                        safe_method.upper(),
+                        safe_url_for_log,
                     )
                 break
 
@@ -760,7 +771,12 @@ class Endpoint(BaseEndpoint):
         """
         merged_headers = self._merge_headers(kwargs)
         return self.api_call(
-            self._auth, "delete", self._url, headers=merged_headers, domain=domain, **kwargs
+            self._auth,
+            "delete",
+            self._url,
+            headers=merged_headers,
+            domain=domain,
+            **kwargs,
         )
 
     def stream(
@@ -1192,7 +1208,12 @@ class AsyncEndpoint(BaseEndpoint):
         """
         merged_headers = self._merge_headers(kwargs)
         return await self.api_call(
-            self._auth, "delete", self._url, headers=merged_headers, domain=domain, **kwargs
+            self._auth,
+            "delete",
+            self._url,
+            headers=merged_headers,
+            domain=domain,
+            **kwargs,
         )
 
     async def stream(

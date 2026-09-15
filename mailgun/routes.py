@@ -194,5 +194,5 @@ def get_deprecated_regexes() -> MappingProxyType[re.Pattern[str], str]:
         A read-only mapping of compiled regular expressions to their deprecation messages.
     """
     return MappingProxyType(
-        {re.compile(pattern): msg for pattern, msg in _DEPRECATED_ROUTES_PATTERNS.items()}
+        {re.compile(pattern): msg for pattern, msg in _DEPRECATED_ROUTES_PATTERNS.items()},
     )

@@ -147,7 +147,7 @@ class Config:
     # Use Mapping to denote read-only dictionary-like structures
     _HEADERS_BASE: Final[Mapping[str, str]] = MappingProxyType({"User-agent": USER_AGENT})
     _HEADERS_JSON: Final[Mapping[str, str]] = MappingProxyType(
-        {"User-agent": USER_AGENT, "Content-Type": "application/json"}
+        {"User-agent": USER_AGENT, "Content-Type": "application/json"},
     )
 
     # --- ENCAPSULATED ROUTING REGISTRIES ---
@@ -159,7 +159,7 @@ class Config:
     _DOMAIN_ALIASES: Final[Mapping[str, str]] = MappingProxyType(routes.DOMAIN_ALIASES)
 
     _DOMAIN_ENDPOINTS: Final[Mapping[str, tuple[str, ...]]] = MappingProxyType(
-        routes.DOMAIN_ENDPOINTS
+        routes.DOMAIN_ENDPOINTS,
     )
     _V1_ENDPOINTS: Final[frozenset[str]] = frozenset(routes.DOMAIN_ENDPOINTS["v1"])
     _V3_ENDPOINTS: Final[frozenset[str]] = frozenset(routes.DOMAIN_ENDPOINTS["v3"])

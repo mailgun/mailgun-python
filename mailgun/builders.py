@@ -365,7 +365,10 @@ class MailgunMessageBuilder:
         return self
 
     def attach_inline(
-        self, file_path: str | Path, cid: str | None = None, safe_base_dir: str | Path | None = None
+        self,
+        file_path: str | Path,
+        cid: str | None = None,
+        safe_base_dir: str | Path | None = None,
     ) -> Self:
         """Safely prepare and map an inline image attachment with an explicit Content-ID.
 
@@ -436,7 +439,9 @@ class MailgunMessageBuilder:
             The builder instance.
         """
         self._payload["recipient-variables"] = json.dumps(
-            variables, separators=(",", ":"), default=str
+            variables,
+            separators=(",", ":"),
+            default=str,
         )
         return self
 
@@ -474,7 +479,9 @@ class MailgunMessageBuilder:
 
         if self._idempotency_safe and "h:X-Idempotency-Key" not in final_payload:
             idempotency_key = IdempotencyGuard.generate_key(
-                self._domain, final_payload, self._files
+                self._domain,
+                final_payload,
+                self._files,
             )
             final_payload["h:X-Idempotency-Key"] = idempotency_key
 

@@ -360,7 +360,9 @@ class AsyncClient(BaseClient):
             if "transport" not in kwargs:
                 limits = httpx.Limits(max_keepalive_connections=100, max_connections=100)
                 kwargs["transport"] = httpx.AsyncHTTPTransport(
-                    retries=3, limits=limits, verify=ssl_context
+                    retries=3,
+                    limits=limits,
+                    verify=ssl_context,
                 )
 
             self._httpx_client = httpx.AsyncClient(**kwargs)

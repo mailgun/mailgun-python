@@ -38,7 +38,7 @@ class RedactingFilter(logging.Filter):
             "thread",
             "threadName",
             "taskName",
-        }
+        },
     )
 
     def _redact_str(self, data: str) -> str:
