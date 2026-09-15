@@ -359,7 +359,8 @@ with Client(auth=("api", "key-super-secret-12345")) as client:
 
 By default, the SDK relies on the underlying HTTP client's standard timeouts. To prevent uncontrolled resource consumption (CWE-400) in high-throughput production environments, you can enforce strict global timeouts.
 
-Timeouts can be passed as a single `float` (seconds for both connect and read) or a tuple (connect_timeout, read_timeout):
+Timeouts can be passed as a single `float` (seconds for both connect and read) or a tuple (connect_timeout, read_timeout).
+Timeouts are strictly validated against `float` overflow and capped at 300 seconds to prevent thread starvation.
 
 ```python
 import os
@@ -421,7 +422,7 @@ If the issue persists, please reach out to our support team.
 
 The `Client`/`AsyncClient` utilize a dynamic routing engine but is heavily optimized for modern Developer Experience (DX).
 
-- **Introspection**: Calling `dir(client)` or using autocomplete in IDEs like VS Code or PyCharm will automatically expose all available API endpoints (e.g., `client.messages`, `client.domains`, `client.bounces`).
+- **Introspection**: Calling `dir(client)` or using autocomplete in IDEs like VS Code or PyCharm will automatically expose all available API endpoints (e.g., `client.messages`, `client.domains`, `client.bounces`). Internal configuration and state properties (`client.config`, `client.auth`) are strictly isolated from dynamic endpoint dispatching.
 - **Security Guardrails**: If you accidentally print the client instance or an exception traceback occurs in your CI/CD logs, your API key is strictly redacted from memory dumps: (`'api', '***REDACTED***'`).
 - **Performance**: JSON payloads are automatically minified before transit to save bandwidth on large batch requests, and internal route resolution is heavily cached in memory.
 
@@ -1805,6 +1806,8 @@ The SDK includes an active Interceptor engine that protects your application fro
 
 If you attempt to call a legacy or deprecated Mailgun endpoint (such as the old `v3` address validation or `v1` bounce classification), the SDK will **not** break your code.
 It will successfully execute the request but will emit a non-breaking Python `DeprecationWarning` and print a logger warning with instructions on which modern API endpoint to migrate to.
+
+In `mailgun/routes.py`, `_DEPRECATED_ROUTES_PATTERNS` added explicit deprecation warnings for the legacy `/v1/spamtraps` family (`/v1/spamtraps`, `/v1/spamtraps/totals`, `/v1/spamtraps/filters`), directing users to the `v2` endpoint (`GET /v2/spamtraps`).
 
 ## Type Hinting
 

@@ -29,6 +29,17 @@ String manipulation, dynamic imports (`importlib`), and sequential regex evaluat
 
 ______________________________________________________________________
 
+## Benchmarks (v1.9.0 vs. v1.9.1)
+
+| Metric                      | v1.9.0 (Baseline) | v1.9.1 (Current) | Delta / Notes                          |
+| :-------------------------- | :---------------- | :--------------- | :------------------------------------- |
+| **Cold Boot Time**          | ~0.220 s          | **~0.131 s**     | **~40.5% Faster** (Optimized I/O read) |
+| **Routing Speed (Mean)**    | ~0.94 µs          | **~0.95 µs**     | **+9.5 ns** (Statistical parity)       |
+| **Async Throughput (Mean)** | ~3.06 ms          | **~3.16 ms**     | **+0.10 ms** (Type-cast validation)    |
+| **Sync Throughput (Mean)**  | ~10.47 ms         | **~10.15 ms**    | **~3.1% Faster** (Tighter variance)    |
+
+*Note: Tests were executed on CPython 3.13 (Apple M4 Pro, Darwin ARM64-bit) in an isolated environment.*
+
 ## Benchmarks (v1.8.0 vs. v1.9.0)
 
 | Metric                      | v1.8.0 (Baseline) | v1.9.0 (Current) | Delta / Notes                          |

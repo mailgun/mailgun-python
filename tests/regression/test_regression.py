@@ -1,6 +1,7 @@
 import logging
 import unittest
 from pathlib import Path
+import base64
 
 import pytest
 
@@ -413,6 +414,117 @@ class RegressionRedactionTests(unittest.TestCase):
         # Should not crash and should fall back safely
         result = self.filter.filter(record)
         self.assertTrue(result)
+
+    def test_unbounded_exception(self) -> None:
+        """Verify the exact libFuzzer crash artifact cannot raise unhandled exceptions."""
+        raw_b64 = (
+            b"QDU1NTU1NTU1N+jo6Ojo6OgY6AAAAAAAAAH0v7/0j7+/APSAgIDEswAlKnMlJSUlIm1lbUBiZXJz"  # pragma: allowlist secret
+            b"IjoiW3vo6Ojo6Ojo6Ojg6OhHRw=="
+        )
+        payload_bytes = base64.b64decode(raw_b64)
+        malicious_msg = payload_bytes.decode("latin1")
+
+        filter_instance = RedactingFilter()
+
+        # Test Case 1: Message contains %*s and formatting operators
+        record1 = logging.LogRecord(
+            name="test_logger",
+            level=logging.INFO,
+            pathname=__file__,
+            lineno=10,
+            msg=malicious_msg,
+            args=(),
+            exc_info=None,
+        )
+        assert filter_instance.filter(record1) is True
+        # Emulate getMessage() formatting check from the fuzzer
+        try:
+            _ = record1.getMessage()
+        except (TypeError, ValueError, OverflowError, KeyError):
+            # Expected for malformed fuzzer-derived format strings; ensure nothing escapes.
+            pass
+
+        # Test Case 2: Injected formatting args with unescaped specifiers
+        record2 = logging.LogRecord(
+            name="test_logger",
+            level=logging.INFO,
+            pathname=__file__,
+            lineno=20,
+            msg="%*s%%%%\"mem@bers\":",
+            args=(5, malicious_msg),
+            exc_info=None,
+        )
+        assert filter_instance.filter(record2) is True
+        try:
+            _ = record2.getMessage()
+        except (TypeError, ValueError, OverflowError, KeyError):
+            # Expected for malformed fuzzed format strings; this test only verifies
+            # no unhandled exception escapes the redaction/filtering path.
+            pass
+
+
+class ExplodingRepr:
+    """Simulates an object whose __repr__ or __str__ raises during formatting."""
+
+    def __str__(self) -> str:
+        raise AttributeError("Dynamic property lookup failed")
+
+    def __repr__(self) -> str:
+        raise RuntimeError("Exploding repr")
+
+
+class TestRedactionFuzzCrash032af5:
+    def test_crash_032af53f_fuzz_payload(self) -> None:
+        """Verify crash-032af53f76502e96d7e1a7cc0c98017d0ab36d90 is handled safely."""
+        raw_b64 = (
+            b"QG11bHRpcGFydC9tYWlsZ3VpJSpyb19f"
+            b"/////7///+np6enp+ekb6W3FAQAAAG3FAQAA"
+            b"AOgYlQ7o6P7+6sXF"
+            b"GA6V6P7+6v476uz+"
+        )
+        payload_bytes = base64.b64decode(raw_b64)
+        msg_str = payload_bytes.decode("latin1")
+        filter_instance = RedactingFilter()
+
+        # Case 1: Payload as log record message with arbitrary complex args
+        record1 = logging.LogRecord(
+            name="test",
+            level=logging.INFO,
+            pathname="fake.py",
+            lineno=1,
+            msg=msg_str,
+            args=(10, ExplodingRepr(), "extra"),
+            exc_info=None,
+        )
+
+        assert filter_instance.filter(record1) is True
+        try:
+            _ = record1.getMessage()
+        except (TypeError, ValueError, OverflowError, KeyError):
+            # Fuzz payload may trigger formatting/parsing errors; test only asserts no unsafe crash.
+            pass
+
+    def test_exploding_object_in_record_args_and_extra(self) -> None:
+        """Verify custom objects raising in __repr__ or __str__ do not crash filter."""
+        filter_instance = RedactingFilter()
+        record = logging.LogRecord(
+            name="test",
+            level=logging.INFO,
+            pathname="fake.py",
+            lineno=1,
+            msg="Formatting with dynamic width: %*r",
+            args=(5, ExplodingRepr()),
+            exc_info=None,
+        )
+        record.__dict__["custom_extra"] = ExplodingRepr()
+
+        assert filter_instance.filter(record) is True
+        try:
+            _ = record.getMessage()
+        except (TypeError, ValueError, OverflowError, KeyError):
+            # Expected for fuzzed/hostile formatting inputs; this test only verifies
+            # the redaction filter path does not crash.
+            return
 
 
 if __name__ == "__main__":

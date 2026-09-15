@@ -131,7 +131,7 @@ class SendMessageSchema(BaseModel):
         if not any([self.text, self.html, self.template, self.amp_html]):
             raise ValueError(
                 "A Mailgun message must contain at least one body part: "
-                "'text', 'html', 'amp_html', or 'template'."
+                "'text', 'html', 'amp_html', or 'template'.",
             )
 
         return self
@@ -146,7 +146,9 @@ class SendMessageSchema(BaseModel):
         """
         # Get standard fields as a dict
         data: dict[str, Any] = self.model_dump(
-            by_alias=True, exclude_none=True, exclude={"custom_params"}
+            by_alias=True,
+            exclude_none=True,
+            exclude={"custom_params"},
         )
         # Flatten custom_params into the root
         data.update(self.custom_params)

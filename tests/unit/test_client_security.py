@@ -135,6 +135,25 @@ class TestSecurityGuardGeneral:
         expired_ts = now - 600
         assert SecurityGuard.verify_webhook(signing_key, token, expired_ts, sig) is False
 
+    def test_verify_webhook_invalid_types_and_disabled_ttl(self) -> None:
+        """Covers security.py lines 613-616, 625-637: invalid types and max_age_seconds <= 0."""
+        # Non-string token / signature
+        with pytest.raises(TypeError, match="must be strings"):
+            SecurityGuard.verify_webhook("key", 12345, 1700000000, "sig")  # type: ignore[arg-type]
+
+        with pytest.raises(TypeError, match="must be strings"):
+            SecurityGuard.verify_webhook("key", "token", 1700000000, 12345)  # type: ignore[arg-type]
+
+        # Non-string/bytes signing_key
+        with pytest.raises(TypeError, match="must be a string or bytes"):
+            SecurityGuard.verify_webhook(12345, "token", 1700000000, "sig")  # type: ignore[arg-type]
+
+        # max_age_seconds <= 0 disables expiration check
+        old_ts = 1000
+        msg = f"{old_ts}token".encode("utf-8")
+        sig = hmac.new(b"key", msg, hashlib.sha256).hexdigest()
+        assert SecurityGuard.verify_webhook("key", "token", old_ts, sig, max_age_seconds=0) is True
+
     def test_normalize_domain_punycode(self) -> None:
         assert SecurityGuard.normalize_domain("укр.net") == "xn--j1amh.net"
         assert SecurityGuard.normalize_domain(None) == ""
@@ -331,6 +350,16 @@ class TestSecurityGuardResourceExhaustion:
         dummy_file = tmp_path / "safe_file.txt"
         dummy_file.write_bytes(b"Safe content")
         SecurityGuard.check_file_size(dummy_file, max_size_mb=1)
+
+    def test_sanitize_timeout_float_overflow_raises_value_error(self) -> None:
+        """Covers security.py: OverflowError caught when float(val) exceeds limits."""
+        with pytest.raises(ValueError, match="maximum scalar float capacity"):
+            SecurityGuard.sanitize_timeout(10**1000)
+
+    def test_normalize_domain_with_email_address(self) -> None:
+        """Covers security.py: normalize_domain partitioning email addresses."""
+        assert SecurityGuard.normalize_domain("user@укр.net") == "user@xn--j1amh.net"
+        assert SecurityGuard.normalize_domain("plain@example.com") == "plain@example.com"
 
 
 class TestSecurityGuardUtilityAndFallbacks:

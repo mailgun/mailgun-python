@@ -9,6 +9,7 @@ from typing import Any
 
 from mailgun.endpoints import build_path_from_keys
 from mailgun.handlers.error_handler import ApiError
+from mailgun.routes import DOMAIN_ALIASES
 from mailgun.security import SecurityGuard
 
 
@@ -60,9 +61,8 @@ def handle_domains(  # noqa: PLR0914
     Raises:
         ApiError: If the domain is missing or options are invalid.
     """
-    keys = list(url.get("keys", []))
-    if "domains" in keys:
-        keys.remove("domains")
+    # Extract, strip "domains" prefix, and canonicalize aliases in a single pass
+    keys = [DOMAIN_ALIASES.get(k, k) for k in url.get("keys", []) if k != "domains"]
 
     base_url = str(url.get("base", "")).rstrip("/")
 
@@ -108,7 +108,7 @@ def handle_domains(  # noqa: PLR0914
         safe_webhook = SecurityGuard.sanitize_path_segment(webhook_name)
         return f"{final_url}/{safe_webhook}"
 
-    # B. Credentials Logins (CRITICAL FIX: Correct path segment handling)
+    # B. Credentials Logins (Preserve literal '@' and handle domain duplicates)
     login_val = kwargs.pop("login", None)
     if "credentials" in keys and login_val is not None:
         login_str = str(login_val)
@@ -119,7 +119,10 @@ def handle_domains(  # noqa: PLR0914
             if domain and domain_part == domain:
                 safe_login = SecurityGuard.sanitize_path_segment(local_part)
             else:
-                safe_login = f"{SecurityGuard.sanitize_path_segment(local_part)}@{SecurityGuard.sanitize_path_segment(domain_part)}"
+                safe_login = (
+                    f"{SecurityGuard.sanitize_path_segment(local_part)}@"
+                    f"{SecurityGuard.sanitize_path_segment(domain_part)}"
+                )
         else:
             safe_login = SecurityGuard.sanitize_path_segment(login_str)
 
@@ -191,10 +194,7 @@ def handle_mailboxes_credentials(
     Raises:
         ApiError: If the domain is missing.
     """
-    keys = list(url.get("keys", []))
-
-    if "domains" in keys:
-        keys.remove("domains")
+    keys = [k for k in url.get("keys", []) if k != "domains"]
 
     base_url = str(url["base"]).rstrip("/")
 

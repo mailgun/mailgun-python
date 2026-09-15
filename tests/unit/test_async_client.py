@@ -412,6 +412,32 @@ class TestAsyncClient:
         res = [i async for i in ep.stream(filters=filters)]  # pyright: ignore[reportGeneralTypeIssues]
         assert len(res) == 1
 
+    @pytest.mark.asyncio
+    async def test_async_stream_pagination_type_casting_all_types(self) -> None:
+        """Covers endpoints.py lines 1231-1239: async type casting for int, tuple, set, list."""
+        class MockResp:
+            def raise_for_status(self) -> None:
+                pass
+
+            def json(self) -> dict:
+                return {
+                    "items": [{"id": 1}],
+                    "paging": {"next": "http://test?limit=20&tags=val1&tags=val2"},
+                }
+
+        mock_client = AsyncMock()
+        mock_client.request.side_effect = [
+            MockResp(),
+            MagicMock(json=lambda: {"items": []}, raise_for_status=lambda: None),
+        ]
+
+        ep = AsyncEndpoint({"base": "http://test", "keys": []}, {}, None, client=mock_client)
+        filters = {"limit": 10, "tags": ["initial"], "tuple_param": ("x",)}
+
+        res = [i async for i in ep.stream(filters=filters)]  # pyright: ignore[reportGeneralTypeIssues]
+        assert len(res) == 1
+
+
 class TestAsyncEndpoint:
     @staticmethod
     def _make_endpoint() -> AsyncEndpoint:

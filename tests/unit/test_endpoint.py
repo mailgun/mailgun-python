@@ -490,7 +490,7 @@ class TestEndpointRetryAndStreamPointers:
         url = {"base": "https://api.mailgun.net/v3/", "keys": ["messages"]}
         policy = RetryPolicy(max_retries=1, base_delay=0.01)
         ep = Endpoint(url=url, headers={}, auth=("api", "key"))
-        ep.retry_policy = policy  # type: ignore[assignment]
+        ep.retry_policy = policy
 
         resp_500 = MagicMock(status_code=500)
         resp_200 = MagicMock(status_code=200)
@@ -506,7 +506,7 @@ class TestEndpointRetryAndStreamPointers:
 
         mock_client = AsyncMock(spec=httpx.AsyncClient)
         ep = AsyncEndpoint(url=url, headers={}, auth=("api", "key"), client=mock_client)
-        ep.retry_policy = policy  # type: ignore[assignment]
+        ep.retry_policy = policy
 
         resp_503 = MagicMock(status_code=503)
         resp_200 = MagicMock(status_code=200)
@@ -516,3 +516,63 @@ class TestEndpointRetryAndStreamPointers:
 
         assert res.status_code == 200
         assert mock_client.request.call_count == 2
+
+    def test_sync_endpoint_retries_respect_retry_after_header(self) -> None:
+        """Covers endpoints.py lines 499-515: Retry-After header parsing on 429."""
+        url = {"base": "https://api.mailgun.net/v3/", "keys": ["messages"]}
+        policy = RetryPolicy(max_retries=1, base_delay=0.01)
+        ep = Endpoint(url=url, headers={}, auth=("api", "key"))
+        ep.retry_policy = policy
+
+        resp_429 = MagicMock(status_code=429)
+        resp_429.headers = {"Retry-After": "1"}
+        resp_200 = MagicMock(status_code=200)
+
+        with patch.object(requests.Session, "request", side_effect=[resp_429, resp_200]):
+            with patch("time.sleep") as mock_sleep:
+                res = ep.create(domain="test.com", data={"to": "user@test.com"})
+                assert res.status_code == 200
+                mock_sleep.assert_called_with(1.0)
+
+    def test_stream_pagination_type_casting_all_types(self) -> None:
+        """Covers endpoints.py lines 795-806: cast int, tuple, set, and list."""
+        class MockResp:
+            def raise_for_status(self) -> None:
+                pass
+
+            def json(self) -> dict:
+                return {
+                    "items": [{"id": 1}],
+                    "paging": {"next": "https://api.mailgun.net/v3/events?page=2&tags=a&tags=b&limit=10"},
+                }
+
+        ep = Endpoint(url={"base": "https://test", "keys": ["events"]}, headers={}, auth=("api", "key"))
+
+        responses = [
+            MockResp(),
+            MagicMock(json=lambda: {"items": [], "paging": {}}, raise_for_status=lambda: None),
+        ]
+
+        filters = {
+            "page": 1,
+            "limit": 5,
+            "tags": ("a",),
+            "set_tags": {"x"},
+        }
+
+        with patch.object(Endpoint, "get", side_effect=responses):
+            results = list(ep.stream(filters=filters))
+            assert len(results) == 1
+
+    @patch.object(Endpoint, "get")
+    def test_sync_stream_pagination_non_dict_response_breaks(self, mock_get: MagicMock) -> None:
+        """Covers endpoints.py: if not isinstance(data, dict): break."""
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status = MagicMock()
+        mock_resp.json.return_value = ["not", "a", "dict"]  # List response shock
+
+        mock_get.return_value = mock_resp
+        endpoint = Endpoint(url={"base": "http://mock", "keys": []}, headers={}, auth=None)
+
+        results = list(endpoint.stream())
+        assert results == []

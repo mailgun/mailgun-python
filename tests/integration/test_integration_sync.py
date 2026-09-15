@@ -1167,7 +1167,8 @@ class RoutesTests(unittest.TestCase):
         )
         self.client: Client = Client(auth=self.auth)
         self.domain: str = os.environ["DOMAIN"]
-        self.sender: str = os.environ["MESSAGES_FROM"]
+        raw_sender = os.environ.get("MESSAGES_FROM") or f"sender@{self.domain}"
+        self.sender = email.utils.parseaddr(raw_sender)[1] or raw_sender
         self.routes_data: dict[str, int | str | list[str]] = {
             "priority": 0,
             "description": "Sample route",
@@ -1182,14 +1183,15 @@ class RoutesTests(unittest.TestCase):
             "priority": 2,
         }
 
-    # 'Routes quota (1) is exceeded for a free plan'
     def test_routes_create(self) -> None:
         params = {"skip": 0, "limit": 1}
         req1 = self.client.routes.get(domain=self.domain, filters=params)
-        self.client.routes.delete(
-            domain=self.domain,
-            route_id=req1.json()["items"][0]["id"],
-        )
+        items = req1.json().get("items") or []
+        if items:
+            self.client.routes.delete(
+                domain=self.domain,
+                route_id=items[0]["id"],
+            )
         req = self.client.routes.create(domain=self.domain, data=self.routes_data)
 
         self.assertEqual(req.status_code, 200)
@@ -1198,17 +1200,14 @@ class RoutesTests(unittest.TestCase):
     def test_routes_get_all(self) -> None:
         params = {"skip": 0, "limit": 1}
         req1 = self.client.routes.get(domain=self.domain, filters=params)
-        #  IndexError: list index out of range
-        if len(req1.json()["items"]) > 0:
+        items = req1.json().get("items") or []
+        if items:
             self.client.routes.delete(
                 domain=self.domain,
-                route_id=req1.json()["items"][0]["id"],
+                route_id=items[0]["id"],
             )
-            self.client.routes.create(domain=self.domain, data=self.routes_data)
-            req = self.client.routes.get(domain=self.domain, filters=self.routes_params)
-        else:
-            self.client.routes.create(domain=self.domain, data=self.routes_data)
-            req = self.client.routes.get(domain=self.domain, filters=self.routes_params)
+        self.client.routes.create(domain=self.domain, data=self.routes_data)
+        req = self.client.routes.get(domain=self.domain, filters=self.routes_params)
 
         self.assertEqual(req.status_code, 200)
         self.assertIn("items", req.json())
@@ -1216,23 +1215,17 @@ class RoutesTests(unittest.TestCase):
     def test_get_route_by_id(self) -> None:
         params = {"skip": 0, "limit": 1}
         req1 = self.client.routes.get(domain=self.domain, filters=params)
-        if len(req1.json()["items"]) > 0:
+        items = req1.json().get("items") or []
+        if items:
             self.client.routes.delete(
                 domain=self.domain,
-                route_id=req1.json()["items"][0]["id"],
+                route_id=items[0]["id"],
             )
 
-            req_post = self.client.routes.create(domain=self.domain, data=self.routes_data)
-            self.client.routes.create(domain=self.domain, data=self.routes_data)
-            req = self.client.routes.get(
-                domain=self.domain, route_id=req_post.json()["route"]["id"]
-            )
-        else:
-            req_post = self.client.routes.create(domain=self.domain, data=self.routes_data)
-            self.client.routes.create(domain=self.domain, data=self.routes_data)
-            req = self.client.routes.get(
-                domain=self.domain, route_id=req_post.json()["route"]["id"]
-            )
+        req_post = self.client.routes.create(domain=self.domain, data=self.routes_data)
+        req = self.client.routes.get(
+            domain=self.domain, route_id=req_post.json()["route"]["id"]
+        )
 
         self.assertEqual(req.status_code, 200)
         self.assertIn("route", req.json())
@@ -1240,24 +1233,18 @@ class RoutesTests(unittest.TestCase):
     def test_routes_put(self) -> None:
         params = {"skip": 0, "limit": 1}
         req1 = self.client.routes.get(domain=self.domain, filters=params)
-        if len(req1.json()["items"]) > 0:
+        items = req1.json().get("items") or []
+        if items:
             self.client.routes.delete(
                 domain=self.domain,
-                route_id=req1.json()["items"][0]["id"],
+                route_id=items[0]["id"],
             )
-            req_post = self.client.routes.create(domain=self.domain, data=self.routes_data)
-            req = self.client.routes.put(
-                domain=self.domain,
-                data=self.routes_put_data,
-                route_id=req_post.json()["route"]["id"],
-            )
-        else:
-            req_post = self.client.routes.create(domain=self.domain, data=self.routes_data)
-            req = self.client.routes.put(
-                domain=self.domain,
-                data=self.routes_put_data,
-                route_id=req_post.json()["route"]["id"],
-            )
+        req_post = self.client.routes.create(domain=self.domain, data=self.routes_data)
+        req = self.client.routes.put(
+            domain=self.domain,
+            data=self.routes_put_data,
+            route_id=req_post.json()["route"]["id"],
+        )
 
         self.assertEqual(req.status_code, 200)
         self.assertIn("message", req.json())
@@ -1265,29 +1252,35 @@ class RoutesTests(unittest.TestCase):
     def test_routes_delete(self) -> None:
         params = {"skip": 0, "limit": 1}
         req1 = self.client.routes.get(domain=self.domain, filters=params)
-        if len(req1.json()["items"]) > 0:
+        items = req1.json().get("items") or []
+        if items:
             self.client.routes.delete(
                 domain=self.domain,
-                route_id=req1.json()["items"][0]["id"],
+                route_id=items[0]["id"],
             )
-            req_post = self.client.routes.create(domain=self.domain, data=self.routes_data)
+        req_post = self.client.routes.create(domain=self.domain, data=self.routes_data)
 
-            req = self.client.routes.delete(
-                domain=self.domain, route_id=req_post.json()["route"]["id"]
-            )
-        else:
-            req_post = self.client.routes.create(domain=self.domain, data=self.routes_data)
-
-            req = self.client.routes.delete(
-                domain=self.domain, route_id=req_post.json()["route"]["id"]
-            )
+        req = self.client.routes.delete(
+            domain=self.domain, route_id=req_post.json()["route"]["id"]
+        )
 
         self.assertEqual(req.status_code, 200)
         self.assertIn("message", req.json())
 
     def test_get_routes_match(self) -> None:
         """Test to match address to route: Happy Path with valid data."""
+        params = {"skip": 0, "limit": 1}
         query = {"address": self.sender}
+        req1 = self.client.routes.get(domain=self.domain, filters=params)
+
+        items = req1.json().get("items") or []
+        if items:
+            self.client.routes.delete(
+                domain=self.domain,
+                route_id=items[0]["id"],
+            )
+
+        self.client.routes.create(domain=self.domain, data=self.routes_data)
         req = self.client.routes_match.get(domain=self.domain, filters=query)
 
         self.assertEqual(req.status_code, 200)
@@ -2570,6 +2563,7 @@ class UsersTests(unittest.TestCase):
             "opened_ip",
             "password_updated_at",
             "preferences",
+            "region_data",
             "role",
             "salesforce_user_id",
             "tfa_active",
@@ -2639,6 +2633,7 @@ class UsersTests(unittest.TestCase):
                     "opened_ip",
                     "password_updated_at",
                     "preferences",
+                    "region_data",
                     "role",
                     "salesforce_user_id",
                     "tfa_active",

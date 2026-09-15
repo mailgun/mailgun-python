@@ -10,8 +10,8 @@ dependencies:
   # PyPi only
   - python-build
   # runtime deps
-  - requests >=2.32.5
-  - conda-forge::httpx2 >=2.7.0
+  - requests >=2.33.0
+  - httpx2 >=2.7.0
   - httpx >=0.24.0
   # extras
   - fastapi

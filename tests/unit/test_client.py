@@ -48,6 +48,19 @@ class TestClientAttributeAccess:
         assert ep._auth == ("api", "key-123")
         assert ep._url["keys"] == ["domains"]
 
+    def test_client_getattr_blocks_config_and_auth(self) -> None:
+        """Covers client.py: name in {'config', 'auth'} raising AttributeError."""
+        client = Client(auth=("api", "key-123"))
+
+        # When the slot is deleted, __getattr__ must explicitly block routing lookups
+        del client.auth
+        with pytest.raises(AttributeError, match="'Client' object has no attribute 'auth'"):
+            _ = client.auth
+
+        del client.config
+        with pytest.raises(AttributeError, match="'Client' object has no attribute 'config'"):
+            _ = client.config
+
 
 class TestClientClosure:
     def test_client_close(self) -> None:

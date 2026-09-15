@@ -937,10 +937,12 @@ class AsyncRoutesTests(unittest.IsolatedAsyncioTestCase):
     async def test_routes_create(self) -> None:
         params = {"skip": 0, "limit": 1}
         req1 = await self.client.routes.get(domain=self.domain, filters=params)
-        await self.client.routes.delete(
-            domain=self.domain,
-            route_id=req1.json()["items"][0]["id"],
-        )
+        items = req1.json().get("items") or []
+        if items:
+            await self.client.routes.delete(
+                domain=self.domain,
+                route_id=items[0]["id"],
+            )
         req = await self.client.routes.create(domain=self.domain, data=self.routes_data)
 
         self.assertEqual(req.status_code, 200)
@@ -949,16 +951,14 @@ class AsyncRoutesTests(unittest.IsolatedAsyncioTestCase):
     async def test_routes_get_all(self) -> None:
         params = {"skip": 0, "limit": 1}
         req1 = await self.client.routes.get(domain=self.domain, filters=params)
-        if len(req1.json()["items"]) > 0:
+        items = req1.json().get("items") or []
+        if items:
             await self.client.routes.delete(
                 domain=self.domain,
-                route_id=req1.json()["items"][0]["id"],
+                route_id=items[0]["id"],
             )
-            await self.client.routes.create(domain=self.domain, data=self.routes_data)
-            req = await self.client.routes.get(domain=self.domain, filters=self.routes_params)
-        else:
-            await self.client.routes.create(domain=self.domain, data=self.routes_data)
-            req = await self.client.routes.get(domain=self.domain, filters=self.routes_params)
+        await self.client.routes.create(domain=self.domain, data=self.routes_data)
+        req = await self.client.routes.get(domain=self.domain, filters=self.routes_params)
 
         self.assertEqual(req.status_code, 200)
         self.assertIn("items", req.json())
@@ -966,23 +966,17 @@ class AsyncRoutesTests(unittest.IsolatedAsyncioTestCase):
     async def test_get_route_by_id(self) -> None:
         params = {"skip": 0, "limit": 1}
         req1 = await self.client.routes.get(domain=self.domain, filters=params)
-        if len(req1.json()["items"]) > 0:
+        items = req1.json().get("items") or []
+        if items:
             await self.client.routes.delete(
                 domain=self.domain,
-                route_id=req1.json()["items"][0]["id"],
+                route_id=items[0]["id"],
             )
 
-            req_post = await self.client.routes.create(domain=self.domain, data=self.routes_data)
-            await self.client.routes.create(domain=self.domain, data=self.routes_data)
-            req = await self.client.routes.get(
-                domain=self.domain, route_id=req_post.json()["route"]["id"]
-            )
-        else:
-            req_post = await self.client.routes.create(domain=self.domain, data=self.routes_data)
-            await self.client.routes.create(domain=self.domain, data=self.routes_data)
-            req = await self.client.routes.get(
-                domain=self.domain, route_id=req_post.json()["route"]["id"]
-            )
+        req_post = await self.client.routes.create(domain=self.domain, data=self.routes_data)
+        req = await self.client.routes.get(
+            domain=self.domain, route_id=req_post.json()["route"]["id"]
+        )
 
         self.assertEqual(req.status_code, 200)
         self.assertIn("route", req.json())
@@ -990,24 +984,18 @@ class AsyncRoutesTests(unittest.IsolatedAsyncioTestCase):
     async def test_routes_put(self) -> None:
         params = {"skip": 0, "limit": 1}
         req1 = await self.client.routes.get(domain=self.domain, filters=params)
-        if len(req1.json()["items"]) > 0:
+        items = req1.json().get("items") or []
+        if items:
             await self.client.routes.delete(
                 domain=self.domain,
-                route_id=req1.json()["items"][0]["id"],
+                route_id=items[0]["id"],
             )
-            req_post = await self.client.routes.create(domain=self.domain, data=self.routes_data)
-            req = await self.client.routes.put(
-                domain=self.domain,
-                data=self.routes_put_data,
-                route_id=req_post.json()["route"]["id"],
-            )
-        else:
-            req_post = await self.client.routes.create(domain=self.domain, data=self.routes_data)
-            req = await self.client.routes.put(
-                domain=self.domain,
-                data=self.routes_put_data,
-                route_id=req_post.json()["route"]["id"],
-            )
+        req_post = await self.client.routes.create(domain=self.domain, data=self.routes_data)
+        req = await self.client.routes.put(
+            domain=self.domain,
+            data=self.routes_put_data,
+            route_id=req_post.json()["route"]["id"],
+        )
 
         self.assertEqual(req.status_code, 200)
         self.assertIn("message", req.json())
@@ -1015,22 +1003,17 @@ class AsyncRoutesTests(unittest.IsolatedAsyncioTestCase):
     async def test_routes_delete(self) -> None:
         params = {"skip": 0, "limit": 1}
         req1 = await self.client.routes.get(domain=self.domain, filters=params)
-        if len(req1.json()["items"]) > 0:
+        items = req1.json().get("items") or []
+        if items:
             await self.client.routes.delete(
                 domain=self.domain,
-                route_id=req1.json()["items"][0]["id"],
+                route_id=items[0]["id"],
             )
-            req_post = await self.client.routes.create(domain=self.domain, data=self.routes_data)
+        req_post = await self.client.routes.create(domain=self.domain, data=self.routes_data)
 
-            req = await self.client.routes.delete(
-                domain=self.domain, route_id=req_post.json()["route"]["id"]
-            )
-        else:
-            req_post = await self.client.routes.create(domain=self.domain, data=self.routes_data)
-
-            req = await self.client.routes.delete(
-                domain=self.domain, route_id=req_post.json()["route"]["id"]
-            )
+        req = await self.client.routes.delete(
+            domain=self.domain, route_id=req_post.json()["route"]["id"]
+        )
 
         self.assertEqual(req.status_code, 200)
         self.assertIn("message", req.json())
@@ -1041,17 +1024,15 @@ class AsyncRoutesTests(unittest.IsolatedAsyncioTestCase):
         query = {"address": self.sender}
         req1 = await self.client.routes.get(domain=self.domain, filters=params)
 
-        if len(req1.json()["items"]) > 0:
+        items = req1.json().get("items") or []
+        if items:
             await self.client.routes.delete(
                 domain=self.domain,
-                route_id=req1.json()["items"][0]["id"],
+                route_id=items[0]["id"],
             )
 
-            await self.client.routes.create(domain=self.domain, data=self.routes_data)
-            req = await self.client.routes_match.get(domain=self.domain, filters=query)
-        else:
-            await self.client.routes.create(domain=self.domain, data=self.routes_data)
-            req = await self.client.routes_match.get(domain=self.domain, filters=query)
+        await self.client.routes.create(domain=self.domain, data=self.routes_data)
+        req = await self.client.routes_match.get(domain=self.domain, filters=query)
 
         self.assertEqual(req.status_code, 200)
         self.assertIn("route", req.json())
@@ -1061,7 +1042,6 @@ class AsyncRoutesTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 200)
         [self.assertIn(key, expected_keys) for key in req.json()["route"].keys()]  # type: ignore[func-returns-value]
-
 
 class AsyncWebhooksTests(unittest.IsolatedAsyncioTestCase):
     """Async tests for Mailgun Webhooks API using AsyncClient."""
@@ -2177,6 +2157,7 @@ class AsyncUsersTests(unittest.IsolatedAsyncioTestCase):
             "opened_ip",
             "password_updated_at",
             "preferences",
+            "region_data",
             "role",
             "salesforce_user_id",
             "tfa_active",
@@ -2252,6 +2233,7 @@ class AsyncUsersTests(unittest.IsolatedAsyncioTestCase):
                     "opened_ip",
                     "password_updated_at",
                     "preferences",
+                    "region_data",
                     "role",
                     "salesforce_user_id",
                     "tfa_active",
