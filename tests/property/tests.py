@@ -159,6 +159,7 @@ class TestHandlerProperties:
             assert "\r" not in url_result
             assert "\n" not in url_result
         except (ValueError, TypeError, ApiError):
+            # Expected for hostile/property-generated input: defensive rejection is acceptable.
             pass
 
     @given(tag=st.text())  # type: ignore[untyped-decorator]
@@ -537,7 +538,6 @@ class MailgunStateSequenceMachine(RuleBasedStateMachine):
                     key,
                     exc,
                 )
-                pass
 
     @rule()  # type: ignore[untyped-decorator]
     def attach_and_hash_stream(self) -> None:
