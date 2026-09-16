@@ -309,6 +309,7 @@ include = [ "mailgun" ]
 exclude = [ "mailgun/examples/*", "**/__pycache__" ]
 reportAttributeAccessIssue = false
 reportMissingImports = false
+reportMissingModuleSource = "none"
 
 [tool.typos.default.extend-words]
 requestor = "requestor"
