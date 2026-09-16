@@ -333,28 +333,70 @@ class SecurityGuard:
         return {k: v for k, v in kwargs.items() if k in cls.ALLOWED_KWARGS}
 
     @staticmethod
-    def sanitize_headers(headers: dict[str, str] | None) -> dict[str, str] | None:
+    def sanitize_headers(headers: dict[Any, Any] | None) -> dict[str, str] | None:
         """Poka-yoke: Prevent HTTP Header Injection (CWE-113 / RFC 9110).
 
+        Validates header keys and values against CRLF injection, control characters,
+        and non-ASCII/non-Latin-1 encodings that cause runtime divergences across
+        HTTP engines (requests vs. httpx). Multi-value headers (lists/tuples/sets)
+        are safely joined into RFC 9110 comma-delimited strings.
+
+        Args:
+            headers: Dictionary of headers to sanitize, or None.
+
         Returns:
-            The sanitized headers dictionary, or None if no headers were provided.
+            The sanitized, strictly string-typed headers dictionary, or None if headers is None.
 
         Raises:
-            ValueError: If CRLF or control character sequences are detected.
+            ValueError: If CRLF sequences or forbidden control characters are detected.
+            UnicodeEncodeError: If headers cannot be encoded to ISO-8859-1 (Latin-1).
         """
-        if not headers:
-            return headers
-        for key, value in headers.items():
-            k_str, v_str = str(key), str(value)
+        if headers is None:
+            return None
+
+        sanitized: dict[str, str] = {}
+        for raw_key, raw_value in headers.items():
+            if raw_key is None:
+                continue
+
+            k_str = str(raw_key)
+
+            # Flatten multi-value headers (e.g. list, tuple, set) per RFC 9110
+            if isinstance(raw_value, (list, tuple, set)):
+                items = [str(item) for item in raw_value if item is not None]
+                v_str = ", ".join(items)
+            elif raw_value is None:
+                v_str = ""
+            else:
+                v_str = str(raw_value)
+
+            # 1. Block CRLF and forbidden control characters (CWE-113 / RFC 9110)
             has_crlf = any(c in k_str or c in v_str for c in ("\r", "\n"))
             if has_crlf or _CONTROL_CHAR_RE.search(k_str) or _CONTROL_CHAR_RE.search(v_str):
                 if "sys" in sys.modules:
-                    # PEP 578: Emit Enterprise security telemetry before crashing
-                    sys.audit("mailgun.security.header_injection", key)
+                    sys.audit("mailgun.security.header_injection", k_str)
 
-                msg = f"CRLF injection detected in header: {key}"
+                msg = f"CRLF injection detected in header: {k_str}"
                 raise ValueError(msg)
-        return headers
+
+            # 2. Strict HTTP Wire Encoding Check (RFC 9110 / ISO-8859-1 Parity)
+            try:
+                k_str.encode("latin-1")
+                v_str.encode("latin-1")
+            except UnicodeEncodeError as err:
+                if "sys" in sys.modules:
+                    sys.audit("mailgun.security.header_encoding_divergence", k_str)
+                raise UnicodeEncodeError(
+                    err.encoding,
+                    err.object,
+                    err.start,
+                    err.end,
+                    f"Header '{k_str}' contains characters outside the ISO-8859-1/Latin-1 standard",
+                ) from err
+
+            sanitized[k_str] = v_str
+
+        return sanitized
 
     @staticmethod
     def validate_no_control_characters(value: str, context: str = "Input") -> None:
@@ -652,8 +694,12 @@ class SecurityGuard:
         Raises:
             ValueError: If invalid domain name encoding.
         """
-        if not domain:
+        if not domain or not isinstance(domain, str):
             return ""
+
+        if any(c in domain for c in ("\r", "\n", "\x00")):
+            msg = "Domain contains illegal control characters"
+            raise ValueError(msg)
 
         try:
             local_part, sep, domain_part = domain.rpartition("@")

@@ -1222,10 +1222,15 @@ class AsyncEndpoint(BaseEndpoint):
         domain: str | None = None,
         **kwargs: Any,
     ) -> Any:
-        """Lazy pagination: yield records asynchronously one by one.
+        """Lazy pagination: yield records asynchronously one by one without loading all into memory.
+
+        Automatically traverses the 'paging' links returned by the Mailgun API.
 
         Yields:
             Individual records from the paginated API response.
+
+        Raises:
+            ApiError: If the server returns a 4xx or 5xx status code or a network error occurs.
         """
         initial_filters = dict(filters) if filters else {}
         current_filters = initial_filters.copy()
@@ -1233,15 +1238,24 @@ class AsyncEndpoint(BaseEndpoint):
         while True:
             response = await self.get(filters=current_filters.copy(), domain=domain, **kwargs)
 
+            # Defensive status check: Convert raw HTTPStatusError into SDK's standard ApiError
             if hasattr(response, "raise_for_status"):
-                response.raise_for_status()
+                try:
+                    response.raise_for_status()
+                except httpx.HTTPStatusError as exc:
+                    raise ApiError(exc.response) from exc
 
             data = response.json()
-            items = data.get("items", [])
+            # Stop if response payload is not a valid JSON mapping (e.g. error list or gateway shock)
+            if not isinstance(data, dict):
+                break
+
+            items = data.get("items") or []
             for item in items:
                 yield item
 
-            next_url = data.get("paging", {}).get("next")
+            paging_dict = data.get("paging") or {}
+            next_url = paging_dict.get("next")
             if not next_url or not items:
                 break
 
