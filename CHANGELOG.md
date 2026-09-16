@@ -10,7 +10,7 @@ We [keep a changelog.](http://keepachangelog.com/)
 - **Multi-Pass URL Encoding and Path Traversal (CWE-116 / CWE-22):** Hardened `SecurityGuard.sanitize_domain()` to iterate recursive `unquote()` checks up to 3 passes, apply NFKC Unicode normalization, and strip CRLF/slash sequences before evaluating `..` traversal sequences.
 - **Replay Attack Window Verification (CWE-294):** Updated default webhook timestamp TTL in `SecurityGuard.verify_webhook()` to 900 seconds (15 minutes), rejecting expired requests while permitting `<= 0` to selectively bypass clock checks in test environments.
 - **Pre-Flight Deliverability & XSS Detection (CWE-79 / CWE-400):** Extended `SpamGuard` with `_BLOCKED_TAGS` (`iframe`, `object`, `embed`, `applet`) and automated regex detection for inline event handlers (`on*`), and added pre-parsing length boundary checks.
-- **Log Redaction Hardening (CWE-316 / CWE-117):** Increased `MAX_REDACTION_DEPTH` to 5 in `RedactingFilter`. Preserved original `record.args` types (tuple, dict, list) to prevent string formatting crashes, wrapped object inspection in defensive guards, and added fallback handling for sets containing unhashable elements.
+- **Log Redaction Hardening (CWE-316 / CWE-117):** Increased `MAX_REDACTION_DEPTH` to 5 in `RedactingFilter` and added `frozenset` support. Preserved original `record.args` types (tuple, dict, list) to prevent string formatting crashes, wrapped object inspection in defensive guards, and added fallback handling for sets containing unhashable elements.
 - **Payload Cycle & Recursion Protection:** Added `_deep_sanitize()` with a 50-level depth limit to `IdempotencyGuard` to prevent recursion overflow and handle cyclic data references.
 - **Header Injection Boundaries (CWE-113 / RFC 9110):** Enforced ASCII control character checks across header keys and values in `SecurityGuard.sanitize_headers()` and guarded runtime telemetry calls with `sys in sys.modules`.
 
@@ -29,8 +29,13 @@ We [keep a changelog.](http://keepachangelog.com/)
 ### Changed
 
 - **Route Registry Definitions:** Registered `routes_match` under the v3 endpoint mapping, added `reputationanalytics_v2` under v2 prefix routes, and mapped `v1/spamtraps` deprecation warnings.
-- **Dependency Specifications:** Removed direct `conda-forge::` channel pinning for `httpx2` in `environment.yaml` and `environment-dev.yaml`, and synchronized `.pre-commit-config.yaml` dependency constraints.
+- **Dependency Specifications:** Synchronized `requests >=2.33.0` across environments, removed direct `conda-forge::` channel pinning for `httpx2` in `environment.yaml` and `environment-dev.yaml`, and aligned `.pre-commit-config.yaml` dependency constraints.
+- **Linter Rule Alignment:** Removed the deprecated `missing-trailing-comma` selector from `pyproject.toml` to maintain compatibility with modern Ruff formatters.
 - **Manage Script Permissions:** Updated `manage.sh` file mode to executable (`100755`).
+
+### Pull Requests Merged
+
+- PR #65: Hardening security and stability.
 
 ## v1.9.0 - 2026-08-04
 
