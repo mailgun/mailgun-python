@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """Stateful Fuzzer for the Mailgun Sync Client.
 
-Exercises state transitions, streaming pagination shocks, attachment pointer
-resets, and circular payload sanitization under adversarial inputs.
+Exercises state transitions, chaos HTTP responses (429/500/503), streaming
+pagination shocks, file pointer resets, and post-close lifecycle invariants.
 """
 
+import io
 import logging
 import sys
-import tempfile
-from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -16,31 +15,51 @@ import atheris
 import requests
 
 with atheris.instrument_imports():
-    from mailgun.builders import ChunkedStreamer
-    from mailgun.client import Client
+    from mailgun.client import Client, Config
+    from mailgun.config import RetryPolicy
     from mailgun.endpoints import Endpoint
-    from mailgun.handlers.error_handler import ApiError
+    from mailgun.handlers.error_handler import ApiError, MailgunTimeoutError
     from mailgun.security import IdempotencyGuard, SecurityGuard, SpamGuard
 
 logging.disable(logging.CRITICAL)
 
-# Static response pre-allocation for high throughput execution
-_STATIC_RESP = requests.Response()
-_STATIC_RESP.status_code = 200
-_STATIC_RESP._content = b'{"id": "<test>", "message": "Queued", "items": []}'
 
+class ChaosMockAdapter(requests.adapters.HTTPAdapter):
+    """Dynamic HTTP adapter injecting chaotic status codes and payloads."""
 
-def mock_requests_send(
-    self: requests.adapters.HTTPAdapter,
-    request: requests.PreparedRequest,
-    *args: Any,
-    **kwargs: Any,
-) -> requests.Response:
-    _STATIC_RESP.request = request
-    return _STATIC_RESP
+    def __init__(self, fdp: atheris.FuzzedDataProvider) -> None:
+        super().__init__()
+        self.fdp = fdp
 
+    def send(  # type: ignore[override]
+        self,
+        request: requests.PreparedRequest,
+        stream: bool = False,
+        timeout: Any = None,
+        verify: Any = True,
+        cert: Any = None,
+        proxies: Any = None,
+    ) -> requests.Response:
+        resp = requests.Response()
+        resp.request = request
 
-requests.adapters.HTTPAdapter.send = mock_requests_send  # type: ignore[method-assign]
+        # Inject chaos responses based on fuzzer state
+        status_code = self.fdp.PickValueInList([200, 400, 429, 500, 502, 503])
+        resp.status_code = status_code
+
+        headers: dict[str, str] = {
+            "Content-Type": "application/json",
+        }
+        if status_code == 429:
+            headers["Retry-After"] = "0"
+        resp.headers = requests.structures.CaseInsensitiveDict(headers)
+
+        if status_code == 200:
+            resp._content = b'{"id": "", "message": "Queued", "items": []}'
+        else:
+            resp._content = b'{"message": "Chaos injected error"}'
+
+        return resp
 
 
 def TestOneInput(data: bytes) -> None:
@@ -48,129 +67,158 @@ def TestOneInput(data: bytes) -> None:
         return
 
     fdp = atheris.FuzzedDataProvider(data)
+    auth_key = fdp.ConsumeUnicodeNoSurrogates(16) or "test-key"
+    num_operations = fdp.ConsumeIntInRange(2, 10)
 
-    auth_key = fdp.ConsumeUnicodeNoSurrogates(32)
-    num_operations = fdp.ConsumeIntInRange(1, 20)
+    adapter = ChaosMockAdapter(fdp)
+    config = Config(
+        api_url="https://api.mailgun.net/v3",
+        retry_policy=RetryPolicy(max_retries=0, base_delay=0.0),
+    )
 
-    try:
-        client = Client(auth=("api", auth_key or "test-key"))
-        active_domains: list[str] = []
+    with patch("time.sleep", return_value=None):
+        try:
+            client = Client(auth=("api", auth_key), config=config)
+            assert client._session is not None
+            client._session.mount("https://", adapter)
+            client._session.mount("http://", adapter)
 
-        with client:
-            for _ in range(num_operations):
-                op_code = fdp.ConsumeIntInRange(0, 7)
+            active_domains: list[str] = []
 
-                # Action 0: Domain Registration
-                if op_code == 0:
-                    domain = fdp.ConsumeUnicodeNoSurrogates(16)
-                    if domain:
-                        client.domains.get(domain=domain)
-                        active_domains.append(domain)
+            with client:
+                for _ in range(num_operations):
+                    op_code = fdp.ConsumeIntInRange(0, 8)
 
-                # Action 1: Send Message with Cyclic Custom Variables
-                elif op_code == 1 and active_domains:
-                    target_domain = fdp.PickValueInList(active_domains)
-                    msg_payload: dict[str, Any] = {
-                        "to": fdp.ConsumeUnicodeNoSurrogates(16),
-                        "from": f"test@{target_domain}",
-                        "subject": fdp.ConsumeUnicodeNoSurrogates(16),
-                        "text": fdp.ConsumeUnicodeNoSurrogates(64),
-                    }
-                    if fdp.ConsumeBool():
-                        circ: dict[str, Any] = {}
-                        circ["self"] = circ
-                        msg_payload["v:circular"] = circ
-
-                    # Test idempotency key generation against circular payloads
-                    try:
-                        IdempotencyGuard.generate_key(target_domain, msg_payload)
-                    except (ValueError, TypeError):
-                        # Expected for malformed/circular fuzz payloads; continue exercising state transitions.
-                        pass
-
-                    client.messages.create(domain=target_domain, data=msg_payload)
-
-                # Action 2: Teardown Domain
-                elif op_code == 2 and active_domains:
-                    target_domain = active_domains.pop()
-                    client.domains.delete(domain=target_domain)
-
-                # Action 3: Ping
-                elif op_code == 3:
-                    client.ping()
-
-                # Action 4: Streamer File Pointer Preservation Sequence
-                elif op_code == 4:
-                    with tempfile.NamedTemporaryFile(delete=False) as tmp:
-                        tmp.write(fdp.ConsumeBytes(fdp.ConsumeIntInRange(1, 4096)))
-                        tmp_path = Path(tmp.name)
-
-                    try:
-                        streamer = ChunkedStreamer(
-                            tmp_path, safe_base_dir=tmp_path.parent, chunk_size=512
-                        )
-                        files = [("attachment", ("file.bin", streamer, "application/octet-stream"))]
-                        IdempotencyGuard.generate_key("test.com", {"to": "test@test.com"}, files)
-                        assert streamer.tell() == 0, "Streamer pointer corrupted during hash generation"
-                        streamer.close()
-                    finally:
-                        if tmp_path.exists():
-                            tmp_path.unlink()
-
-                # Action 5: Stream Null Paging Cursor Shock
-                elif op_code == 5:
-                    endpoint = Endpoint(
-                        url={"base": "https://api.mailgun.net/v3", "keys": ["events"]},
-                        headers={},
-                        auth=client.auth,
-                        session=client._session,
-                    )
-                    mock_payload = {
-                        "items": [{"id": fdp.ConsumeInt(1000)}] if fdp.ConsumeBool() else None,
-                        "paging": None
-                        if fdp.ConsumeBool()
-                        else {
-                            "next": None
-                            if fdp.ConsumeBool()
-                            else "https://api.mailgun.net/v3/events?page=next"
-                        },
-                    }
-                    mock_resp = MagicMock()
-                    mock_resp.status_code = 200
-                    mock_resp.json.return_value = mock_payload
-
-                    # Patch on Endpoint class to respect __slots__
-                    with patch.object(Endpoint, "get", return_value=mock_resp):
-                        stream_gen = endpoint.stream(domain="example.com")
-                        for _ in range(2):
+                    # Action 0: Domain Registration
+                    if op_code == 0:
+                        domain = fdp.ConsumeUnicodeNoSurrogates(16)
+                        if domain and "." in domain:
                             try:
-                                next(stream_gen)
-                            except StopIteration:
-                                break
+                                client.domains.get(domain=domain)
+                                active_domains.append(domain)
+                            except ApiError:
+                                pass
 
-                # Action 6: Deliverability & XSS SpamGuard Parse
-                elif op_code == 6:
-                    fuzzed_html = fdp.ConsumeUnicodeNoSurrogates(256)
-                    try:
-                        report = SpamGuard.check_html(fuzzed_html)
-                        assert isinstance(report, dict)
-                    except ValueError:
-                        # Expected for malformed fuzz inputs; continue fuzzing.
-                        pass
+                    # Action 1: Send Message with Cyclic Custom Variables
+                    elif op_code == 1 and active_domains:
+                        target_domain = fdp.PickValueInList(active_domains)
+                        msg_payload: dict[str, Any] = {
+                            "to": fdp.ConsumeUnicodeNoSurrogates(16),
+                            "from": f"test@{target_domain}",
+                            "subject": fdp.ConsumeUnicodeNoSurrogates(16),
+                            "text": fdp.ConsumeUnicodeNoSurrogates(64),
+                        }
+                        if fdp.ConsumeBool():
+                            circ: dict[str, Any] = {}
+                            circ["self"] = circ
+                            msg_payload["v:circular"] = circ
 
-                # Action 7: Timeout Overflow & Chaos Bounds
-                elif op_code == 7:
-                    timeout_val = fdp.ConsumeUnicodeNoSurrogates(16)
-                    try:
-                        SecurityGuard.sanitize_timeout(timeout_val)
-                    except (ValueError, TypeError):
-                        # Invalid fuzzed timeout values are expected; continue fuzzing.
-                        pass
+                        try:
+                            IdempotencyGuard.generate_key(target_domain, msg_payload)
+                        except (TypeError, ValueError):
+                            pass
 
-    except (ApiError, ValueError, TypeError, KeyError, UnicodeEncodeError, StopIteration):
-        pass
-    except Exception as e:
-        raise RuntimeError(f"STATEFUL CRASH: {type(e).__name__} - {e}") from e
+                        try:
+                            client.messages.create(domain=target_domain, data=msg_payload)
+                        except ApiError:
+                            pass
+
+                    # Action 2: Teardown Domain
+                    elif op_code == 2 and active_domains:
+                        target_domain = active_domains.pop()
+                        try:
+                            client.domains.delete(domain=target_domain)
+                        except ApiError:
+                            pass
+
+                    # Action 3: Ping
+                    elif op_code == 3:
+                        try:
+                            client.ping()
+                        except ApiError:
+                            pass
+
+                    # Action 4: In-Memory Stream Pointer Preservation Sequence
+                    elif op_code == 4:
+                        raw_bytes = fdp.ConsumeBytes(fdp.ConsumeIntInRange(1, 1024))
+                        mem_stream = io.BytesIO(raw_bytes)
+                        files = [("attachment", ("file.bin", mem_stream, "application/octet-stream"))]
+                        IdempotencyGuard.generate_key("test.com", {"to": "test@test.com"}, files)
+                        assert mem_stream.tell() == 0, "Stream pointer corrupted during hash generation"
+
+                    # Action 5: Deep Pagination Shock
+                    elif op_code == 5:
+                        endpoint = Endpoint(
+                            url={"base": "https://api.mailgun.net/v3", "keys": ["events"]},
+                            headers={},
+                            auth=client.auth,
+                            session=client._session,
+                        )
+
+                        call_count = 0
+
+                        def mock_paged_get(*args: Any, **kwargs: Any) -> MagicMock:
+                            nonlocal call_count
+                            call_count += 1
+                            m = MagicMock()
+                            m.status_code = 200
+                            has_next = (call_count < 2) and fdp.ConsumeBool()
+                            m.json.return_value = {
+                                "items": [{"id": fdp.ConsumeInt(1000)}] if fdp.ConsumeBool() else [],
+                                "paging": {
+                                    "next": "https://api.mailgun.net/v3/events?page=next"
+                                    if has_next
+                                    else None
+                                },
+                            }
+                            return m
+
+                        with patch.object(Endpoint, "get", side_effect=mock_paged_get):
+                            stream_gen = endpoint.stream(domain="example.com")
+                            for _ in range(3):
+                                try:
+                                    next(stream_gen)
+                                except (StopIteration, ApiError):
+                                    break
+
+                    # Action 6: SpamGuard Deliverability Parse
+                    elif op_code == 6:
+                        fuzzed_html = fdp.ConsumeUnicodeNoSurrogates(128)
+                        try:
+                            report = SpamGuard.check_html(fuzzed_html)
+                            assert isinstance(report, dict)
+                        except (TypeError, ValueError):
+                            pass
+
+                    # Action 7: Timeout Sanitizer Overflow
+                    elif op_code == 7:
+                        timeout_val = fdp.ConsumeUnicodeNoSurrogates(16)
+                        try:
+                            SecurityGuard.sanitize_timeout(timeout_val)
+                        except (TypeError, ValueError):
+                            pass
+
+                    # Action 8: Post-Close Invocation Invariant Check
+                    elif op_code == 8:
+                        client.close()
+                        try:
+                            client.ping()
+                        except (ApiError, AttributeError, RuntimeError):
+                            pass
+                        break
+
+        except (
+            ApiError,
+            MailgunTimeoutError,
+            KeyError,
+            StopIteration,
+            TypeError,
+            UnicodeEncodeError,
+            ValueError,
+        ):
+            pass
+        except Exception as e:
+            raise RuntimeError(f"STATEFUL CRASH: {type(e).__name__} - {e}") from e
 
 
 if __name__ == "__main__":

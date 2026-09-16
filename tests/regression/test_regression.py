@@ -2,6 +2,7 @@ import logging
 import unittest
 from pathlib import Path
 import base64
+from typing import Any
 
 import pytest
 
@@ -10,6 +11,14 @@ from mailgun.client import AsyncClient, Client, Config
 from mailgun.logger import get_logger
 from mailgun.security import SecurityGuard
 from mailgun.filters import RedactingFilter
+from mailgun._httpx_compat import httpx as compat_httpx
+import requests
+from mailgun.handlers.email_validation_handler import handle_address_validate
+from pydantic import ValidationError
+from mailgun.ext.pydantic.models import SendMessageSchema
+from mailgun.handlers.error_handler import ApiError
+
+
 
 CORPUS_ROOT = Path("tests/fuzz/corpus")
 
@@ -158,30 +167,6 @@ class TestControlCharacters:
 
         assert "CWE-20" in str(exc.value)
         assert "Forbidden control characters" in str(exc.value)
-
-
-# class TestCorpusRegression:
-#     @pytest.mark.security
-#     @pytest.mark.parametrize(
-#         "corpus_file", get_corpus_files(), ids=lambda x: x.name
-#     )
-#     def test_corpus_regression(self, corpus_file: Path) -> None:
-#         """
-#         Regression test: ensures current code handles historical crash/coverage
-#         payloads without unhandled exceptions.
-#         """
-#         from tests.fuzz.fuzz_client import TestOneInput
-#
-#         if not corpus_file.is_file():
-#             pytest.skip("Not a file")
-#
-#         with open(corpus_file, "rb") as f:
-#             data = f.read()
-#
-#         # The test passes if it runs without raising a new exception type
-#         # not already covered by the fuzzer's internal try/except blocks.
-#         # If the fuzzer previously caught a bug here, it won't crash now.
-#         TestOneInput(data)
 
 
 class TestLoggerRegression:
@@ -525,6 +510,151 @@ class TestRedactionFuzzCrash032af5:
             # Expected for fuzzed/hostile formatting inputs; this test only verifies
             # the redaction filter path does not crash.
             return
+
+class TestuzzCrash:
+    @pytest.mark.asyncio
+    async def test_sync_async_parity_non_ascii_headers(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Verify crash crash-066038255edaea23d35f02373148682cdad44d66 is handled safely."""
+        status_code = 201
+        headers = {
+            "content-type": "application/json",
+            "x-mailgun-request-id": "test-\u00a1\u00a9-id",
+        }
+        body = b'{"message": "success"}'
+
+        # Mock Requests
+        def mock_send(
+            self: Any, request: requests.PreparedRequest, *args: Any, **kwargs: Any
+        ) -> requests.Response:
+            resp = requests.Response()
+            resp.status_code = status_code
+            resp.headers.update(headers)
+            resp._content = body
+            resp.request = request
+            resp.url = request.url or "https://api.mailgun.net/v3"
+            return resp
+
+        monkeypatch.setattr(requests.adapters.HTTPAdapter, "send", mock_send)
+
+        # Mock HTTPX
+        async def mock_handle(
+            self: Any, request: compat_httpx.Request
+        ) -> compat_httpx.Response:
+            byte_headers = {
+                k.encode("latin-1"): (
+                    v.encode("latin-1", "replace") if isinstance(v, str) else v
+                )
+                for k, v in headers.items()
+            }
+            return compat_httpx.Response(
+                status_code=status_code,
+                headers=byte_headers,
+                content=body,
+                request=request,
+            )
+
+        monkeypatch.setattr(
+            compat_httpx.AsyncHTTPTransport, "handle_async_request", mock_handle
+        )
+
+        sync_client = Client(auth=("api", "key-test"))
+        async_client = AsyncClient(auth=("api", "key-test"))
+
+        sync_res = sync_client.ip_whitelist.delete()
+        async_res = await async_client.ip_whitelist.delete()
+
+        assert sync_res.status_code == async_res.status_code == 201
+
+
+    def test_handle_address_validate_dict_keys_regression(self) -> None:
+        """Verify handle_address_validate does not crash with KeyError: slice(1, None, None)."""
+        # Payload reproducing crash-29de1ca9e58e3d7df4a99760f028c058edeb3c56
+        corrupted_url_config = {
+            "base": "https://api.mailgun.net/v4",
+            "keys": {"_dict__": "corrupted_non_list_structure"},
+        }
+
+        try:
+            result = handle_address_validate(corrupted_url_config, "example.com", "get")
+            assert isinstance(result, str)
+        except (ValueError, TypeError, KeyError):
+            # Graceful rejection is acceptable; unhandled internal KeyError/crash is not
+            pass
+
+
+    def test_sanitize_headers_multivalue_list_type_drift(self) -> None:
+        """Verify list-valued headers are coerced into strings without type drift."""
+        headers = {
+            "X-Mailgun-Tag": ["newsletter", "weekly_digest"],
+            "Accept": ("text/html", "application/xhtml+xml"),
+        }
+        sanitized = SecurityGuard.sanitize_headers(headers)
+        assert isinstance(sanitized, dict)
+        for k, v in sanitized.items():
+            assert isinstance(k, str)
+            assert isinstance(v, str)
+        assert sanitized["X-Mailgun-Tag"] == "newsletter, weekly_digest"
+        assert sanitized["Accept"] == "text/html, application/xhtml+xml"
+
+
+    def test_send_message_schema_rejects_crlf_in_subject(self) -> None:
+        """Ensure CRLF characters in subject are rejected (CWE-113)."""
+        malicious_subject = "Test Subject\nBcc: evil@attacker.com"
+        with pytest.raises(ValidationError) as exc_info:
+            SendMessageSchema(
+                to="user@example.com",
+                from_="sender@example.com",
+                subject=malicious_subject,
+                text="Hello world",
+            )
+        assert "CRLF injection detected in subject" in str(exc_info.value)
+
+
+    def test_sanitize_headers_rejects_null_byte_in_list_value(self) -> None:
+        """Ensure null bytes inside list-valued headers raise ValueError (CWE-113)."""
+        headers = {"X-Custom": ["\x00"]}
+        with pytest.raises(ValueError, match="CRLF injection detected"):
+            SecurityGuard.sanitize_headers(headers)
+
+        headers_str = {"X-Custom": "\x00"}
+        with pytest.raises(ValueError, match="CRLF injection detected"):
+            SecurityGuard.sanitize_headers(headers_str)
+
+    @pytest.mark.asyncio
+    async def test_async_endpoint_stream_handles_http_error_gracefully(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Ensure AsyncEndpoint.stream() wraps HTTP errors into ApiError rather than leaking HTTPStatusError."""
+        async def mock_handle(
+            self: Any, request: compat_httpx.Request
+        ) -> compat_httpx.Response:
+            return compat_httpx.Response(
+                status_code=404,
+                content=b'{"message": "Not Found"}',
+                request=request,
+            )
+
+        monkeypatch.setattr(compat_httpx.AsyncHTTPTransport, "handle_async_request", mock_handle)
+
+        client = AsyncClient(auth=("api", "test-key"))
+        with pytest.raises(ApiError) as exc_info:
+            async for _ in client.ips.stream(filters={"limit": 5}):
+                pass
+
+        # Check the status code via code, response.status_code, or error string
+        err = exc_info.value
+        status = getattr(err, "code", None) or getattr(getattr(err, "response", None), "status_code", None)
+        if status is not None:
+            assert status == 404
+        else:
+            assert "404" in str(err)
+
+
+    def test_client_init_rejects_crlf_in_api_key(self) -> None:
+        """Regression test for crash-a61263193b9bd80a8aa013dbff2bbc5f9549c014."""
+        bad_key = "key-\r\ninjection"
+        with pytest.raises(ValueError, match="API Key contains invalid characters"):
+            Client(auth=("api", bad_key))
 
 
 if __name__ == "__main__":

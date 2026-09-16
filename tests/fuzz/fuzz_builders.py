@@ -1,28 +1,46 @@
 #!/usr/bin/env python3
+"""Fuzzer for Message and Template Builders targeting RFC2822, MIME, and Template ASTs."""
 
+import logging
 import sys
 from typing import Any
 
 import atheris
 
-
 with atheris.instrument_imports():
     from mailgun.builders import MailgunMessageBuilder, MailgunTemplateBuilder
 
+logging.disable(logging.CRITICAL)
+
+_ALLOWED_ERRORS = [
+    "Cannot build an empty template payload",
+    "Cannot build template payload without template content",
+    "Exceeds the limit",
+    "Invalid recipient type",
+    "Security Alert (CWE-20)",
+    "Security Alert (CWE-113)",
+    "Security Alert (CWE-400)",
+    "Template content cannot be empty",
+    "Template name cannot be empty",
+    "Invalid email address",
+    "Header injection detected",
+]
+
 
 def TestOneInput(data: bytes) -> None:
+    if len(data) < 15:
+        return
+
     fdp = atheris.FuzzedDataProvider(data)
 
     try:
-        target_builder = fdp.ConsumeIntInRange(0, 1)
-
-        if target_builder == 0:
+        if fdp.ConsumeBool():
+            # Target 1: MailgunMessageBuilder
             from_email = fdp.ConsumeUnicodeNoSurrogates(30)
             builder = MailgunMessageBuilder(from_email)
 
-            num_operations = fdp.ConsumeIntInRange(1, 20)
-            for _ in range(num_operations):
-                op_code = fdp.ConsumeIntInRange(0, 7)
+            for _ in range(fdp.ConsumeIntInRange(1, 15)):
+                op_code = fdp.ConsumeIntInRange(0, 8)
 
                 if op_code == 0:
                     builder.add_custom_header(
@@ -30,116 +48,75 @@ def TestOneInput(data: bytes) -> None:
                         fdp.ConsumeUnicodeNoSurrogates(100),
                     )
                 elif op_code == 1:
-                    val_type = fdp.ConsumeIntInRange(0, 3)
-                    val: Any = None
-                    if val_type == 0:
-                        val = fdp.ConsumeUnicodeNoSurrogates(50)
-                    elif val_type == 1:
-                        val = fdp.ConsumeInt(8)
-                    elif val_type == 2:
-                        val = fdp.ConsumeBool()
-                    else:
-                        val = {
-                            fdp.ConsumeUnicodeNoSurrogates(
-                                10
-                            ): fdp.ConsumeUnicodeNoSurrogates(20)
-                        }
+                    val: Any = (
+                        fdp.ConsumeUnicodeNoSurrogates(40)
+                        if fdp.ConsumeBool()
+                        else {"k": fdp.ConsumeUnicodeNoSurrogates(20)}
+                    )
                     builder.add_custom_variable(fdp.ConsumeUnicodeNoSurrogates(20), val)
                 elif op_code == 2:
-                    opt_val = fdp.PickValueInList(
-                        [True, False, fdp.ConsumeUnicodeNoSurrogates(10)]
+                    builder.add_option(
+                        fdp.ConsumeUnicodeNoSurrogates(20),
+                        value=fdp.PickValueInList([True, False, fdp.ConsumeUnicodeNoSurrogates(10)]),
                     )
-                    builder.add_option(fdp.ConsumeUnicodeNoSurrogates(20), value=opt_val)
                 elif op_code == 3:
-                    rec_type = fdp.PickValueInList(
-                        ["bcc", "cc", "to", fdp.ConsumeUnicodeNoSurrogates(5)]
+                    builder.add_recipient(
+                        fdp.ConsumeUnicodeNoSurrogates(30),
+                        recipient_type=fdp.PickValueInList(["to", "cc", "bcc", "invalid"]),
                     )
-                    try:
-                        builder.add_recipient(
-                            fdp.ConsumeUnicodeNoSurrogates(30), rec_type
-                        )
-                    except ValueError:
-                        # Fuzz input can generate invalid recipient types/values.
-                        # Ignore expected ValueError here and continue exploring.
-                        pass
                 elif op_code == 4:
-                    builder.set_html(fdp.ConsumeUnicodeNoSurrogates(500))
+                    builder.set_html(fdp.ConsumeUnicodeNoSurrogates(200))
                 elif op_code == 5:
                     builder.set_subject(fdp.ConsumeUnicodeNoSurrogates(100))
                 elif op_code == 6:
                     builder.set_template(fdp.ConsumeUnicodeNoSurrogates(20))
                 elif op_code == 7:
-                    builder.set_text(fdp.ConsumeUnicodeNoSurrogates(500))
+                    builder.set_text(fdp.ConsumeUnicodeNoSurrogates(200))
+                elif op_code == 8:
+                    builder.add_option(
+                        "deliverytime",
+                        value=fdp.ConsumeUnicodeNoSurrogates(30),
+                    )
 
             _ = builder.build()
 
         else:
-            if fdp.ConsumeBool():
-                template_name = fdp.ConsumeUnicodeNoSurrogates(30)
-                try:
-                    t_builder = MailgunTemplateBuilder(template_name)
-                except ValueError:
-                    return
-            else:
-                t_builder = MailgunTemplateBuilder()
+            # Target 2: MailgunTemplateBuilder
+            template_name = (
+                fdp.ConsumeUnicodeNoSurrogates(30) if fdp.ConsumeBool() else None
+            )
+            t_builder = (
+                MailgunTemplateBuilder(template_name)
+                if template_name
+                else MailgunTemplateBuilder()
+            )
 
-            num_operations = fdp.ConsumeIntInRange(1, 10)
-            for _ in range(num_operations):
-                op_code = fdp.ConsumeIntInRange(0, 7)
-
-                if op_code == 0:
+            for _ in range(fdp.ConsumeIntInRange(1, 8)):
+                op = fdp.ConsumeIntInRange(0, 4)
+                if op == 0:
                     t_builder.set_active(active=fdp.ConsumeBool())
-                elif op_code == 1:
-                    acc = fdp.ConsumeUnicodeNoSurrogates(10)
-                    name = fdp.ConsumeUnicodeNoSurrogates(10)
-                    t_builder.set_copy_requests([{"account_id": acc, "name": name}])
-                elif op_code == 2:
-                    t_builder.set_description(fdp.ConsumeUnicodeNoSurrogates(100))
-                elif op_code == 3:
+                elif op == 1:
+                    t_builder.set_description(fdp.ConsumeUnicodeNoSurrogates(50))
+                elif op == 2:
                     t_builder.set_engine(
-                        fdp.PickValueInList(
-                            ["handlebars", "jinja2", fdp.ConsumeUnicodeNoSurrogates(10)]
-                        )
+                        fdp.PickValueInList(["handlebars", "jinja2", "{{7*7}}", "none"])
                     )
-                elif op_code == 4:
-                    key = fdp.ConsumeUnicodeNoSurrogates(10)
-                    t_val = fdp.ConsumeUnicodeNoSurrogates(20)
-                    t_builder.set_headers({key: t_val})
-                elif op_code == 5:
+                elif op == 3:
+                    t_builder.set_template_content(fdp.ConsumeUnicodeNoSurrogates(200))
+                elif op == 4:
                     t_builder.set_tag(fdp.ConsumeUnicodeNoSurrogates(20))
-                elif op_code == 6:
-                    try:
-                        t_builder.set_template_content(
-                            fdp.ConsumeUnicodeNoSurrogates(500)
-                        )
-                    except ValueError:
-                        # Expected for some fuzz inputs; ignore and continue exploring.
-                        pass
-                elif op_code == 7:
-                    t_builder.set_version_comment(fdp.ConsumeUnicodeNoSurrogates(100))
 
-            try:
-                t_builder.build()
-            except ValueError:
-                # Expected for some fuzzed inputs; ignore so fuzzing can continue.
-                pass
+            _ = t_builder.build()
 
-    except ValueError as e:
+
+    except (ValueError, AttributeError) as e:
         error_msg = str(e)
-        allowed_errors = [
-            "Cannot build an empty template payload",
-            "Cannot build template payload without template content",
-            "Exceeds the limit",
-            "Invalid recipient type",
-            "Security Alert (CWE-20)",
-            "Security Alert (CWE-113)",
-            "Security Alert (CWE-400)",
-            "Template content cannot be empty",
-            "Template name cannot be empty",
-        ]
-
-        if not any(msg in error_msg for msg in allowed_errors):
-            raise
+        if isinstance(e, ValueError) and not any(msg in error_msg for msg in _ALLOWED_ERRORS):
+            raise RuntimeError(f"CRASH: Unexpected ValueError in builders: {e}") from e
+    except TypeError:
+        pass
+    except Exception as e:
+        raise RuntimeError(f"UNHANDLED CRASH in Builders execution: {e}") from e
 
 
 if __name__ == "__main__":

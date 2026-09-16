@@ -178,6 +178,7 @@ fuzz_all() {
                 -max_total_time="$duration" \
                 -artifact_prefix="./" \
                 "$fuzzer_corpus" \
+                -timeout=5 \
                 "$@" > "fuzz_output.log" 2>&1
         ) &
     done

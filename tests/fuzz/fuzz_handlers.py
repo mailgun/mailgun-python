@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Fuzz test for Mailgun API Route Handlers.
-Focus: Deep Path Traversal, Template Injection, and Structure-Aware Type Confusion.
+
+Focus: Deep Path Traversal, Template Injection, Sub-resource Transitions,
+Parameter Type Confusion, and URL Interpolation Resiliency.
 """
 
 import atexit
@@ -10,7 +12,6 @@ from collections.abc import Callable
 from typing import Any
 
 import atheris
-
 
 with atheris.instrument_imports():
     from mailgun.handlers.bounce_classification_handler import (
@@ -69,14 +70,19 @@ _KNOWN_KWARGS = [
     "_method",
     "action",
     "address",
+    "authority_name",
     "bounce_address",
     "checks",
+    "comparator",
     "complaint_address",
     "counters",
     "data",
+    "dkim",
+    "dkim_selector",
     "domain",
     "domain_name",
     "event_types",
+    "expression",
     "filters",
     "ip",
     "key_id",
@@ -92,6 +98,7 @@ _KNOWN_KWARGS = [
     "route_id",
     "skip",
     "storage_url",
+    "subaccount_id",
     "tag",
     "tag_name",
     "tags",
@@ -107,106 +114,168 @@ _KNOWN_KWARGS = [
     "whitelist_address",
 ]
 
+_PATH_ATTACK_SEEDS = [
+    "../",
+    "..\\",
+    "%2e%2e%2f",
+    "%2e%2e/",
+    "..%2f",
+    "%252e%252e%252f",
+    "....//",
+    "/absolute/root",
+    "C:\\windows\\system32",
+    "\x00",
+    "\x01\x00\x00\x00\x00\x00\x00\x01",
+    "https://attacker.evil/%2f..",
+    "xn--eckwd4c7c.xn--zckzah",
+]
+
 
 def _generate_chaotic_value(fdp: atheris.FuzzedDataProvider, depth: int = 0) -> Any:
-    """Structure-Aware Fuzzing Breakthrough:
-    Generates valid Python structures (dicts, lists, primitives) filled with chaotic data.
-    This bypasses initial type-checkers to penetrate deep URL interpolation logic.
-    """
-    if depth > 2:  # Prevent infinite recursion depth
+    """Structure-aware chaotic payload generator."""
+    if depth > 3:
         return fdp.ConsumeUnicodeNoSurrogates(16)
 
-    choice = fdp.ConsumeIntInRange(0, 5)
+    choice = fdp.ConsumeIntInRange(0, 7)
     if choice == 0:
-        return fdp.ConsumeUnicodeNoSurrogates(64)  # XSS/Path Traversal Strings
+        return fdp.ConsumeUnicodeNoSurrogates(64)
     if choice == 1:
-        return fdp.ConsumeInt(1000)  # Overflows/Negative ints
+        return fdp.PickValueInList(_PATH_ATTACK_SEEDS)
     if choice == 2:
-        return fdp.ConsumeBool()  # Booleans
+        return fdp.ConsumeIntInRange(-2147483648, 2147483647)
     if choice == 3:
-        return None  # Null injection
+        return fdp.ConsumeBool()
     if choice == 4:
-        # Fuzzed List
+        return None
+    if choice == 5:
         return [
             _generate_chaotic_value(fdp, depth + 1)
-            for _ in range(fdp.ConsumeIntInRange(0, 3))
+            for _ in range(fdp.ConsumeIntInRange(0, 4))
         ]
-    # Fuzzed Dictionary
-    return {
-        fdp.ConsumeUnicodeNoSurrogates(10): _generate_chaotic_value(fdp, depth + 1)
-        for _ in range(fdp.ConsumeIntInRange(0, 3))
-    }
+    if choice == 6:
+        return {
+            fdp.ConsumeUnicodeNoSurrogates(12): _generate_chaotic_value(fdp, depth + 1)
+            for _ in range(fdp.ConsumeIntInRange(0, 3))
+        }
+    return fdp.ConsumeBytes(16)
 
 
 def TestOneInput(data: bytes) -> None:
-    if len(data) < 20:
+    if len(data) < 12:
         return
 
     fdp = atheris.FuzzedDataProvider(data)
 
     handler: Any
-    if fdp.ConsumeIntInRange(1, 100) <= 20:
-        handler = fdp.ConsumeUnicodeNoSurrogates(16)
+    if fdp.ConsumeIntInRange(1, 100) <= 15:
+        handler = handle_default
     else:
         handler = fdp.PickValueInList(_ALL_HANDLERS)
 
-    url_config: dict[str, Any] = {
-        "base": fdp.ConsumeUnicodeNoSurrogates(32) or "https://api.mailgun.net/v3",
-        "keys": [
-            fdp.ConsumeUnicodeNoSurrogates(16)
-            for _ in range(fdp.ConsumeIntInRange(0, 3))
-        ],
-    }
+    # Base URL configuration variants
+    base_choice = fdp.ConsumeIntInRange(0, 4)
+    if base_choice == 0:
+        base_url = "https://api.mailgun.net/v3"
+    elif base_choice == 1:
+        base_url = "https://api.eu.mailgun.net/v4"
+    elif base_choice == 2:
+        base_url = fdp.ConsumeUnicodeNoSurrogates(48)
+    elif base_choice == 3:
+        base_url = ""
+    else:
+        base_url = "http://127.0.0.1:8080/prefix"
 
-    domain: str | None = (
-        fdp.ConsumeUnicodeNoSurrogates(32) if fdp.ConsumeBool() else None
-    )
-    method: str | None = fdp.PickValueInList(
-        ["delete", "get", "patch", "post", "put", None]
-    )
+    # Multi-segment path keys fuzzing
+    key_count = fdp.ConsumeIntInRange(0, 4)
+    url_keys: list[Any] = []
+    for _ in range(key_count):
+        if fdp.ConsumeBool():
+            url_keys.append(fdp.PickValueInList(_PATH_ATTACK_SEEDS))
+        else:
+            url_keys.append(fdp.ConsumeUnicodeNoSurrogates(16))
+
+    url_config: dict[str, Any] = {"base": base_url, "keys": url_keys}
+
+    # Structure corruption on url_config itself (10% of inputs)
+    if fdp.ConsumeIntInRange(1, 100) <= 10:
+        if fdp.ConsumeBool():
+            url_config.pop("keys", None)
+        else:
+            url_config["keys"] = _generate_chaotic_value(fdp, depth=2)
+
+    # Domain fuzzing with path injection and IDN edge cases
+    domain: Any = None
+    if fdp.ConsumeBool():
+        domain_choice = fdp.ConsumeIntInRange(0, 3)
+        if domain_choice == 0:
+            domain = fdp.ConsumeUnicodeNoSurrogates(32)
+        elif domain_choice == 1:
+            domain = fdp.PickValueInList(_PATH_ATTACK_SEEDS)
+        elif domain_choice == 2:
+            domain = "example.com"
+        else:
+            domain = fdp.ConsumeInt(500)
+
+    # HTTP method variations including casing, whitespace, and injection
+    method_choices = [
+        "get",
+        "post",
+        "put",
+        "delete",
+        "patch",
+        "GET",
+        "POST",
+        "DELETE",
+        "HEAD",
+        "OPTIONS",
+        "get\r\n",
+        "post ",
+        None,
+    ]
+    method: Any = fdp.PickValueInList(method_choices)
 
     kwargs: dict[str, Any] = {}
-    for _ in range(fdp.ConsumeIntInRange(0, 5)):
+    num_kwargs = fdp.ConsumeIntInRange(0, 7)
+    for _ in range(num_kwargs):
         key = (
             fdp.PickValueInList(_KNOWN_KWARGS)
             if fdp.ConsumeBool()
-            else fdp.ConsumeUnicodeNoSurrogates(10)
+            else fdp.ConsumeUnicodeNoSurrogates(12)
         )
 
-        # Structure-aware injection for V4 Webhook upgrades
         if key == "event_types":
             kwargs[key] = [
-                fdp.ConsumeUnicodeNoSurrogates(5),
-                fdp.ConsumeUnicodeNoSurrogates(5),
+                fdp.ConsumeUnicodeNoSurrogates(8)
+                for _ in range(fdp.ConsumeIntInRange(1, 4))
             ]
         elif key == "filters" and fdp.ConsumeBool():
-            kwargs[key] = {"url": fdp.ConsumeUnicodeNoSurrogates(20)}
+            kwargs[key] = {
+                "url": fdp.ConsumeUnicodeNoSurrogates(24),
+                "resolution": fdp.PickValueInList(["hour", "day", "month", None]),
+            }
         else:
             kwargs[key] = _generate_chaotic_value(fdp)
 
-    # Randomize method vs _method parameter binding (Testing our recent fix)
-    method_val = fdp.PickValueInList(["delete", "get", "patch", "post", "put", None])
+    # Test method parameter priority: method vs _method
     if fdp.ConsumeBool():
-        kwargs["_method"] = method_val
+        kwargs["_method"] = method
         method = None
-    else:
-        method = method_val
 
     try:
         result = handler(url_config, domain, method, **kwargs)
         if not isinstance(result, str):
             handler_name = getattr(handler, "__name__", type(handler).__name__)
             raise RuntimeError(
-                f"CRASH: Handler {handler_name} returned non-string: {type(result)}"
+                f"CONTRACT VIOLATION: Handler {handler_name} returned non-string: {type(result)}"
             )
-
-    # REMOVED: AttributeError, KeyError
     except (ApiError, TypeError, ValueError):
-        # SECURITY SUCCESS: Intercepted malformed path combinations
+        # Expected rejections for malformed URLs, missing keys, or unsupported methods
         pass
     except Exception as e:
         handler_name = getattr(handler, "__name__", type(handler).__name__)
-        raise RuntimeError(f"UNHANDLED CRASH in {handler_name}: {e}") from e
+        raise RuntimeError(
+            f"UNHANDLED CRASH in {handler_name} with kwargs {list(kwargs.keys())}: {e}"
+        ) from e
 
 
 if __name__ == "__main__":

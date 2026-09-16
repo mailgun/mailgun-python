@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-"""Mailgun Enhanced Fuzzer Seed Harvester
-Harvests successful AND error-case payloads to seed the fuzzing corpus.
+"""Mailgun Enhanced Fuzzer Seed Harvester.
+
+Harvests realistic payloads from live API or generates high-entropy offline
+synthetic seeds for each fuzzer corpus directory to bootstrap libFuzzer.
 """
 
 import json
@@ -8,144 +10,194 @@ import os
 from pathlib import Path
 from typing import Any
 
-import requests
-
-
-# Ensure configuration is robust
+# Domain and API key configuration
 API_KEY = os.environ.get("APIKEY")
 DOMAIN = os.environ.get("DOMAIN", "sandbox-fuzz.mailgun.org")
 
-# Schema-aware targets based on Mailgun API documentation
 TARGETS: list[dict[str, Any]] = [
     {
-        "method": "GET",
-        "name": "bounces_get",
-        "url": f"https://api.mailgun.net/v3/{DOMAIN}/bounces",
-    },
-    {
-        "data": {"from": "fuzz@example.com", "subject": "fuzz", "to": "bad-address"},
-        "method": "POST",
         "name": "messages_post",
+        "method": "POST",
         "url": f"https://api.mailgun.net/v3/{DOMAIN}/messages",
+        "data": {
+            "from": f"fuzz@{DOMAIN}",
+            "to": "test@example.com",
+            "subject": "Fuzz Seed Email",
+            "text": "Hello world from fuzzer seed harvester",
+            "o:tag": "fuzz-seed",
+            "o:tracking": "yes",
+        },
     },
     {
+        "name": "bounces_get",
         "method": "GET",
-        "name": "routes_get",
-        "url": "https://api.mailgun.net/v3/routes",
+        "url": f"https://api.mailgun.net/v3/{DOMAIN}/bounces",
+        "params": {"limit": 5},
     },
     {
+        "name": "domains_get",
         "method": "GET",
-        "name": "validate_get",
-        "params": {"address": "test@example.com"},
-        "url": "https://api.mailgun.net/v4/address/validate",
+        "url": "https://api.mailgun.net/v4/domains",
+        "params": {"limit": 10},
     },
-    # NEW ENDPOINTS ADDED BELOW
     {
+        "name": "events_get",
         "method": "GET",
+        "url": f"https://api.mailgun.net/v3/{DOMAIN}/events",
+        "params": {"limit": 10, "ascending": "yes"},
+    },
+    {
         "name": "webhooks_get",
+        "method": "GET",
         "url": f"https://api.mailgun.net/v3/domains/{DOMAIN}/webhooks",
     },
     {
+        "name": "validate_get",
         "method": "GET",
-        "name": "domains_get",
-        "url": "https://api.mailgun.net/v4/domains",
+        "url": "https://api.mailgun.net/v4/address/validate",
+        "params": {"address": "fuzz.deliverability@gmail.com"},
     },
     {
-        "method": "GET",
-        "name": "events_get",
-        "params": {"limit": 5},
-        "url": f"https://api.mailgun.net/v3/{DOMAIN}/events",
-    },
-    {
-        "method": "GET",
-        "name": "lists_get",
-        "url": "https://api.mailgun.net/v3/lists",
-    },
-    {
-        "method": "GET",
         "name": "templates_get",
+        "method": "GET",
         "url": f"https://api.mailgun.net/v3/{DOMAIN}/templates",
+        "params": {"limit": 5},
     },
     {
-        "method": "GET",
         "name": "ips_get",
+        "method": "GET",
         "url": "https://api.mailgun.net/v3/ips",
     },
     {
+        "name": "routes_get",
         "method": "GET",
-        "name": "ip_pools_get",
-        "url": "https://api.mailgun.net/v3/ip_pools",
+        "url": "https://api.mailgun.net/v3/routes",
+        "params": {"limit": 5},
     },
-    {
-        "method": "GET",
-        "name": "stats_get",
-        "params": {"event": ["accepted", "delivered", "failed"]},
-        "url": f"https://api.mailgun.net/v3/{DOMAIN}/stats/total",
-    }
 ]
 
-# Map specific API targets to their respective fuzzer corpus directories
 CORPUS_MAP: dict[str, list[str]] = {
     "fuzz_handlers": [
-        "bounces_get", "routes_get", "webhooks_get", "domains_get",
-        "lists_get", "templates_get", "ips_get", "ip_pools_get", "stats_get"
+        "bounces_get",
+        "domains_get",
+        "events_get",
+        "ips_get",
+        "messages_post",
+        "routes_get",
+        "templates_get",
+        "validate_get",
+        "webhooks_get",
     ],
-    "fuzz_async_client": [
-        "messages_post", "events_get", "validate_get", "domains_get"
-    ],
-    "fuzz_error_parser": [
-        # Allows the error parser to learn from any 400/401/404 payloads returned
-        "messages_post", "validate_get", "templates_get"
-    ]
+    "fuzz_async_client": ["messages_post", "events_get", "domains_get"],
+    "fuzz_error_parser": ["messages_post", "validate_get", "templates_get"],
+    "fuzz_structure_aware": ["domains_get", "webhooks_get", "messages_post"],
+    "fuzz_semantic_payloads": ["messages_post"],
 }
 
+_SYNTHETIC_SEEDS: dict[str, list[dict[str, Any]]] = {
+    "messages_post": [
+        {
+            "from": "Admin <admin@example.com>",
+            "to": ["user1@example.com", "user2@example.com"],
+            "subject": "Seed Subject with Variables",
+            "text": "Hello %recipient.name%",
+            "recipient-variables": '{"user1@example.com": {"name": "Alice"}}',
+            "o:tag": ["newsletter", "fuzz"],
+            "o:tracking": True,
+            "o:deliverytime": "Fri, 25 Oct 2026 23:10:10 -0000",
+        },
+        {
+            "from": "spoofed@evil.com\r\nBcc: victim@target.com",
+            "to": "test@[127.0.0.1]",
+            "subject": "CRLF Injection Probe",
+            "text": "Payload test",
+        },
+    ],
+    "events_get": [
+        {
+            "items": [
+                {
+                    "event": "delivered",
+                    "id": "A_EV_12345",
+                    "timestamp": 1714000000.0,
+                    "recipient": "user@example.com",
+                }
+            ],
+            "paging": {
+                "next": "https://api.mailgun.net/v3/events?page=eyJwIjoxfQ==&limit=10",
+                "previous": "https://api.mailgun.net/v3/events?page=eyJwIjowfQ==",
+            },
+        }
+    ],
+    "webhooks_get": [
+        {
+            "webhook": {
+                "url": "https://example.com/webhook",
+                "urls": ["https://example.com/webhook"],
+            }
+        }
+    ],
+    "validate_get": [
+        {
+            "address": "test@example.com",
+            "is_valid": True,
+            "parts": {"domain": "example.com", "local_part": "test"},
+            "risk": "low",
+        }
+    ],
+}
+
+
+def _save_corpus_payload(target_name: str, payload_bytes: bytes, prefix: str) -> None:
+    """Saves generated or harvested payload into mapped corpus directories."""
+    for folder, mapped_targets in CORPUS_MAP.items():
+        if target_name in mapped_targets:
+            dest_dir = Path("tests") / "fuzz" / "corpus" / folder
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            filename = f"{prefix}_{target_name}.json"
+            file_path = dest_dir / filename
+            file_path.write_bytes(payload_bytes)
+            print(f"  [SAVED] {file_path}")
+
+
 def harvest_seeds() -> None:
+    """Main execution router: queries live endpoints if API_KEY is set, else synthesizes."""
     if not API_KEY:
-        print("❌ Error: APIKEY environment variable is missing.")
+        print("[INFO] No APIKEY provided. Generating high-entropy offline synthetic seeds...")
+        for target_name, seed_list in _SYNTHETIC_SEEDS.items():
+            for idx, seed_obj in enumerate(seed_list):
+                payload_bytes = json.dumps(seed_obj, indent=2).encode("utf-8")
+                _save_corpus_payload(target_name, payload_bytes, prefix=f"synthetic_{idx}")
+        print("[SUCCESS] Synthetic seed generation complete.")
         return
 
+    import requests
+
     auth = ("api", API_KEY)
+    print(f"[INFO] Harvesting live seeds using API key against domain: {DOMAIN}")
 
     for target in TARGETS:
         method = target.get("method", "GET")
         url = target["url"]
-        print(f"📡 Harvesting {method} {url}...")
+        print(f"📡 Querying {method} {url}...")
 
         try:
-            # Capture data to force various API responses (Success vs Error)
             if method == "POST":
-                resp = requests.post(
-                    url, auth=auth, data=target.get("data"), timeout=10
-                )
+                resp = requests.post(url, auth=auth, data=target.get("data"), timeout=8)
             else:
-                resp = requests.get(
-                    url, auth=auth, params=target.get("params"), timeout=10
-                )
+                resp = requests.get(url, auth=auth, params=target.get("params"), timeout=8)
 
-            # Save the raw JSON payload
-            # We save the status code in the filename so the fuzzer learns
-            # to distinguish between success and error schemas
             try:
-                parsed_json = resp.json()
+                data = resp.json()
             except ValueError:
-                print(f"  ⚠️ Warning: Non-JSON response for {target['name']} (HTTP {resp.status_code})")
-                parsed_json = {"raw_text": resp.text}
+                data = {"raw_content": resp.text}
 
-            payload = json.dumps(parsed_json, indent=2).encode("utf-8")
+            payload_bytes = json.dumps(data, indent=2).encode("utf-8")
+            _save_corpus_payload(target["name"], payload_bytes, prefix=f"http_{resp.status_code}")
 
-            for folder, target_names in CORPUS_MAP.items():
-                if target["name"] in target_names:
-                    dir_path = Path("tests") / "fuzz" / "corpus" / folder
-                    dir_path.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            print(f"  [WARN] Failed to harvest {target['name']}: {e}")
 
-                    filename = f"{resp.status_code}_{target['name']}.json"
-                    file_path = dir_path / filename
-                    file_path.write_bytes(payload)
-
-                    print(f"  ✅ Saved {filename} to {folder}")
-
-        except Exception as e:  # noqa: BLE001
-            print(f"  ❌ Failed {target['name']}: {e}")
 
 if __name__ == "__main__":
     harvest_seeds()

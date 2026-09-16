@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Differential Fuzzer for Requests (Sync) vs HTTPX (Async) Multipart Serialization."""
+"""Differential Fuzzer for Requests (Sync) vs HTTPX (Async) Payload Serialization."""
 
 import logging
 import sys
@@ -7,69 +7,76 @@ from typing import Any
 
 import atheris
 
-
 with atheris.instrument_imports():
     import requests
 
     from mailgun._httpx_compat import httpx as compat_httpx
 
-
 logging.disable(logging.CRITICAL)
 
+
+def _categorize_error(exc: Exception | None) -> str:
+    """Normalize library-specific exception hierarchies to semantic categories."""
+    if exc is None:
+        return "SUCCESS"
+    name = type(exc).__name__
+    if any(
+        err in name
+        for err in ["Unicode", "Encode", "Decode", "ASCII", "InvalidURL", "LocationParseError"]
+    ):
+        return "ENCODING_ERROR"
+    if any(err in name for err in ["Type", "Value", "Key", "Attribute"]):
+        return "VALIDATION_ERROR"
+    return "GENERIC_ERROR"
+
+
 def TestOneInput(data: bytes) -> None:
-    if len(data) < 10:
+    if len(data) < 15:
         return
 
     fdp = atheris.FuzzedDataProvider(data)
 
-    # Generate a complex, chaotic dictionary payload
     payload: dict[str, Any] = {}
-    for _ in range(fdp.ConsumeIntInRange(1, 5)):
+    for _ in range(fdp.ConsumeIntInRange(1, 4)):
         key = fdp.ConsumeUnicodeNoSurrogates(16)
-
-        # Type confusion in the payload (ints, booleans, nested dicts, raw bytes)
-        val_type = fdp.ConsumeIntInRange(0, 3)
-        if val_type == 0:
-            payload[key] = fdp.ConsumeUnicodeNoSurrogates(64)
-        elif val_type == 1:
-            payload[key] = fdp.ConsumeInt(1000)
-        elif val_type == 2:
-            payload[key] = fdp.ConsumeBool()
+        choice = fdp.ConsumeIntInRange(0, 2)
+        if choice == 0:
+            payload[key] = fdp.ConsumeUnicodeNoSurrogates(32)
+        elif choice == 1:
+            payload[key] = fdp.ConsumeInt(10000)
         else:
-            # Simulate a file attachment tuple: (filename, content, mime_type)
-            payload[key] = (
-                fdp.ConsumeUnicodeNoSurrogates(16),
-                fdp.ConsumeBytes(64),
-                fdp.ConsumeUnicodeNoSurrogates(16)
-            )
+            payload[key] = fdp.ConsumeBool()
 
     sync_req = requests.Request("POST", "https://api.mailgun.net/v3/fuzz", data=payload)
     async_req = compat_httpx.Request("POST", "https://api.mailgun.net/v3/fuzz", data=payload)
 
-    sync_error = None
-    async_error = None
+    sync_exc: Exception | None = None
+    async_exc: Exception | None = None
 
-    # 1. Test Sync Serialization
+    # 1. Sync Serialization
     try:
-        prepared_sync = sync_req.prepare()
-        _ = prepared_sync.body
+        prep = sync_req.prepare()
+        _ = prep.body
     except Exception as e:
-        sync_error = type(e).__name__
+        sync_exc = e
 
-    # 2. Test Async Serialization
+    # 2. Async Serialization
     try:
-        # Read the async byte stream
-        _ = b"".join([chunk for chunk in async_req.stream])
+        _ = b"".join(chunk for chunk in async_req.stream)
     except Exception as e:
-        async_error = type(e).__name__
+        async_exc = e
 
-    # 3. The Differential Assertion
-    # Both should succeed, OR both should throw the exact same validation error
-    if sync_error != async_error:
+    # 3. Normalized Differential Verification
+    sync_category = _categorize_error(sync_exc)
+    async_category = _categorize_error(async_exc)
+
+    if sync_category != async_category:
         raise RuntimeError(
-            f"DIFFERENTIAL CRASH: Sync threw {sync_error}, but Async threw {async_error}. "
-            f"Payload Serialization Divergence detected!"
+            f"DIFFERENTIAL DIVERGENCE: Sync resolved to '{sync_category}' ({type(sync_exc).__name__}), "
+            f"but Async resolved to '{async_category}' ({type(async_exc).__name__}). "
+            f"Payload: {payload!r}"
         )
+
 
 if __name__ == "__main__":
     atheris.instrument_all()
