@@ -22,7 +22,7 @@ class ExplodingDescriptor:
     """Simulates dynamic attributes or descriptors that raise exceptions when accessed."""
 
     def __getattr__(self, item: str) -> Any:
-        raise RuntimeError(f"Hostile descriptor access: {item}")
+        raise AttributeError(f"Hostile descriptor access: {item}")
 
     def __repr__(self) -> str:
         raise ValueError("Hostile __repr__ evaluation")

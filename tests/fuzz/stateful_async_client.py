@@ -55,6 +55,7 @@ class MailgunAsyncStateMachine(RuleBasedStateMachine):
             elif hasattr(ep, "list"):
                 self.loop.run_until_complete(ep.list(domain=domain))
         except (ApiError, ValueError, TypeError, KeyError):
+            # Expected during fuzzing with malformed/invalid inputs; continue exploring state transitions.
             pass
 
     @rule(  # type: ignore[untyped-decorator]
@@ -83,6 +84,7 @@ class MailgunAsyncStateMachine(RuleBasedStateMachine):
                 self.created_domains.add(domain)
 
         except (ApiError, ValueError, TypeError, KeyError):
+            # Expected during fuzzing with malformed/invalid inputs; continue exploring state transitions.
             pass
 
     @rule(domain=evil_payloads())  # type: ignore[untyped-decorator] # pyright: ignore[reportCallIssue]
@@ -95,6 +97,8 @@ class MailgunAsyncStateMachine(RuleBasedStateMachine):
             self.loop.run_until_complete(self.client.domains.delete(domain=domain))
             self.created_domains.discard(domain)
         except (ApiError, ValueError, TypeError, KeyError, AttributeError):
+            # Expected during fuzzing: malformed inputs or endpoint state can
+            # raise; continue exploring subsequent state transitions.
             pass
 
     @rule(  # type: ignore[untyped-decorator]

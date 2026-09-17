@@ -100,7 +100,6 @@ def TestOneInput(data: bytes) -> None:
     fdp = atheris.FuzzedDataProvider(data)
 
     mock_auth_token = "".join(["fuzz-", "dummy-", "token"])
-    client = Client(auth=("api", mock_auth_token), dry_run=True)
     domain = fdp.ConsumeUnicodeNoSurrogates(20) or "sandbox.mailgun.org"
 
     payload = _generate_semantic_message(fdp)
@@ -112,18 +111,16 @@ def TestOneInput(data: bytes) -> None:
         filename = fdp.ConsumeUnicodeNoSurrogates(16) or "attachment.bin"
         files = [("attachment", (filename, io.BytesIO(file_bytes)))]
 
-    try:
-        client.messages.create(domain=domain, data=payload, files=files)
-    except (ApiError, TypeError, ValueError):
-        # Clean defensive rejection during local validation or dry-run assembly
-        pass
-    except RecursionError:
-        raise RuntimeError("CRITICAL: Infinite recursion during payload serialization")
-    except Exception as e:
-        raise RuntimeError(f"SEMANTIC CRASH: {type(e).__name__} - {e}") from e
-    finally:
-        client.close()
-
+    with Client(auth=("api", mock_auth_token), dry_run=True) as client:
+        try:
+            client.messages.create(domain=domain, data=payload, files=files)
+        except (ApiError, TypeError, ValueError):
+            # Clean defensive rejection during local validation or dry-run assembly
+            pass
+        except RecursionError:
+            raise RuntimeError("CRITICAL: Infinite recursion during payload serialization")
+        except Exception as e:
+            raise RuntimeError(f"SEMANTIC CRASH: {type(e).__name__} - {e}") from e
 
 if __name__ == "__main__":
     atheris.instrument_all()

@@ -13,7 +13,6 @@ import atheris
 
 with atheris.instrument_imports():
     from mailgun.builders import ChunkedStreamer, MailgunMessageBuilder
-    from mailgun.security import IdempotencyGuard
 
 logging.disable(logging.CRITICAL)
 

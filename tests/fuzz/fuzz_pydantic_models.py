@@ -6,7 +6,6 @@ custom parameter prefixes (h:, v:, o:), delivery time boundaries, and JSON varia
 """
 
 import atexit
-import json
 import logging
 import sys
 from typing import Any
