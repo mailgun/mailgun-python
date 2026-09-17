@@ -105,6 +105,8 @@ def TestOneInput(data: bytes) -> None:
                                 client.domains.get(domain=domain)
                                 active_domains.append(domain)
                             except ApiError:
+                                # Expected during fuzzing: invalid/nonexistent domains
+                                # should not stop state exploration.
                                 pass
 
                     # Action 1: Send Message with Cyclic Custom Variables
@@ -124,11 +126,15 @@ def TestOneInput(data: bytes) -> None:
                         try:
                             IdempotencyGuard.generate_key(target_domain, msg_payload)
                         except (TypeError, ValueError):
+                            # Expected during fuzzing: invalid/nonexistent domains
+                            # should not stop state exploration.
                             pass
 
                         try:
                             client.messages.create(domain=target_domain, data=msg_payload)
                         except ApiError:
+                            # Expected during fuzzing: invalid/nonexistent domains
+                            # should not stop state exploration.
                             pass
 
                     # Action 2: Teardown Domain
@@ -137,6 +143,8 @@ def TestOneInput(data: bytes) -> None:
                         try:
                             client.domains.delete(domain=target_domain)
                         except ApiError:
+                            # Expected during fuzzing: invalid/nonexistent domains
+                            # should not stop state exploration.
                             pass
 
                     # Action 3: Ping
@@ -144,6 +152,8 @@ def TestOneInput(data: bytes) -> None:
                         try:
                             client.ping()
                         except ApiError:
+                            # Expected during fuzzing: invalid/nonexistent domains
+                            # should not stop state exploration.
                             pass
 
                     # Action 4: In-Memory Stream Pointer Preservation Sequence
@@ -187,6 +197,8 @@ def TestOneInput(data: bytes) -> None:
                                 try:
                                     next(stream_gen)
                                 except (StopIteration, ApiError):
+                                    # Expected during fuzzing: invalid/nonexistent domains
+                                    # should not stop state exploration.
                                     break
 
                     # Action 6: SpamGuard Deliverability Parse
@@ -196,6 +208,8 @@ def TestOneInput(data: bytes) -> None:
                             report = SpamGuard.check_html(fuzzed_html)
                             assert isinstance(report, dict)
                         except (TypeError, ValueError):
+                            # Expected during fuzzing: invalid/nonexistent domains
+                            # should not stop state exploration.
                             pass
 
                     # Action 7: Timeout Sanitizer Overflow
@@ -204,6 +218,8 @@ def TestOneInput(data: bytes) -> None:
                         try:
                             SecurityGuard.sanitize_timeout(timeout_val)
                         except (TypeError, ValueError):
+                            # Expected during fuzzing: invalid/nonexistent domains
+                            # should not stop state exploration.
                             pass
 
                     # Action 8: Post-Close Invocation Invariant Check
@@ -212,6 +228,8 @@ def TestOneInput(data: bytes) -> None:
                         try:
                             client.ping()
                         except (ApiError, AttributeError, RuntimeError):
+                            # Expected during fuzzing: invalid/nonexistent domains
+                            # should not stop state exploration.
                             pass
                         break
 

@@ -143,6 +143,7 @@ def TestOneInput(data: bytes) -> None:
                             f"REPLAY VULNERABILITY (CWE-294): Webhook with delta {time_diff:.1f}s accepted!"
                         )
             except (ValueError, TypeError, OverflowError):
+                # Fuzzed timestamp is intentionally non-numeric/out-of-range; skip replay-window invariant.
                 pass
 
     except (ValueError, TypeError, AttributeError):
