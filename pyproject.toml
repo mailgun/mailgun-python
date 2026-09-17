@@ -178,7 +178,6 @@ docstring-code-format = true
 select = [ "ALL" ]
 ignore = [
     # --- Formatter Conflicts ---
-    "missing-trailing-comma", # Missing trailing comma (Conflicts with ruff-format)
     "single-line-implicit-string-concatenation", # Implicit string concatenation (Conflicts with ruff-format)
     "incorrect-blank-line-before-class",   # one-blank-line-before-class (conflicts with D211)
     "multi-line-summary-second-line",   # multi-line-summary-second-line (conflicts with D212)
@@ -310,6 +309,7 @@ include = [ "mailgun" ]
 exclude = [ "mailgun/examples/*", "**/__pycache__" ]
 reportAttributeAccessIssue = false
 reportMissingImports = false
+reportMissingModuleSource = "none"
 
 [tool.typos.default.extend-words]
 requestor = "requestor"

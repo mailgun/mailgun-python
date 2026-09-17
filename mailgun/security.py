@@ -24,6 +24,7 @@ logger = get_logger(__name__)
 
 # Constants for API error handling and logging (fixes Ruff PLR2004)
 _AUTH_TUPLE_LEN: Final = 2
+_MAX_IDEMPOTENCY_DEPTH: Final = 50
 # Regex to detect any ASCII control character EXCEPT horizontal tab (\x09)
 # Compliant with RFC 9110 Section 5.5
 _CONTROL_CHAR_RE: Final = re.compile(r"[\x00-\x08\x0a-\x1f\x7f]")
@@ -32,7 +33,7 @@ _PATH_CONTROL_CHAR_RE: Final = re.compile(r"[\x00-\x1f\x7f]")
 _XSS_PATTERN: Final = re.compile(r"<(script|svg)|javascript:|onload=", re.IGNORECASE)
 
 ALLOWED_HOSTS: Final = frozenset(
-    {"mailgun.net", "mailgun.org", "mailgun.com", "localhost", "127.0.0.1"}
+    {"mailgun.net", "mailgun.org", "mailgun.com", "localhost", "127.0.0.1"},
 )
 ALLOWED_SUFFIXES: Final = (".mailgun.net", ".mailgun.org", ".mailgun.com")
 ALLOWED_SCHEMES: Final = frozenset({"https", "http"})
@@ -67,9 +68,7 @@ class SecureHTTPAdapter(HTTPAdapter):
         Returns:
             Any: The proxy manager instance.
         """
-        # Inject our hardened SSL context into the proxy kwargs
         proxy_kwargs["ssl_context"] = self._get_secure_ssl_context()
-        # Pass it up to the parent class to actually construct the ProxyManager
         return super().proxy_manager_for(proxy, **proxy_kwargs)
 
 
@@ -90,15 +89,18 @@ class SecurityGuard:
     easy to extract into a dedicated security module in future releases.
     """
 
+    ALLOWED_SCHEMES: Final[frozenset[str]] = frozenset({"https", "http"})
     ALLOWED_HTTP_METHODS: Final[frozenset[str]] = frozenset(
-        {"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"}
+        {"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"},
     )
     ALLOWED_API_HOSTS: Final[tuple[str, ...]] = (
         "mailgun.net",
         "mailgun.org",
+        "mailgun.com",
         "localhost",
         "127.0.0.1",
     )
+    ALLOWED_SUFFIXES: tuple[str, ...] = (".mailgun.net", ".mailgun.org", ".mailgun.com")
     ALLOWED_KWARGS: Final[frozenset[str]] = frozenset({"proxies", "cert"})
     SAFE_KEY_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[a-z0-9_]+$")
     CRLF_SLASH_PATTERN: Final[re.Pattern[str]] = re.compile(r"[\r\n/\\]+")
@@ -122,6 +124,10 @@ class SecurityGuard:
         if not parsed.scheme:
             raw_url = f"https://{raw_url}"
             parsed = urlparse(raw_url)
+
+        if parsed.scheme not in cls.ALLOWED_SCHEMES:
+            msg = f"Security Alert (CWE-918): Forbidden URL scheme '{parsed.scheme}'."
+            raise ValueError(msg)
 
         if parsed.scheme == "http" and parsed.hostname not in {"localhost", "127.0.0.1"}:
             msg = (
@@ -188,7 +194,7 @@ class SecurityGuard:
 
     @classmethod
     def sanitize_domain(cls, domain: str | None) -> str | None:
-        """Protect against Path Traversal in URL construction.
+        """Protect against Path Traversal and Encoding Bypasses in URL construction.
 
         Args:
             domain: Target domain name to sanitize.
@@ -197,20 +203,31 @@ class SecurityGuard:
             The sanitized domain name or None.
 
         Raises:
-            ValueError: If path traversal characters are detected.
+            ValueError: If path traversal characters or excessive encodings are detected.
         """
         if not domain:
             return None
 
-        decoded_domain = unquote(domain)
+        decoded = str(domain)
+        for _ in range(3):
+            new_decoded = unquote(decoded)
+            if new_decoded == decoded:
+                break
+            decoded = new_decoded
+        else:
+            raise ValueError("Security Alert (CWE-116): Excessive URL encoding detected.")
 
-        # Poka-yoke: Actively strip all slashes and newlines (Advanced Traversal & CRLF)
-        safe_domain = cls.CRLF_SLASH_PATTERN.sub("", decoded_domain).strip()
+        decoded = unicodedata.normalize("NFKC", decoded)
 
+        # Poka-yoke: Cut CRLF and slashes, normalize whitespaces
+        safe_domain = cls.CRLF_SLASH_PATTERN.sub("", decoded).strip()
+
+        # Check path traversal after removing slashes ("mytest.com/....//path" -> "mytest.com....path")
         if ".." in safe_domain:
             raise ValueError(
-                "CRITICAL SECURITY: Path traversal characters detected in domain parameter."
+                "CRITICAL SECURITY: Path traversal characters detected in domain parameter.",
             )
+
         return safe_domain
 
     @classmethod
@@ -237,8 +254,8 @@ class SecurityGuard:
         """Prevent Infinite Timeout Thread Exhaustion (DoS).
 
         Strict Creation-Time Timeout Constraints & Float Validation.
-        Prevents thread pool exhaustion from infinite blocking (CWE-400).
-        Enforces a strict maximum boundary of 300 seconds.
+        Prevents thread pool exhaustion from infinite blocking.
+        Enforces a strict maximum boundary of 300 seconds (CWE-400).
 
         Args:
             timeout: The requested timeout value.
@@ -247,8 +264,7 @@ class SecurityGuard:
             The safely verified timeout value.
 
         Raises:
-            ValueError: If the timeout is None, negative, zero, non-finite,
-                exceeds 300 seconds, or a tuple with an incorrect number of elements.
+            ValueError: If timeout is None, non-finite, out of bounds, or an invalid tuple.
         """
         if timeout is None:
             msg = (
@@ -277,7 +293,11 @@ class SecurityGuard:
                 msg = f"Timeout must be a numeric value, got {type(val).__name__}"
                 raise TypeError(msg)
 
-            f_val = float(val)
+            # In SecurityGuard._validate_float (mailgun/security.py)
+            try:
+                f_val = float(val)
+            except OverflowError as e:
+                raise ValueError("Timeout value exceeds maximum scalar float capacity.") from e
 
             if math.isnan(f_val) or math.isinf(f_val):
                 raise ValueError("Timeout must be a finite number.")
@@ -285,7 +305,7 @@ class SecurityGuard:
                 raise ValueError("Timeout must be a strictly positive finite number.")
             if f_val > 300.0:  # noqa: PLR2004
                 raise ValueError(
-                    "Security Alert: Timeout exceeds maximum allowed boundary of 300 seconds."
+                    "Security Alert: Timeout exceeds maximum allowed boundary of 300 seconds.",
                 )
 
             return f_val
@@ -294,7 +314,7 @@ class SecurityGuard:
             expected_tuple_length = 2
             if len(timeout) != expected_tuple_length:
                 raise ValueError(
-                    "Timeout must be a tuple containing exactly two elements: (connect, read)."
+                    "Timeout must be a tuple containing exactly two elements: (connect, read).",
                 )
             return _validate_float(timeout[0]), _validate_float(timeout[1])
 
@@ -313,26 +333,70 @@ class SecurityGuard:
         return {k: v for k, v in kwargs.items() if k in cls.ALLOWED_KWARGS}
 
     @staticmethod
-    def sanitize_headers(headers: dict[str, str] | None) -> dict[str, str] | None:
-        """Poka-yoke: Prevent HTTP Header Injection (CWE-113).
+    def sanitize_headers(headers: dict[Any, Any] | None) -> dict[str, str] | None:
+        """Poka-yoke: Prevent HTTP Header Injection (CWE-113 / RFC 9110).
+
+        Validates header keys and values against CRLF injection, control characters,
+        and non-ASCII/non-Latin-1 encodings that cause runtime divergences across
+        HTTP engines (requests vs. httpx). Multi-value headers (lists/tuples/sets)
+        are safely joined into RFC 9110 comma-delimited strings.
+
+        Args:
+            headers: Dictionary of headers to sanitize, or None.
 
         Returns:
-            The sanitized headers dictionary, or None if no headers were provided.
+            The sanitized, strictly string-typed headers dictionary, or None if headers is None.
 
         Raises:
-            ValueError: If a CRLF injection pattern is detected in any header key or value.
+            ValueError: If CRLF sequences or forbidden control characters are detected.
+            UnicodeEncodeError: If headers cannot be encoded to ISO-8859-1 (Latin-1).
         """
-        if not headers:
-            return headers
-        for key, value in headers.items():
-            # Check both key and value
-            if "\n" in str(key) or "\r" in str(key) or "\n" in str(value) or "\r" in str(value):
-                # PEP 578: Emit Enterprise security telemetry before crashing
-                sys.audit("mailgun.security.header_injection", key)
+        if headers is None:
+            return None
 
-                msg = f"CRLF injection detected in header: {key}"
+        sanitized: dict[str, str] = {}
+        for raw_key, raw_value in headers.items():
+            if raw_key is None:
+                continue
+
+            k_str = str(raw_key)
+
+            # Flatten multi-value headers (e.g. list, tuple, set) per RFC 9110
+            if isinstance(raw_value, (list, tuple, set)):
+                items = [str(item) for item in raw_value if item is not None]
+                v_str = ", ".join(items)
+            elif raw_value is None:
+                v_str = ""
+            else:
+                v_str = str(raw_value)
+
+            # 1. Block CRLF and forbidden control characters (CWE-113 / RFC 9110)
+            has_crlf = any(c in k_str or c in v_str for c in ("\r", "\n"))
+            if has_crlf or _CONTROL_CHAR_RE.search(k_str) or _CONTROL_CHAR_RE.search(v_str):
+                if "sys" in sys.modules:
+                    sys.audit("mailgun.security.header_injection", k_str)
+
+                msg = f"CRLF injection detected in header: {k_str}"
                 raise ValueError(msg)
-        return headers
+
+            # 2. Strict HTTP Wire Encoding Check (RFC 9110 / ISO-8859-1 Parity)
+            try:
+                k_str.encode("latin-1")
+                v_str.encode("latin-1")
+            except UnicodeEncodeError as err:
+                if "sys" in sys.modules:
+                    sys.audit("mailgun.security.header_encoding_divergence", k_str)
+                raise UnicodeEncodeError(
+                    err.encoding,
+                    err.object,
+                    err.start,
+                    err.end,
+                    f"Header '{k_str}' contains characters outside the ISO-8859-1/Latin-1 standard",
+                ) from err
+
+            sanitized[k_str] = v_str
+
+        return sanitized
 
     @staticmethod
     def validate_no_control_characters(value: str, context: str = "Input") -> None:
@@ -342,7 +406,8 @@ class SecurityGuard:
             ValueError: If control characters are detected.
         """
         if _CONTROL_CHAR_RE.search(str(value)):
-            sys.audit("mailgun.security.control_characters", context)
+            if "sys" in sys.modules:
+                sys.audit("mailgun.security.control_characters", context)
 
             msg = f"Security Alert (CWE-20): Control characters detected in {context}: {value!r}"
             raise ValueError(msg)
@@ -355,13 +420,13 @@ class SecurityGuard:
             The URL-encoded path segment string.
 
         Raises:
-            TypeError: If the segment is not a string, int, or float.
+            TypeError: If the segment is a complex container or boolean.
             ValueError: If path traversal or invalid characters are detected.
         """
         if segment is None:
             return ""
 
-        if isinstance(segment, (dict, list, set, bool)):
+        if isinstance(segment, (dict, list, set, tuple, bool)):
             msg = f"Security Alert: Invalid segment type {type(segment).__name__}."
             raise TypeError(msg)
 
@@ -422,20 +487,22 @@ class SecurityGuard:
         if not hostname:
             raise ValueError("Security Alert: Missing hostname in URL.")
 
-        if scheme and scheme not in ALLOWED_SCHEMES:
-            sys.audit("mailgun.security.ssrf_scheme_violation", scheme)
+        if not scheme or scheme not in ALLOWED_SCHEMES:
+            if "sys" in sys.modules:
+                sys.audit("mailgun.security.ssrf_scheme_violation", scheme)
             msg = f"Security Alert (CWE-319): Forbidden URL scheme '{scheme}'."
             raise ValueError(msg)
 
         if scheme == "http" and hostname not in {"localhost", "127.0.0.1"}:
             raise ValueError(
-                "Security Alert (CWE-319): Plaintext HTTP is forbidden for external URLs."
+                "Security Alert (CWE-319): Plaintext HTTP is forbidden for external URLs.",
             )
 
         is_safe = hostname in ALLOWED_HOSTS or hostname.endswith(ALLOWED_SUFFIXES)
 
         if not is_safe:
-            sys.audit("mailgun.security.ssrf_attempt", url)
+            if "sys" in sys.modules:
+                sys.audit("mailgun.security.ssrf_attempt", url)
             msg = f"Security Alert (CWE-918): Untrusted external hostname '{hostname}'."
             raise ValueError(msg)
 
@@ -443,7 +510,8 @@ class SecurityGuard:
 
     @staticmethod
     def validate_attachment_path(
-        file_path: str | Path, safe_base_dir: str | Path | None = None
+        file_path: str | Path,
+        safe_base_dir: str | Path | None = None,
     ) -> Path:
         """Poka-yoke: Prevent Path Traversal (CWE-22) when reading attachments.
 
@@ -472,7 +540,7 @@ class SecurityGuard:
             # Fallback zero-trust checks if no specific sandbox is provided
             if ".." in original_path:
                 raise ValueError(
-                    "Security Alert (CWE-22): Path traversal tokens ('..') are explicitly forbidden."
+                    "Security Alert (CWE-22): Path traversal tokens ('..') are explicitly forbidden.",
                 )
 
             # Allow files residing in the OS temporary directory
@@ -486,7 +554,7 @@ class SecurityGuard:
             path_str = str(target_path).lower()
             if any(path_str.startswith(root.lower()) for root in forbidden_roots):
                 raise ValueError(
-                    "Security Alert: Access to sensitive OS system directories is explicitly forbidden."
+                    "Security Alert: Access to sensitive OS system directories is explicitly forbidden.",
                 )
 
             forbidden_components = {
@@ -501,7 +569,7 @@ class SecurityGuard:
             }
             if any(part.lower() in forbidden_components for part in target_path.parts):
                 raise ValueError(
-                    "Security Alert: Access to sensitive OS system directories is explicitly forbidden."
+                    "Security Alert: Access to sensitive OS system directories is explicitly forbidden.",
                 )
 
         return target_path
@@ -551,26 +619,25 @@ class SecurityGuard:
         token: str,
         timestamp: str | int,
         signature: str,
-        max_age_seconds: int = 300,
+        max_age_seconds: int = 900,
     ) -> bool:
         """Cryptographically verify a Mailgun webhook signature.
 
-        Protects against CWE-347 (Improper Verification), CWE-208 (Timing Attacks),
-        and CWE-294 (Capture-Replay Attacks).
+        Protects against CWE-347, CWE-208 (Timing Attacks), and CWE-294 (Replay Attacks).
 
         Args:
             signing_key: The Mailgun webhook signing key from the dashboard.
             token: The token provided in the webhook payload.
             timestamp: The timestamp provided in the webhook payload.
             signature: The signature provided in the webhook payload.
-            max_age_seconds: Maximum allowed age of the webhook in seconds.
+            max_age_seconds: Maximum allowed age in seconds (default 15m; <=0 disables TTL).
 
         Returns:
             True if the signature mathematically matches and is within TTL, False otherwise.
 
         Raises:
-            TypeError: If the signature components are invalid types.
-            ValueError: If the cryptographic payload or timestamp is invalid or out of bounds.
+            TypeError: If signature components are invalid types.
+            ValueError: If cryptographic payload or timestamp is invalid or out of bounds.
         """
         # 1. Type Guard: Prevent AttributeError and Type Confusion
         if not isinstance(token, str) or not isinstance(signature, str):
@@ -586,15 +653,16 @@ class SecurityGuard:
             raise TypeError("Security Alert: Webhook timestamp must be a valid integer.") from e
 
         # 3. TTL/Replay Attack Prevention (CWE-294)
-        try:
-            if abs(time.time() - ts_math) > max_age_seconds:
-                logger.warning("Security Alert (CWE-294): Webhook timestamp expired.")
-                return False
-        except (TypeError, ValueError, OverflowError) as e:
-            # If the timestamp is wildly out of bounds, it's invalid.
-            raise ValueError(
-                "Security Alert: Invalid cryptographic payload or timestamp out of bounds."
-            ) from e
+        if max_age_seconds > 0:
+            try:
+                if abs(time.time() - ts_math) > max_age_seconds:
+                    logger.warning("Security Alert (CWE-294): Webhook timestamp expired.")
+                    return False
+            except (TypeError, ValueError, OverflowError) as e:
+                # If the timestamp is wildly out of bounds, it's invalid.
+                raise ValueError(
+                    "Security Alert: Invalid cryptographic payload or timestamp out of bounds.",
+                ) from e
 
         # 4. Canonicalization: Encode securely
         if isinstance(signing_key, str):
@@ -618,20 +686,26 @@ class SecurityGuard:
         attempt to route to or build URLs with non-ASCII domains (e.g., Cyrillic).
 
         Args:
-            domain: The target domain name
+            domain: The target domain or email address.
 
         Returns:
-            The ASCII-safe Punycode string
+            The ASCII-safe Punycode string.
 
         Raises:
             ValueError: If invalid domain name encoding.
         """
-        if not domain:
+        if not domain or not isinstance(domain, str):
             return ""
 
+        if any(c in domain for c in ("\r", "\n", "\x00")):
+            msg = "Domain contains illegal control characters"
+            raise ValueError(msg)
+
         try:
-            # Encode the Unicode string to IDNA bytes, then decode to an ASCII string.
-            # If the domain is already ASCII (e.g., 'example.com'), it remains unchanged.
+            local_part, sep, domain_part = domain.rpartition("@")
+            if sep:
+                normalized_host = domain_part.encode("idna").decode("ascii")
+                return f"{local_part}@{normalized_host}"
             return domain.encode("idna").decode("ascii")
         except UnicodeError as e:
             # Fallback or raise a clear validation error if the domain is completely malformed
@@ -650,6 +724,8 @@ class SpamReport(TypedDict):
 class _SpamGuardParser(HTMLParser):
     """Internal lightning-fast HTML parser for detecting structural spam triggers."""
 
+    _BLOCKED_TAGS: Final = frozenset({"script", "iframe", "object", "embed", "applet"})
+
     def __init__(self) -> None:
         super().__init__()
         self.issues: list[str] = []
@@ -658,16 +734,26 @@ class _SpamGuardParser(HTMLParser):
         self.has_scripts = False
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        attr_dict = dict(attrs)
-
-        if tag == "img":
+        tag_lower = tag.lower()
+        if tag_lower == "img":
             self.image_count += 1
+            attr_dict = dict(attrs)
             if "alt" not in attr_dict or not attr_dict["alt"]:
                 self.has_alt_tags = False
 
-        if tag == "script":
+        if tag_lower in self._BLOCKED_TAGS:
             self.has_scripts = True
-            self.issues.append("CRITICAL: <script> tags are strictly forbidden in email clients.")
+            if tag_lower == "script":
+                self.issues.append(
+                    "CRITICAL: <script> tags are strictly forbidden in email clients.",
+                )
+            else:
+                self.issues.append(f"CRITICAL: Blocked executable tag: <{tag_lower}>")
+
+        for attr_name, _ in attrs:
+            if attr_name.lower().startswith("on"):
+                self.has_scripts = True
+                self.issues.append(f"CRITICAL: Blocked inline event handler: {attr_name}")
 
 
 class SpamGuard:
@@ -677,7 +763,7 @@ class SpamGuard:
 
     MAX_HTML_SIZE: Final[int] = 5242880  # 5MB
     # 100KB max payload threshold to prevent ReDoS / Memory Exhaustion
-    MAX_HTML_SIZE_BYTES: Final[int] = 100 * 1024
+    MAX_HTML_SIZE_BYTES: Final[int] = 100 * 1024  # 100KB
 
     @classmethod
     def check_html(cls, html_content: str) -> SpamReport:
@@ -690,7 +776,7 @@ class SpamGuard:
             Dictionary with score, issues, and is_safe keys.
 
         Raises:
-            ValueError: If the payload exceeds absolute safety limits for static analysis.
+            ValueError: If payload exceeds absolute safety limits (5MB).
         """
         # Memory Optimization: isspace() avoids allocating a new string copy in RAM
         if not html_content or html_content.isspace():
@@ -701,13 +787,21 @@ class SpamGuard:
             raise ValueError("Payload exceeds absolute safety limits for static analysis.")
 
         # 2. Fail-fast memory/CPU protection (MUST occur before parsing)
-        byte_size = len(html_content.encode("utf-8"))
+        if len(html_content) > cls.MAX_HTML_SIZE_BYTES:
+            return {
+                "score": 0.0,
+                "issues": [
+                    f"Payload exceeds 100KB ({len(html_content) / 1024:.1f}KB). Validation aborted.",
+                ],
+                "is_safe": False,
+            }
 
+        byte_size = len(html_content.encode("utf-8"))
         if byte_size > cls.MAX_HTML_SIZE_BYTES:
             return {
                 "score": 0.0,
                 "issues": [
-                    f"Payload exceeds 100KB ({byte_size / 1024:.1f}KB). Validation aborted."
+                    f"Payload exceeds 100KB ({byte_size / 1024:.1f}KB). Validation aborted.",
                 ],
                 "is_safe": False,
             }
@@ -731,7 +825,6 @@ class SpamGuard:
             score -= 50.0
 
         score = max(0.0, score)
-
         return {"score": score, "issues": issues, "is_safe": score >= safe_score}
 
 
@@ -741,14 +834,44 @@ class IdempotencyGuard:
     __slots__ = ()
 
     @staticmethod
+    def _deep_sanitize(data: Any, depth: int = 0, seen: set[int] | None = None) -> Any:
+        """Sanitize nested structures against circular references and recursion overflow.
+
+        Args:
+            data: The arbitrary payload data to sanitize.
+            depth: The current recursion depth.
+            seen: Set of visited object IDs to detect cycles.
+
+        Returns:
+            A sanitized structure with pruned cycles and depth limits.
+        """
+        if seen is None:
+            seen = set()
+        if id(data) in seen:
+            return "[Circular]"
+        if depth > _MAX_IDEMPOTENCY_DEPTH:
+            return "[MaxDepth]"
+
+        if isinstance(data, dict):
+            seen.add(id(data))
+            return {
+                str(k): IdempotencyGuard._deep_sanitize(v, depth + 1, seen.copy())
+                for k, v in data.items()
+            }
+        if isinstance(data, (list, tuple, set)):
+            seen.add(id(data))
+            return [IdempotencyGuard._deep_sanitize(item, depth + 1, seen.copy()) for item in data]
+        return data
+
+    @staticmethod
     def generate_key(domain: str, payload: dict[str, Any], files: list[Any] | None = None) -> str:
         """Generates a unique, collision-resistant SHA-256 fingerprint of the message payload.
 
         Returns:
-            SHA-256 fingerprint.
+            SHA-256 fingerprint hex digest.
         """
         # Filtering only core fields
-        fingerprint_data = {
+        fingerprint_data: dict[str, Any] = {
             "domain": domain,
             "to": payload.get("to"),
             "cc": payload.get("cc"),
@@ -762,44 +885,48 @@ class IdempotencyGuard:
 
         # Include attachment signatures to prevent false-positive deduplication
         if files:
-            file_signatures = []
-            for f_tuple in files:
-                if len(f_tuple) > 1 and f_tuple[1] is not None:
-                    file_data = f_tuple[1]
+            file_signatures: list[str] = []
+            for f_item in files:
+                if isinstance(f_item, (tuple, list)) and len(f_item) > 1 and f_item[1] is not None:
+                    field_name = str(f_item[0])
+                    file_data = f_item[1]
+                else:
+                    field_name = "attachment"
+                    file_data = f_item
 
-                    # Safe, deterministic content-based hashing
-                    if isinstance(file_data, tuple):
-                        # Extract the actual file payload from nested tuples
-                        content = file_data[1] if len(file_data) > 1 else b""
-                        sig = hashlib.sha256(
-                            content if isinstance(content, bytes) else str(content).encode("utf-8")
-                        ).hexdigest()
+                # Unwrap nested tuple attachments: ("filename.pdf", stream/bytes, ...)
+                if isinstance(file_data, (tuple, list)) and len(file_data) > 1:
+                    file_obj = file_data[1]
+                else:
+                    file_obj = file_data
 
-                    elif isinstance(file_data, (bytes, bytearray)):
-                        # Hash the entire byte array
-                        sig = hashlib.sha256(file_data).hexdigest()
+                if isinstance(file_obj, (bytes, bytearray)):
+                    sig = hashlib.sha256(file_obj).hexdigest()
+                elif hasattr(file_obj, "read") and callable(file_obj.read):
+                    current_pos = (
+                        file_obj.tell()
+                        if hasattr(file_obj, "tell") and callable(file_obj.tell)
+                        else 0
+                    )
+                    if hasattr(file_obj, "seek") and callable(file_obj.seek):
+                        file_obj.seek(0)
 
-                    elif hasattr(file_data, "read") and callable(file_data.read):
-                        # Safely hash file-like objects (e.g., io.BytesIO)
-                        current_pos = file_data.tell()
-                        file_data.seek(0)
+                    file_hash = hashlib.sha256()
+                    while chunk := file_obj.read(65536):
+                        file_hash.update(
+                            chunk if isinstance(chunk, bytes) else str(chunk).encode("utf-8"),
+                        )
 
-                        file_hash = hashlib.sha256()
-                        # Bind file_data as a default argument to prevent late-binding closure bugs
-                        for chunk in iter(lambda fd=file_data: fd.read(8192), b""):
-                            file_hash.update(
-                                chunk if isinstance(chunk, bytes) else chunk.encode("utf-8")
-                            )
+                    if hasattr(file_obj, "seek") and callable(file_obj.seek):
+                        file_obj.seek(current_pos)
+                    sig = file_hash.hexdigest()
+                else:
+                    sig = hashlib.sha256(str(file_obj).encode("utf-8")).hexdigest()
 
-                        file_data.seek(current_pos)  # Reset pointer for HTTP transport
-                        sig = file_hash.hexdigest()
-
-                    else:
-                        # Absolute fallback: Hash the stringified payload representation
-                        sig = hashlib.sha256(str(file_data).encode("utf-8")).hexdigest()
-
-                    file_signatures.append(f"{f_tuple[0]}_{sig}")
+                file_signatures.append(f"{field_name}_{sig}")
             fingerprint_data["files"] = file_signatures
 
-        serialized = json.dumps(fingerprint_data, sort_keys=True, default=str)
+        # Pass fingerprint_data through _deep_sanitize before JSON serialization
+        safe_data = IdempotencyGuard._deep_sanitize(fingerprint_data)
+        serialized = json.dumps(safe_data, sort_keys=True, default=str)
         return hashlib.sha256(serialized.encode("utf-8")).hexdigest()

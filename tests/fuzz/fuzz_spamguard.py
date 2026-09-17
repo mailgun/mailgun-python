@@ -1,51 +1,101 @@
 #!/usr/bin/env python3
-"""Fuzz test for the Local SpamGuard Deliverability HTML Parser."""
+"""Fuzz test for the Local SpamGuard Deliverability HTML Parser and Pre-Flight Engine.
 
+Focus: HTML parsing state explosion, unbalanced tags, script/style injection,
+zero-width text hiding, boundary payload enforcement (<100KB vs >=100KB),
+and SpamReport TypedDict contract verification.
+"""
+
+import atexit
 import logging
 import sys
+from typing import Any
 
 import atheris
-
 
 with atheris.instrument_imports():
     from mailgun.security import SpamGuard
 
 logging.disable(logging.CRITICAL)
 
+_MALFORMED_HTML_SNIPPETS = [
+    '<a href="http://evil.com">Click here</a>',
+    '<img src="cid:missing.png" alt="No image">',
+    '<div style="display:none;font-size:0px;color:#ffffff;background-color:#ffffff">Hidden Spam</div>',
+    '<script>alert("xss")</script>',
+    '<iframe src="javascript:alert(1)"></iframe>',
+    '<!-- ' * 50 + 'Unclosed Comment',
+    '<table' + ' border=1' * 200 + '><tr><td>Deep attr</td></tr></table>',
+    '<a href="javascript:void(0)">Spam</a>' * 50,
+    '<p>\u200b\u200c\u200dHidden zero-width tokens\ufeff</p>',
+    '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"' + '>' * 100,
+]
+
 
 def TestOneInput(data: bytes) -> None:
-    # We want varied lengths, but avoid multi-megabyte payloads
-    # to maintain high executions-per-second (EPS)
-    if not (10 < len(data) < 100_000):
+    if len(data) < 8:
         return
 
     fdp = atheris.FuzzedDataProvider(data)
 
-    # 1. Generate chaotic HTML (mix of valid tags, malformed attributes, and binary noise)
-    html_content = fdp.ConsumeUnicodeNoSurrogates(fdp.ConsumeIntInRange(10, 50000))
+    mode = fdp.ConsumeIntInRange(0, 2)
+    if mode == 0:
+        # Mode 0: Structured HTML with known deliverability traps
+        num_snippets = fdp.ConsumeIntInRange(1, 6)
+        parts = [
+            fdp.PickValueInList(_MALFORMED_HTML_SNIPPETS)
+            for _ in range(num_snippets)
+        ]
+        html_content = f"<html><body>{''.join(parts)}</body></html>"
+
+    elif mode == 1:
+        # Mode 1: Boundary stress test around MAX_HTML_SIZE_BYTES (100,000 bytes)
+        size_choice = fdp.ConsumeIntInRange(0, 2)
+        if size_choice == 0:
+            target_size = 99_950
+        elif size_choice == 1:
+            target_size = 100_000
+        else:
+            target_size = 100_050
+
+        base_str = fdp.ConsumeUnicodeNoSurrogates(target_size)
+        html_content = f"<html><body><p>{base_str}</p></body></html>"
+
+    else:
+        # Mode 2: Unconstrained chaotic Unicode noise
+        html_content = fdp.ConsumeUnicodeNoSurrogates(fdp.ConsumeIntInRange(10, 40000))
 
     try:
-        # 2. Feed it directly to the static analyzer
-        report = SpamGuard.check_html(html_content)
+        report: Any = SpamGuard.check_html(html_content)
 
-        # 3. Assert the contract of the return type (SpamReport TypedDict)
+        # Invariant 1: Return type strictly conforms to SpamReport contract
         if not isinstance(report, dict):
-            raise RuntimeError("CRASH: SpamGuard did not return a dictionary.")
-        if "score" not in report or "issues" not in report or "is_safe" not in report:
-            raise RuntimeError("CRASH: SpamGuard return payload breached TypedDict contract.")
+            raise RuntimeError(f"CONTRACT VIOLATION: check_html returned {type(report)}")
 
-    except (ValueError, TypeError):
-        # Normal Python rejections for extremely malformed edge cases
+        required_keys = {"score", "issues", "is_safe"}
+        if not required_keys.issubset(report.keys()):
+            raise RuntimeError(f"SCHEMA DEFECT: Missing required keys in SpamReport: {set(report.keys())}")
+
+        # Invariant 2: Score bounded and numeric
+        score = report["score"]
+        if not isinstance(score, (int, float)) or score < 0:
+            raise RuntimeError(f"VALUE ANOMALY: Invalid score returned: {score}")
+
+        # Invariant 3: Issues collection
+        if not isinstance(report["issues"], list):
+            raise RuntimeError(f"TYPE DRIFT: Issues must be a list, got {type(report['issues'])}")
+
+    except (TypeError, ValueError):
+        # Expected rejection for oversized payloads exceeding MAX_HTML_SIZE_BYTES
         pass
     except RecursionError:
-        raise RuntimeError(
-            "CRITICAL SECURITY BUG: Malformed HTML caused a RecursionError in _SpamGuardParser!"
-        )
+        raise RuntimeError("RECURSION EXPLOSION in SpamGuard HTMLParser")
     except Exception as e:
-        raise RuntimeError(f"UNHANDLED CRASH in SpamGuard: {type(e).__name__} - {e}") from e
+        raise RuntimeError(f"UNHANDLED CRASH in SpamGuard.check_html: {type(e).__name__} - {e}") from e
 
 
 if __name__ == "__main__":
     atheris.instrument_all()
     atheris.Setup(sys.argv, TestOneInput)
+    atexit.register(lambda: logging.disable(logging.CRITICAL))
     atheris.Fuzz()

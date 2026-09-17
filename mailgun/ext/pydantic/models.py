@@ -34,7 +34,7 @@ def _validate_emails(value: str | list[str]) -> str | list[str]:
             msg = f"Security Alert (CWE-113): CRLF injection detected in email: '{email}'"
             raise ValueError(msg)
 
-        # Quick format check. Ignore names (e.g., "John Doe <john@doe.com>")
+        # Quick format check. Ignore names (e.g., "John Doe ")
         raw_email = email.split("<")[-1].replace(">", "").strip()
         if not _EMAIL_REGEX.match(raw_email):
             msg = f"Invalid email format detected: '{email}'"
@@ -50,11 +50,9 @@ class SendMessageSchema(BaseModel):
 
     model_config = ConfigDict(
         populate_by_name=True,
-        # 'allow' is risky. We switch to 'forbid' for top-level fields
-        # and handle dynamic keys explicitly in the model validator.
         extra="forbid",
         str_strip_whitespace=True,
-        strict=True,  # Prevents type coercion (e.g., bool -> int)
+        strict=True,
     )
 
     # Required fields
@@ -66,15 +64,33 @@ class SendMessageSchema(BaseModel):
     bcc: str | list[str] | None = Field(default=None)
 
     # Subject and content (CWE-400: Strict memory bounding set to 25MB max)
-    subject: str | None = Field(default=None, max_length=998)  # RFC 2822 limit
+    subject: str | None = Field(default=None, max_length=998)
     text: str | None = Field(default=None, max_length=25_000_000)
     html: str | None = Field(default=None, max_length=25_000_000)
     amp_html: str | None = Field(default=None, max_length=25_000_000)
     template: str | None = Field(default=None, max_length=255)
 
-    # The strict container for dynamic parameters
-    # This prevents Mass Assignment while supporting Mailgun's dynamic schema
+    # Container for dynamic Mailgun parameters
     custom_params: dict[str, str] = Field(default_factory=dict)
+
+    @field_validator("subject", mode="after")
+    @classmethod
+    def validate_subject(cls, v: str | None) -> str | None:
+        """Poka-yoke: Prevent CRLF Injection in email Subject (CWE-113 / RFC 5322).
+
+        Args:
+            v: The subject string to validate.
+
+        Returns:
+            The validated subject string or None.
+
+        Raises:
+            ValueError: If a CRLF injection sequence is detected in the subject.
+        """
+        if v is not None and _CRLF_REGEX.search(v):
+            msg = f"Security Alert (CWE-113): CRLF injection detected in subject: '{v}'"
+            raise ValueError(msg)
+        return v
 
     @field_validator("custom_params")
     @classmethod
@@ -82,13 +98,13 @@ class SendMessageSchema(BaseModel):
         """Validates that custom parameter keys start with allowed Mailgun prefixes and contain no CRLFs.
 
         Args:
-            v: The dictionary of custom parameters to validate.
+            v: Dictionary of custom parameters.
 
         Returns:
-            The validated dictionary of custom parameters.
+            The validated custom parameters dictionary.
 
         Raises:
-            ValueError: If a key does not start with 'v:', 'h:', 'o:', or contains CRLFs.
+            ValueError: If an unknown prefix or CRLF injection sequence is detected.
         """
         for key, val in v.items():
             if not key.startswith(("v:", "h:", "o:")):
@@ -98,7 +114,6 @@ class SendMessageSchema(BaseModel):
                 )
                 raise ValueError(msg)
 
-            # CWE-113: Block CRLF injection in custom headers and variables
             if _CRLF_REGEX.search(key) or _CRLF_REGEX.search(str(val)):
                 msg_0 = f"Security Alert (CWE-113): CRLF injection detected in custom parameter: '{key}'"
                 raise ValueError(msg_0)
@@ -110,8 +125,11 @@ class SendMessageSchema(BaseModel):
     def check_email_formats(cls, v: Any) -> Any:
         """Validates the correct format of email addresses.
 
+        Args:
+            v: Raw email string or sequence of email strings.
+
         Returns:
-            The validated input value.
+            The validated email string or sequence.
         """
         if v is not None:
             _validate_emails(v)
@@ -122,32 +140,28 @@ class SendMessageSchema(BaseModel):
         """Cross-validation of body content.
 
         Returns:
-            The validated schema instance.
+            The validated instance of SendMessageSchema.
 
         Raises:
-            ValueError: If no body parts are provided or invalid prefixes are used.
+            ValueError: If no message body components (text, html, template, amp_html) are provided.
         """
-        # Ensure the presence of the email body
         if not any([self.text, self.html, self.template, self.amp_html]):
             raise ValueError(
                 "A Mailgun message must contain at least one body part: "
-                "'text', 'html', 'amp_html', or 'template'."
+                "'text', 'html', 'amp_html', or 'template'.",
             )
-
         return self
 
     def to_mailgun_payload(self) -> dict[str, Any]:
         """SERIALIZER: Flattens custom_params into the top-level payload.
 
-        This is the method the SDK should call before sending.
-
         Returns:
-            Standard fields as a dict
+            Dictionary payload formatted for direct submission to the Mailgun API.
         """
-        # Get standard fields as a dict
         data: dict[str, Any] = self.model_dump(
-            by_alias=True, exclude_none=True, exclude={"custom_params"}
+            by_alias=True,
+            exclude_none=True,
+            exclude={"custom_params"},
         )
-        # Flatten custom_params into the root
         data.update(self.custom_params)
         return data

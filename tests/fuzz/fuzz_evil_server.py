@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fuzz test for Network Resilience and 'Evil Server' payload handling (Sync/Requests)."""
+"""Fuzz test for Network Resilience, Corrupted Chunked Streams, and Evil Server injection."""
 
 import contextlib
 import json
@@ -19,6 +19,9 @@ with atheris.instrument_imports():
 
 logging.disable(logging.CRITICAL)
 
+_STATUS_CODES = [200, 301, 302, 400, 429, 500, 502, 503, 504]
+_HTTP_METHODS = ["delete", "get", "post", "put"]
+
 
 def TestOneInput(data: bytes) -> None:
     if len(data) < 20:
@@ -26,69 +29,77 @@ def TestOneInput(data: bytes) -> None:
 
     fdp = atheris.FuzzedDataProvider(data)
     client = Client(auth=("api", "test-key"))
-
-    # Save original to restore later
     original_send = requests.Session.send
 
     def evil_send(self: requests.Session, request: requests.PreparedRequest, **kwargs: Any) -> requests.Response:
+        # Inject network-level transport faults
         if fdp.ConsumeBool():
             exceptions = [
-                requests.exceptions.ConnectionError("Fuzzed Connection Drop"),
-                requests.exceptions.Timeout("Fuzzed Timeout"),
+                requests.exceptions.ConnectionError("Fuzzed Drop"),
+                requests.exceptions.Timeout("Fuzzed Read Timeout"),
                 requests.exceptions.TooManyRedirects("Infinite Redirect Loop"),
-                requests.exceptions.ChunkedEncodingError("Fuzzed Chunk Error"),
+                requests.exceptions.ChunkedEncodingError("Corrupted Chunk Framing"),
+                requests.exceptions.ContentDecodingError("Corrupted Zlib/Gzip Stream"),
             ]
             raise fdp.PickValueInList(exceptions)
 
-        # SYNC EVIL PAYLOAD INJECTION
-        status = fdp.PickValueInList([200, 429, 500, 502, 503, 504])
+        # Server response injection
+        status = fdp.PickValueInList(_STATUS_CODES)
+        headers: dict[str, str] = {
+            "content-type": fdp.PickValueInList(
+                ["application/json", "text/html", "application/octet-stream", "image/png"]
+            ),
+            "content-length": str(fdp.ConsumeIntInRange(-1000, 20000)),
+        }
 
-        headers = {
-            "content-type": fdp.PickValueInList(["application/json", "image/png", "text/html"]),
-            "content-length": str(fdp.ConsumeIntInRange(-100, 10000)),
-            "Retry-After": (
+        # Hostile Retry-After injection
+        if fdp.ConsumeBool():
+            headers["Retry-After"] = (
                 fdp.ConsumeUnicodeNoSurrogates(16)
                 if fdp.ConsumeBool()
                 else str(fdp.ConsumeFloat())
             )
-        }
 
-        garbage_bytes = fdp.ConsumeBytes(1024)
+        # Redirect loop simulation
+        if status in (301, 302):
+            headers["Location"] = fdp.PickValueInList(
+                ["https://api.mailgun.net/v3/messages", "http://127.0.0.1:80", "/relative/loop"]
+            )
 
-        # Create the mock standard requests.Response
         mock_response = requests.Response()
         mock_response.status_code = status
-        mock_response._content = garbage_bytes
+        mock_response._content = fdp.ConsumeBytes(fdp.ConsumeIntInRange(0, 2048))
         mock_response.headers.update(headers)
         mock_response.request = request
+        mock_response.url = request.url or "https://api.mailgun.net/v3/messages"
 
         return mock_response
 
-    # Monkeypatch the session
     requests.Session.send = evil_send  # type: ignore[method-assign]
 
     with Path(os.devnull).open("w") as devnull, contextlib.redirect_stdout(
         devnull
     ), contextlib.redirect_stderr(devnull):
         try:
+            target_method = fdp.PickValueInList(_HTTP_METHODS)
             client.messages.api_call(
-                method=fdp.PickValueInList(["delete", "get", "post", "put"]),
-                url=fdp.ConsumeUnicodeNoSurrogates(30) or "https://api.mailgun.net/v3/messages",
+                method=target_method,
+                url=fdp.ConsumeUnicodeNoSurrogates(40) or "https://api.mailgun.net/v3/messages",
+                data={"message": fdp.ConsumeUnicodeNoSurrogates(20)},
             )
         except (
-                ApiError,
-                MailgunTimeoutError,
-                TypeError,
-                ValueError,
-                requests.RequestException,
-                json.JSONDecodeError,
+            ApiError,
+            MailgunTimeoutError,
+            TypeError,
+            ValueError,
+            UnicodeEncodeError,
+            requests.RequestException,
+            json.JSONDecodeError,
         ):
-            # Expected during fuzzing: malformed inputs and injected network faults.
             pass
-        except Exception as e:
-            raise RuntimeError(f"SDK crashed handling Sync Evil Server response: {e}") from e
+        except Exception as exc:
+            raise RuntimeError(f"Unhandled crash during evil server simulation: {type(exc).__name__}: {exc}") from exc
         finally:
-            # Restore to prevent test pollution
             requests.Session.send = original_send  # type: ignore[method-assign]
             if hasattr(client, "close"):
                 client.close()

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fuzz test for dynamic HTTP header merging and kwarg filtering."""
+"""Fuzz test for dynamic HTTP header merging, CRLF injection, and multi-type kwarg filtering."""
 
 import logging
 import sys
@@ -12,17 +12,51 @@ with atheris.instrument_imports():
     from mailgun.endpoints import BaseEndpoint
     from mailgun.security import SecretAuth
 
-# Disable logging globally to avoid noise and atexit race conditions
 logging.disable(logging.CRITICAL)
 
 
+def _generate_header_value(fdp: atheris.FuzzedDataProvider) -> Any:
+    """Generate diverse header value types including injection probes and non-strings."""
+    mode = fdp.ConsumeIntInRange(0, 5)
+    if mode == 0:
+        # CRLF injection probe
+        probe = fdp.PickValueInList(["\r\n", "\n", "\r", "\r\nSet-Cookie: evil=1", "\x00"])
+        return f"{fdp.ConsumeUnicodeNoSurrogates(10)}{probe}{fdp.ConsumeUnicodeNoSurrogates(10)}"
+    if mode == 1:
+        # Standard ASCII header string
+        return fdp.ConsumeUnicodeNoSurrogates(32)
+    if mode == 2:
+        # Numeric / boolean type confusion
+        return fdp.ConsumeInt(65535) if fdp.ConsumeBool() else fdp.ConsumeBool()
+    if mode == 3:
+        # Lists / tuples of values
+        return [fdp.ConsumeUnicodeNoSurrogates(8) for _ in range(fdp.ConsumeIntInRange(1, 4))]
+    if mode == 4:
+        # Empty string or whitespace
+        return fdp.PickValueInList(["", "   ", "\t", "Bearer "])
+    return None
+
+
 def TestOneInput(data: bytes) -> None:
+    if len(data) < 6:
+        return
+
     fdp = atheris.FuzzedDataProvider(data)
 
-    # Fuzz the base headers applied during class instantiation
-    base_headers: dict[str, str] = {}
+    # 1. Generate base headers for endpoint instantiation
+    base_headers: dict[str, Any] = {}
     for _ in range(fdp.ConsumeIntInRange(0, 5)):
-        base_headers[fdp.ConsumeString(16)] = fdp.ConsumeString(32)
+        header_key = fdp.PickValueInList(
+            [
+                "User-Agent",
+                "Authorization",
+                "Content-Type",
+                "X-Mailgun-Tag",
+                "X-Mailgun-Variables",
+                fdp.ConsumeUnicodeNoSurrogates(12),
+            ]
+        )
+        base_headers[header_key] = _generate_header_value(fdp)
 
     endpoint = BaseEndpoint(
         auth=SecretAuth(("api", "key-test")),
@@ -30,30 +64,59 @@ def TestOneInput(data: bytes) -> None:
         headers=base_headers,
     )
 
-    # Fuzz the kwargs passed during runtime (like .post(**kwargs))
+    # 2. Build runtime kwargs to pass into _merge_headers
     kwargs: dict[str, Any] = {}
 
-    # Intentionally trigger header merges/collisions
+    # Case collisions and override testing
     if fdp.ConsumeBool():
-        kwargs["headers"] = {}
+        merged_headers: dict[str, Any] = {}
         for _ in range(fdp.ConsumeIntInRange(1, 8)):
-            # ConsumeString allows weird casing to test case-insensitive merging
-            kwargs["headers"][fdp.ConsumeString(20)] = fdp.ConsumeString(50)
+            header_key = fdp.PickValueInList(
+                [
+                    "user-agent",
+                    "USER-AGENT",
+                    "authorization",
+                    "AUTHORIZATION",
+                    "content-type",
+                    "Content-Type",
+                    "x-mailgun-tag",
+                    fdp.ConsumeUnicodeNoSurrogates(16),
+                ]
+            )
+            merged_headers[header_key] = _generate_header_value(fdp)
+        kwargs["headers"] = merged_headers
 
-    # Inject dynamic HTTP kwargs (timeout, verify, proxies)
+    # HTTP transport kwargs injection
     for _ in range(fdp.ConsumeIntInRange(0, 5)):
-        # Sometimes test type confusion, sometimes valid strings
-        kwarg_val: int | str = (
-            fdp.ConsumeString(30) if fdp.ConsumeBool() else fdp.ConsumeInt(500)
+        prop_key = fdp.PickValueInList(
+            ["timeout", "verify", "proxies", "params", "allow_redirects", fdp.ConsumeUnicodeNoSurrogates(10)]
         )
-        kwargs[fdp.ConsumeString(15)] = kwarg_val
+        prop_val: Any
+        val_mode = fdp.ConsumeIntInRange(0, 3)
+        if val_mode == 0:
+            prop_val = fdp.ConsumeFloat()
+        elif val_mode == 1:
+            prop_val = fdp.ConsumeBool()
+        elif val_mode == 2:
+            prop_val = fdp.ConsumeUnicodeNoSurrogates(20)
+        else:
+            prop_val = {"https": fdp.ConsumeUnicodeNoSurrogates(20)}
+        kwargs[prop_key] = prop_val
 
     try:
-        endpoint._merge_headers(kwargs)
-    except (TypeError, ValueError):
-        # We expect safe rejections. We are hunting for KeyErrors, AttributeErrors,
-        # or deep recursion crashes inside the merge logic.
+        result = endpoint._merge_headers(kwargs)
+        if result is not None and not isinstance(result, (dict, type(None))):
+            raise RuntimeError(f"Unexpected return type from _merge_headers: {type(result)}")
+    except (TypeError, ValueError, UnicodeEncodeError):
+        # Graceful input rejections are expected
         pass
+    except Exception as exc:
+        raise RuntimeError(
+            f"Unhandled exception during _merge_headers:\n"
+            f"Base headers: {base_headers!r}\n"
+            f"Kwargs:       {kwargs!r}\n"
+            f"Exception:    {type(exc).__name__}: {exc}"
+        ) from exc
 
 
 if __name__ == "__main__":

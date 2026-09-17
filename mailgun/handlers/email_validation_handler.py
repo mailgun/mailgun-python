@@ -5,6 +5,7 @@ Doc: https://documentation.mailgun.com/en/latest/api-email-validation.html#email
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 
 from mailgun.endpoints import build_path_from_keys
@@ -28,8 +29,14 @@ def handle_address_validate(
     Returns:
         The final URL for the email validation endpoint.
     """
-    final_keys = build_path_from_keys(url.get("keys", [])[1:])
-    base_url = str(url["base"]).rstrip("/")
+    raw_keys = url.get("keys") if isinstance(url, dict) else None
+    if isinstance(raw_keys, Sequence) and not isinstance(raw_keys, (str, bytes)):
+        keys = list(raw_keys)
+    else:
+        keys = []
+
+    final_keys = build_path_from_keys(keys[1:] if len(keys) > 1 else [])
+    base_url = str(url.get("base", "")).rstrip("/")
 
     if "list_name" in kwargs:
         safe_list = SecurityGuard.sanitize_path_segment(kwargs["list_name"])

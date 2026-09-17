@@ -194,7 +194,7 @@ class BaseEndpoint:
         self._auth = auth
         self._timeout = timeout
         self.dry_run = dry_run
-        self.retry_policy = None
+        self.retry_policy: RetryPolicy | None = None
 
     @staticmethod
     def _warn_if_deprecated(method: str, target_url: str) -> None:
@@ -233,7 +233,9 @@ class BaseEndpoint:
 
     @staticmethod
     def _prepare_payload(
-        data: Any | None, files: Any | None, headers: dict[str, str]
+        data: Any | None,
+        files: Any | None,
+        headers: dict[str, str],
     ) -> tuple[Any | None, dict[str, str]]:
         """Prepares headers and minifies JSON payloads or handles multipart files safely.
 
@@ -257,7 +259,7 @@ class BaseEndpoint:
         )
 
         if is_json_request and data is not None and not isinstance(data, (str, bytes)):
-            data = json.dumps(data, separators=(",", ":"))
+            data = json.dumps(data, separators=(",", ":"), default=str)
 
         return data, working_headers
 
@@ -376,7 +378,10 @@ class BaseEndpoint:
         safe_timeout = SecurityGuard.sanitize_timeout(actual_timeout)
 
         target_url = self.build_url(
-            url, domain=target_domain_normalized, method=safe_method, **kwargs
+            url,
+            domain=target_domain_normalized,
+            method=safe_method,
+            **kwargs,
         )
         self._warn_if_deprecated(safe_method, target_url)
 
@@ -384,6 +389,33 @@ class BaseEndpoint:
         safe_url_for_log = SecurityGuard.sanitize_log_trace(target_url)
 
         return safe_method, target_url, safe_url_for_log, safe_timeout, safe_headers, safe_kwargs
+
+    @staticmethod
+    def _cast_query_param(orig_ref: Any, raw_values: list[str]) -> Any:
+        """Cast query string values to match the original filter parameter type.
+
+        Args:
+            orig_ref: Reference value indicating the intended target type.
+            raw_values: List of string values extracted from the URL query string.
+
+        Returns:
+            The parsed value cast to bool, int, float, list, tuple, set, or str.
+        """
+        parsed_str = raw_values[0] if len(raw_values) == 1 else raw_values
+
+        if isinstance(orig_ref, bool):
+            return str(raw_values[0]).lower() in {"true", "1", "yes"}
+        if isinstance(orig_ref, int):
+            return int(raw_values[0])
+        if isinstance(orig_ref, float):
+            return float(raw_values[0])
+        if isinstance(orig_ref, list):
+            return raw_values
+        if isinstance(orig_ref, tuple):
+            return tuple(raw_values)
+        if isinstance(orig_ref, set):
+            return set(raw_values)
+        return parsed_str
 
 
 class Endpoint(BaseEndpoint):
@@ -517,11 +549,17 @@ class Endpoint(BaseEndpoint):
                 is_error = isinstance(status_code, int) and status_code >= _HTTP_ERROR_THRESHOLD
                 if is_error:
                     logger.error(
-                        "API Error %s | %s %s", status_code, safe_method.upper(), safe_url_for_log
+                        "API Error %s | %s %s",
+                        status_code,
+                        safe_method.upper(),
+                        safe_url_for_log,
                     )
                 else:
                     logger.debug(
-                        "API Success %s | %s %s", status_code, safe_method.upper(), safe_url_for_log
+                        "API Success %s | %s %s",
+                        status_code,
+                        safe_method.upper(),
+                        safe_url_for_log,
                     )
                 break
 
@@ -645,6 +683,7 @@ class Endpoint(BaseEndpoint):
         Args:
             data: Payload data to include in the request.
             filters: Query parameters to include in the request.
+            domain: Target domain name.
             **kwargs: Additional arguments to pass to the HTTP client.
 
         Returns:
@@ -732,7 +771,12 @@ class Endpoint(BaseEndpoint):
         """
         merged_headers = self._merge_headers(kwargs)
         return self.api_call(
-            self._auth, "delete", self._url, headers=merged_headers, domain=domain, **kwargs
+            self._auth,
+            "delete",
+            self._url,
+            headers=merged_headers,
+            domain=domain,
+            **kwargs,
         )
 
     def stream(
@@ -748,7 +792,8 @@ class Endpoint(BaseEndpoint):
         Yields:
             Individual records from the paginated API response.
         """
-        current_filters = dict(filters) if filters else {}
+        initial_filters = dict(filters) if filters else {}
+        current_filters = initial_filters.copy()
 
         while True:
             # Pass a copy of the dictionary so the mock (and the underlying request layer)
@@ -759,13 +804,18 @@ class Endpoint(BaseEndpoint):
                 response.raise_for_status()
 
             data = response.json()
-            items = data.get("items", [])
+            if not isinstance(data, dict):
+                break
+            items = data.get("items") or []
 
             # Yield items one by one (Lazy Evaluation)
             yield from items
 
+            paging_dict = data.get("paging") or {}
             # Check for the next page cursor
-            next_url = data.get("paging", {}).get("next")
+            next_url = paging_dict.get("next")
+            if not next_url or not items:
+                break
 
             # Stop if there's no next URL or the current page was empty
             if not next_url or not items:
@@ -778,30 +828,11 @@ class Endpoint(BaseEndpoint):
                 if not v:
                     continue
 
-                # Default flatten logic for unknown or string parameters
-                parsed_str_val = v[0] if len(v) == 1 else v
-
-                # Prevent Query Parameter Type Drift
-                if k in current_filters:
-                    original_val = current_filters[k]
-
-                    # Dynamically cast to the developer's original type
-                    if isinstance(original_val, bool):
-                        current_filters[k] = str(v[0]).lower() in {"true", "1", "yes"}
-                    elif isinstance(original_val, int):
-                        current_filters[k] = int(v[0])
-                    elif isinstance(original_val, float):
-                        current_filters[k] = float(v[0])
-                    elif isinstance(original_val, list):
-                        current_filters[k] = v  # Always keep as list
-                    elif isinstance(original_val, tuple):
-                        current_filters[k] = tuple(v)  # Always keep as tuple
-                    elif isinstance(original_val, set):
-                        current_filters[k] = set(v)  # Always keep as set
-                    else:
-                        current_filters[k] = parsed_str_val
+                orig_ref = initial_filters.get(k, current_filters.get(k))
+                if orig_ref is not None:
+                    current_filters[k] = self._cast_query_param(orig_ref, v)
                 else:
-                    current_filters[k] = parsed_str_val
+                    current_filters[k] = v[0] if len(v) == 1 else v
 
 
 # ==============================================================================
@@ -1177,7 +1208,12 @@ class AsyncEndpoint(BaseEndpoint):
         """
         merged_headers = self._merge_headers(kwargs)
         return await self.api_call(
-            self._auth, "delete", self._url, headers=merged_headers, domain=domain, **kwargs
+            self._auth,
+            "delete",
+            self._url,
+            headers=merged_headers,
+            domain=domain,
+            **kwargs,
         )
 
     async def stream(
@@ -1186,46 +1222,52 @@ class AsyncEndpoint(BaseEndpoint):
         domain: str | None = None,
         **kwargs: Any,
     ) -> Any:
-        """Lazy pagination: yield records asynchronously one by one.
+        """Lazy pagination: yield records asynchronously one by one without loading all into memory.
+
+        Automatically traverses the 'paging' links returned by the Mailgun API.
 
         Yields:
             Individual records from the paginated API response.
+
+        Raises:
+            ApiError: If the server returns a 4xx or 5xx status code or a network error occurs.
         """
-        current_filters = dict(filters) if filters else {}
+        initial_filters = dict(filters) if filters else {}
+        current_filters = initial_filters.copy()
 
         while True:
             response = await self.get(filters=current_filters.copy(), domain=domain, **kwargs)
 
+            # Defensive status check: Convert raw HTTPStatusError into SDK's standard ApiError
             if hasattr(response, "raise_for_status"):
-                response.raise_for_status()
+                try:
+                    response.raise_for_status()
+                except httpx.HTTPStatusError as exc:
+                    raise ApiError(exc.response) from exc
 
             data = response.json()
-            items = data.get("items", [])
+            # Stop if response payload is not a valid JSON mapping (e.g. error list or gateway shock)
+            if not isinstance(data, dict):
+                break
+
+            items = data.get("items") or []
             for item in items:
                 yield item
 
-            next_url = data.get("paging", {}).get("next")
+            paging_dict = data.get("paging") or {}
+            next_url = paging_dict.get("next")
             if not next_url or not items:
                 break
 
+            # Mailgun returns a full URL. Parse it to extract just the new pagination parameters
+            # (like 'page' or 'url') so the next self.get() call works correctly.
             query_params = parse_qs(urlparse(next_url).query)
             for k, v in query_params.items():
                 if not v:
                     continue
-                parsed_str_val = v[0] if len(v) == 1 else v
 
-                # Prevent Query Parameter Type Drift
-                if k in current_filters:
-                    original_val = current_filters[k]
-
-                    # Dynamically cast to the developer's original type
-                    if isinstance(original_val, bool):
-                        current_filters[k] = str(v[0]).lower() in {"true", "1", "yes"}
-                    elif isinstance(original_val, int):
-                        current_filters[k] = int(v[0])
-                    elif isinstance(original_val, float):
-                        current_filters[k] = float(v[0])
-                    else:
-                        current_filters[k] = parsed_str_val
+                orig_ref = initial_filters.get(k, current_filters.get(k))
+                if orig_ref is not None:
+                    current_filters[k] = self._cast_query_param(orig_ref, v)
                 else:
-                    current_filters[k] = parsed_str_val
+                    current_filters[k] = v[0] if len(v) == 1 else v

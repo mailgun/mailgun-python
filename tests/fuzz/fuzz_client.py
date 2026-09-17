@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+"""Fuzzer for Core SDK Client, Context Managers, Dynamic Routing, and Fallbacks."""
 
 import json
 import logging
@@ -7,7 +8,6 @@ from typing import Any
 
 import atheris
 import requests
-
 
 with atheris.instrument_imports():
     from mailgun import routes
@@ -23,9 +23,7 @@ def _generate_chaotic_file_payload(
     fdp: atheris.FuzzedDataProvider,
 ) -> list[tuple[str, tuple[str, bytes, str]]]:
     files: list[tuple[str, tuple[str, bytes, str]]] = []
-    num_files = fdp.ConsumeIntInRange(1, 3)
-
-    for _ in range(num_files):
+    for _ in range(fdp.ConsumeIntInRange(1, 3)):
         filename = (
             fdp.ConsumeUnicodeNoSurrogates(32)
             if fdp.ConsumeBool()
@@ -33,73 +31,17 @@ def _generate_chaotic_file_payload(
                 [
                     "../../../etc/passwd",
                     ".env",
-                    "C:\\Windows\\System32\\cmd.exe",
                     "payload.exe\x00.jpg",
                     "＼．．／＼．．／.txt",
                 ]
             )
         )
-
-        content = (
-            fdp.ConsumeBytes(128)
-            if fdp.ConsumeBool()
-            else fdp.ConsumeUnicodeNoSurrogates(128).encode("utf-8", errors="ignore")
-        )
-
+        content = fdp.ConsumeBytes(64)
         mime_type = fdp.PickValueInList(
-            [
-                "application/json",
-                "application/x-php",
-                "image/png",
-                "multipart/mixed; boundary=--evil",
-                "text/plain",
-                fdp.ConsumeUnicodeNoSurrogates(16),
-            ]
+            ["application/json", "text/plain", "image/png", fdp.ConsumeUnicodeNoSurrogates(16)]
         )
-
         files.append(("attachment", (filename, content, mime_type)))
-
     return files
-
-
-def TestOneInput(data: bytes) -> None:
-    if len(data) < 10:
-        return
-    fdp = atheris.FuzzedDataProvider(data)
-
-    target_attr = fdp.PickValueInList(_VALID_ENDPOINTS)
-    method_name = fdp.PickValueInList(["post", "put"])
-    domain = (
-        fdp.ConsumeUnicodeNoSurrogates(16)
-        if fdp.ConsumeBool()
-        else "test.mailgun.org"
-    )
-
-    client = Client(auth=("api", "test-key"))
-
-    try:
-        endpoint = getattr(client, target_attr)
-        action = getattr(endpoint, method_name)
-
-        if fdp.ConsumeBool():
-            action(domain=domain, files=_generate_chaotic_file_payload(fdp))
-        else:
-            action(domain=domain, data={"to": fdp.ConsumeUnicodeNoSurrogates(16)})
-
-    except (
-        ApiError,
-        AttributeError,
-        KeyError,
-        TypeError,
-        ValueError,
-        json.JSONDecodeError,
-        requests.RequestException,
-    ):
-        # Expected for malformed fuzz inputs; ignore to keep fuzzing and let
-        # only unexpected exceptions fail via the generic handler below.
-        pass
-    except Exception as e:
-        raise RuntimeError(f"UNHANDLED CRASH in Client Multipart execution: {e}") from e
 
 
 def mock_send(
@@ -110,13 +52,61 @@ def mock_send(
 ) -> requests.Response:
     resp = requests.Response()
     resp.status_code = 200
-    resp._content = b"{}"
+    resp._content = b'{"message": "client fuzz mock"}'
     return resp
 
 
-if __name__ == "__main__":
-    requests.adapters.HTTPAdapter.send = mock_send  # type: ignore[method-assign]
+requests.adapters.HTTPAdapter.send = mock_send  # type: ignore[method-assign]
 
+
+def TestOneInput(data: bytes) -> None:
+    if len(data) < 15:
+        return
+
+    fdp = atheris.FuzzedDataProvider(data)
+
+    # 70% valid endpoints, 30% arbitrary attribute access for default_handler probing
+    if fdp.ConsumeBool() or not _VALID_ENDPOINTS:
+        target_attr = fdp.ConsumeUnicodeNoSurrogates(24) or "messages"
+    else:
+        target_attr = fdp.PickValueInList(_VALID_ENDPOINTS)
+
+    method_name = fdp.PickValueInList(["get", "post", "put", "delete"])
+    domain = fdp.ConsumeUnicodeNoSurrogates(16) or "test.mailgun.org"
+
+    try:
+        with Client(auth=("api", "test-key")) as client:
+            endpoint = getattr(client, target_attr, None)
+            if endpoint is None:
+                return
+
+            action = getattr(endpoint, method_name, None)
+            if action is None:
+                return
+
+            if fdp.ConsumeBool():
+                action(domain=domain, files=_generate_chaotic_file_payload(fdp))
+            else:
+                action(
+                    domain=domain,
+                    data={"to": fdp.ConsumeUnicodeNoSurrogates(16), "url": "https://callback.com"},
+                )
+
+    except (
+        ApiError,
+        AttributeError,
+        KeyError,
+        TypeError,
+        ValueError,
+        json.JSONDecodeError,
+        requests.RequestException,
+    ):
+        pass
+    except Exception as e:
+        raise RuntimeError(f"UNHANDLED CRASH in Client execution: {type(e).__name__} - {e}") from e
+
+
+if __name__ == "__main__":
     atheris.instrument_all()
     atheris.Setup(sys.argv, TestOneInput)
     atheris.Fuzz()

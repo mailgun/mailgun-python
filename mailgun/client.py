@@ -187,7 +187,7 @@ class Client(BaseClient):
             AttributeError: If the requested route is unknown or a magic Python method is invoked.
         """
         # Protect Data Model: Ignore magic Python methods
-        if name.startswith("__") and name.endswith("__"):
+        if (name.startswith("__") and name.endswith("__")) or name in {"config", "auth"}:
             msg = f"'{self.__class__.__name__}' object has no attribute '{name}'"
             raise AttributeError(msg)
 
@@ -360,7 +360,9 @@ class AsyncClient(BaseClient):
             if "transport" not in kwargs:
                 limits = httpx.Limits(max_keepalive_connections=100, max_connections=100)
                 kwargs["transport"] = httpx.AsyncHTTPTransport(
-                    retries=3, limits=limits, verify=ssl_context
+                    retries=3,
+                    limits=limits,
+                    verify=ssl_context,
                 )
 
             self._httpx_client = httpx.AsyncClient(**kwargs)

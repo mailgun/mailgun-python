@@ -31,7 +31,7 @@ class ChunkedStreamer:
     (like Serverless functions).
     """
 
-    __slots__ = ("_file", "_file_path", "chunk_size")
+    __slots__ = ("_eof", "_file", "_file_path", "chunk_size")
 
     def __init__(
         self,
@@ -40,7 +40,19 @@ class ChunkedStreamer:
         safe_base_dir: str | Path | None = None,
         chunk_size: int = CHUNK_SIZE,
     ) -> None:
-        """Init chunked streamer."""
+        """Init chunked streamer.
+
+        Args:
+            file_path: Path to the target attachment file.
+            safe_base_dir: Sandbox base directory for path validation.
+            chunk_size: Positive integer size in bytes per chunk.
+
+        Raises:
+            ValueError: If chunk_size is not a strictly positive integer.
+        """
+        if chunk_size <= 0:
+            raise ValueError("chunk_size must be a strictly positive integer.")
+
         # Provide a secure default base directory (e.g., current working directory) if None is passed
         resolved_base_dir = safe_base_dir if safe_base_dir is not None else Path.cwd()
         safe_path = SecurityGuard.validate_attachment_path(file_path, resolved_base_dir)
@@ -48,6 +60,7 @@ class ChunkedStreamer:
         self._file_path = str(safe_path)
         self.chunk_size = chunk_size
         self._file: IO[bytes] | None = None
+        self._eof = False
 
     def read(self, size: int) -> bytes:
         """File-like read method required by requests/httpx multipart encoders.
@@ -58,6 +71,8 @@ class ChunkedStreamer:
         Returns:
             A byte string containing the read data.
         """
+        if self._eof:
+            return b""
         if self._file is None:
             self._file = Path(self._file_path).open("rb")  # ruff: ignore[open-file-with-context-handler]
 
@@ -66,9 +81,36 @@ class ChunkedStreamer:
         # Auto-close the file descriptor as soon as EOF is reached.
         # This guarantees teardown even if the HTTP library forgets to call .close().
         if not chunk:
+            self._eof = True
             self.close()
+            return b""
 
         return chunk
+
+    def seek(self, offset: int, whence: int = 0) -> int:
+        """Change the stream position to the given byte offset.
+
+        Args:
+            offset: The position to seek to relative to whence.
+            whence: Reference point (0 for start, 1 for current, 2 for end).
+
+        Returns:
+            The new absolute stream position in bytes.
+        """
+        self._eof = False
+        if self._file is None:
+            self._file = Path(self._file_path).open("rb")  # ruff: ignore[open-file-with-context-handler]
+        return self._file.seek(offset, whence)
+
+    def tell(self) -> int:
+        """Return the current stream position in bytes.
+
+        Returns:
+            The current file pointer position.
+        """
+        if self._file is None:
+            return 0
+        return self._file.tell()
 
     def __iter__(self) -> Generator[bytes, None, None]:
         """Stream the file natively in chunks.
@@ -149,7 +191,7 @@ class MailgunMessageBuilder:
         """Initialize the builder with a sender email."""
         self._payload: dict[str, Any] = {"from": from_email, "to": []}
         self._files: list[tuple[str, FileTuple]] = []
-        self._idempotency_safe: bool = True  # Enabled dy default
+        self._idempotency_safe: bool = True  # Enabled by default
         self._domain: str = from_email.rsplit("@", maxsplit=1)[-1] if "@" in from_email else ""
 
     def add_recipient(self, email: str, recipient_type: str = "to") -> Self:
@@ -231,7 +273,7 @@ class MailgunMessageBuilder:
         """
         # Complex types must be serialized
         if isinstance(value, (dict, list)):
-            safe_val = json.dumps(value, separators=(",", ":"))
+            safe_val = json.dumps(value, separators=(",", ":"), default=str)
         else:
             safe_val = str(value)
         self._payload[f"v:{key}"] = safe_val
@@ -323,7 +365,10 @@ class MailgunMessageBuilder:
         return self
 
     def attach_inline(
-        self, file_path: str | Path, cid: str | None = None, safe_base_dir: str | Path | None = None
+        self,
+        file_path: str | Path,
+        cid: str | None = None,
+        safe_base_dir: str | Path | None = None,
     ) -> Self:
         """Safely prepare and map an inline image attachment with an explicit Content-ID.
 
@@ -381,7 +426,7 @@ class MailgunMessageBuilder:
         Returns:
             The builder instance.
         """
-        self._payload["t:variables"] = json.dumps(variables, separators=(",", ":"))
+        self._payload["t:variables"] = json.dumps(variables, separators=(",", ":"), default=str)
         return self
 
     def set_recipient_variables(self, variables: dict[str, dict[str, Any]]) -> Self:
@@ -393,7 +438,11 @@ class MailgunMessageBuilder:
         Returns:
             The builder instance.
         """
-        self._payload["recipient-variables"] = json.dumps(variables, separators=(",", ":"))
+        self._payload["recipient-variables"] = json.dumps(
+            variables,
+            separators=(",", ":"),
+            default=str,
+        )
         return self
 
     def check_deliverability(self) -> dict[str, float | list[str] | bool] | SpamReport:
@@ -430,7 +479,9 @@ class MailgunMessageBuilder:
 
         if self._idempotency_safe and "h:X-Idempotency-Key" not in final_payload:
             idempotency_key = IdempotencyGuard.generate_key(
-                self._domain, final_payload, self._files
+                self._domain,
+                final_payload,
+                self._files,
             )
             final_payload["h:X-Idempotency-Key"] = idempotency_key
 
@@ -442,7 +493,8 @@ class MailgunMessageBuilder:
                 else:
                     del final_payload[key]
 
-        return final_payload, self._files or None
+        files_copy = list(self._files) if self._files else None
+        return final_payload, files_copy
 
 
 class MailgunTemplateBuilder:
@@ -534,7 +586,7 @@ class MailgunTemplateBuilder:
         Returns:
             The builder instance.
         """
-        self._payload["headers"] = json.dumps(headers, separators=(",", ":"))
+        self._payload["headers"] = json.dumps(headers, separators=(",", ":"), default=str)
         return self
 
     def set_copy_requests(self, requests_list: list[dict[str, str]]) -> Self:

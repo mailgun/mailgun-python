@@ -37,7 +37,8 @@ _EXACT_ROUTES: ExactRouteType = {
     # Account level definitions
     "account_templates": ("v4", ("templates",)),
     "account_webhooks": ("v1", ("webhooks",)),
-    # Validation Service
+    "routes_match": ("v3", ("routes", "match")),
+    # Validation Service (v4 Validate API)
     "addressvalidate": ("v4", ("address", "validate")),
     "addressparse": ("v4", ("address", "parse")),
     "address_bulk": ("v4", ("address", "validate", "bulk")),
@@ -45,7 +46,6 @@ _EXACT_ROUTES: ExactRouteType = {
     "address_preview": ("v4", ("address", "validate", "preview")),
     # Standard Domain Endpoints (Merged paths to avoid handle_domains intercept)
     "spamtraps": ("v2", ("spamtraps",)),
-    "blocklists": ("v3", ("domains", "{domain}", "blocklists")),
     # MTLS and DKIM Management
     "x509": ("v2", ("x509", "{domain}")),
     "x509_status": ("v2", ("x509", "{domain}", "status")),
@@ -74,7 +74,7 @@ _PREFIX_ROUTES: PrefixRoutesType = {
     "forwards": ("v3", "", None),
     "ip_pools": ("v3", "", None),
     "ip_warmups": ("v3", "", None),
-    "ip_whitelist": ("v2", "ip", "whitelist"),
+    "ip_whitelist": ("v2", "", "ip_whitelist"),
     "ips": ("v3", "", None),
     "lists": ("v3", "", None),
     "mailboxes": ("v3", "", None),
@@ -110,6 +110,7 @@ _PREFIX_ROUTES: PrefixRoutesType = {
     "preview": ("v1", "", None),
     "preview_v2": ("v2", "", "preview"),
     "reputationanalytics": ("v1", "", None),
+    "reputationanalytics_v2": ("v2", "", "reputationanalytics"),
 }
 
 PREFIX_ROUTES: Final = MappingProxyType(_PREFIX_ROUTES)
@@ -129,8 +130,9 @@ DOMAIN_ALIASES: Final = MappingProxyType(_DOMAIN_ALIASES)
 # --- DOMAIN_ENDPOINTS ---
 # Grouping endpoints by versions for smart routing.
 _DOMAIN_ENDPOINTS: DomainsEndpointsType = {
-    "v1": ("dkim", "security"),
-    "v4": ("ips", "connections"),
+    "v1": ("dkim_management", "monitoring", "security"),
+    "v2": ("x509",),
+    "v4": ("connections", "ips", "keys"),
     "v3": (
         "bounces",
         "click",
@@ -175,6 +177,7 @@ ROUTE_ALIASES: Final = MappingProxyType(_ROUTE_ALIASES)
 # Defined as strings to prevent expensive regex compilation on cold boot.
 _DEPRECATED_ROUTES_PATTERNS: Final[dict[str, str]] = {
     r"^/v1/bounce-classification/": "The v1 bounce-classification API is deprecated. Migrate to POST /v2/bounce-classification/metrics.",
+    r"^/v1/spamtraps": "The v1 spamtraps APIs (/v1/spamtraps, /v1/spamtraps/totals, /v1/spamtraps/filters) are deprecated. Migrate to GET /v2/spamtraps.",
     r"^/v3/(stats|[^/]+/stats|[^/]+/aggregates)": "The v3 Stats API is deprecated. Migrate to the v1 Metrics API.",
     r"^/v3/[^/]+/tag(/|$|\?)": "The legacy Tag API is deprecated. Migrate to the new Tags API (/v3/{domain}/tags).",
     r"^/v3/domains/[^/]+/limits/tag": "The domain tag limits API is deprecated.",
@@ -191,5 +194,5 @@ def get_deprecated_regexes() -> MappingProxyType[re.Pattern[str], str]:
         A read-only mapping of compiled regular expressions to their deprecation messages.
     """
     return MappingProxyType(
-        {re.compile(pattern): msg for pattern, msg in _DEPRECATED_ROUTES_PATTERNS.items()}
+        {re.compile(pattern): msg for pattern, msg in _DEPRECATED_ROUTES_PATTERNS.items()},
     )
