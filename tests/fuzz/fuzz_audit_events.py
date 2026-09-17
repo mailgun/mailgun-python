@@ -26,8 +26,9 @@ def _audit_hook(event: str, args: tuple[Any, ...]) -> None:
 
 try:
     sys.addaudithook(_audit_hook)
-except Exception:
-    pass
+except Exception as exc:
+    # Best-effort in fuzz environments: proceed even if audit hook registration fails.
+    logging.debug("Unable to register sys audit hook for fuzz run: %s", exc)
 
 _STATIC_RESP = requests.Response()
 _STATIC_RESP.status_code = 200
@@ -74,6 +75,7 @@ def TestOneInput(data: bytes) -> None:
                     )
 
     except (ApiError, TypeError, ValueError):
+        # Expected for malformed fuzz inputs; ignore so fuzzing can continue exploring paths.
         pass
     except Exception as e:
         if "embedded null" in str(e).lower():

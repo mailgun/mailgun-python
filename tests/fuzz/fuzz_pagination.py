@@ -79,6 +79,7 @@ def TestOneInput(data: bytes) -> None:
                         try:
                             int(l_val)
                         except (ValueError, TypeError):
+                            # Fuzz inputs frequently contain non-integer limits; ignore and continue exploring.
                             pass
 
                 if "ascending" in params:
@@ -90,9 +91,11 @@ def TestOneInput(data: bytes) -> None:
                     try:
                         SecurityGuard.validate_mailgun_url(target_url)
                     except (ValueError, TypeError):
+                        # Expected for malformed fuzz inputs; continue fuzzing other paths.
                         pass
 
         except (ValueError, TypeError, UnicodeDecodeError):
+            # Expected for malformed fuzz inputs; continue fuzzing other paths.
             pass
 
     elif mode == 1:
@@ -106,6 +109,7 @@ def TestOneInput(data: bytes) -> None:
                 if "\x00" in k or any("\x00" in v for v in vals):
                     raise ValueError("Null-byte injected in query parameter")
         except (ValueError, UnicodeDecodeError):
+            # Expected for malformed fuzz inputs; continue fuzzing other paths.
             pass
 
 
@@ -119,6 +123,7 @@ def TestOneInput(data: bytes) -> None:
             if split_url.scheme not in ("http", "https"):
                 raise RuntimeError("Scheme corruption occurred during cursor interpolation")
         except (ValueError, UnicodeDecodeError):
+            # Expected for malformed fuzz inputs; continue fuzzing other paths.
             pass
 
 

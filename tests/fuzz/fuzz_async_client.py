@@ -66,6 +66,8 @@ async def _worker_task(client: AsyncClient, fdp: atheris.FuzzedDataProvider) -> 
         ValueError,
         compat_httpx.RequestError,
     ):
+        # Fuzzing intentionally suppresses expected malformed-input/runtime errors
+        # so one failing path does not stop concurrent exploration.
         pass
 
 

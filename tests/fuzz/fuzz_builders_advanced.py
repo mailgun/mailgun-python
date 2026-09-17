@@ -72,6 +72,7 @@ def TestOneInput(data: bytes) -> None:
                 try:
                     builder.attach_stream(file_path=tmp_path, chunk_size=chunk_size)
                 except (TypeError, ValueError):
+                    # Expected during fuzzing for invalid chunk_size/type combinations; continue exploring.
                     pass
 
             elif op_code == 3:
@@ -80,6 +81,7 @@ def TestOneInput(data: bytes) -> None:
                 try:
                     builder.attach_inline(file_path=tmp_path, cid=custom_cid)
                 except (FileNotFoundError, TypeError, ValueError):
+                    # Expected for malformed fuzz inputs; continue exploring other operations.
                     pass
 
             elif op_code == 4:
@@ -97,6 +99,7 @@ def TestOneInput(data: bytes) -> None:
                         ("payload.bin", raw_bytes, "application/octet-stream")
                     )
                 except (AttributeError, TypeError, ValueError):
+                    # Expected during fuzzing: optional API may be missing or reject malformed input.
                     pass
 
         # Build and trigger hash serialization
@@ -115,6 +118,7 @@ def TestOneInput(data: bytes) -> None:
                     _ = file_obj.read()
 
     except (FileNotFoundError, TypeError, ValueError):
+        # Expected for malformed fuzz inputs; ignore and continue fuzzing.
         pass
     except RecursionError:
         raise RuntimeError("CRASH: JSON Serialization hit Recursion Depth limit.")

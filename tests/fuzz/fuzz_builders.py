@@ -114,7 +114,8 @@ def TestOneInput(data: bytes) -> None:
         if isinstance(e, ValueError) and not any(msg in error_msg for msg in _ALLOWED_ERRORS):
             raise RuntimeError(f"CRASH: Unexpected ValueError in builders: {e}") from e
     except TypeError:
-        pass
+        # Fuzzed inputs may intentionally violate builder method contracts; ignore and continue fuzzing.
+        return
     except Exception as e:
         raise RuntimeError(f"UNHANDLED CRASH in Builders execution: {e}") from e
 

@@ -74,6 +74,7 @@ def TestOneInput(data: bytes) -> None:
             _ = str(err)
             _ = repr(err)
         except (ValueError, TypeError, OverflowError):
+            # Expected for malformed fuzz inputs; continue fuzzing other paths.
             pass
 
     # 2. MailgunTimeoutError formatting
@@ -82,6 +83,7 @@ def TestOneInput(data: bytes) -> None:
             timeout_err = MailgunTimeoutError(fdp.ConsumeUnicodeNoSurrogates(32))
             _ = str(timeout_err)
         except (ValueError, TypeError):
+            # Expected for malformed fuzz inputs; continue fuzzing other paths.
             pass
 
     # 3. HTTP Response Error Deserialization (HTTPX & Requests)

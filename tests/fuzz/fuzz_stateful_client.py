@@ -7,6 +7,7 @@ pagination shocks, file pointer resets, and post-close lifecycle invariants.
 
 import io
 import logging
+import socket
 import sys
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -62,6 +63,10 @@ class ChaosMockAdapter(requests.adapters.HTTPAdapter):
         return resp
 
 
+# 1. Enforce a global fallback socket timeout to immediately fail any unmocked socket calls
+socket.setdefaulttimeout(1.0)
+
+# 2. Patch Session.send globally so client.ping() cannot escape to live networks
 def TestOneInput(data: bytes) -> None:
     if len(data) < 20:
         return
@@ -76,12 +81,15 @@ def TestOneInput(data: bytes) -> None:
         retry_policy=RetryPolicy(max_retries=0, base_delay=0.0),
     )
 
-    with patch("time.sleep", return_value=None):
+    # Patch time.sleep and requests.Session.send to intercept all network traffic
+    with patch("time.sleep", return_value=None), \
+         patch.object(requests.Session, "send", side_effect=adapter.send):
         try:
             client = Client(auth=("api", auth_key), config=config)
             assert client._session is not None
             client._session.mount("https://", adapter)
             client._session.mount("http://", adapter)
+            client._session.mount("", adapter)
 
             active_domains: list[str] = []
 
