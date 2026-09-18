@@ -105,7 +105,7 @@ repos:
         name: "🔒 security · Detect private keys"
 
   - repo: https://github.com/commitizen-tools/commitizen
-    rev: v4.17.0
+    rev: v4.18.1
     hooks:
       - id: commitizen
         name: "🌳 git · Validate commit message"
@@ -134,7 +134,7 @@ repos:
         additional_dependencies: [".[toml]"]
 
   - repo: https://github.com/semgrep/pre-commit
-    rev: 'v1.171.0'
+    rev: 'v1.177.0'
     hooks:
       - id: semgrep
         name: "🔒 security · Static analysis (semgrep)"
@@ -143,14 +143,14 @@ repos:
 
   # Spelling and typos
   - repo: https://github.com/crate-ci/typos
-    rev: v1.48.0
+    rev: v1.50.2
     hooks:
       - id: typos
         name: "📝 spelling · Check typos"
 
   # CI/CD validation
   - repo: https://github.com/python-jsonschema/check-jsonschema
-    rev: 0.37.4
+    rev: 0.38.0
     hooks:
       - id: check-dependabot
         name: "🔧 ci/cd · Validate Dependabot config"
@@ -159,7 +159,7 @@ repos:
         files: ^\.github/workflows/.*\.ya?ml$
 
   - repo: https://github.com/ariebovenberg/slotscheck
-    rev: v0.20.1
+    rev: v0.21.0
     hooks:
       - id: slotscheck
         name: "🔍 check · slotscheck"
@@ -172,7 +172,7 @@ repos:
           - responses
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.1
+    rev: v0.16.8
     hooks:
       - id: ruff-check
         name: "🐍 lint · Check with Ruff"
@@ -191,7 +191,7 @@ repos:
 
   # Python type checking
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v2.3.0
+    rev: v2.3.1
     hooks:
       - id: mypy
         name: "🐍 types · Check with mypy"
@@ -202,14 +202,14 @@ repos:
         exclude: ^mailgun/examples/
 
   - repo: https://github.com/RobertCraigie/pyright-python
-    rev: v1.1.411
+    rev: v1.1.414
     hooks:
       - id: pyright
         name: "🐍 types · Check with pyright"
 
   # Python project configuration
   - repo: https://github.com/abravalheri/validate-pyproject
-    rev: v0.25
+    rev: '0.26'
     hooks:
       - id: validate-pyproject
         name: "🐍 config · Validate pyproject.toml"
