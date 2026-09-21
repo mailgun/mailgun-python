@@ -2,7 +2,9 @@
 
 We [keep a changelog.](http://keepachangelog.com/)
 
-## [Unreleased] (1.9.1)
+## [Unreleased]
+
+## [1.9.1] - 2026-09-21
 
 ### Security
 
@@ -35,9 +37,14 @@ We [keep a changelog.](http://keepachangelog.com/)
 
 ### Pull Requests Merged
 
+- PR #61: build(deps): Bump the minor-and-patch group across 1 directory with 3 updates.
+- PR #63: build(deps): Bump the minor-and-patch group across 1 directory with 2 updates.
+- PR #64: build(deps): Bump github/codeql-action/upload-sarif from 4.37.8 to 4.37.9 in the minor-and-patch group.
 - PR #65: Hardening security and stability.
+- PR #66: Release 1.9.1.
+- PR #67: build(deps): Bump github/codeql-action/upload-sarif from 4.37.9 to 4.38.0 in the minor-and-patch group.
 
-## v1.9.0 - 2026-08-04
+## [1.9.0] - 2026-08-04
 
 ### Added
 
@@ -76,7 +83,7 @@ We [keep a changelog.](http://keepachangelog.com/)
 - [PR_58](https://github.com/mailgun/mailgun-python/pull/58) - build(deps): Bump the minor-and-patch group with 2 updates.
 - [PR_59](https://github.com/mailgun/mailgun-python/pull/59) - build(deps): Bump actions/setup-python from 6.3.0 to 7.0.0.
 
-## v1.8.0 - 2026-07-20
+## [1.8.0] - 2026-07-20
 
 ### 🌟 Top Highlights (The "Big Wins")
 
@@ -505,4 +512,7 @@ We [keep a changelog.](http://keepachangelog.com/)
 [1.6.0]: https://github.com/mailgun/mailgun-python/releases/tag/v1.6.0
 [1.7.0]: https://github.com/mailgun/mailgun-python/releases/tag/v1.7.0
 [1.7.1]: https://github.com/mailgun/mailgun-python/releases/tag/v1.7.1
-[unreleased]: https://github.com/mailgun/mailgun-python/compare/v1.8.0...HEAD
+[1.8.0]: https://github.com/mailgun/mailgun-python/releases/tag/v1.8.0
+[1.9.0]: https://github.com/mailgun/mailgun-python/releases/tag/v1.9.0
+[1.9.1]: https://github.com/mailgun/mailgun-python/releases/tag/v1.9.1
+[unreleased]: https://github.com/mailgun/mailgun-python/compare/v1.9.1...HEAD

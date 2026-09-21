@@ -11,10 +11,26 @@ from typing import Any
 
 import atheris
 
+from mailgun.security import IdempotencyGuard
+
+
 with atheris.instrument_imports():
     from mailgun.builders import ChunkedStreamer, MailgunMessageBuilder
 
 logging.disable(logging.CRITICAL)
+
+
+def _test_cyclic_and_stream_pointer_invariants(
+    fdp: atheris.FuzzedDataProvider, builder: MailgunMessageBuilder
+) -> None:
+    # Explicitly annotate cyclic_dict as dict[str, Any] to allow self-referential structures
+    cyclic_dict: dict[str, Any] = {"domain": "test.com", "to": ["a@b.com"]}
+    cyclic_dict["self"] = cyclic_dict
+    cyclic_dict["nested"] = [cyclic_dict]
+
+    key = IdempotencyGuard.generate_key("test.com", cyclic_dict)
+    assert isinstance(key, str)
+    assert len(key) == 64
 
 
 def _generate_nested_ast(fdp: atheris.FuzzedDataProvider, depth: int = 0) -> Any:
@@ -57,7 +73,7 @@ def TestOneInput(data: bytes) -> None:
     try:
         num_operations = fdp.ConsumeIntInRange(1, 10)
         for _ in range(num_operations):
-            op_code = fdp.ConsumeIntInRange(0, 5)
+            op_code = fdp.ConsumeIntInRange(0, 6)
 
             if op_code == 0:
                 builder.set_idempotency_safe(safe=fdp.ConsumeBool())
@@ -100,6 +116,16 @@ def TestOneInput(data: bytes) -> None:
                 except (AttributeError, TypeError, ValueError):
                     # Expected during fuzzing: optional API may be missing or reject malformed input.
                     pass
+
+            elif op_code == 6:
+                # Direct cyclic graph insertion into builder payload
+                cyclic: dict[str, Any] = {"nested": []}
+                cyclic["self"] = cyclic
+                cyclic["nested"].append(cyclic)
+                builder.add_custom_variable("cyclic_prop", cyclic)
+
+        # Exercise the standalone idempotency cyclic invariant
+        _test_cyclic_and_stream_pointer_invariants(fdp, builder)
 
         # Build and trigger hash serialization
         final_payload, files = builder.build()
