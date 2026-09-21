@@ -49,7 +49,6 @@ def TestOneInput(data: bytes) -> None:
     fdp = atheris.FuzzedDataProvider(data)
 
     mode = fdp.ConsumeIntInRange(0, 3)
-    has_active_exploit = False
 
     if mode == 0:
         # Mode 0: Mixed HTML snippets
@@ -60,14 +59,12 @@ def TestOneInput(data: bytes) -> None:
                 parts.append(fdp.PickValueInList(_BENIGN_MALFORMED_SNIPPETS))
             else:
                 parts.append(fdp.PickValueInList(_HOSTILE_EXECUTABLE_SNIPPETS))
-                has_active_exploit = True
         html_content = f"<html><body>{''.join(parts)}</body></html>"
 
     elif mode == 1:
         # Mode 1: Guaranteed un-commented exploit tag to verify detection invariant
         exploit = fdp.PickValueInList(_HOSTILE_EXECUTABLE_SNIPPETS)
         html_content = f"<html><body><div>{exploit}</div></body></html>"
-        has_active_exploit = True
 
     elif mode == 2:
         # Mode 2: Boundary stress test around MAX_HTML_SIZE_BYTES (100,000 bytes)
@@ -107,7 +104,7 @@ def TestOneInput(data: bytes) -> None:
             raise RuntimeError(f"TYPE DRIFT: Issues must be a list, got {type(report['issues'])}")
 
         # Invariant 4: Standalone unmasked hostile executable snippets must be flagged unsafe
-        if mode == 1 and has_active_exploit:
+        if mode == 1:
             if report["is_safe"]:
                 raise RuntimeError(
                     f"SECURITY BYPASS: Active executable snippet marked safe: {html_content!r}"
