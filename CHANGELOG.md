@@ -37,7 +37,12 @@ We [keep a changelog.](http://keepachangelog.com/)
 
 ### Pull Requests Merged
 
+- PR #61: build(deps): Bump the minor-and-patch group across 1 directory with 3 updates.
+- PR #63: build(deps): Bump the minor-and-patch group across 1 directory with 2 updates.
+- PR #64: build(deps): Bump github/codeql-action/upload-sarif from 4.37.8 to 4.37.9 in the minor-and-patch group.
 - PR #65: Hardening security and stability.
+- PR #66: Release 1.9.1.
+- PR #67: build(deps): Bump github/codeql-action/upload-sarif from 4.37.9 to 4.38.0 in the minor-and-patch group.
 
 ## [1.9.0] - 2026-08-04
 
