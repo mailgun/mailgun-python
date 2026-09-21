@@ -227,6 +227,7 @@ tmp/
 tmp.txt
 wget-log
 Downloads/
+logs/
 *.gz
 *.rar
 *.zip

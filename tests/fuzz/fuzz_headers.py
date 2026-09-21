@@ -46,6 +46,9 @@ _HEADER_VALUE_SEEDS = [
     "value\x00_null_byte",
     "value\x09tab_separated",
     "https://api.mailgun.net/v3\r\n\r\n<script>alert(1)</script>",
+    "просто-заголовок",
+    "header-with-emoji-🚀",
+    "\ud800\udc00",
 ]
 
 
@@ -118,7 +121,7 @@ def TestOneInput(data: bytes) -> None:
             if "\r" in v or "\n" in v or "\x00" in v:
                 raise RuntimeError(f"INJECTION LEAK in header value: {repr(v)}")
 
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, UnicodeEncodeError):
         # Expected security rejection for malformed headers or control characters
         pass
     except Exception as e:

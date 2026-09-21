@@ -26,6 +26,8 @@ _HOSTILE_PAGING_URLS = [
     "https://api.mailgun.net/v3/events?limit=10&ascending=true&ascending=false",
     "https://api.mailgun.net/v3/events?tags=tag1&tags=tag2&tags=tag3",
     "https://api.mailgun.net/v3/events?\x00=corrupted",
+    "https://api.mailgun.net/v3/events?ascending=yes&limit=NaN&score=Infinity",
+    "https://api.mailgun.net/v3/events?tags=promo&tags=newsletter&threshold=1e300",
 ]
 
 
@@ -47,6 +49,11 @@ def TestOneInput(data: bytes) -> None:
         initial_filters["event"] = fdp.PickValueInList(
             ["delivered", "failed", "opened", "clicked", None]
         )
+
+    if fdp.ConsumeBool():
+        initial_filters["tags"] = [
+            fdp.ConsumeUnicodeNoSurrogates(10) for _ in range(fdp.ConsumeIntInRange(1, 3))
+        ]
 
     # Next URL selection: either from hostile seeds or dynamically fuzzed
     if fdp.ConsumeBool():

@@ -18,17 +18,27 @@ with atheris.instrument_imports():
 
 logging.disable(logging.CRITICAL)
 
-_MALFORMED_HTML_SNIPPETS = [
+_BENIGN_MALFORMED_SNIPPETS = [
     '<a href="http://evil.com">Click here</a>',
     '<img src="cid:missing.png" alt="No image">',
     '<div style="display:none;font-size:0px;color:#ffffff;background-color:#ffffff">Hidden Spam</div>',
-    '<script>alert("xss")</script>',
-    '<iframe src="javascript:alert(1)"></iframe>',
     '<!-- ' * 50 + 'Unclosed Comment',
     '<table' + ' border=1' * 200 + '><tr><td>Deep attr</td></tr></table>',
     '<a href="javascript:void(0)">Spam</a>' * 50,
     '<p>\u200b\u200c\u200dHidden zero-width tokens\ufeff</p>',
     '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"' + '>' * 100,
+]
+
+_HOSTILE_EXECUTABLE_SNIPPETS = [
+    '<script>alert("xss")</script>',
+    '<iframe src="javascript:alert(1)"></iframe>',
+    '<object data="exploit.swf"></object>',
+    '<embed src="exploit.pdf">',
+    '<applet code="Exploit.class"></applet>',
+    '<img src="x" onerror="alert(1)">',
+    '<div onmouseover="stealCookies()">Hover me</div>',
+    '<body onload="init()">',
+    '<button onclick="leak()">Click</button>',
 ]
 
 
@@ -38,18 +48,29 @@ def TestOneInput(data: bytes) -> None:
 
     fdp = atheris.FuzzedDataProvider(data)
 
-    mode = fdp.ConsumeIntInRange(0, 2)
+    mode = fdp.ConsumeIntInRange(0, 3)
+    has_active_exploit = False
+
     if mode == 0:
-        # Mode 0: Structured HTML with known deliverability traps
+        # Mode 0: Mixed HTML snippets
         num_snippets = fdp.ConsumeIntInRange(1, 6)
-        parts = [
-            fdp.PickValueInList(_MALFORMED_HTML_SNIPPETS)
-            for _ in range(num_snippets)
-        ]
+        parts = []
+        for _ in range(num_snippets):
+            if fdp.ConsumeBool():
+                parts.append(fdp.PickValueInList(_BENIGN_MALFORMED_SNIPPETS))
+            else:
+                parts.append(fdp.PickValueInList(_HOSTILE_EXECUTABLE_SNIPPETS))
+                has_active_exploit = True
         html_content = f"<html><body>{''.join(parts)}</body></html>"
 
     elif mode == 1:
-        # Mode 1: Boundary stress test around MAX_HTML_SIZE_BYTES (100,000 bytes)
+        # Mode 1: Guaranteed un-commented exploit tag to verify detection invariant
+        exploit = fdp.PickValueInList(_HOSTILE_EXECUTABLE_SNIPPETS)
+        html_content = f"<html><body><div>{exploit}</div></body></html>"
+        has_active_exploit = True
+
+    elif mode == 2:
+        # Mode 2: Boundary stress test around MAX_HTML_SIZE_BYTES (100,000 bytes)
         size_choice = fdp.ConsumeIntInRange(0, 2)
         if size_choice == 0:
             target_size = 99_950
@@ -62,7 +83,7 @@ def TestOneInput(data: bytes) -> None:
         html_content = f"<html><body><p>{base_str}</p></body></html>"
 
     else:
-        # Mode 2: Unconstrained chaotic Unicode noise
+        # Mode 3: Unconstrained chaotic Unicode noise
         html_content = fdp.ConsumeUnicodeNoSurrogates(fdp.ConsumeIntInRange(10, 40000))
 
     try:
@@ -84,6 +105,13 @@ def TestOneInput(data: bytes) -> None:
         # Invariant 3: Issues collection
         if not isinstance(report["issues"], list):
             raise RuntimeError(f"TYPE DRIFT: Issues must be a list, got {type(report['issues'])}")
+
+        # Invariant 4: Standalone unmasked hostile executable snippets must be flagged unsafe
+        if mode == 1 and has_active_exploit:
+            if report["is_safe"]:
+                raise RuntimeError(
+                    f"SECURITY BYPASS: Active executable snippet marked safe: {html_content!r}"
+                )
 
     except (TypeError, ValueError):
         # Expected rejection for oversized payloads exceeding MAX_HTML_SIZE_BYTES

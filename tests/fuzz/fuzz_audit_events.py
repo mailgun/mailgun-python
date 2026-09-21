@@ -65,6 +65,27 @@ def TestOneInput(data: bytes) -> None:
             action = getattr(client.domains, fuzzed_method)
             action(domain=fuzzed_domain)
 
+
+        # Probe header injection & control character audit hooks
+        if fdp.ConsumeBool():
+            hostile_headers = {
+                fdp.ConsumeUnicodeNoSurrogates(16): fdp.PickValueInList(
+                    ["valid", "bad\r\nHeader: 1", "control\x01char", "null\x00byte"]
+                )
+            }
+            client.messages.create(
+                domain=fuzzed_domain,
+                data={"from": "test@example.com", "to": "user@example.com"},
+                headers=hostile_headers,
+            )
+
+        # Probe SSRF URL audit hooks
+        if fdp.ConsumeBool():
+            hostile_url = fdp.PickValueInList(
+                ["ftp://api.mailgun.net", "gopher://127.0.0.1", "http://attacker.com/v3"]
+            )
+            client.messages.api_call(method="get", url=hostile_url)
+
         # Verify invariant: if audit hook fired, arguments must be safe
         for event, args in _AUDIT_LOG:
             for arg in args:
