@@ -145,8 +145,7 @@ To build the `mailgun` package from the sources you need `setuptools` (as a buil
 
 ### Runtime dependencies
 
-At runtime the package requires `requests >=2.33.0`. For async support, it uses `httpx2 >=2.7.0`.
-Async client automatically detects and uses `httpx2` if available, falling back seamlessly to legacy `httpx`.
+At runtime the package requires `requests >=2.33.0`. For async support, it requires `httpx2 >=2.7.0`.
 
 ### Test dependencies
 
@@ -675,7 +674,7 @@ data = {
     "to": ["recipient1@example.com", "recipient2@example.com"],
     "subject": "Advanced Mailgun Features",
     "text": "Testing out tags, custom variables, and testmode!",
-    "o:tag": ["newsletter", "python-sdk"],  # Multiple tags
+    "o:tag": ["async-integration-test", "httpx2-sdk"],  # Multiple tags
     "o:testmode": "yes",  # Validates payload without actually sending
     "o:deliverytime-optimize-period": "24h",  # Send Time Optimization
     "v:my-custom-id": "USER-12345",  # Custom user-defined variable
