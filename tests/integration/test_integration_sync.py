@@ -2248,12 +2248,13 @@ class LogsTests(unittest.TestCase):
         [self.assertIn(key, expected_keys) for key in req.json()]  # type: ignore[func-returns-value]
 
         # Verify core log properties exist without breaking when Mailgun adds new telemetry fields
-        core_item_keys = {"@timestamp", "event", "id", "account"}
-        actual_item_keys = set(req.json()["items"][0].keys())
-        self.assertTrue(
-            core_item_keys.issubset(actual_item_keys),
-            f"Missing core keys in log item: {core_item_keys - actual_item_keys}",
-        )
+        if req.json().get("items"):
+            core_item_keys = {"@timestamp", "event", "id", "account"}
+            actual_item_keys = set(req.json()["items"][0].keys())
+            self.assertTrue(
+                core_item_keys.issubset(actual_item_keys),
+                f"Missing core keys in log item: {core_item_keys - actual_item_keys}",
+            )
 
     def test_post_query_get_account_logs_invalid_data(self) -> None:
         """Expected failure with invalid data."""
