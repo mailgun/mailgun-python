@@ -40,8 +40,8 @@ def main() -> None:
             data = filepath.read_bytes()
             try:
                 TestOneInput(data)
-            except Exception:
-                pass
+            except Exception as exc:
+                print(f"Error while replaying {filepath}: {exc}")
 
     print("✅ Replay complete. Coverage data ready.")
 
