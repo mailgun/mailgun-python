@@ -452,7 +452,7 @@ class TestEndpointSerialization:
             "subject": "Testing STO",
             "text": "This is a test message.",
             "o:deliverytime-optimize-period": "24h",
-            "o:tag": ["newsletter", "python-sdk"],
+            "o:tag": ["async-integration-test", "httpx2-sdk"],
             "o:testmode": "yes",
             "v:custom-id": "USER-12345",
         }
@@ -470,7 +470,7 @@ class TestEndpointSerialization:
             assert actual_data is not None, "Data payload should not be None"
             assert "o:deliverytime-optimize-period" in actual_data
             assert actual_data["o:deliverytime-optimize-period"] == "24h"
-            assert actual_data["o:tag"] == ["newsletter", "python-sdk"]
+            assert actual_data["o:tag"] == ["async-integration-test", "httpx2-sdk"]
 
     def test_update_serializes_json(self) -> None:
         url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}

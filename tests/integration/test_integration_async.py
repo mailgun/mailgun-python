@@ -92,7 +92,7 @@ class AsyncMessagesTests(unittest.IsolatedAsyncioTestCase):
         advanced_data.update(
             {
                 "o:deliverytime-optimize-period": "24h",
-                "o:tag": ["async-integration-test", "httpx-sdk"],
+                "o:tag": ["async-integration-test", "httpx2-sdk"],
                 "v:test-variable": "custom_async_value",
                 "o:testmode": "yes",  # CRITICAL: Ensures the email is NOT actually sent
             },
