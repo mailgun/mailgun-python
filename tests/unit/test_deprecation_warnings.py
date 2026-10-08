@@ -13,7 +13,10 @@ def test_legacy_tag_api_triggers_warning() -> None:
 
     with pytest.warns(DeprecationWarning) as record:
         # Directly test the interceptor with a known legacy URL boundary
-        client.messages._warn_if_deprecated("GET", "https://api.mailgun.net/v3/sandbox.mailgun.org/tag")
+        client.messages._warn_if_deprecated(
+            "GET",
+            "https://api.mailgun.net/v3/sandbox.mailgun.org/tag",
+        )
 
     assert len(record) >= 1
     warning_msg = str(record[0].message)
@@ -27,7 +30,10 @@ def test_legacy_bounce_classification_triggers_warning() -> None:
     client = Client(auth=("api", "key"))
 
     with pytest.warns(DeprecationWarning) as record:
-        client.messages._warn_if_deprecated("GET", "https://api.mailgun.net/v1/bounce-classification/stats")
+        client.messages._warn_if_deprecated(
+            "GET",
+            "https://api.mailgun.net/v1/bounce-classification/stats",
+        )
 
     assert len(record) >= 1
     assert "v1 bounce-classification API is deprecated" in str(record[0].message)
@@ -49,7 +55,10 @@ def test_legacy_bulk_validations_trigger_warning() -> None:
     client = Client(auth=("api", "key"))
 
     with pytest.warns(DeprecationWarning) as record:
-        client.messages._warn_if_deprecated("POST", "https://api.mailgun.net/v3/lists/my-list/validate")
+        client.messages._warn_if_deprecated(
+            "POST",
+            "https://api.mailgun.net/v3/lists/my-list/validate",
+        )
 
     assert len(record) >= 1
     assert "v3 Bulk Validation API is deprecated" in str(record[0].message)
@@ -63,10 +72,16 @@ def test_valid_endpoints_do_not_trigger_warnings() -> None:
         warnings.simplefilter("error", DeprecationWarning)
 
         # This is the NEW API (/v3/domain/tags). It should pass without warnings.
-        client.messages._warn_if_deprecated("GET", "https://api.mailgun.net/v3/sandbox.mailgun.org/tags")
+        client.messages._warn_if_deprecated(
+            "GET",
+            "https://api.mailgun.net/v3/sandbox.mailgun.org/tags",
+        )
 
         # Standard messages API
-        client.messages._warn_if_deprecated("POST", "https://api.mailgun.net/v3/sandbox.mailgun.org/messages")
+        client.messages._warn_if_deprecated(
+            "POST",
+            "https://api.mailgun.net/v3/sandbox.mailgun.org/messages",
+        )
 
         # New v4 validations API
         client.messages._warn_if_deprecated("GET", "https://api.mailgun.net/v4/address/validate")

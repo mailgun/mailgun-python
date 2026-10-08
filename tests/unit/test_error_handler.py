@@ -1,6 +1,5 @@
 """Unit tests for custom API exception classes in error_handler.py."""
 
-
 from mailgun.handlers.error_handler import (
     ApiError,
     DeliverabilityError,
