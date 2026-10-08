@@ -7,10 +7,10 @@ from typing import Any
 
 import atheris
 
-with atheris.instrument_imports():
-    import requests
 
+with atheris.instrument_imports():
     import httpx2
+    import requests
 
 logging.disable(logging.CRITICAL)
 
@@ -74,7 +74,7 @@ def TestOneInput(data: bytes) -> None:
         raise RuntimeError(
             f"DIFFERENTIAL DIVERGENCE: Sync resolved to '{sync_category}' ({type(sync_exc).__name__}), "
             f"but Async resolved to '{async_category}' ({type(async_exc).__name__}). "
-            f"Payload: {payload!r}"
+            f"Payload: {payload!r}",
         )
 
 

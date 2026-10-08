@@ -4,16 +4,16 @@
 import asyncio
 import atexit
 import logging
-import os
 import sys
-from pathlib import Path
 from typing import Any
 
 import atheris
 
+
 with atheris.instrument_imports():
-    from mailgun import routes
     import httpx2
+
+    from mailgun import routes
     from mailgun.client import AsyncClient
     from mailgun.handlers.error_handler import ApiError
 
@@ -110,5 +110,5 @@ def TestOneInput(data: bytes) -> None:
 if __name__ == "__main__":
     atheris.instrument_all()
     atheris.Setup(sys.argv, TestOneInput)
-    atexit.register(lambda: _FUZZ_LOOP.close())
+    atexit.register(_FUZZ_LOOP.close)
     atheris.Fuzz()

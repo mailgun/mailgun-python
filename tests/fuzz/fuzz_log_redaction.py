@@ -12,6 +12,7 @@ from typing import Any
 
 import atheris
 
+
 with atheris.instrument_imports():
     from mailgun.filters import RedactingFilter
 
@@ -56,7 +57,9 @@ def _generate_nested_payload(
     if choice == 3:
         return {
             fdp.ConsumeUnicodeNoSurrogates(10): _generate_nested_payload(
-                fdp, depth + 1, state
+                fdp,
+                depth + 1,
+                state,
             )
             for _ in range(fdp.ConsumeIntInRange(1, 3))
         }
@@ -97,7 +100,7 @@ def TestOneInput(data: bytes) -> None:
                 "pubkey-",
                 "secret-",
                 "https://api.mailgun.net/v3/domains/",
-            ]
+            ],
         )
         multiplier = fdp.ConsumeIntInRange(10, 80)
         suffix = fdp.ConsumeUnicodeNoSurrogates(120)
@@ -143,14 +146,15 @@ def TestOneInput(data: bytes) -> None:
         # Invariant 2: String formatting safety
         # Guard against LibFuzzer OOM on massive format specifiers like %999999999s
         if isinstance(record.msg, str) and re.search(
-            r"%[^a-zA-Z%]*[0-9]{4,}", record.msg
+            r"%[^a-zA-Z%]*[0-9]{4,}",
+            record.msg,
         ):
             return
 
         formatted = record.getMessage()
         if not isinstance(formatted, str):
             raise RuntimeError(
-                f"CONTRACT VIOLATION: getMessage returned {type(formatted)}"
+                f"CONTRACT VIOLATION: getMessage returned {type(formatted)}",
             )
 
     except (KeyError, OverflowError, TypeError, ValueError):
@@ -158,7 +162,7 @@ def TestOneInput(data: bytes) -> None:
         pass
     except RecursionError as e:
         raise RuntimeError(
-            f"SECURITY BREACH: RedactingFilter failed to prevent infinite recursion: {e}"
+            f"SECURITY BREACH: RedactingFilter failed to prevent infinite recursion: {e}",
         ) from e
     except Exception as e:
         raise RuntimeError(f"UNHANDLED CRASH in RedactingFilter: {e}") from e

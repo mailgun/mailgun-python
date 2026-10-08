@@ -8,9 +8,8 @@ from typing import Any
 from unittest.mock import patch
 
 import atheris
-import requests
-
 import httpx2
+import requests
 
 
 with atheris.instrument_imports():
@@ -37,7 +36,9 @@ _SYNC_CLIENT = Client(auth=("api", "key-test"), config=_NO_RETRY_CONFIG)
 _ASYNC_CLIENT = AsyncClient(auth=("api", "key-test"), config=_NO_RETRY_CONFIG)
 
 
-def _build_fuzzed_response_data(fdp: atheris.FuzzedDataProvider) -> tuple[int, dict[str, str], bytes]:
+def _build_fuzzed_response_data(
+    fdp: atheris.FuzzedDataProvider,
+) -> tuple[int, dict[str, str], bytes]:
     """Generate dynamic status codes, headers, and payloads for mock responses."""
     status_code = fdp.PickValueInList(_STATUS_CODES)
     content_types = [
@@ -62,7 +63,7 @@ def _build_fuzzed_response_data(fdp: atheris.FuzzedDataProvider) -> tuple[int, d
     if choice == 0:
         msg = fdp.ConsumeUnicodeNoSurrogates(32)
         total = fdp.ConsumeInt(100)
-        body = f'{{"message": "{msg}", "total": {total}}}'.encode("utf-8")
+        body = f'{{"message": "{msg}", "total": {total}}}'.encode()
     elif choice == 1:
         body = b"{}" if fdp.ConsumeBool() else b""
     else:
@@ -99,12 +100,12 @@ def TestOneInput(data: bytes) -> None:
 
     # Dynamic mock for Async (httpx)
     byte_headers = {
-        k.encode("latin-1"): v.encode("latin-1", "replace")
-        for k, v in resp_headers.items()
+        k.encode("latin-1"): v.encode("latin-1", "replace") for k, v in resp_headers.items()
     }
 
     async def mock_httpx_handle(
-        self: httpx2.AsyncBaseTransport, request: httpx2.Request
+        self: httpx2.AsyncBaseTransport,
+        request: httpx2.Request,
     ) -> httpx2.Response:
         return httpx2.Response(
             status_code=status_code,
@@ -133,7 +134,7 @@ def TestOneInput(data: bytes) -> None:
         call_kwargs["domain"] = fdp.ConsumeUnicodeNoSurrogates(24)
     if fdp.ConsumeBool():
         call_kwargs["params"] = {
-            fdp.ConsumeUnicodeNoSurrogates(8): fdp.ConsumeUnicodeNoSurrogates(16)
+            fdp.ConsumeUnicodeNoSurrogates(8): fdp.ConsumeUnicodeNoSurrogates(16),
         }
     if fdp.ConsumeBool():
         call_kwargs["data"] = {
@@ -159,7 +160,7 @@ def TestOneInput(data: bytes) -> None:
             ares = _FUZZ_LOOP.run_until_complete(coro)
             if hasattr(ares, "status_code"):
                 async_result = f"status_{ares.status_code}"
-        except (TimeoutError, asyncio.TimeoutError):
+        except TimeoutError:
             async_result = "TimeoutError"
         except Exception as exc:
             async_result = type(exc).__name__
@@ -170,7 +171,7 @@ def TestOneInput(data: bytes) -> None:
             f"Call kwargs:   {call_kwargs!r}\n"
             f"Mock Status:   {status_code}\n"
             f"Sync Result:   {sync_result}\n"
-            f"Async Result:  {async_result}"
+            f"Async Result:  {async_result}",
         )
 
 

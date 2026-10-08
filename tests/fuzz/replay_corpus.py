@@ -40,10 +40,11 @@ def main() -> None:
             data = filepath.read_bytes()
             try:
                 TestOneInput(data)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 pass
 
     print("✅ Replay complete. Coverage data ready.")
+
 
 if __name__ == "__main__":
     main()

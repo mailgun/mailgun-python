@@ -6,9 +6,8 @@ import logging
 import sys
 
 import atheris
-import requests
-
 import httpx2
+import requests
 
 
 with atheris.instrument_imports():
@@ -25,24 +24,32 @@ def _build_fuzzed_error_content(fdp: atheris.FuzzedDataProvider) -> bytes:
 
     if payload_type == 0:
         # Standard Mailgun error structure
-        return json.dumps({
-            "message": fdp.ConsumeUnicodeNoSurrogates(64),
-            "details": [fdp.ConsumeUnicodeNoSurrogates(32) for _ in range(fdp.ConsumeIntInRange(0, 3))],
-        }).encode("utf-8")
+        return json.dumps(
+            {
+                "message": fdp.ConsumeUnicodeNoSurrogates(64),
+                "details": [
+                    fdp.ConsumeUnicodeNoSurrogates(32) for _ in range(fdp.ConsumeIntInRange(0, 3))
+                ],
+            },
+        ).encode("utf-8")
 
     if payload_type == 1:
         # Single error key or legacy dictionary format
-        return json.dumps({
-            "error": fdp.ConsumeUnicodeNoSurrogates(64),
-            "code": fdp.ConsumeInt(1000),
-        }).encode("utf-8")
+        return json.dumps(
+            {
+                "error": fdp.ConsumeUnicodeNoSurrogates(64),
+                "code": fdp.ConsumeInt(1000),
+            },
+        ).encode("utf-8")
 
     if payload_type == 2:
         # Array-wrapped errors
-        return json.dumps([
-            {"message": fdp.ConsumeUnicodeNoSurrogates(32)},
-            {"reason": fdp.ConsumeUnicodeNoSurrogates(32)},
-        ]).encode("utf-8")
+        return json.dumps(
+            [
+                {"message": fdp.ConsumeUnicodeNoSurrogates(32)},
+                {"reason": fdp.ConsumeUnicodeNoSurrogates(32)},
+            ],
+        ).encode("utf-8")
 
     if payload_type == 3:
         # Non-JSON HTML / XML error page (Cloudflare/Nginx gateway crashes)
@@ -67,8 +74,7 @@ def TestOneInput(data: bytes) -> None:
         try:
             score = fdp.ConsumeFloat()
             issues = [
-                fdp.ConsumeUnicodeNoSurrogates(24)
-                for _ in range(fdp.ConsumeIntInRange(0, 20))
+                fdp.ConsumeUnicodeNoSurrogates(24) for _ in range(fdp.ConsumeIntInRange(0, 20))
             ]
             err = DeliverabilityError(score=score, issues=issues)
             _ = str(err)
@@ -96,7 +102,7 @@ def TestOneInput(data: bytes) -> None:
             "text/html",
             "text/plain",
             fdp.ConsumeUnicodeNoSurrogates(16),
-        ]
+        ],
     )
     # Ensure header values conform to valid ASCII per HTTP header specifications
     content_type = raw_content_type.encode("ascii", "replace").decode("ascii")
@@ -111,7 +117,7 @@ def TestOneInput(data: bytes) -> None:
         headers=httpx_headers,
         content=content,
         request=httpx2.Request("POST", "https://api.mailgun.net/v3/messages"),
-        )
+    )
 
     try:
         api_error_httpx = ApiError(httpx_resp)

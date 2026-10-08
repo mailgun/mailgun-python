@@ -8,6 +8,7 @@ from typing import Any
 import atheris
 import requests
 
+
 with atheris.instrument_imports():
     from mailgun.client import Client
     from mailgun.handlers.error_handler import ApiError
@@ -65,13 +66,12 @@ def TestOneInput(data: bytes) -> None:
             action = getattr(client.domains, fuzzed_method)
             action(domain=fuzzed_domain)
 
-
         # Probe header injection & control character audit hooks
         if fdp.ConsumeBool():
             hostile_headers = {
                 fdp.ConsumeUnicodeNoSurrogates(16): fdp.PickValueInList(
-                    ["valid", "bad\r\nHeader: 1", "control\x01char", "null\x00byte"]
-                )
+                    ["valid", "bad\r\nHeader: 1", "control\x01char", "null\x00byte"],
+                ),
             }
             client.messages.create(
                 domain=fuzzed_domain,
@@ -82,7 +82,7 @@ def TestOneInput(data: bytes) -> None:
         # Probe SSRF URL audit hooks
         if fdp.ConsumeBool():
             hostile_url = fdp.PickValueInList(
-                ["ftp://api.mailgun.net", "gopher://127.0.0.1", "http://attacker.com/v3"]
+                ["ftp://api.mailgun.net", "gopher://127.0.0.1", "http://attacker.com/v3"],
             )
             client.messages.api_call(method="get", url=hostile_url)
 
@@ -91,7 +91,7 @@ def TestOneInput(data: bytes) -> None:
             for arg in args:
                 if isinstance(arg, str) and "\x00" in arg:
                     raise RuntimeError(
-                        f"CRITICAL: Embedded null byte leaked into sys.audit hook '{event}': {arg!r}"
+                        f"CRITICAL: Embedded null byte leaked into sys.audit hook '{event}': {arg!r}",
                     )
 
     except (ApiError, TypeError, ValueError):
@@ -100,7 +100,7 @@ def TestOneInput(data: bytes) -> None:
     except Exception as e:
         if "embedded null" in str(e).lower():
             raise RuntimeError(
-                f"CRASH: Unsanitized null byte reached runtime boundary: {e}"
+                f"CRASH: Unsanitized null byte reached runtime boundary: {e}",
             ) from e
         raise RuntimeError(f"UNHANDLED CRASH in Audit Events execution: {e}") from e
 

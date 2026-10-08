@@ -7,6 +7,7 @@ from typing import Any
 
 import atheris
 
+
 with atheris.instrument_imports():
     from mailgun.builders import MailgunMessageBuilder, MailgunTemplateBuilder
 
@@ -57,7 +58,9 @@ def TestOneInput(data: bytes) -> None:
                 elif op_code == 2:
                     builder.add_option(
                         fdp.ConsumeUnicodeNoSurrogates(20),
-                        value=fdp.PickValueInList([True, False, fdp.ConsumeUnicodeNoSurrogates(10)]),
+                        value=fdp.PickValueInList(
+                            [True, False, fdp.ConsumeUnicodeNoSurrogates(10)],
+                        ),
                     )
                 elif op_code == 3:
                     builder.add_recipient(
@@ -82,13 +85,9 @@ def TestOneInput(data: bytes) -> None:
 
         else:
             # Target 2: MailgunTemplateBuilder
-            template_name = (
-                fdp.ConsumeUnicodeNoSurrogates(30) if fdp.ConsumeBool() else None
-            )
+            template_name = fdp.ConsumeUnicodeNoSurrogates(30) if fdp.ConsumeBool() else None
             t_builder = (
-                MailgunTemplateBuilder(template_name)
-                if template_name
-                else MailgunTemplateBuilder()
+                MailgunTemplateBuilder(template_name) if template_name else MailgunTemplateBuilder()
             )
 
             for _ in range(fdp.ConsumeIntInRange(1, 8)):
@@ -99,7 +98,7 @@ def TestOneInput(data: bytes) -> None:
                     t_builder.set_description(fdp.ConsumeUnicodeNoSurrogates(50))
                 elif op == 2:
                     t_builder.set_engine(
-                        fdp.PickValueInList(["handlebars", "jinja2", "{{7*7}}", "none"])
+                        fdp.PickValueInList(["handlebars", "jinja2", "{{7*7}}", "none"]),
                     )
                 elif op == 3:
                     t_builder.set_template_content(fdp.ConsumeUnicodeNoSurrogates(200))
@@ -107,7 +106,6 @@ def TestOneInput(data: bytes) -> None:
                     t_builder.set_tag(fdp.ConsumeUnicodeNoSurrogates(20))
 
             _ = t_builder.build()
-
 
     except (ValueError, AttributeError) as e:
         error_msg = str(e)

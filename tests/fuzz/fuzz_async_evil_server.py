@@ -14,8 +14,10 @@ from unittest.mock import patch
 
 import atheris
 
+
 with atheris.instrument_imports():
     import httpx2
+
     from mailgun.client import AsyncClient, Config
     from mailgun.config import RetryPolicy
     from mailgun.handlers.error_handler import ApiError, MailgunTimeoutError
@@ -58,7 +60,9 @@ def TestOneInput(data: bytes) -> None:
     original_send = httpx2.AsyncClient.send
 
     async def evil_send(
-        self: httpx2.AsyncClient, request: httpx2.Request, **kwargs: Any
+        self: httpx2.AsyncClient,
+        request: httpx2.Request,
+        **kwargs: Any,
     ) -> httpx2.Response:
         if fdp.ConsumeBool():
             exceptions = [
@@ -80,7 +84,7 @@ def TestOneInput(data: bytes) -> None:
 
         headers = {
             b"content-type": fdp.PickValueInList(
-                [b"application/json", b"image/png", b"text/html", b"application/octet-stream"]
+                [b"application/json", b"image/png", b"text/html", b"application/octet-stream"],
             ),
             b"content-length": str(fdp.ConsumeIntInRange(-100, 10000)).encode(),
             b"Retry-After": retry_val.encode(errors="ignore"),
@@ -97,9 +101,13 @@ def TestOneInput(data: bytes) -> None:
     httpx2.AsyncClient.send = evil_send  # type: ignore[method-assign]
 
     async def run_fuzz() -> None:
-        with Path(os.devnull).open("w") as devnull, contextlib.redirect_stdout(
-            devnull
-        ), contextlib.redirect_stderr(devnull):
+        with (
+            Path(os.devnull).open("w") as devnull,
+            contextlib.redirect_stdout(
+                devnull,
+            ),
+            contextlib.redirect_stderr(devnull),
+        ):
             try:
                 action_choice = fdp.ConsumeIntInRange(0, 2)
                 if action_choice == 0:
@@ -120,14 +128,13 @@ def TestOneInput(data: bytes) -> None:
                 httpx2.RequestError,
                 json.JSONDecodeError,
                 TimeoutError,
-                asyncio.TimeoutError,
             ):
                 pass
             except OverflowError as oe:
                 raise RuntimeError(f"CRASH: Retry-After exponential overflow: {oe}") from oe
             except Exception as e:
                 raise RuntimeError(
-                    f"SDK crashed handling Async Evil Server response: {type(e).__name__} - {e}"
+                    f"SDK crashed handling Async Evil Server response: {type(e).__name__} - {e}",
                 ) from e
             finally:
                 httpx2.AsyncClient.send = original_send  # type: ignore[method-assign]
