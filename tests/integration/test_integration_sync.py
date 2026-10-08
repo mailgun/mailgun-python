@@ -65,16 +65,18 @@ class MessagesTests(unittest.TestCase):
         """Integration test proving the API accepts advanced tags without error."""
         # We merge our base data with the advanced tags
         advanced_data = self.data.copy()
-        advanced_data.update({
-            "o:deliverytime-optimize-period": "24h",
-            "o:tag": ["integration-test", "python-sdk"],
-            "v:test-variable": "custom_value",
-            "o:testmode": "yes"  # CRITICAL: Ensures the email is NOT actually sent
-        })
+        advanced_data.update(
+            {
+                "o:deliverytime-optimize-period": "24h",
+                "o:tag": ["integration-test", "python-sdk"],
+                "v:test-variable": "custom_value",
+                "o:testmode": "yes",  # CRITICAL: Ensures the email is NOT actually sent
+            },
+        )
 
         req = self.client.messages.create(
             domain=self.domain,
-            data=advanced_data
+            data=advanced_data,
         )
 
         self.assertEqual(req.status_code, 200)
@@ -233,7 +235,7 @@ class DomainTests(unittest.TestCase):
 
     @pytest.mark.order(4)
     @pytest.mark.xfail(
-        reason="Mailgun free tier quota limits and background deletion cause a race condition (403 -> 404)."
+        reason="Mailgun free tier quota limits and background deletion cause a race condition (403 -> 404).",
     )
     def test_get_sending_queues(self) -> None:
         self.client.domains.delete(domain=self.test_domain)
@@ -251,7 +253,7 @@ class DomainTests(unittest.TestCase):
 
     @pytest.mark.order(5)
     @pytest.mark.xfail(
-        reason="Mailgun free tier quota limits and background deletion cause a race condition (403 -> 404)."
+        reason="Mailgun free tier quota limits and background deletion cause a race condition (403 -> 404).",
     )
     def test_verify_domain(self) -> None:
         with suppress(Exception):
@@ -361,7 +363,7 @@ class DomainTests(unittest.TestCase):
         """Test to create a domain key: happy path with valid data."""
         with suppress(Exception):
             self.client.dkim_keys.delete(
-                filters={"signing_domain": self.test_domain, "selector": "smtp-test-new"}
+                filters={"signing_domain": self.test_domain, "selector": "smtp-test-new"},
             )
         # Private key PEM file must be generated in PKCS1 format. You need 'openssl' on your machine
         # openssl genrsa -traditional -out .server.key 2048
@@ -375,7 +377,7 @@ class DomainTests(unittest.TestCase):
             (
                 "pem",
                 ("server.key", server_key_path.read_bytes()),
-            )
+            ),
         ]
 
         data = {
@@ -446,7 +448,7 @@ class DomainTests(unittest.TestCase):
             (
                 "pem",
                 ("server.key", server_key_path.read_bytes()),
-            )
+            ),
         ]
 
         data = {
@@ -487,7 +489,7 @@ class DomainTests(unittest.TestCase):
             (
                 "pem",
                 ("server.key", server_key_path.read_bytes()),
-            )
+            ),
         ]
 
         data = {
@@ -502,7 +504,8 @@ class DomainTests(unittest.TestCase):
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 400)
         self.assertIn(
-            "failed to parse private key: key must be PKCS1 format", req.json()["message"]
+            "failed to parse private key: key must be PKCS1 format",
+            req.json()["message"],
         )
         server_key_path.unlink(missing_ok=True)
         print(f"File {server_key_path} has been removed.")
@@ -533,7 +536,7 @@ class DomainTests(unittest.TestCase):
             (
                 "pem",
                 ("server.key", server_key_path.read_bytes()),
-            )
+            ),
         ]
 
         data = {
@@ -597,7 +600,7 @@ class DomainTests(unittest.TestCase):
 
 
 @pytest.mark.skip(
-    "Dedicated IPs should be enabled for the domain, see https://app.mailgun.com/settings/dedicated-ips"
+    "Dedicated IPs should be enabled for the domain, see https://app.mailgun.com/settings/dedicated-ips",
 )
 class IpTests(unittest.TestCase):
     """Tests for Mailgun IP API.
@@ -648,7 +651,7 @@ class IpTests(unittest.TestCase):
 
 
 @pytest.mark.skip(
-    "This feature can be disabled for an account, see https://app.mailgun.com/settings/ip-pools"
+    "This feature can be disabled for an account, see https://app.mailgun.com/settings/ip-pools",
 )
 class IpPoolsTests(unittest.TestCase):
     """Tests for Mailgun IP POOLS API.
@@ -1224,7 +1227,8 @@ class RoutesTests(unittest.TestCase):
 
         req_post = self.client.routes.create(domain=self.domain, data=self.routes_data)
         req = self.client.routes.get(
-            domain=self.domain, route_id=req_post.json()["route"]["id"]
+            domain=self.domain,
+            route_id=req_post.json()["route"]["id"],
         )
 
         self.assertEqual(req.status_code, 200)
@@ -1261,7 +1265,8 @@ class RoutesTests(unittest.TestCase):
         req_post = self.client.routes.create(domain=self.domain, data=self.routes_data)
 
         req = self.client.routes.delete(
-            domain=self.domain, route_id=req_post.json()["route"]["id"]
+            domain=self.domain,
+            route_id=req_post.json()["route"]["id"],
         )
 
         self.assertEqual(req.status_code, 200)
@@ -1290,7 +1295,7 @@ class RoutesTests(unittest.TestCase):
 
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 200)
-        [self.assertIn(key, expected_keys) for key in req.json()["route"].keys()]  # type: ignore[func-returns-value]
+        [self.assertIn(key, expected_keys) for key in req.json()["route"]]  # type: ignore[func-returns-value]
 
 
 class WebhooksTests(unittest.TestCase):
@@ -1374,7 +1379,10 @@ class MailingListsTests(unittest.TestCase):
         )
         self.client: Client = Client(auth=self.auth)
         self.domain: str = os.environ["DOMAIN"]
-        self.maillist_address = os.environ.get("MAILLIST_ADDRESS_SYNC", f"python_sdk_sync@{self.domain}")
+        self.maillist_address = os.environ.get(
+            "MAILLIST_ADDRESS_SYNC",
+            f"python_sdk_sync@{self.domain}",
+        )
         # Extract clean email addresses (напр., "AB <test@m.com>" -> "test@m.com")
         raw_to = os.environ.get("MESSAGES_TO", f"success@{self.domain}")
         raw_cc = os.environ.get("MESSAGES_CC", f"cc@{self.domain}")
@@ -1411,10 +1419,12 @@ class MailingListsTests(unittest.TestCase):
 
         self.mailing_lists_members_data_mult: dict[str, Any] = {
             "upsert": True,
-            "members": json.dumps([
-                {"address": f"Alice <{self.messages_to}>", "vars": {"age": 26}},
-                {"name": "Bob", "address": self.messages_cc, "vars": {"age": 34}}
-            ]),
+            "members": json.dumps(
+                [
+                    {"address": f"Alice <{self.messages_to}>", "vars": {"age": 26}},
+                    {"name": "Bob", "address": self.messages_cc, "vars": {"age": 34}},
+                ],
+            ),
         }
 
     def test_maillist_pages_get(self) -> None:
@@ -1515,10 +1525,10 @@ class MailingListsTests(unittest.TestCase):
         try:
             self.client.lists_members.delete(
                 address=self.maillist_address,
-                member_address=self.messages_to
+                member_address=self.messages_to,
             )
         except Exception as e:
-            logging.getLogger(__name__).warning(f"Ignored integration error: {e}")
+            logging.getLogger(__name__).warning("Ignored integration error: %s", e)
 
         data = {"address": self.messages_to, "name": "Bob", "subscribed": True}
         req = self.client.lists_members.create(address=self.maillist_address, data=data)
@@ -1531,8 +1541,14 @@ class MailingListsTests(unittest.TestCase):
         with suppress(Exception):
             self.client.lists.create(domain=self.domain, data=self.mailing_lists_data)
         with suppress(Exception):
-            self.client.lists_members.create(address=self.maillist_address, data={"address": self.messages_to})
-        req = self.client.lists_members.get(address=self.maillist_address, member_address=self.messages_to)
+            self.client.lists_members.create(
+                address=self.maillist_address,
+                data={"address": self.messages_to},
+            )
+        req = self.client.lists_members.get(
+            address=self.maillist_address,
+            member_address=self.messages_to,
+        )
         self.assertEqual(req.status_code, 200)
         self.assertIn("member", req.json())
         self.assertEqual(self.messages_to, req.json()["member"]["address"])
@@ -1541,10 +1557,15 @@ class MailingListsTests(unittest.TestCase):
         with suppress(Exception):
             self.client.lists.create(domain=self.domain, data=self.mailing_lists_data)
         with suppress(Exception):
-            self.client.lists_members.create(address=self.maillist_address, data={"address": self.messages_to})
+            self.client.lists_members.create(
+                address=self.maillist_address,
+                data={"address": self.messages_to},
+            )
         data = {"subscribed": False}
         req = self.client.lists_members.update(
-            address=self.maillist_address, member_address=self.messages_to, data=data
+            address=self.maillist_address,
+            member_address=self.messages_to,
+            data=data,
         )
         self.assertEqual(req.status_code, 200)
         self.assertIn("member", req.json())
@@ -1554,7 +1575,10 @@ class MailingListsTests(unittest.TestCase):
     def test_maillists_lists_members_delete(self) -> None:
         with suppress(Exception):
             self.client.lists.create(domain=self.domain, data=self.mailing_lists_data)
-        req = self.client.lists_members.delete(address=self.maillist_address, member_address=self.messages_to)
+        req = self.client.lists_members.delete(
+            address=self.maillist_address,
+            member_address=self.messages_to,
+        )
         self.assertIn(req.status_code, {200, 404})
         if req.status_code == 200:
             self.assertIn("member", req.json())
@@ -1563,7 +1587,9 @@ class MailingListsTests(unittest.TestCase):
         with suppress(Exception):
             self.client.lists.create(domain=self.domain, data=self.mailing_lists_data)
         req = self.client.lists_members.create(
-            address=self.maillist_address, data=self.mailing_lists_members_data_mult, multiple=True
+            address=self.maillist_address,
+            data=self.mailing_lists_members_data_mult,
+            multiple=True,
         )
         self.assertEqual(req.status_code, 200)
         self.assertEqual("Mailing list has been updated", req.json()["message"])
@@ -1785,14 +1811,14 @@ class TemplatesTests(unittest.TestCase):
 
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 200)
-        [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
+        [self.assertIn(key, expected_keys) for key in req.json()]  # type: ignore[func-returns-value]
         self.assertIn("tag", req.json()["version"])
         self.assertIn("version has been copied", req.json()["message"])
         [self.assertIn(key, expected_template_keys) for key in req.json()["template"]]  # type: ignore[func-returns-value]
 
 
 @pytest.mark.skip(
-    "Email Validation is only available through Mailgun paid plans, see https://www.mailgun.com/pricing/"
+    "Email Validation is only available through Mailgun paid plans, see https://www.mailgun.com/pricing/",
 )
 class EmailValidationTests(unittest.TestCase):
     """Tests for Mailgun Email Validation API.
@@ -1848,7 +1874,7 @@ class EmailValidationTests(unittest.TestCase):
 
 
 @pytest.mark.skip(
-    "Inbox Placement is only available through Mailgun Optimize plans, see https://help.mailgun.com/hc/en-us/articles/360034702773-Inbox-Placement"
+    "Inbox Placement is only available through Mailgun Optimize plans, see https://help.mailgun.com/hc/en-us/articles/360034702773-Inbox-Placement",
 )
 class InboxPlacementTests(unittest.TestCase):
     """Tests for Mailgun Inbox Placement API.
@@ -1921,7 +1947,11 @@ class InboxPlacementTests(unittest.TestCase):
         test_id = self.client.inbox_tests.create(domain=self.domain, data=self.post_inbox_test)
         if test_id.status_code in {403, 404}:
             self.skipTest("InboxReady feature not enabled for this account")
-        req = self.client.inbox_tests.get(domain=self.domain, test_id=test_id.json()["tid"], counters=True)
+        req = self.client.inbox_tests.get(
+            domain=self.domain,
+            test_id=test_id.json()["tid"],
+            counters=True,
+        )
         self.assertIn("status", req.json())
 
     def test_get_checks_inbox_tests(self) -> None:
@@ -1978,8 +2008,8 @@ class MetricsTest(unittest.TestCase):
                         "attribute": "domain",
                         "comparator": "=",
                         "values": [{"label": self.domain, "value": self.domain}],
-                    }
-                ]
+                    },
+                ],
             },
             "include_subaccounts": True,
             "include_aggregates": True,
@@ -2002,8 +2032,8 @@ class MetricsTest(unittest.TestCase):
                         "attribute": "domain",
                         "comparator": "=",
                         "values": [{"label": self.domain, "value": self.domain}],
-                    }
-                ]
+                    },
+                ],
             },
             "include_subaccounts": True,
             "include_aggregates": True,
@@ -2073,7 +2103,7 @@ class MetricsTest(unittest.TestCase):
         ]
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 200)
-        [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
+        [self.assertIn(key, expected_keys) for key in req.json()]  # type: ignore[func-returns-value]
         if req.json().get("items"):
             self.assertIn("metrics", req.json()["items"][0])
 
@@ -2112,7 +2142,7 @@ class MetricsTest(unittest.TestCase):
         ]
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 200)
-        [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
+        [self.assertIn(key, expected_keys) for key in req.json()]  # type: ignore[func-returns-value]
         if req.json().get("items"):  # Fixed: call .json().get("items")
             self.assertIn("metrics", req.json()["items"][0])
             self.assertIn("dimensions", req.json()["items"][0])
@@ -2170,8 +2200,8 @@ class LogsTests(unittest.TestCase):
                         "attribute": "test",
                         "comparator": "=",
                         "values": [{"label": "", "value": ""}],
-                    }
-                ]
+                    },
+                ],
             },
             "include_subaccounts": True,
             "pagination": {
@@ -2189,8 +2219,8 @@ class LogsTests(unittest.TestCase):
                         "attribute": "domain",
                         "comparator": "=",
                         "values": [{"label": self.domain, "value": self.domain}],
-                    }
-                ]
+                    },
+                ],
             },
             "include_subaccounts": True,
             "pagination": {
@@ -2215,14 +2245,14 @@ class LogsTests(unittest.TestCase):
 
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 200)
-        [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
+        [self.assertIn(key, expected_keys) for key in req.json()]  # type: ignore[func-returns-value]
 
         # Verify core log properties exist without breaking when Mailgun adds new telemetry fields
         core_item_keys = {"@timestamp", "event", "id", "account"}
         actual_item_keys = set(req.json()["items"][0].keys())
         self.assertTrue(
             core_item_keys.issubset(actual_item_keys),
-            f"Missing core keys in log item: {core_item_keys - actual_item_keys}"
+            f"Missing core keys in log item: {core_item_keys - actual_item_keys}",
         )
 
     def test_post_query_get_account_logs_invalid_data(self) -> None:
@@ -2304,7 +2334,7 @@ class TagsNewTests(unittest.TestCase):
 
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 200)
-        [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
+        [self.assertIn(key, expected_keys) for key in req.json()]  # type: ignore[func-returns-value]
         [self.assertIn(key, expected_pagination_keys) for key in req.json()["pagination"]]  # type: ignore[func-returns-value]
 
     @pytest.mark.order(1)
@@ -2318,7 +2348,7 @@ class TagsNewTests(unittest.TestCase):
 
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 404)
-        [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
+        [self.assertIn(key, expected_keys) for key in req.json()]  # type: ignore[func-returns-value]
 
     # Make sure that the message has been created in MessagesTests before running this test.
     @pytest.mark.order(4)
@@ -2367,7 +2397,7 @@ class TagsNewTests(unittest.TestCase):
 
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 200)
-        [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
+        [self.assertIn(key, expected_keys) for key in req.json()]  # type: ignore[func-returns-value]
 
     @pytest.mark.order(3)
     def test_get_account_tag_incorrect_url_without_limits_part(self) -> None:
@@ -2427,8 +2457,8 @@ class BounceClassificationTests(unittest.TestCase):
                         "attribute": "domain.name",
                         "comparator": "=",
                         "values": [{"value": self.domain}],
-                    }
-                ]
+                    },
+                ],
             },
             "include_subaccounts": True,
             "pagination": {"sort": "entity-name:asc", "limit": 10},
@@ -2478,7 +2508,7 @@ class BounceClassificationTests(unittest.TestCase):
 
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 200)
-        [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
+        [self.assertIn(key, expected_keys) for key in req.json()]  # type: ignore[func-returns-value]
         [self.assertIn(key, expected_dimensions_elements) for key in req.json()["dimensions"]]  # type: ignore[func-returns-value]
         [self.assertIn(key, expected_pagination_keys) for key in req.json()["pagination"]]  # type: ignore[func-returns-value]
 
@@ -2488,7 +2518,7 @@ class BounceClassificationTests(unittest.TestCase):
 
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 400)
-        [self.assertIn(key, "message") for key in req.json().keys()]  # type: ignore[func-returns-value]
+        [self.assertIn(key, "message") for key in req.json()]  # type: ignore[func-returns-value]
         self.assertIn("sort should be either one of metrics or dimensions", req.json()["message"])
 
     def test_post_list_statistic_with_old_dates(self) -> None:
@@ -2497,7 +2527,7 @@ class BounceClassificationTests(unittest.TestCase):
 
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 400)
-        [self.assertIn(key, "message") for key in req.json().keys()]  # type: ignore[func-returns-value]
+        [self.assertIn(key, "message") for key in req.json()]  # type: ignore[func-returns-value]
         self.assertIn("is out of permitted log retention", req.json()["message"])
 
     def test_post_list_statistic_with_empty_payload(self) -> None:
@@ -2746,7 +2776,7 @@ class KeysTests(unittest.TestCase):
         [self.assertIn(key, expected_key_keys) for key in req.json()["key"]]  # type: ignore[func-returns-value]
 
     @pytest.mark.xfail(
-        reason="Mailgun key propagation delay causes intermittent 400 Validation errors on deletion."
+        reason="Mailgun key propagation delay causes intermittent 400 Validation errors on deletion.",
     )
     def test_delete_key(self) -> None:
         """Test to delete the Mailgun API keys: happy path with valid data."""
@@ -2780,18 +2810,22 @@ class NewIntegrationPaidTierTests(unittest.TestCase):
         self,
         func: Callable[..., Any],
         *args: Any,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> Any:
         """Execute a network call and assert it returned a valid JSON response."""
         req = func(*args, **kwargs)
 
         valid_codes = {200, 201, 202, 400, 401, 403, 404, 405, 429}
-        self.assertIn(req.status_code, valid_codes, f"SDK hit an Infrastructure 404 or Server Error: {req.url}")
+        self.assertIn(
+            req.status_code,
+            valid_codes,
+            f"SDK hit an Infrastructure 404 or Server Error: {req.url}",
+        )
 
         try:
             return req.json()
         except Exception as e:
-            logging.getLogger(__name__).warning(f"Ignored integration error: {e}")
+            logging.getLogger(__name__).warning("Ignored integration error: %s", e)
             self.fail(f"API did not return JSON. Route: {req.url}. Response: {req.text}")
 
     # --- SUCCESSFUL ENDPOINTS ---
@@ -2821,8 +2855,14 @@ class NewIntegrationPaidTierTests(unittest.TestCase):
 
     # --- PROBED ENDPOINTS ---
     def test_validations_service(self) -> None:
-        self._safe_execute(self.client.addressvalidate.get, filters={"address": self.validation_address})
-        self._safe_execute(self.client.addressparse.get, filters={"addresses": self.validation_address})
+        self._safe_execute(
+            self.client.addressvalidate.get,
+            filters={"address": self.validation_address},
+        )
+        self._safe_execute(
+            self.client.addressparse.get,
+            filters={"addresses": self.validation_address},
+        )
         self._safe_execute(self.client.address.get)
 
     def test_inspect_and_preview(self) -> None:
@@ -2842,8 +2882,10 @@ class NewIntegrationPaidTierTests(unittest.TestCase):
         try:
             self.client.x509_status.get(domain=self.domain)
         except Exception as e:
-            logging.getLogger(__name__).warning(f"Ignored integration error: {e}")
-            self.skipTest("x509 status returns 500 Server Error for accounts without active TLS certs")
+            logging.getLogger(__name__).warning("Ignored integration error: %s", e)
+            self.skipTest(
+                "x509 status returns 500 Server Error for accounts without active TLS certs",
+            )
 
 
 if __name__ == "__main__":

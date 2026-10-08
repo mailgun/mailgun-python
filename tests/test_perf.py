@@ -1,22 +1,23 @@
 """Performance and throughput benchmark tests for the Mailgun SDK."""
 
 import asyncio
+import tracemalloc
 from collections.abc import Generator
 from concurrent.futures import ThreadPoolExecutor
-import tracemalloc
 from typing import Any
 
+import httpx2
 import pytest
 import requests  # pyright: ignore[reportMissingModuleSource]
 import responses
 
-import httpx2
 from mailgun.client import AsyncClient, Client
 
 
 # ------------------------------------------------------------------------
 # FIXTURES
 # ------------------------------------------------------------------------
+
 
 @pytest.fixture
 def mocked_mailgun() -> Generator[responses.RequestsMock, None, None]:
@@ -37,6 +38,7 @@ def mocked_mailgun() -> Generator[responses.RequestsMock, None, None]:
 # BENCHMARK 1: ROUTING OVERHEAD (PURE CPU)
 # ------------------------------------------------------------------------
 
+
 def test_client_routing_speed(benchmark: Any) -> None:
     """Measures the pure CPU overhead of the __getattr__ dynamic router.
     This proves the efficiency of the lru_cache and magic-method short-circuits.
@@ -55,7 +57,11 @@ def test_client_routing_speed(benchmark: Any) -> None:
 # BENCHMARK 2: SYNCHRONOUS CONNECTION POOLING (THREADING)
 # ------------------------------------------------------------------------
 
-def test_sync_client_concurrent_throughput(benchmark: Any, mocked_mailgun: responses.RequestsMock) -> None:
+
+def test_sync_client_concurrent_throughput(
+    benchmark: Any,
+    mocked_mailgun: responses.RequestsMock,
+) -> None:
     """Measures how fast the synchronous Client can dispatch concurrent requests.
     This proves that pool_maxsize=100 prevents ThreadPoolExecutor bottlenecks.
     """
@@ -69,8 +75,8 @@ def test_sync_client_concurrent_throughput(benchmark: Any, mocked_mailgun: respo
                 "from": "sender@test.com",
                 "to": f"recipient_{i}@test.com",
                 "subject": "Load Test",
-                "text": "Testing connection pooling."
-            }
+                "text": "Testing connection pooling.",
+            },
         )
 
     def dispatch_batch() -> None:
@@ -90,6 +96,7 @@ def test_sync_client_concurrent_throughput(benchmark: Any, mocked_mailgun: respo
 # ------------------------------------------------------------------------
 # BENCHMARK 3: ASYNCHRONOUS CONNECTION POOLING (EVENT LOOP)
 # ------------------------------------------------------------------------
+
 
 def test_async_client_concurrent_throughput(benchmark: Any) -> None:
     """Measures how fast the AsyncClient can dispatch concurrent requests.
@@ -147,8 +154,8 @@ def test_async_client_concurrent_throughput(benchmark: Any) -> None:
                 "from": "sender@test.com",
                 "to": f"recipient_{i}@test.com",
                 "subject": "Load Test",
-                "text": "Testing async pooling."
-            }
+                "text": "Testing async pooling.",
+            },
         )
 
     async def dispatch_batch_async() -> None:
@@ -173,6 +180,7 @@ def test_async_client_concurrent_throughput(benchmark: Any) -> None:
 # BENCHMARK 4: MEMORY FOOTPRINT & LEAK PREVENTION (__slots__)
 # ------------------------------------------------------------------------
 
+
 def test_memory_footprint_leak_prevention() -> None:
     """Proves that processing large requests doesn't bloat the RSS memory footprint."""
     client = Client(auth=("api", "key"))
@@ -186,7 +194,7 @@ def test_memory_footprint_leak_prevention() -> None:
     snapshot_after = tracemalloc.take_snapshot()
     tracemalloc.stop()
 
-    stats = snapshot_after.compare_to(snapshot_before, 'lineno')
+    stats = snapshot_after.compare_to(snapshot_before, "lineno")
     total_diff_kb = sum(stat.size_diff for stat in stats) / 1024
 
     print(f"\nMemory Delta after 5,000 operations: {total_diff_kb:.2f} KB")

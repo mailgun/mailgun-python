@@ -89,17 +89,19 @@ class AsyncMessagesTests(unittest.IsolatedAsyncioTestCase):
         """Async integration test proving the API accepts advanced tags without error."""
         # Merge our base data with the advanced Mailgun tags
         advanced_data = self.data.copy()
-        advanced_data.update({
-            "o:deliverytime-optimize-period": "24h",
-            "o:tag": ["async-integration-test", "httpx-sdk"],
-            "v:test-variable": "custom_async_value",
-            "o:testmode": "yes"  # CRITICAL: Ensures the email is NOT actually sent
-        })
+        advanced_data.update(
+            {
+                "o:deliverytime-optimize-period": "24h",
+                "o:tag": ["async-integration-test", "httpx-sdk"],
+                "v:test-variable": "custom_async_value",
+                "o:testmode": "yes",  # CRITICAL: Ensures the email is NOT actually sent
+            },
+        )
 
         # Execute the request asynchronously
         req = await self.client.messages.create(
             domain=self.domain,
-            data=advanced_data
+            data=advanced_data,
         )
 
         self.assertEqual(req.status_code, 200)
@@ -227,7 +229,7 @@ class AsyncDomainTests(unittest.IsolatedAsyncioTestCase):
 
     @pytest.mark.order(3)
     @pytest.mark.xfail(
-        reason="Mailgun free tier quota limits and background deletion cause a race condition (403 -> 404)."
+        reason="Mailgun free tier quota limits and background deletion cause a race condition (403 -> 404).",
     )
     async def test_get_sending_queues(self) -> None:
         await self.client.domains.delete(domain=self.test_domain)
@@ -246,7 +248,7 @@ class AsyncDomainTests(unittest.IsolatedAsyncioTestCase):
 
     @pytest.mark.order(5)
     @pytest.mark.xfail(
-        reason="Mailgun free tier quota limits and background deletion cause a race condition (403 -> 404)."
+        reason="Mailgun free tier quota limits and background deletion cause a race condition (403 -> 404).",
     )
     async def test_verify_domain(self) -> None:
         with suppress(Exception):
@@ -404,7 +406,7 @@ class AsyncDomainTests(unittest.IsolatedAsyncioTestCase):
 
 
 @pytest.mark.skip(
-    "Dedicated IPs should be enabled for the domain, see https://app.mailgun.com/settings/dedicated-ips"
+    "Dedicated IPs should be enabled for the domain, see https://app.mailgun.com/settings/dedicated-ips",
 )
 class AsyncIpTests(unittest.IsolatedAsyncioTestCase):
     """Async tests for Mailgun IP API using AsyncClient."""
@@ -452,7 +454,7 @@ class AsyncIpTests(unittest.IsolatedAsyncioTestCase):
 
 
 @pytest.mark.skip(
-    "This feature can be disabled for an account, see https://app.mailgun.com/settings/ip-pools"
+    "This feature can be disabled for an account, see https://app.mailgun.com/settings/ip-pools",
 )
 class AsyncIpPoolsTests(unittest.IsolatedAsyncioTestCase):
     """Async tests for Mailgun IP POOLS API using AsyncClient."""
@@ -600,13 +602,17 @@ class AsyncTagsTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_tags_stats_get(self) -> None:
         req = await self.client.tags_stats.get(
-            domain=self.domain, filters=self.stats_params, tag_name=self.tag_name
+            domain=self.domain,
+            filters=self.stats_params,
+            tag_name=self.tag_name,
         )
         self.assertIn(req.status_code, {200, 404})
 
     async def test_tags_stats_aggregate_get(self) -> None:
         req = await self.client.tags_stats_aggregates_devices.get(
-            domain=self.domain, filters=self.stats_params, tag_name=self.tag_name
+            domain=self.domain,
+            filters=self.stats_params,
+            tag_name=self.tag_name,
         )
         self.assertIn(req.status_code, {200, 404})
 
@@ -975,7 +981,8 @@ class AsyncRoutesTests(unittest.IsolatedAsyncioTestCase):
 
         req_post = await self.client.routes.create(domain=self.domain, data=self.routes_data)
         req = await self.client.routes.get(
-            domain=self.domain, route_id=req_post.json()["route"]["id"]
+            domain=self.domain,
+            route_id=req_post.json()["route"]["id"],
         )
 
         self.assertEqual(req.status_code, 200)
@@ -1012,7 +1019,8 @@ class AsyncRoutesTests(unittest.IsolatedAsyncioTestCase):
         req_post = await self.client.routes.create(domain=self.domain, data=self.routes_data)
 
         req = await self.client.routes.delete(
-            domain=self.domain, route_id=req_post.json()["route"]["id"]
+            domain=self.domain,
+            route_id=req_post.json()["route"]["id"],
         )
 
         self.assertEqual(req.status_code, 200)
@@ -1041,7 +1049,8 @@ class AsyncRoutesTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 200)
-        [self.assertIn(key, expected_keys) for key in req.json()["route"].keys()]  # type: ignore[func-returns-value]
+        [self.assertIn(key, expected_keys) for key in req.json()["route"]]  # type: ignore[func-returns-value]
+
 
 class AsyncWebhooksTests(unittest.IsolatedAsyncioTestCase):
     """Async tests for Mailgun Webhooks API using AsyncClient."""
@@ -1116,7 +1125,10 @@ class AsyncMailingListsTests(unittest.IsolatedAsyncioTestCase):
         self.client: AsyncClient = AsyncClient(auth=self.auth)
         self.domain: str = os.environ["DOMAIN"]
 
-        self.maillist_address = os.environ.get("MAILLIST_ADDRESS_ASYNC", f"python_sdk_async@{self.domain}")
+        self.maillist_address = os.environ.get(
+            "MAILLIST_ADDRESS_ASYNC",
+            f"python_sdk_async@{self.domain}",
+        )
 
         raw_to = os.environ.get("MESSAGES_TO", f"success@{self.domain}")
         raw_cc = os.environ.get("MESSAGES_CC", f"cc@{self.domain}")
@@ -1153,10 +1165,12 @@ class AsyncMailingListsTests(unittest.IsolatedAsyncioTestCase):
 
         self.mailing_lists_members_data_mult: dict[str, Any] = {
             "upsert": True,
-            "members": json.dumps([
-                {"address": f"Alice <{self.messages_to}>", "vars": {"age": 26}},
-                {"name": "Bob", "address": self.messages_cc, "vars": {"age": 34}}
-            ]),
+            "members": json.dumps(
+                [
+                    {"address": f"Alice <{self.messages_to}>", "vars": {"age": 26}},
+                    {"name": "Bob", "address": self.messages_cc, "vars": {"age": 34}},
+                ],
+            ),
         }
 
     async def asyncTearDown(self) -> None:
@@ -1208,8 +1222,13 @@ class AsyncMailingListsTests(unittest.IsolatedAsyncioTestCase):
                 raise
 
         # Execute creation on the dedicated isolated path
-        create_req = await self.client.lists.create(domain=self.domain, data=self.mailing_lists_data)
-        assert create_req.status_code == 200, f"Mailing list creation failed with payload: {create_req.text}"
+        create_req = await self.client.lists.create(
+            domain=self.domain,
+            data=self.mailing_lists_data,
+        )
+        assert create_req.status_code == 200, (
+            f"Mailing list creation failed with payload: {create_req.text}"
+        )
 
         # Execute teardown verification
         req = await self.client.lists.delete(
@@ -1269,10 +1288,10 @@ class AsyncMailingListsTests(unittest.IsolatedAsyncioTestCase):
         try:
             await self.client.lists_members.delete(
                 address=self.maillist_address,
-                member_address=self.messages_to
+                member_address=self.messages_to,
             )
         except Exception as e:
-            logging.getLogger(__name__).warning(f"Ignored integration error: {e}")
+            logging.getLogger(__name__).warning("Ignored integration error: %s", e)
 
         data = {"address": self.messages_to, "name": "Bob", "subscribed": True}
         req = await self.client.lists_members.create(address=self.maillist_address, data=data)
@@ -1282,7 +1301,10 @@ class AsyncMailingListsTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.messages_to, req.json()["member"]["address"])
 
     async def test_maillists_lists_members_get(self) -> None:
-        req = await self.client.lists_members.get(address=self.maillist_address, member_address=self.messages_to)
+        req = await self.client.lists_members.get(
+            address=self.maillist_address,
+            member_address=self.messages_to,
+        )
         self.assertEqual(req.status_code, 200)
         self.assertIn("member", req.json())
         self.assertEqual(self.messages_to, req.json()["member"]["address"])
@@ -1290,7 +1312,9 @@ class AsyncMailingListsTests(unittest.IsolatedAsyncioTestCase):
     async def test_maillists_lists_members_update(self) -> None:
         data = {"subscribed": False}
         req = await self.client.lists_members.update(
-            address=self.maillist_address, member_address=self.messages_to, data=data
+            address=self.maillist_address,
+            member_address=self.messages_to,
+            data=data,
         )
         self.assertEqual(req.status_code, 200)
         self.assertIn("member", req.json())
@@ -1299,14 +1323,19 @@ class AsyncMailingListsTests(unittest.IsolatedAsyncioTestCase):
     @pytest.mark.order(9)
     @pytest.mark.skip("Flaky test")
     async def test_maillists_lists_members_delete(self) -> None:
-        req = await self.client.lists_members.delete(address=self.maillist_address, member_address=self.messages_to)
+        req = await self.client.lists_members.delete(
+            address=self.maillist_address,
+            member_address=self.messages_to,
+        )
         self.assertEqual(req.status_code, 200)
         self.assertIn("member", req.json())
         self.assertEqual(self.messages_to, req.json()["member"]["address"])
 
     async def test_maillists_lists_members_create_mult(self) -> None:
         req = await self.client.lists_members.create(
-            address=self.maillist_address, data=self.mailing_lists_members_data_mult, multiple=True
+            address=self.maillist_address,
+            data=self.mailing_lists_members_data_mult,
+            multiple=True,
         )
         self.assertEqual(req.status_code, 200)
         self.assertEqual("Mailing list has been updated", req.json()["message"])
@@ -1525,14 +1554,14 @@ class AsyncTemplatesTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 200)
-        [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
+        [self.assertIn(key, expected_keys) for key in req.json()]  # type: ignore[func-returns-value]
         self.assertIn("tag", req.json()["version"])
         self.assertIn("version has been copied", req.json()["message"])
         [self.assertIn(key, expected_template_keys) for key in req.json()["template"]]  # type: ignore[func-returns-value]
 
 
 @pytest.mark.skip(
-    "Email Validation is only available through Mailgun paid plans, see https://www.mailgun.com/pricing/"
+    "Email Validation is only available through Mailgun paid plans, see https://www.mailgun.com/pricing/",
 )
 class AsyncEmailValidationTests(unittest.IsolatedAsyncioTestCase):
     """Async tests for Mailgun Email Validation API using AsyncClient."""
@@ -1559,7 +1588,6 @@ class AsyncEmailValidationTests(unittest.IsolatedAsyncioTestCase):
             "address": self.validation_address_1,
         }
 
-
     async def asyncTearDown(self) -> None:
         await self.client.aclose()
 
@@ -1582,7 +1610,7 @@ class AsyncEmailValidationTests(unittest.IsolatedAsyncioTestCase):
 
 
 @pytest.mark.skip(
-    "Inbox Placement is only available through Mailgun Optimize plans, see https://help.mailgun.com/hc/en-us/articles/360034702773-Inbox-Placement"
+    "Inbox Placement is only available through Mailgun Optimize plans, see https://help.mailgun.com/hc/en-us/articles/360034702773-Inbox-Placement",
 )
 class AsyncInboxPlacementTests(unittest.IsolatedAsyncioTestCase):
     """Async tests for Mailgun Inbox Placement API using AsyncClient."""
@@ -1612,7 +1640,10 @@ class AsyncInboxPlacementTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(req.status_code, 201)
 
     async def test_get_inbox_tests(self) -> None:
-        test_id = await self.client.inbox_tests.create(domain=self.domain, data=self.post_inbox_test)
+        test_id = await self.client.inbox_tests.create(
+            domain=self.domain,
+            data=self.post_inbox_test,
+        )
         if test_id.status_code in {403, 404}:
             self.skipTest("InboxReady feature not enabled for this account")
         req = await self.client.inbox_tests.get(domain=self.domain)
@@ -1621,7 +1652,7 @@ class AsyncInboxPlacementTests(unittest.IsolatedAsyncioTestCase):
     async def test_get_simple_inbox_tests(self) -> None:
         test_id = await self.client.inbox_tests.create(
             domain=self.domain,
-            data=self.post_inbox_test
+            data=self.post_inbox_test,
         )
         if test_id.status_code in {403, 404}:
             self.skipTest("InboxReady feature not enabled for this account")
@@ -1633,7 +1664,10 @@ class AsyncInboxPlacementTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("status", req.json())
 
     async def test_delete_inbox_tests(self) -> None:
-        test_id_req = await self.client.inbox_tests.create(domain=self.domain, data=self.post_inbox_test)
+        test_id_req = await self.client.inbox_tests.create(
+            domain=self.domain,
+            data=self.post_inbox_test,
+        )
         if test_id_req.status_code == 403:
             self.skipTest("InboxReady feature not enabled for this account")
 
@@ -1644,20 +1678,34 @@ class AsyncInboxPlacementTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(req.status_code, 200)
 
     async def test_get_counters_inbox_tests(self) -> None:
-        test_id = await self.client.inbox_tests.create(domain=self.domain, data=self.post_inbox_test)
+        test_id = await self.client.inbox_tests.create(
+            domain=self.domain,
+            data=self.post_inbox_test,
+        )
         if test_id.status_code in {403, 404}:
             self.skipTest("InboxReady feature not enabled for this account")
-        req = await self.client.inbox_tests.get(domain=self.domain, test_id=test_id.json()["tid"], counters=True)
+        req = await self.client.inbox_tests.get(
+            domain=self.domain,
+            test_id=test_id.json()["tid"],
+            counters=True,
+        )
         self.assertIn("status", req.json())
 
         self.assertEqual(req.status_code, 200)
         self.assertIn("counters", req.json())
 
     async def test_get_checks_inbox_tests(self) -> None:
-        test_id = await self.client.inbox_tests.create(domain=self.domain, data=self.post_inbox_test)
+        test_id = await self.client.inbox_tests.create(
+            domain=self.domain,
+            data=self.post_inbox_test,
+        )
         if test_id.status_code in {403, 404}:
             self.skipTest("InboxReady feature not enabled for this account")
-        req = await self.client.inbox_tests.get(domain=self.domain, test_id=test_id.json()["tid"], checks=True)
+        req = await self.client.inbox_tests.get(
+            domain=self.domain,
+            test_id=test_id.json()["tid"],
+            checks=True,
+        )
         self.assertIn("status", req.json())
 
 
@@ -1690,8 +1738,8 @@ class AsyncMetricsTest(unittest.IsolatedAsyncioTestCase):
                         "attribute": "domain",
                         "comparator": "=",
                         "values": [{"label": self.domain, "value": self.domain}],
-                    }
-                ]
+                    },
+                ],
             },
             "include_subaccounts": True,
             "include_aggregates": True,
@@ -1714,8 +1762,8 @@ class AsyncMetricsTest(unittest.IsolatedAsyncioTestCase):
                         "attribute": "domain",
                         "comparator": "=",
                         "values": [{"label": self.domain, "value": self.domain}],
-                    }
-                ]
+                    },
+                ],
             },
             "include_subaccounts": True,
             "include_aggregates": True,
@@ -1788,7 +1836,7 @@ class AsyncMetricsTest(unittest.IsolatedAsyncioTestCase):
         ]
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 200)
-        [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
+        [self.assertIn(key, expected_keys) for key in req.json()]  # type: ignore[func-returns-value]
         if req.json().get("items"):
             self.assertIn("metrics", req.json()["items"][0])
 
@@ -1832,7 +1880,7 @@ class AsyncMetricsTest(unittest.IsolatedAsyncioTestCase):
         ]
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 200)
-        [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
+        [self.assertIn(key, expected_keys) for key in req.json()]  # type: ignore[func-returns-value]
         if req.json().get("items"):
             self.assertIn("metrics", req.json()["items"][0])
             self.assertIn("dimensions", req.json()["items"][0])
@@ -1857,7 +1905,9 @@ class AsyncMetricsTest(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 404)
 
-    async def test_post_query_get_account_usage_metrics_invalid_url_without_underscore(self) -> None:
+    async def test_post_query_get_account_usage_metrics_invalid_url_without_underscore(
+        self,
+    ) -> None:
         """Expected failure with an invalid URL dynamically handled by Catch-All"""
         with self.assertRaises(AttributeError):
             await self.client.analyticsusagemetrics.get(filters={"limit": "0", "skip": "0"})
@@ -1888,8 +1938,8 @@ class AsyncLogsTests(unittest.IsolatedAsyncioTestCase):
                         "attribute": "test",
                         "comparator": "=",
                         "values": [{"label": "", "value": ""}],
-                    }
-                ]
+                    },
+                ],
             },
             "include_subaccounts": True,
             "pagination": {
@@ -1907,8 +1957,8 @@ class AsyncLogsTests(unittest.IsolatedAsyncioTestCase):
                         "attribute": "domain",
                         "comparator": "=",
                         "values": [{"label": self.domain, "value": self.domain}],
-                    }
-                ]
+                    },
+                ],
             },
             "include_subaccounts": True,
             "pagination": {
@@ -1936,14 +1986,14 @@ class AsyncLogsTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 200)
-        [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
+        [self.assertIn(key, expected_keys) for key in req.json()]  # type: ignore[func-returns-value]
 
         # Verify core log properties exist without breaking when Mailgun adds new telemetry fields
         core_item_keys = {"@timestamp", "event", "id", "log-level"}
         actual_item_keys = set(req.json()["items"][0].keys())
         self.assertTrue(
             core_item_keys.issubset(actual_item_keys),
-            f"Missing core keys in log item: {core_item_keys - actual_item_keys}"
+            f"Missing core keys in log item: {core_item_keys - actual_item_keys}",
         )
 
     async def test_post_query_get_account_logs_invalid_data(self) -> None:
@@ -2037,7 +2087,7 @@ class AsyncTagsNewTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 200)
-        [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
+        [self.assertIn(key, expected_keys) for key in req.json()]  # type: ignore[func-returns-value]
         [self.assertIn(key, expected_pagination_keys) for key in req.json()["pagination"]]  # type: ignore[func-returns-value]
 
     @pytest.mark.order(1)
@@ -2051,7 +2101,7 @@ class AsyncTagsNewTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 404)
-        [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
+        [self.assertIn(key, expected_keys) for key in req.json()]  # type: ignore[func-returns-value]
 
     @pytest.mark.order(4)
     async def test_delete_account_tag(self) -> None:
@@ -2098,7 +2148,7 @@ class AsyncTagsNewTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 200)
-        [self.assertIn(key, expected_keys) for key in req.json().keys()]  # type: ignore[func-returns-value]
+        [self.assertIn(key, expected_keys) for key in req.json()]  # type: ignore[func-returns-value]
 
     @pytest.mark.order(3)
     async def test_get_account_tag_incorrect_url_without_limits_part(self) -> None:
@@ -2349,7 +2399,7 @@ class AsyncKeysTests(unittest.IsolatedAsyncioTestCase):
         [self.assertIn(key, expected_key_keys) for key in req.json()["key"]]  # type: ignore[func-returns-value]
 
     @pytest.mark.xfail(
-        reason="Mailgun key propagation delay causes intermittent 400 Validation errors on deletion."
+        reason="Mailgun key propagation delay causes intermittent 400 Validation errors on deletion.",
     )
     async def test_delete_key(self) -> None:
         """Test to delete the Mailgun API keys: happy path with valid data."""
@@ -2380,7 +2430,6 @@ class AsyncNewIntegrationPaidTierTests(unittest.IsolatedAsyncioTestCase):
         self.domain = os.environ.get("DOMAIN", "example.com")
         self.validation_address = os.environ.get("VALIDATION_ADDRESS_1", "test@example.com")
 
-
     async def asyncTearDown(self) -> None:
         """Ensure the underlying HTTPX client is closed."""
         await self.client.aclose()
@@ -2389,7 +2438,7 @@ class AsyncNewIntegrationPaidTierTests(unittest.IsolatedAsyncioTestCase):
         self,
         func: Callable[..., Any],
         *args: Any,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> Any:
         """Execute an async network call and assert it returned a valid JSON response."""
         req = await func(*args, **kwargs)
@@ -2398,15 +2447,15 @@ class AsyncNewIntegrationPaidTierTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn(
             req.status_code,
             valid_codes,
-            f"Async SDK hit an Infrastructure 404 or Server Error: {req.url}"
+            f"Async SDK hit an Infrastructure 404 or Server Error: {req.url}",
         )
 
         try:
             return req.json()
         except Exception as e:
-            logging.getLogger(__name__).warning(f"Ignored integration error: {e}")
+            logging.getLogger(__name__).warning("Ignored integration error: %s", e)
             raise AssertionError(
-                f"Async API did not return JSON. Route: {req.url}. Response: {req.text}"
+                f"Async API did not return JSON. Route: {req.url}. Response: {req.text}",
             ) from e
 
     # --- SUCCESSFUL ENDPOINTS ---
@@ -2434,8 +2483,14 @@ class AsyncNewIntegrationPaidTierTests(unittest.IsolatedAsyncioTestCase):
 
     # --- PROBED ENDPOINTS ---
     async def test_validations_service(self) -> None:
-        await self._safe_execute(self.client.addressvalidate.get, filters={"address": self.validation_address})
-        await self._safe_execute(self.client.addressparse.get, filters={"addresses": self.validation_address})
+        await self._safe_execute(
+            self.client.addressvalidate.get,
+            filters={"address": self.validation_address},
+        )
+        await self._safe_execute(
+            self.client.addressparse.get,
+            filters={"addresses": self.validation_address},
+        )
         await self._safe_execute(self.client.address.get)
 
     async def test_inspect_and_preview(self) -> None:
@@ -2454,8 +2509,10 @@ class AsyncNewIntegrationPaidTierTests(unittest.IsolatedAsyncioTestCase):
         try:
             await self.client.x509_status.get(domain=self.domain)
         except Exception as e:
-            logging.getLogger(__name__).warning(f"Ignored integration error: {e}")
-            self.skipTest("x509 status returns 500 Server Error for accounts without active TLS certs")
+            logging.getLogger(__name__).warning("Ignored integration error: %s", e)
+            self.skipTest(
+                "x509 status returns 500 Server Error for accounts without active TLS certs",
+            )
 
 
 if __name__ == "__main__":
