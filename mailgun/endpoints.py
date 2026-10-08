@@ -791,9 +791,13 @@ class Endpoint(BaseEndpoint):
 
         Yields:
             Individual records from the paginated API response.
+
+        Raises:
+            ApiError: If the server returns a 4xx or 5xx status code or a network error occurs.
         """
         initial_filters = dict(filters) if filters else {}
         current_filters = initial_filters.copy()
+        prev_url: str | None = None
 
         while True:
             # Pass a copy of the dictionary so the mock (and the underlying request layer)
@@ -801,7 +805,10 @@ class Endpoint(BaseEndpoint):
             response = self.get(filters=current_filters.copy(), domain=domain, **kwargs)
 
             if hasattr(response, "raise_for_status"):
-                response.raise_for_status()
+                try:
+                    response.raise_for_status()
+                except requests.HTTPError as exc:
+                    raise ApiError(exc.response) from exc
 
             data = response.json()
             if not isinstance(data, dict):
@@ -812,14 +819,10 @@ class Endpoint(BaseEndpoint):
             yield from items
 
             paging_dict = data.get("paging") or {}
-            # Check for the next page cursor
             next_url = paging_dict.get("next")
-            if not next_url or not items:
+            if not next_url or not items or next_url == prev_url:
                 break
-
-            # Stop if there's no next URL or the current page was empty
-            if not next_url or not items:
-                break
+            prev_url = next_url
 
             # Mailgun returns a full URL. Parse it to extract just the new pagination parameters
             # (like 'page' or 'url') so the next self.get() call works correctly.
@@ -1234,6 +1237,7 @@ class AsyncEndpoint(BaseEndpoint):
         """
         initial_filters = dict(filters) if filters else {}
         current_filters = initial_filters.copy()
+        prev_url: str | None = None
 
         while True:
             response = await self.get(filters=current_filters.copy(), domain=domain, **kwargs)
@@ -1256,8 +1260,9 @@ class AsyncEndpoint(BaseEndpoint):
 
             paging_dict = data.get("paging") or {}
             next_url = paging_dict.get("next")
-            if not next_url or not items:
+            if not next_url or not items or next_url == prev_url:
                 break
+            prev_url = next_url
 
             # Mailgun returns a full URL. Parse it to extract just the new pagination parameters
             # (like 'page' or 'url') so the next self.get() call works correctly.
