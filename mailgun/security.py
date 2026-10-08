@@ -272,7 +272,7 @@ class SecurityGuard:
             )
             raise ValueError(msg)
 
-        # Extract values from httpx.Timeout object cleanly
+        # Extract values from httpx2.Timeout object cleanly
         if hasattr(timeout, "read") and hasattr(timeout, "connect"):
             timeout = (getattr(timeout, "connect", 60.0), getattr(timeout, "read", 60.0))
 

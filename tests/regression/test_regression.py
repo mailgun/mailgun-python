@@ -11,7 +11,7 @@ from mailgun.client import AsyncClient, Client, Config
 from mailgun.logger import get_logger
 from mailgun.security import SecurityGuard
 from mailgun.filters import RedactingFilter
-from mailgun._httpx_compat import httpx as compat_httpx
+import httpx2
 import requests
 from mailgun.handlers.email_validation_handler import handle_address_validate
 from pydantic import ValidationError
@@ -114,7 +114,7 @@ class TestControlCharacters:
     @pytest.mark.asyncio
     async def test_async_endpoint_rejects_control_characters(self) -> None:
         """Ensure the asynchronous client intercepts control characters injected
-        via endpoint kwargs before they crash httpx.
+        via endpoint kwargs before they crash httpx2.
         """
         client = AsyncClient(auth=("api", "key"))
 
@@ -540,15 +540,15 @@ class TestuzzCrash:
 
         # Mock HTTPX
         async def mock_handle(
-            self: Any, request: compat_httpx.Request
-        ) -> compat_httpx.Response:
+            self: Any, request: httpx2.Request
+        ) -> httpx2.Response:
             byte_headers = {
                 k.encode("latin-1"): (
                     v.encode("latin-1", "replace") if isinstance(v, str) else v
                 )
                 for k, v in headers.items()
             }
-            return compat_httpx.Response(
+            return httpx2.Response(
                 status_code=status_code,
                 headers=byte_headers,
                 content=body,
@@ -556,7 +556,7 @@ class TestuzzCrash:
             )
 
         monkeypatch.setattr(
-            compat_httpx.AsyncHTTPTransport, "handle_async_request", mock_handle
+            httpx2.AsyncHTTPTransport, "handle_async_request", mock_handle
         )
 
         sync_client = Client(auth=("api", "key-test"))
@@ -626,15 +626,15 @@ class TestuzzCrash:
     async def test_async_endpoint_stream_handles_http_error_gracefully(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Ensure AsyncEndpoint.stream() wraps HTTP errors into ApiError rather than leaking HTTPStatusError."""
         async def mock_handle(
-            self: Any, request: compat_httpx.Request
-        ) -> compat_httpx.Response:
-            return compat_httpx.Response(
+            self: Any, request: httpx2.Request
+        ) -> httpx2.Response:
+            return httpx2.Response(
                 status_code=404,
                 content=b'{"message": "Not Found"}',
                 request=request,
             )
 
-        monkeypatch.setattr(compat_httpx.AsyncHTTPTransport, "handle_async_request", mock_handle)
+        monkeypatch.setattr(httpx2.AsyncHTTPTransport, "handle_async_request", mock_handle)
 
         client = AsyncClient(auth=("api", "test-key"))
         with pytest.raises(ApiError) as exc_info:

@@ -10,7 +10,7 @@ import pytest
 import requests  # pyright: ignore[reportMissingModuleSource]
 import responses
 
-from mailgun._httpx_compat import httpx
+import httpx2
 from mailgun.client import AsyncClient, Client
 
 
@@ -93,14 +93,14 @@ def test_sync_client_concurrent_throughput(benchmark: Any, mocked_mailgun: respo
 
 def test_async_client_concurrent_throughput(benchmark: Any) -> None:
     """Measures how fast the AsyncClient can dispatch concurrent requests.
-    This proves that httpx.Limits(max_connections=100) prevents asyncio bottlenecks.
+    This proves that httpx2.Limits(max_connections=100) prevents asyncio bottlenecks.
     """
     BATCH_SIZE = 50
 
-    async def mock_handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, json={"id": "<test-id>", "message": "Queued."})
+    async def mock_handler(request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(200, json={"id": "<test-id>", "message": "Queued."})
 
-    mock_transport = httpx.MockTransport(mock_handler)
+    mock_transport = httpx2.MockTransport(mock_handler)
 
     try:
         # 1. Attempt modern injection (using client_kwargs dictionary)
@@ -116,7 +116,7 @@ def test_async_client_concurrent_throughput(benchmark: Any) -> None:
 
     if existing is None or getattr(existing, "_transport", None) != mock_transport:
         auth = getattr(existing, "auth", getattr(client, "auth", ("api", "key")))
-        limits = getattr(existing, "_limits", httpx.Limits(max_connections=100))
+        limits = getattr(existing, "_limits", httpx2.Limits(max_connections=100))
 
         kwargs: dict[str, Any] = {"transport": mock_transport, "auth": auth, "limits": limits}
 
@@ -128,7 +128,7 @@ def test_async_client_concurrent_throughput(benchmark: Any) -> None:
         if timeout:
             kwargs["timeout"] = timeout
 
-        new_httpx_client = httpx.AsyncClient(**kwargs)
+        new_httpx_client = httpx2.AsyncClient(**kwargs)
 
         try:
             # Use setattr to bypass static read-only property restrictions
@@ -140,7 +140,7 @@ def test_async_client_concurrent_throughput(benchmark: Any) -> None:
         setattr(client, "_httpx_client", new_httpx_client)
     # -------------------------------
 
-    async def send_one_email(i: int) -> httpx.Response:
+    async def send_one_email(i: int) -> httpx2.Response:
         return await client.messages.create(
             domain="test.com",
             data={

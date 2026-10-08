@@ -8,7 +8,7 @@ import sys
 import atheris
 import requests
 
-from mailgun._httpx_compat import httpx as compat_httpx
+import httpx2
 
 
 with atheris.instrument_imports():
@@ -106,11 +106,11 @@ def TestOneInput(data: bytes) -> None:
     if status_code == 429 and fdp.ConsumeBool():
         httpx_headers["retry-after"] = str(fdp.ConsumeIntInRange(0, 300))
 
-    httpx_resp = compat_httpx.Response(
+    httpx_resp = httpx2.Response(
         status_code=status_code,
         headers=httpx_headers,
         content=content,
-        request=compat_httpx.Request("POST", "https://api.mailgun.net/v3/messages"),
+        request=httpx2.Request("POST", "https://api.mailgun.net/v3/messages"),
         )
 
     try:

@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 import requests  # pyright: ignore[reportMissingModuleSource]
 
-from mailgun._httpx_compat import httpx as compat_httpx
+import httpx2
 from mailgun.client import (
     AsyncClient,
     Client,
@@ -445,14 +445,14 @@ class TestTransportSecurity:
         client = AsyncClient(auth=("api", "key"))
 
         # Patch the transport directly
-        with patch("httpx.AsyncHTTPTransport") as mock_transport_class:
+        with patch("httpx2.AsyncHTTPTransport") as mock_transport_class:
             # Create a mock instance
             mock_transport_instance = AsyncMock()
             mock_transport_class.return_value = mock_transport_instance
 
             # Ensure handle_async_request is an AsyncMock that returns a valid response
             mock_transport_instance.handle_async_request = AsyncMock(
-                return_value=compat_httpx.Response(200)
+                return_value=httpx2.Response(200)
             )
 
             await client.domains.get()
@@ -479,13 +479,13 @@ class TestExceptionSafety:
         """Verify that when an async network failure occurs, the logger uses safe_url_for_log."""
         client = AsyncClient(auth=("api", "key"))
 
-        with patch("mailgun.client.httpx.AsyncHTTPTransport") as mock_transport_class:
+        with patch("mailgun.client.httpx2.AsyncHTTPTransport") as mock_transport_class:
             mock_transport_instance = AsyncMock()
             mock_transport_class.return_value = mock_transport_instance
 
             # Set the side_effect on the async handler
             mock_transport_instance.handle_async_request = AsyncMock(
-                side_effect=compat_httpx.ConnectError("DNS failure")
+                side_effect=httpx2.ConnectError("DNS failure")
             )
 
             with pytest.raises(ApiError, match="Network routing failed"):

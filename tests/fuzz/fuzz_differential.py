@@ -10,7 +10,7 @@ from unittest.mock import patch
 import atheris
 import requests
 
-from mailgun._httpx_compat import httpx as compat_httpx
+import httpx2
 
 
 with atheris.instrument_imports():
@@ -104,16 +104,16 @@ def TestOneInput(data: bytes) -> None:
     }
 
     async def mock_httpx_handle(
-        self: compat_httpx.AsyncBaseTransport, request: compat_httpx.Request
-    ) -> compat_httpx.Response:
-        return compat_httpx.Response(
+        self: httpx2.AsyncBaseTransport, request: httpx2.Request
+    ) -> httpx2.Response:
+        return httpx2.Response(
             status_code=status_code,
             headers=byte_headers,
             content=resp_body,
             request=request,
         )
 
-    compat_httpx.AsyncHTTPTransport.handle_async_request = mock_httpx_handle  # type: ignore[method-assign]
+    httpx2.AsyncHTTPTransport.handle_async_request = mock_httpx_handle  # type: ignore[method-assign]
 
     target_attr = fdp.PickValueInList(_VALID_ENDPOINTS)
     method_name = fdp.PickValueInList(_HTTP_METHODS)

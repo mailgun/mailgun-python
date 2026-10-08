@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import httpx
+import httpx2
 import pytest
 import requests  # pyright: ignore[reportMissingModuleSource]
 
@@ -102,7 +102,7 @@ class TestEndpointDryRun:
         """Ensure Async dry_run mode intercepts email messages and returns a mock response."""
         url = {"base": f"{BASE_URL_V3}/", "keys": ["messages"]}
 
-        mock_client = AsyncMock(spec=httpx.AsyncClient)
+        mock_client = AsyncMock(spec=httpx2.AsyncClient)
         ep = AsyncEndpoint(
             url=url, headers={}, auth=("api", "key"), dry_run=True, client=mock_client
         )
@@ -122,7 +122,7 @@ class TestEndpointDryRun:
         """Ensure standard async routes fallback to the generic JSON mock."""
         url = {"base": f"{BASE_URL_V3}/", "keys": ["domains"]}
 
-        mock_client = AsyncMock(spec=httpx.AsyncClient)
+        mock_client = AsyncMock(spec=httpx2.AsyncClient)
         ep = AsyncEndpoint(
             url=url, headers={}, auth=("api", "key"), dry_run=True, client=mock_client
         )
@@ -227,7 +227,7 @@ class TestEndpointHTTPMethods:
         """
         url = {"base": "https://api.mailgun.net/v3/", "keys": ["domains"]}
 
-        mock_client = AsyncMock(spec=httpx.AsyncClient)
+        mock_client = AsyncMock(spec=httpx2.AsyncClient)
         ep = AsyncEndpoint(url=url, headers={}, auth=("api", "key"), client=mock_client)
 
         with patch(
@@ -504,7 +504,7 @@ class TestEndpointRetryAndStreamPointers:
         url = {"base": "https://api.mailgun.net/v3/", "keys": ["messages"]}
         policy = RetryPolicy(max_retries=1, base_delay=0.01)
 
-        mock_client = AsyncMock(spec=httpx.AsyncClient)
+        mock_client = AsyncMock(spec=httpx2.AsyncClient)
         ep = AsyncEndpoint(url=url, headers={}, auth=("api", "key"), client=mock_client)
         ep.retry_policy = policy
 

@@ -44,8 +44,7 @@ classifiers = [
 
 dynamic = [ "version" ]
 dependencies = [
-    "httpx2 >=2.7.0",     # The new primary async engine
-    "httpx >=0.24.0",     # Kept as a fallback/safety net
+    "httpx2 >=2.7.0",
     "requests>=2.33.0",
 ]
 
@@ -207,6 +206,7 @@ preview = true
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = [ "module-import-not-at-top-of-file" ]
 "mailgun/endpoints.py" = ["import-outside-top-level"]
+"tests/**" = ["assert", "import-outside-top-level"]
 
 [tool.ruff.lint.pylint]
 max-args = 9           # Default is 5. SDK endpoints need more (auth, data, headers, files, etc.)

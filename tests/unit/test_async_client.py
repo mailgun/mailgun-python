@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from mailgun._httpx_compat import httpx as compat_httpx
+import httpx2
 from mailgun.client import AsyncClient, AsyncEndpoint, Config, SecurityGuard
 from mailgun.endpoints import Endpoint
 from mailgun.handlers.error_handler import ApiError
@@ -15,8 +15,8 @@ from tests.conftest import BASE_URL_V3, BASE_URL_V4
 
 
 class TestAsyncClient:
-    @patch("mailgun.client.httpx.AsyncHTTPTransport")
-    @patch("mailgun.client.httpx.AsyncClient")
+    @patch("mailgun.client.httpx2.AsyncHTTPTransport")
+    @patch("mailgun.client.httpx2.AsyncClient")
     @pytest.mark.asyncio
     async def test_aclose_closes_httpx_client(
         self, mock_client_class: MagicMock, _mock_transport: MagicMock
@@ -34,7 +34,7 @@ class TestAsyncClient:
         """Verify that aclose() nullifies the client for GC and is safe to call twice."""
         client = AsyncClient(auth=("api", "key"))
 
-        mock_httpx = AsyncMock(spec=compat_httpx.AsyncClient)
+        mock_httpx = AsyncMock(spec=httpx2.AsyncClient)
         client._httpx_client = mock_httpx
         assert client._httpx_client is not None
 
@@ -54,7 +54,7 @@ class TestAsyncClient:
         """Ensures that calling `.aclose()` repeatedly does not crash the client."""
         client = AsyncClient(auth=("api", "key"))
 
-        client._httpx_client = AsyncMock(spec=compat_httpx.AsyncClient)
+        client._httpx_client = AsyncMock(spec=httpx2.AsyncClient)
         assert client._httpx_client is not None
 
         await client.aclose()
@@ -63,8 +63,8 @@ class TestAsyncClient:
         await client.aclose()
         assert client._httpx_client is None
 
-    @patch("mailgun.client.httpx.AsyncHTTPTransport")
-    @patch("mailgun.client.httpx.AsyncClient")
+    @patch("mailgun.client.httpx2.AsyncHTTPTransport")
+    @patch("mailgun.client.httpx2.AsyncClient")
     def test_async_client_connection_pooling_configured(
         self, _mock_httpx: MagicMock, mock_transport: MagicMock
     ) -> None:
@@ -84,19 +84,19 @@ class TestAsyncClient:
         """Ensures the async context manager correctly initializes and closes the client."""
         async with AsyncClient(auth=("api", "key")) as client:
             assert client.auth == ("api", "key")
-            client._httpx_client = AsyncMock(spec=compat_httpx.AsyncClient)
+            client._httpx_client = AsyncMock(spec=httpx2.AsyncClient)
             assert client._httpx_client is not None
 
         assert client._httpx_client is None
 
-    @patch("mailgun.client.httpx.AsyncHTTPTransport")
-    @patch("mailgun.client.httpx.AsyncClient")
+    @patch("mailgun.client.httpx2.AsyncHTTPTransport")
+    @patch("mailgun.client.httpx2.AsyncClient")
     @pytest.mark.asyncio
     async def test_async_client_context_manager_clean_exit(
-        self, _mock_httpx: MagicMock, _mock_transport: MagicMock
+        self, _mock_httpx2: MagicMock, _mock_transport: MagicMock
     ) -> None:
         """Cover clean AsyncClient __aexit__."""
-        _mock_httpx.return_value.aclose = AsyncMock()
+        _mock_httpx2.return_value.aclose = AsyncMock()
 
         client = AsyncClient(auth=("api", "key"))
         async with client:
@@ -116,8 +116,8 @@ class TestAsyncClient:
         assert client.auth is None
 
     @pytest.mark.asyncio
-    @patch("mailgun.endpoints.httpx.AsyncClient.request")
-    @patch("mailgun.client.httpx.AsyncHTTPTransport")
+    @patch("mailgun.endpoints.httpx2.AsyncClient.request")
+    @patch("mailgun.client.httpx2.AsyncHTTPTransport")
     async def test_async_client_context_manager_reuse(
         self, mock_transport_class: MagicMock, mock_request: MagicMock
     ) -> None:
@@ -145,7 +145,7 @@ class TestAsyncClient:
     @pytest.mark.asyncio
     async def test_async_client_custom_transport_bypasses_default(self) -> None:
         """Verify passing a custom HTTPX transport skips the default TLS transport creation."""
-        mock_transport = compat_httpx.MockTransport(lambda _: compat_httpx.Response(200))
+        mock_transport = httpx2.MockTransport(lambda _: httpx2.Response(200))
 
         client = AsyncClient(
             auth=("api", "key"),
@@ -156,8 +156,8 @@ class TestAsyncClient:
 
         assert client._httpx_client._transport is mock_transport  # pyright: ignore[reportOptionalMemberAccess]
 
-    @patch("mailgun.client.httpx.AsyncHTTPTransport")
-    @patch("mailgun.client.httpx.AsyncClient")
+    @patch("mailgun.client.httpx2.AsyncHTTPTransport")
+    @patch("mailgun.client.httpx2.AsyncClient")
     def test_async_client_dir_includes_endpoints(
         self, _mock_httpx: MagicMock, _mock_transport: MagicMock
     ) -> None:
@@ -169,8 +169,8 @@ class TestAsyncClient:
         assert "bounces" in client_dir
         assert "domains" in client_dir
 
-    @patch("mailgun.client.httpx.AsyncHTTPTransport")
-    @patch("mailgun.client.httpx.AsyncClient")
+    @patch("mailgun.client.httpx2.AsyncHTTPTransport")
+    @patch("mailgun.client.httpx2.AsyncClient")
     def test_async_client_getattr_caching_and_dir(
         self, _mock_httpx: MagicMock, _mock_transport: MagicMock
     ) -> None:
@@ -185,8 +185,8 @@ class TestAsyncClient:
         assert ep1._url == ep2._url
         assert ep1._auth == ep2._auth
 
-    @patch("mailgun.client.httpx.AsyncHTTPTransport")
-    @patch("mailgun.client.httpx.AsyncClient")
+    @patch("mailgun.client.httpx2.AsyncHTTPTransport")
+    @patch("mailgun.client.httpx2.AsyncClient")
     def test_async_client_getattr_invalid_route(
         self, _mock_httpx: MagicMock, _mock_transport: MagicMock
     ) -> None:
@@ -206,8 +206,8 @@ class TestAsyncClient:
         assert client_copy is not client
         assert isinstance(client_copy, AsyncClient)
 
-    @patch("mailgun.client.httpx.AsyncHTTPTransport")
-    @patch("mailgun.client.httpx.AsyncClient")
+    @patch("mailgun.client.httpx2.AsyncHTTPTransport")
+    @patch("mailgun.client.httpx2.AsyncClient")
     def test_async_client_getattr_returns_async_endpoint_type(
         self, _mock_httpx: MagicMock, _mock_transport: MagicMock
     ) -> None:
@@ -230,13 +230,13 @@ class TestAsyncClient:
         assert exc_info.value.__suppress_context__ is True
 
     @pytest.mark.asyncio
-    @patch("mailgun.endpoints.httpx.AsyncClient.request")
-    @patch("mailgun.client.httpx.AsyncHTTPTransport")
+    @patch("mailgun.endpoints.httpx2.AsyncClient.request")
+    @patch("mailgun.client.httpx2.AsyncHTTPTransport")
     async def test_async_client_global_timeout_not_shadowed(
         self, _mock_transport: MagicMock, mock_request: MagicMock
     ) -> None:
         """Verify that the global timeout is not shadowed by the method's default value."""
-        mock_request.return_value = MagicMock(status_code=200, spec=compat_httpx.Response)
+        mock_request.return_value = MagicMock(status_code=200, spec=httpx2.Response)
         client = AsyncClient(auth=("api", "key"), timeout=299.0)
 
         await client.messages.create(domain="test.com", data={"to": "test@test.com"})
@@ -247,8 +247,8 @@ class TestAsyncClient:
         assert "timeout" in kwargs
         assert kwargs["timeout"] == 299.0
 
-    @patch("mailgun.client.httpx.AsyncHTTPTransport")
-    @patch("mailgun.client.httpx.AsyncClient")
+    @patch("mailgun.client.httpx2.AsyncHTTPTransport")
+    @patch("mailgun.client.httpx2.AsyncClient")
     def test_async_client_inherits_client(
         self, _mock_httpx: MagicMock, _mock_transport: MagicMock
     ) -> None:
@@ -256,23 +256,23 @@ class TestAsyncClient:
         assert client.auth == ("api", "key-123")
         assert client.config.api_url == Config.DEFAULT_API_URL
 
-    @patch("mailgun.client.httpx.AsyncHTTPTransport")
-    @patch("mailgun.client.httpx.AsyncClient")
+    @patch("mailgun.client.httpx2.AsyncHTTPTransport")
+    @patch("mailgun.client.httpx2.AsyncClient")
     @pytest.mark.asyncio
     async def test_async_context_manager(
         self, mock_client_class: MagicMock, _mock_transport: MagicMock
     ) -> None:
-        mock_instance = mock_httpx = mock_client_class.return_value
-        mock_httpx.aclose = AsyncMock()
+        mock_instance = mock_httpx2 = mock_client_class.return_value
+        mock_httpx2.aclose = AsyncMock()
 
         async with AsyncClient() as client:
             _ = client._client
             assert client._httpx_client is mock_instance
 
-        mock_httpx.aclose.assert_called_once()
+        mock_httpx2.aclose.assert_called_once()
 
-    @patch("mailgun.client.httpx.AsyncHTTPTransport")
-    @patch("mailgun.client.httpx.AsyncClient")
+    @patch("mailgun.client.httpx2.AsyncHTTPTransport")
+    @patch("mailgun.client.httpx2.AsyncClient")
     def test_async_global_timeout_propagates_to_endpoint(
         self, _mock_httpx: MagicMock, _mock_transport: MagicMock
     ) -> None:
@@ -344,7 +344,7 @@ class TestAsyncClient:
         assert second_pool is not None
         assert second_pool.is_closed is False
 
-        # Validate that a brand new httpx.AsyncClient was generated
+        # Validate that a brand new httpx2.AsyncClient was generated
         assert first_pool is not second_pool, "Failed to regenerate a closed connection pool!"
 
         await client.aclose()
@@ -446,14 +446,14 @@ class TestAsyncEndpoint:
             url=url,
             headers={},
             auth=None,
-            client=MagicMock(spec=compat_httpx.AsyncClient),
+            client=MagicMock(spec=httpx2.AsyncClient),
         )
 
     @pytest.mark.asyncio
     async def test_api_call_exception_chaining(self) -> None:
         """Verify that PEP 3134 exception chaining preserves the original httpx error."""
-        mock_client = AsyncMock(spec=compat_httpx.AsyncClient)
-        original_err = compat_httpx.RequestError("Async DNS resolution failed", request=MagicMock())
+        mock_client = AsyncMock(spec=httpx2.AsyncClient)
+        original_err = httpx2.RequestError("Async DNS resolution failed", request=MagicMock())
         mock_client.request.side_effect = original_err
 
         url = {"base": f"{BASE_URL_V3}/", "keys": ["messages"]}
@@ -469,8 +469,8 @@ class TestAsyncEndpoint:
     @pytest.mark.asyncio
     async def test_api_call_raises_api_error_on_request_error(self) -> None:
         url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
-        mock_client = AsyncMock(spec=compat_httpx.AsyncClient)
-        mock_client.request.side_effect = compat_httpx.RequestError(
+        mock_client = AsyncMock(spec=httpx2.AsyncClient)
+        mock_client.request.side_effect = httpx2.RequestError(
             "network error", request=MagicMock()
         )
         ep = AsyncEndpoint(url=url, headers={}, auth=None, client=mock_client)
@@ -480,8 +480,8 @@ class TestAsyncEndpoint:
     @pytest.mark.asyncio
     async def test_api_call_raises_timeout_error(self) -> None:
         url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
-        mock_client = AsyncMock(spec=compat_httpx.AsyncClient)
-        mock_client.request.side_effect = compat_httpx.TimeoutException("timeout")
+        mock_client = AsyncMock(spec=httpx2.AsyncClient)
+        mock_client.request.side_effect = httpx2.TimeoutException("timeout")
         ep = AsyncEndpoint(url=url, headers={}, auth=None, client=mock_client)
         with pytest.raises(TimeoutError):
             await ep.get()
@@ -493,11 +493,11 @@ class TestAsyncEndpoint:
     ) -> None:
         """Test that async error responses are NOT logged to prevent secret leakage."""
         url = {"base": "https://api.mailgun.net/v4/", "keys": ["domainlist"]}
-        mock_client = AsyncMock(spec=compat_httpx.AsyncClient)
+        mock_client = AsyncMock(spec=httpx2.AsyncClient)
 
         long_response_text = "A" * 600
         mock_resp = MagicMock(
-            status_code=500, text=long_response_text, spec=compat_httpx.Response
+            status_code=500, text=long_response_text, spec=httpx2.Response
         )
         mock_resp.json.side_effect = ValueError("No JSON")
         mock_client.request = AsyncMock(return_value=mock_resp)
@@ -514,9 +514,9 @@ class TestAsyncEndpoint:
         self, mock_get: AsyncMock
     ) -> None:
         """Cover missing verbs and stream filter logic."""
-        mock_client = AsyncMock(spec=compat_httpx.AsyncClient)
+        mock_client = AsyncMock(spec=httpx2.AsyncClient)
         mock_client.request = AsyncMock(
-            return_value=MagicMock(status_code=200, spec=compat_httpx.Response)
+            return_value=MagicMock(status_code=200, spec=httpx2.Response)
         )
         ep = AsyncEndpoint(
             url={"base": "https://api.mailgun.net/v3/", "keys": ["test"]},
@@ -540,9 +540,9 @@ class TestAsyncEndpoint:
     async def test_async_endpoint_payload_is_strictly_minified(self) -> None:
         """Test that JSON payloads are strictly minified before async transmission."""
         url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
-        mock_client = AsyncMock(spec=compat_httpx.AsyncClient)
+        mock_client = AsyncMock(spec=httpx2.AsyncClient)
         mock_client.request = AsyncMock(
-            return_value=MagicMock(status_code=200, spec=compat_httpx.Response)
+            return_value=MagicMock(status_code=200, spec=httpx2.Response)
         )
         ep = AsyncEndpoint(
             url=url,
@@ -565,9 +565,9 @@ class TestAsyncEndpoint:
     @pytest.mark.asyncio
     async def test_create_sends_post(self) -> None:
         url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
-        mock_client = AsyncMock(spec=compat_httpx.AsyncClient)
+        mock_client = AsyncMock(spec=httpx2.AsyncClient)
         mock_client.request = AsyncMock(
-            return_value=MagicMock(status_code=200, spec=compat_httpx.Response)
+            return_value=MagicMock(status_code=200, spec=httpx2.Response)
         )
         ep = AsyncEndpoint(url=url, headers={}, auth=None, client=mock_client)
         await ep.create(data={"key": "value"})
@@ -577,9 +577,9 @@ class TestAsyncEndpoint:
     @pytest.mark.asyncio
     async def test_delete_calls_client_request(self) -> None:
         url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
-        mock_client = AsyncMock(spec=compat_httpx.AsyncClient)
+        mock_client = AsyncMock(spec=httpx2.AsyncClient)
         mock_client.request = AsyncMock(
-            return_value=MagicMock(status_code=200, spec=compat_httpx.Response)
+            return_value=MagicMock(status_code=200, spec=httpx2.Response)
         )
         ep = AsyncEndpoint(url=url, headers={}, auth=None, client=mock_client)
         await ep.delete()
@@ -589,9 +589,9 @@ class TestAsyncEndpoint:
     @pytest.mark.asyncio
     async def test_get_calls_client_request(self) -> None:
         url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
-        mock_client = AsyncMock(spec=compat_httpx.AsyncClient)
+        mock_client = AsyncMock(spec=httpx2.AsyncClient)
         mock_client.request = AsyncMock(
-            return_value=MagicMock(status_code=200, spec=compat_httpx.Response)
+            return_value=MagicMock(status_code=200, spec=httpx2.Response)
         )
         ep = AsyncEndpoint(
             url=url, headers={"User-agent": "test"}, auth=("api", "key"), client=mock_client
@@ -603,9 +603,9 @@ class TestAsyncEndpoint:
     @pytest.mark.asyncio
     async def test_patch_calls_client_request(self) -> None:
         url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
-        mock_client = AsyncMock(spec=compat_httpx.AsyncClient)
+        mock_client = AsyncMock(spec=httpx2.AsyncClient)
         mock_client.request = AsyncMock(
-            return_value=MagicMock(status_code=200, spec=compat_httpx.Response)
+            return_value=MagicMock(status_code=200, spec=httpx2.Response)
         )
         ep = AsyncEndpoint(url=url, headers={}, auth=("api", "key"), client=mock_client)
         await ep.patch(data={"test": "data"})
@@ -618,9 +618,9 @@ class TestAsyncEndpoint:
     @pytest.mark.asyncio
     async def test_put_calls_client_request(self) -> None:
         url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
-        mock_client = AsyncMock(spec=compat_httpx.AsyncClient)
+        mock_client = AsyncMock(spec=httpx2.AsyncClient)
         mock_client.request = AsyncMock(
-            return_value=MagicMock(status_code=200, spec=compat_httpx.Response)
+            return_value=MagicMock(status_code=200, spec=httpx2.Response)
         )
         ep = AsyncEndpoint(url=url, headers={}, auth=("api", "key"), client=mock_client)
         await ep.put(data={"test": "data"})
@@ -633,9 +633,9 @@ class TestAsyncEndpoint:
     @pytest.mark.asyncio
     async def test_update_serializes_json_with_custom_headers(self) -> None:
         url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
-        mock_client = AsyncMock(spec=compat_httpx.AsyncClient)
+        mock_client = AsyncMock(spec=httpx2.AsyncClient)
         mock_client.request = AsyncMock(
-            return_value=MagicMock(status_code=200, spec=compat_httpx.Response)
+            return_value=MagicMock(status_code=200, spec=httpx2.Response)
         )
         ep = AsyncEndpoint(url=url, headers={}, auth=None, client=mock_client)
         await ep.update(

@@ -13,7 +13,7 @@ import atheris
 
 with atheris.instrument_imports():
     from mailgun import routes
-    from mailgun._httpx_compat import httpx as compat_httpx
+    import httpx2
     from mailgun.client import AsyncClient
     from mailgun.handlers.error_handler import ApiError
 
@@ -25,24 +25,24 @@ asyncio.set_event_loop(_FUZZ_LOOP)
 _VALID_ENDPOINTS = list(routes.EXACT_ROUTES.keys()) + list(routes.PREFIX_ROUTES.keys())
 
 
-class MockAsyncTransport(compat_httpx.AsyncBaseTransport):
+class MockAsyncTransport(httpx2.AsyncBaseTransport):
     """Zero-allocation async mock transport."""
 
-    _static_resp = compat_httpx.Response(200, content=b'{"id": "async-test", "items": []}')
+    _static_resp = httpx2.Response(200, content=b'{"id": "async-test", "items": []}')
 
-    async def handle_async_request(self, request: compat_httpx.Request) -> compat_httpx.Response:
+    async def handle_async_request(self, request: httpx2.Request) -> httpx2.Response:
         return self._static_resp
 
 
-original_init = compat_httpx.AsyncClient.__init__
+original_init = httpx2.AsyncClient.__init__
 
 
-def secure_init(self: compat_httpx.AsyncClient, *args: Any, **kwargs: Any) -> None:
+def secure_init(self: httpx2.AsyncClient, *args: Any, **kwargs: Any) -> None:
     kwargs["transport"] = MockAsyncTransport()
     original_init(self, *args, **kwargs)
 
 
-compat_httpx.AsyncClient.__init__ = secure_init  # type: ignore[method-assign]
+httpx2.AsyncClient.__init__ = secure_init  # type: ignore[method-assign]
 
 
 async def _worker_task(client: AsyncClient, fdp: atheris.FuzzedDataProvider) -> None:
@@ -64,7 +64,7 @@ async def _worker_task(client: AsyncClient, fdp: atheris.FuzzedDataProvider) -> 
         RuntimeError,
         TypeError,
         ValueError,
-        compat_httpx.RequestError,
+        httpx2.RequestError,
     ):
         # Fuzzing intentionally suppresses expected malformed-input/runtime errors
         # so one failing path does not stop concurrent exploration.
@@ -96,7 +96,7 @@ async def _async_fuzz_target(data: bytes) -> None:
         RuntimeError,
         TypeError,
         ValueError,
-        compat_httpx.RequestError,
+        httpx2.RequestError,
     ):
         pass
 
