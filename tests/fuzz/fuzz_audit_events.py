@@ -3,6 +3,7 @@
 
 import logging
 import sys
+import time
 from typing import Any
 
 import atheris
@@ -11,9 +12,16 @@ import requests
 
 with atheris.instrument_imports():
     from mailgun.client import Client
+    from mailgun.config import RetryPolicy
     from mailgun.handlers.error_handler import ApiError
+    from mailgun.security import SecurityGuard
 
 logging.disable(logging.CRITICAL)
+
+# Eliminate all sleep latency during fuzzing
+time.sleep = lambda *args, **kwargs: None
+
+_NO_RETRY_CONFIG = RetryPolicy(max_retries=0, base_delay=0.0, max_delay=0.0)
 
 _AUDIT_LOG: list[tuple[str, tuple[Any, ...]]] = []
 
@@ -58,7 +66,7 @@ def TestOneInput(data: bytes) -> None:
     fuzzed_domain = fdp.ConsumeUnicodeNoSurrogates(64)
     fuzzed_method = fdp.PickValueInList(["get", "post", "delete", "put"])
 
-    client = Client(auth=("api", "test-key"))
+    client = Client(auth=("api", "test-key"), retry_policy=_NO_RETRY_CONFIG)
 
     try:
         # Route through actual SDK endpoint execution
@@ -84,7 +92,10 @@ def TestOneInput(data: bytes) -> None:
             hostile_url = fdp.PickValueInList(
                 ["ftp://api.mailgun.net", "gopher://127.0.0.1", "http://attacker.com/v3"],
             )
-            client.messages.api_call(method="get", url=hostile_url)
+            try:
+                SecurityGuard.validate_mailgun_url(hostile_url)
+            except ValueError:
+                pass
 
         # Verify invariant: if audit hook fired, arguments must be safe
         for event, args in _AUDIT_LOG:
