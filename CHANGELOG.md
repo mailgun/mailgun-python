@@ -12,6 +12,7 @@ We [keep a changelog.](http://keepachangelog.com/)
 - **Core HTTP Import Refactoring:** Updated `mailgun.client`, `mailgun.endpoints`, `mailgun.security`, and `mailgun.types` to interface directly with `httpx2` for client instances (`httpx2.AsyncClient`), requests (`httpx2.Request`), responses (`httpx2.Response`), timeouts (`httpx2.Timeout`), and network exceptions (`httpx2.RequestError`, `httpx2.TimeoutException`, `httpx2.ConnectError`, `httpx2.NetworkError`, `httpx2.HTTPStatusError`).
 - **Tooling & Static Analysis Alignment:** Synchronized pre-commit hooks (`commitizen v4.19.2`, `semgrep v1.180.0`, `typos v1.51.1`, `check-jsonschema 0.38.2`, `ruff v0.16.10`, and `mypy v2.4.0`). Added `COM812` (`missing-trailing-comma`) to `[tool.ruff.lint.ignore]` to eliminate Ruff formatter conflicts, and configured test-suite rule relaxations under `[tool.ruff.lint.per-file-ignores]` for `tests/**`.
 - **Security Policy Update:** Updated `SECURITY.md` supported versions table to mark `1.10.x` supported and deprecate `< 1.10.0`.
+- **Fuzzing Harness Latency & Retry Optimization:** Mocked `time.sleep` in `tests/fuzz/fuzz_audit_events.py` to eliminate artificial delays during fuzz test runs, passed a zero-retry policy configuration (`_NO_RETRY_CONFIG`) to the client, and safely handled expected `ValueError` exceptions when testing hostile URLs via `SecurityGuard.validate_mailgun_url`.
 
 ### Removed
 
@@ -21,6 +22,7 @@ We [keep a changelog.](http://keepachangelog.com/)
 ### Fixed
 
 - **Stream Pagination Hardening:** Added duplicate and stagnant cursor detection (`prev_url`) in both `Endpoint.stream()` and `AsyncEndpoint.stream()` to prevent infinite loops. Wrapped synchronous `requests.HTTPError` in `ApiError` for contract parity with the async client, and eliminated redundant loop termination checks.
+- **Retry Short-Circuiting on Unrecoverable Client Errors:** Suppressed retry attempts in `Endpoint` and `AsyncEndpoint` for permanent client-side exceptions. Configuration errors (`InvalidURL`, `InvalidHeader`, `InvalidSchema`, `MissingSchema`) and protocol/decoding errors (`UnsupportedProtocol`, `DecodingError`) are now dispatched directly to `_handle_api_error` without backoff delays.
 - **Telemetry Log Item Index Guard:** Added an `items` existence check in `test_post_query_get_account_logs` across `test_integration_async.py` and `test_integration_sync.py` to prevent `IndexError` when querying accounts with empty log retention windows.
 - **Test Suite Quality & Formatting:** Corrected verbose exception re-raising in `test_integration_coverage.py`, added missing placeholder formatting to `sdk_logger.info` calls, and formatted all unit, integration, and fuzz test targets using `ruff format`.
 
