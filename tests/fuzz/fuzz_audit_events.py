@@ -95,6 +95,7 @@ def TestOneInput(data: bytes) -> None:
             try:
                 SecurityGuard.validate_mailgun_url(hostile_url)
             except ValueError:
+                # Expected for hostile fuzzed URLs; rejection is a valid outcome.
                 pass
 
         # Verify invariant: if audit hook fired, arguments must be safe
