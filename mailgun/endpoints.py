@@ -564,6 +564,18 @@ class Endpoint(BaseEndpoint):
                 break
 
             except requests.RequestException as e:
+                # Client-side configuration and validation errors are unrecoverable; do not retry
+                if isinstance(
+                    e,
+                    (
+                        requests.exceptions.InvalidURL,
+                        requests.exceptions.InvalidHeader,
+                        requests.exceptions.InvalidSchema,
+                        requests.exceptions.MissingSchema,
+                    ),
+                ):
+                    self._handle_api_error(e, safe_method, target_url)
+
                 if attempt < max_attempts - 1:
                     delay = policy.calculate_delay(attempt)
 
@@ -1002,6 +1014,10 @@ class AsyncEndpoint(BaseEndpoint):
                 break
 
             except httpx2.RequestError as e:
+                # Protocol and decoding violations are non-transient; do not retry
+                if isinstance(e, (httpx2.UnsupportedProtocol, httpx2.DecodingError)):
+                    self._handle_api_error(e, safe_method, target_url)
+
                 if attempt < max_attempts - 1:
                     delay = policy.calculate_delay(attempt)
 
