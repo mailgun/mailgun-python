@@ -9,7 +9,6 @@ dependencies:
   # runtime deps
   - requests >=2.33.0
   - httpx2 >=2.7.0
-  - httpx >=0.24.0
   # tests
   - pytest >=9.0.3
   # other

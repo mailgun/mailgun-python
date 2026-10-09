@@ -25,19 +25,20 @@ class TestStreamPaginationAsync:
     @patch.object(AsyncEndpoint, "get", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_async_stream_pagination_traverses_pages(
-        self, mock_async_get: AsyncMock
+        self,
+        mock_async_get: AsyncMock,
     ) -> None:
         page_1 = MockResponse(
             {
                 "items": [{"id": "async_1"}],
                 "paging": {"next": "https://api.mailgun.net/v3/domains?skip=1"},
-            }
+            },
         )
         page_2 = MockResponse(
             {
                 "items": [],
                 "paging": {"next": "https://api.mailgun.net/v3/domains?skip=2"},
-            }
+            },
         )
         mock_async_get.side_effect = [page_1, page_2]
 
@@ -60,7 +61,9 @@ class TestStreamPaginationErrorHandling:
     def test_stream_respects_raise_for_status_errors(self, mock_get: MagicMock) -> None:
         mock_get.return_value = MockResponse({}, status_code=401)
         endpoint = Endpoint(
-            url={"base": "http://mock", "keys": []}, headers={}, auth=None
+            url={"base": "http://mock", "keys": []},
+            headers={},
+            auth=None,
         )
 
         with pytest.raises(ValueError, match="HTTP Error: 401"):
@@ -75,17 +78,18 @@ class TestStreamPaginationSync:
                 "items": [{"id": "event_1"}, {"id": "event_2"}],
                 "paging": {
                     "next": (
-                        "https://api.mailgun.net/v3/events"
-                        "?event=delivered&page=next_page&limit=2"
-                    )
+                        "https://api.mailgun.net/v3/events?event=delivered&page=next_page&limit=2"
+                    ),
                 },
-            }
+            },
         )
         page_2 = MockResponse({"items": [{"id": "event_3"}], "paging": {}})
         mock_get.side_effect = [page_1, page_2]
 
         endpoint = Endpoint(
-            url={"base": "http://mock", "keys": []}, headers={}, auth=None
+            url={"base": "http://mock", "keys": []},
+            headers={},
+            auth=None,
         )
 
         results = list(endpoint.stream(filters={"event": "delivered"}))

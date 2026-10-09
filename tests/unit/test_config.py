@@ -21,7 +21,8 @@ def reset_audit_hook_state() -> Generator[None, Any, None]:
 
 class TestConfigAuditHook:
     def test_audit_hook_actual_execution(
-        self, caplog: pytest.LogCaptureFixture
+        self,
+        caplog: pytest.LogCaptureFixture,
     ) -> None:
         Config.enable_security_audit()
 
@@ -47,10 +48,7 @@ class TestConfigAuditHook:
                 )
                 hook_fn("other.event", ("GET", "https://other.com"))
 
-        assert (
-            "Outbound API call tracked - POST https://api.mailgun.net/v3/messages"
-            in caplog.text
-        )
+        assert "Outbound API call tracked - POST https://api.mailgun.net/v3/messages" in caplog.text
 
     @patch("mailgun.config.logger.info")
     def test_enable_security_audit_hook_execution(self, mock_logger: MagicMock) -> None:
@@ -78,7 +76,8 @@ class TestConfigEdgeCases:
     def test_config_headers_mapping_proxy_prevents_mutation(self) -> None:
         config = Config()
         with pytest.raises(
-            TypeError, match="'mappingproxy' object does not support item assignment"
+            TypeError,
+            match="'mappingproxy' object does not support item assignment",
         ):
             config._HEADERS_BASE["X-Malicious-Header"] = "value"  # type: ignore[index]
 
@@ -263,8 +262,8 @@ class TestConfigRouting:
 
     def test_get_cached_route_data_raises_keyerror_on_invalid_route(self) -> None:
         """Coverage: Ensure typo'd endpoints raise a descriptive KeyError instead of returning None."""
-        from mailgun.config import _get_cached_route_data
         from mailgun import routes
+        from mailgun.config import _get_cached_route_data
 
         bad_key = "messages_typo"
 
@@ -275,7 +274,7 @@ class TestConfigRouting:
 
         assert f"Invalid API endpoint requested: {bad_key}" in error_msg
         assert "Available endpoints:" in error_msg
-        assert list(routes.EXACT_ROUTES.keys())[0] in error_msg
+        assert next(iter(routes.EXACT_ROUTES.keys())) in error_msg
 
 
 class TestConfigSanitization:
@@ -328,7 +327,8 @@ class TestConfigURLValidation:
                 Config(api_url=url)
 
     def test_config_warns_and_strips_trailing_versions(
-        self, caplog: pytest.LogCaptureFixture
+        self,
+        caplog: pytest.LogCaptureFixture,
     ) -> None:
         with caplog.at_level(logging.WARNING):
             config = Config(api_url="https://api.mailgun.net/v3/")
@@ -349,7 +349,8 @@ class TestConfigURLValidation:
 
     @patch("mailgun.config.logger.warning")
     def test_normalize_api_url_strips_trailing_version(
-        self, mock_warn: MagicMock
+        self,
+        mock_warn: MagicMock,
     ) -> None:
         trailing_url = "https://api.mailgun.net/v3/"
         result = Config._normalize_api_url(trailing_url)
@@ -367,7 +368,8 @@ class TestConfigURLValidation:
 
     @patch("mailgun.config.logger.warning")
     def test_validate_api_url_no_warning_on_localhost(
-        self, mock_warn: MagicMock
+        self,
+        mock_warn: MagicMock,
     ) -> None:
         Config(api_url="http://localhost:8000")
         mock_warn.assert_not_called()
@@ -380,7 +382,8 @@ class TestConfigURLValidation:
 
     @patch("mailgun.security.logger.warning")
     def test_validate_api_url_warns_on_unrecognized_host(
-        self, mock_warn: MagicMock
+        self,
+        mock_warn: MagicMock,
     ) -> None:
         Config(api_url="https://custom.corporate.proxy/")
         mock_warn.assert_called_once()
@@ -395,7 +398,12 @@ class TestRetryPolicy:
 
     def test_retry_policy_initialization_and_slots(self) -> None:
         """Verify immutable properties and memory-efficient __slots__ usage."""
-        policy = mailgun.config.RetryPolicy(max_retries=5, base_delay=2.0, max_delay=20.0, respect_retry_after=False)
+        policy = mailgun.config.RetryPolicy(
+            max_retries=5,
+            base_delay=2.0,
+            max_delay=20.0,
+            respect_retry_after=False,
+        )
         assert policy.max_retries == 5
         assert policy.base_delay == 2.0
         assert policy.max_delay == 20.0
@@ -403,7 +411,7 @@ class TestRetryPolicy:
 
         # Prove __slots__ prevents dynamic dict allocation
         with pytest.raises(AttributeError):
-            policy.new_attr = "leak" # type: ignore[attr-defined]
+            policy.new_attr = "leak"  # type: ignore[attr-defined]
 
     @patch("random.uniform")
     def test_calculate_delay_applies_full_jitter(self, mock_uniform: MagicMock) -> None:

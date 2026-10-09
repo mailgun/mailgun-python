@@ -54,7 +54,7 @@ def TestOneInput(data: bytes) -> None:
                 "X-Mailgun-Tag",
                 "X-Mailgun-Variables",
                 fdp.ConsumeUnicodeNoSurrogates(12),
-            ]
+            ],
         )
         base_headers[header_key] = _generate_header_value(fdp)
 
@@ -81,7 +81,7 @@ def TestOneInput(data: bytes) -> None:
                     "Content-Type",
                     "x-mailgun-tag",
                     fdp.ConsumeUnicodeNoSurrogates(16),
-                ]
+                ],
             )
             merged_headers[header_key] = _generate_header_value(fdp)
         kwargs["headers"] = merged_headers
@@ -89,7 +89,14 @@ def TestOneInput(data: bytes) -> None:
     # HTTP transport kwargs injection
     for _ in range(fdp.ConsumeIntInRange(0, 5)):
         prop_key = fdp.PickValueInList(
-            ["timeout", "verify", "proxies", "params", "allow_redirects", fdp.ConsumeUnicodeNoSurrogates(10)]
+            [
+                "timeout",
+                "verify",
+                "proxies",
+                "params",
+                "allow_redirects",
+                fdp.ConsumeUnicodeNoSurrogates(10),
+            ],
         )
         prop_val: Any
         val_mode = fdp.ConsumeIntInRange(0, 3)
@@ -115,7 +122,7 @@ def TestOneInput(data: bytes) -> None:
             f"Unhandled exception during _merge_headers:\n"
             f"Base headers: {base_headers!r}\n"
             f"Kwargs:       {kwargs!r}\n"
-            f"Exception:    {type(exc).__name__}: {exc}"
+            f"Exception:    {type(exc).__name__}: {exc}",
         ) from exc
 
 

@@ -14,8 +14,10 @@ from unittest.mock import patch
 
 import atheris
 
+
 with atheris.instrument_imports():
-    from mailgun._httpx_compat import httpx as compat_httpx
+    import httpx2
+
     from mailgun.client import AsyncClient, Config
     from mailgun.config import RetryPolicy
     from mailgun.handlers.error_handler import ApiError, MailgunTimeoutError
@@ -55,18 +57,20 @@ def TestOneInput(data: bytes) -> None:
 
     fdp = atheris.FuzzedDataProvider(data)
 
-    original_send = compat_httpx.AsyncClient.send
+    original_send = httpx2.AsyncClient.send
 
     async def evil_send(
-        self: compat_httpx.AsyncClient, request: compat_httpx.Request, **kwargs: Any
-    ) -> compat_httpx.Response:
+        self: httpx2.AsyncClient,
+        request: httpx2.Request,
+        **kwargs: Any,
+    ) -> httpx2.Response:
         if fdp.ConsumeBool():
             exceptions = [
-                compat_httpx.ConnectError("Fuzzed Connection Drop"),
-                compat_httpx.NetworkError("Fuzzed Network Error"),
-                compat_httpx.ProtocolError("Fuzzed Protocol Error"),
-                compat_httpx.ReadTimeout("Fuzzed Timeout"),
-                compat_httpx.TooManyRedirects("Infinite Redirect Loop"),
+                httpx2.ConnectError("Fuzzed Connection Drop"),
+                httpx2.NetworkError("Fuzzed Network Error"),
+                httpx2.ProtocolError("Fuzzed Protocol Error"),
+                httpx2.ReadTimeout("Fuzzed Timeout"),
+                httpx2.TooManyRedirects("Infinite Redirect Loop"),
             ]
             raise fdp.PickValueInList(exceptions)
 
@@ -80,26 +84,30 @@ def TestOneInput(data: bytes) -> None:
 
         headers = {
             b"content-type": fdp.PickValueInList(
-                [b"application/json", b"image/png", b"text/html", b"application/octet-stream"]
+                [b"application/json", b"image/png", b"text/html", b"application/octet-stream"],
             ),
             b"content-length": str(fdp.ConsumeIntInRange(-100, 10000)).encode(),
             b"Retry-After": retry_val.encode(errors="ignore"),
         }
         garbage_bytes = fdp.ConsumeBytes(512)
 
-        return compat_httpx.Response(
+        return httpx2.Response(
             status_code=status,
             headers=headers,
             content=garbage_bytes,
             request=request,
         )
 
-    compat_httpx.AsyncClient.send = evil_send  # type: ignore[method-assign]
+    httpx2.AsyncClient.send = evil_send  # type: ignore[method-assign]
 
     async def run_fuzz() -> None:
-        with Path(os.devnull).open("w") as devnull, contextlib.redirect_stdout(
-            devnull
-        ), contextlib.redirect_stderr(devnull):
+        with (
+            Path(os.devnull).open("w") as devnull,
+            contextlib.redirect_stdout(
+                devnull,
+            ),
+            contextlib.redirect_stderr(devnull),
+        ):
             try:
                 action_choice = fdp.ConsumeIntInRange(0, 2)
                 if action_choice == 0:
@@ -117,20 +125,19 @@ def TestOneInput(data: bytes) -> None:
                 MailgunTimeoutError,
                 TypeError,
                 ValueError,
-                compat_httpx.RequestError,
+                httpx2.RequestError,
                 json.JSONDecodeError,
                 TimeoutError,
-                asyncio.TimeoutError,
             ):
                 pass
             except OverflowError as oe:
                 raise RuntimeError(f"CRASH: Retry-After exponential overflow: {oe}") from oe
             except Exception as e:
                 raise RuntimeError(
-                    f"SDK crashed handling Async Evil Server response: {type(e).__name__} - {e}"
+                    f"SDK crashed handling Async Evil Server response: {type(e).__name__} - {e}",
                 ) from e
             finally:
-                compat_httpx.AsyncClient.send = original_send  # type: ignore[method-assign]
+                httpx2.AsyncClient.send = original_send  # type: ignore[method-assign]
 
     # Global patch prevents any residual retry or backoff sleeps from blocking the runner
     with patch("time.sleep", return_value=None), patch("asyncio.sleep", return_value=None):

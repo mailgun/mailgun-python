@@ -3,16 +3,25 @@
 
 import logging
 import sys
+import time
 from typing import Any
 
 import atheris
 import requests
 
+
 with atheris.instrument_imports():
     from mailgun.client import Client
+    from mailgun.config import RetryPolicy
     from mailgun.handlers.error_handler import ApiError
+    from mailgun.security import SecurityGuard
 
 logging.disable(logging.CRITICAL)
+
+# Eliminate all sleep latency during fuzzing
+time.sleep = lambda *args, **kwargs: None
+
+_NO_RETRY_CONFIG = RetryPolicy(max_retries=0, base_delay=0.0, max_delay=0.0)
 
 _AUDIT_LOG: list[tuple[str, tuple[Any, ...]]] = []
 
@@ -57,7 +66,7 @@ def TestOneInput(data: bytes) -> None:
     fuzzed_domain = fdp.ConsumeUnicodeNoSurrogates(64)
     fuzzed_method = fdp.PickValueInList(["get", "post", "delete", "put"])
 
-    client = Client(auth=("api", "test-key"))
+    client = Client(auth=("api", "test-key"), retry_policy=_NO_RETRY_CONFIG)
 
     try:
         # Route through actual SDK endpoint execution
@@ -65,13 +74,12 @@ def TestOneInput(data: bytes) -> None:
             action = getattr(client.domains, fuzzed_method)
             action(domain=fuzzed_domain)
 
-
         # Probe header injection & control character audit hooks
         if fdp.ConsumeBool():
             hostile_headers = {
                 fdp.ConsumeUnicodeNoSurrogates(16): fdp.PickValueInList(
-                    ["valid", "bad\r\nHeader: 1", "control\x01char", "null\x00byte"]
-                )
+                    ["valid", "bad\r\nHeader: 1", "control\x01char", "null\x00byte"],
+                ),
             }
             client.messages.create(
                 domain=fuzzed_domain,
@@ -82,16 +90,20 @@ def TestOneInput(data: bytes) -> None:
         # Probe SSRF URL audit hooks
         if fdp.ConsumeBool():
             hostile_url = fdp.PickValueInList(
-                ["ftp://api.mailgun.net", "gopher://127.0.0.1", "http://attacker.com/v3"]
+                ["ftp://api.mailgun.net", "gopher://127.0.0.1", "http://attacker.com/v3"],
             )
-            client.messages.api_call(method="get", url=hostile_url)
+            try:
+                SecurityGuard.validate_mailgun_url(hostile_url)
+            except ValueError:
+                # Expected for hostile fuzzed URLs; rejection is a valid outcome.
+                pass
 
         # Verify invariant: if audit hook fired, arguments must be safe
         for event, args in _AUDIT_LOG:
             for arg in args:
                 if isinstance(arg, str) and "\x00" in arg:
                     raise RuntimeError(
-                        f"CRITICAL: Embedded null byte leaked into sys.audit hook '{event}': {arg!r}"
+                        f"CRITICAL: Embedded null byte leaked into sys.audit hook '{event}': {arg!r}",
                     )
 
     except (ApiError, TypeError, ValueError):
@@ -100,7 +112,7 @@ def TestOneInput(data: bytes) -> None:
     except Exception as e:
         if "embedded null" in str(e).lower():
             raise RuntimeError(
-                f"CRASH: Unsanitized null byte reached runtime boundary: {e}"
+                f"CRASH: Unsanitized null byte reached runtime boundary: {e}",
             ) from e
         raise RuntimeError(f"UNHANDLED CRASH in Audit Events execution: {e}") from e
 

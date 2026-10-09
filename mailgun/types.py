@@ -9,8 +9,8 @@ from requests.models import Response  # pyright: ignore[reportMissingModuleSourc
 
 
 if TYPE_CHECKING:
-    from mailgun._httpx_compat import Response as HttpxResponse
-    from mailgun._httpx_compat import Timeout as HttpxTimeout
+    from httpx2 import Response as HttpxResponse
+    from httpx2 import Timeout as HttpxTimeout
 
 __all__ = [
     "APIResponseType",

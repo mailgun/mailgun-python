@@ -13,6 +13,7 @@ from typing import Any
 
 import atheris
 
+
 with atheris.instrument_imports():
     from mailgun.logger import get_logger
 
@@ -72,7 +73,7 @@ def TestOneInput(data: bytes) -> None:
                 logger.warning,
                 logger.error,
                 logger.critical,
-            ]
+            ],
         )
 
         # Message with log forging payloads

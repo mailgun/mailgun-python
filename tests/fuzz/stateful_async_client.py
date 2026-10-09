@@ -64,7 +64,10 @@ class MailgunAsyncStateMachine(RuleBasedStateMachine):
         data=get_fuzz_payloads(),  # pyright: ignore[reportCallIssue]
     )
     def call_endpoint_post(
-        self, endpoint: str, domain: str, data: dict[str, Any]
+        self,
+        endpoint: str,
+        domain: str,
+        data: dict[str, Any],
     ) -> None:
         """Invokes POST / create operations with structured payload trees."""
         if not self.is_open or self.client is None:
@@ -131,9 +134,9 @@ class MailgunAsyncStateMachine(RuleBasedStateMachine):
         """Asserts client invariants: prevents memory leaks and unhandled closed states."""
         if not self.is_open:
             if self.client is not None and hasattr(self.client, "_httpx_client"):
-                assert (
-                    self.client._httpx_client is None
-                ), "Resource Leak: httpx client persists after aclose()"
+                assert self.client._httpx_client is None, (
+                    "Resource Leak: httpx client persists after aclose()"
+                )
         else:
             assert self.client is not None
 

@@ -4,6 +4,33 @@ We [keep a changelog.](http://keepachangelog.com/)
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-10-08
+
+### Changed
+
+- **Async Engine Migration (`httpx2`):** Migrated the asynchronous engine exclusively to `httpx2 >=2.7.0`, removing `httpx >=0.24.0` from runtime dependencies across `pyproject.toml`, `environment.yaml`, and `environment-dev.yaml`.
+- **Core HTTP Import Refactoring:** Updated `mailgun.client`, `mailgun.endpoints`, `mailgun.security`, and `mailgun.types` to interface directly with `httpx2` for client instances (`httpx2.AsyncClient`), requests (`httpx2.Request`), responses (`httpx2.Response`), timeouts (`httpx2.Timeout`), and network exceptions (`httpx2.RequestError`, `httpx2.TimeoutException`, `httpx2.ConnectError`, `httpx2.NetworkError`, `httpx2.HTTPStatusError`).
+- **Tooling & Static Analysis Alignment:** Synchronized pre-commit hooks (`commitizen v4.19.2`, `semgrep v1.180.0`, `typos v1.51.1`, `check-jsonschema 0.38.2`, `ruff v0.16.10`, and `mypy v2.4.0`). Added `COM812` (`missing-trailing-comma`) to `[tool.ruff.lint.ignore]` to eliminate Ruff formatter conflicts, and configured test-suite rule relaxations under `[tool.ruff.lint.per-file-ignores]` for `tests/**`.
+- **Security Policy Update:** Updated `SECURITY.md` supported versions table to mark `1.10.x` supported and deprecate `< 1.10.0`.
+- **Fuzzing Harness Latency & Retry Optimization:** Mocked `time.sleep` in `tests/fuzz/fuzz_audit_events.py` to eliminate artificial delays during fuzz test runs, passed a zero-retry policy configuration (`_NO_RETRY_CONFIG`) to the client, and safely handled expected `ValueError` exceptions when testing hostile URLs via `SecurityGuard.validate_mailgun_url`.
+
+### Removed
+
+- **`_httpx_compat` Bridge Layer:** Removed `mailgun/_httpx_compat.py` and its runtime detection flag (`HAS_HTTPX2`), eliminating dual-dependency branching and legacy import redirection.
+- **Obsolete Compat Tests:** Removed `tests/unit/test_httpx_compat.py`.
+
+### Fixed
+
+- **Stream Pagination Hardening:** Added duplicate and stagnant cursor detection (`prev_url`) in both `Endpoint.stream()` and `AsyncEndpoint.stream()` to prevent infinite loops. Wrapped synchronous `requests.HTTPError` in `ApiError` for contract parity with the async client, and eliminated redundant loop termination checks.
+- **Retry Short-Circuiting on Unrecoverable Client Errors:** Suppressed retry attempts in `Endpoint` and `AsyncEndpoint` for permanent client-side exceptions. Configuration errors (`InvalidURL`, `InvalidHeader`, `InvalidSchema`, `MissingSchema`) and protocol/decoding errors (`UnsupportedProtocol`, `DecodingError`) are now dispatched directly to `_handle_api_error` without backoff delays.
+- **Telemetry Log Item Index Guard:** Added an `items` existence check in `test_post_query_get_account_logs` across `test_integration_async.py` and `test_integration_sync.py` to prevent `IndexError` when querying accounts with empty log retention windows.
+- **Test Suite Quality & Formatting:** Corrected verbose exception re-raising in `test_integration_coverage.py`, added missing placeholder formatting to `sdk_logger.info` calls, and formatted all unit, integration, and fuzz test targets using `ruff format`.
+
+### Pull Requests Merged
+
+- PR #68: build(deps): Bump the minor-and-patch group with 2 updates.
+- PR #70: build(deps): Bump the minor-and-patch group with 2 updates.
+
 ## [1.9.1] - 2026-09-21
 
 ### Security
@@ -505,6 +532,7 @@ We [keep a changelog.](http://keepachangelog.com/)
 [1.0.1]: https://github.com/mailgun/mailgun-python/releases/tag/v1.0.1
 [1.0.2]: https://github.com/mailgun/mailgun-python/releases/tag/v1.0.2
 [1.1.0]: https://github.com/mailgun/mailgun-python/releases/tag/v1.1.0
+[1.10.0]: https://github.com/mailgun/mailgun-python/releases/tag/v1.10.0
 [1.2.0]: https://github.com/mailgun/mailgun-python/releases/tag/v1.2.0
 [1.3.0]: https://github.com/mailgun/mailgun-python/releases/tag/v1.3.0
 [1.4.0]: https://github.com/mailgun/mailgun-python/releases/tag/v1.4.0
@@ -515,4 +543,4 @@ We [keep a changelog.](http://keepachangelog.com/)
 [1.8.0]: https://github.com/mailgun/mailgun-python/releases/tag/v1.8.0
 [1.9.0]: https://github.com/mailgun/mailgun-python/releases/tag/v1.9.0
 [1.9.1]: https://github.com/mailgun/mailgun-python/releases/tag/v1.9.1
-[unreleased]: https://github.com/mailgun/mailgun-python/compare/v1.9.1...HEAD
+[unreleased]: https://github.com/mailgun/mailgun-python/compare/v1.10.0...HEAD

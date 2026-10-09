@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import httpx
+import httpx2
 import pytest
 import requests  # pyright: ignore[reportMissingModuleSource]
 
@@ -87,29 +87,33 @@ class TestEndpointDryRun:
             assert "Dry run successful" in resp.json()["message"]
 
     def test_api_call_dry_run_logs_interception(
-        self, caplog: pytest.LogCaptureFixture
+        self,
+        caplog: pytest.LogCaptureFixture,
     ) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["messages"]}
         ep = Endpoint(url=url, headers={}, auth=("api", "key"), dry_run=True)
         with caplog.at_level(logging.INFO):
             ep.create(domain="test.com", data={"to": "test@example.com"})
 
-        assert any(
-            "DRY RUN: Intercepting" in record.message for record in caplog.records
-        )
+        assert any("DRY RUN: Intercepting" in record.message for record in caplog.records)
 
     def test_async_api_call_dry_run_intercepts_request(self) -> None:
         """Ensure Async dry_run mode intercepts email messages and returns a mock response."""
         url = {"base": f"{BASE_URL_V3}/", "keys": ["messages"]}
 
-        mock_client = AsyncMock(spec=httpx.AsyncClient)
+        mock_client = AsyncMock(spec=httpx2.AsyncClient)
         ep = AsyncEndpoint(
-            url=url, headers={}, auth=("api", "key"), dry_run=True, client=mock_client
+            url=url,
+            headers={},
+            auth=("api", "key"),
+            dry_run=True,
+            client=mock_client,
         )
 
         async def run_test() -> None:
             resp = await ep.create(
-                domain="test.com", data={"to": "test@example.com"}
+                domain="test.com",
+                data={"to": "test@example.com"},
             )
             mock_client.request.assert_not_called()
             assert resp.status_code == 200
@@ -122,9 +126,13 @@ class TestEndpointDryRun:
         """Ensure standard async routes fallback to the generic JSON mock."""
         url = {"base": f"{BASE_URL_V3}/", "keys": ["domains"]}
 
-        mock_client = AsyncMock(spec=httpx.AsyncClient)
+        mock_client = AsyncMock(spec=httpx2.AsyncClient)
         ep = AsyncEndpoint(
-            url=url, headers={}, auth=("api", "key"), dry_run=True, client=mock_client
+            url=url,
+            headers={},
+            auth=("api", "key"),
+            dry_run=True,
+            client=mock_client,
         )
 
         async def run_test() -> None:
@@ -141,7 +149,7 @@ class TestEndpointEdgeCases:
     def test_build_path_from_keys_empty_and_iterables(self) -> None:
         assert build_path_from_keys([]) == ""
         assert build_path_from_keys(set()) == ""
-        assert build_path_from_keys(tuple()) == ""
+        assert build_path_from_keys(()) == ""
         assert build_path_from_keys(["a", "b"]) == "/a/b"
         assert build_path_from_keys(iter(["a", "b"])) == "/a/b"
 
@@ -186,24 +194,33 @@ class TestEndpointErrorHandling:
     def test_api_call_raises_api_error_on_request_exception(self) -> None:
         url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
         ep = Endpoint(url=url, headers={}, auth=None)
-        with patch.object(
-            requests.Session,
-            "request",
-            side_effect=requests.exceptions.RequestException("Boom"),
-        ), pytest.raises(ApiError, match="Boom"):
+        with (
+            patch.object(
+                requests.Session,
+                "request",
+                side_effect=requests.exceptions.RequestException("Boom"),
+            ),
+            pytest.raises(ApiError, match="Boom"),
+        ):
             ep.get()
 
     def test_api_call_raises_timeout_error_on_timeout(self) -> None:
         url = {"base": "https://api.mailgun.net/v4/", "keys": ["domainlist"]}
         ep = Endpoint(url=url, headers={}, auth=None)
-        with patch.object(
-            requests.Session, "request", side_effect=requests.exceptions.Timeout()
-        ), pytest.raises(TimeoutError):
+        with (
+            patch.object(
+                requests.Session,
+                "request",
+                side_effect=requests.exceptions.Timeout(),
+            ),
+            pytest.raises(TimeoutError),
+        ):
             ep.get()
 
     @patch("mailgun.endpoints.logger.error")
     def test_api_call_truncates_long_error_response(
-        self, mock_logger_error: MagicMock
+        self,
+        mock_logger_error: MagicMock,
     ) -> None:
         """Test error responses are NOT logged to prevent secret leakage (CWE-316)."""
         url = {"base": "https://api.mailgun.net/v4/", "keys": ["domainlist"]}
@@ -227,15 +244,20 @@ class TestEndpointHTTPMethods:
         """
         url = {"base": "https://api.mailgun.net/v3/", "keys": ["domains"]}
 
-        mock_client = AsyncMock(spec=httpx.AsyncClient)
+        mock_client = AsyncMock(spec=httpx2.AsyncClient)
         ep = AsyncEndpoint(url=url, headers={}, auth=("api", "key"), client=mock_client)
 
         with patch(
-            "mailgun.endpoints.AsyncEndpoint.api_call", new_callable=AsyncMock
+            "mailgun.endpoints.AsyncEndpoint.api_call",
+            new_callable=AsyncMock,
         ) as mock_call:
             asyncio.run(ep.delete(domain="test.com"))
             mock_call.assert_called_with(
-                ("api", "key"), "delete", url, headers={}, domain="test.com"
+                ("api", "key"),
+                "delete",
+                url,
+                headers={},
+                domain="test.com",
             )
 
             asyncio.run(ep.put(domain="test.com", data={"action": "update"}))
@@ -327,7 +349,9 @@ class TestEndpointMissingCoverage:
     @patch("requests.Session.request")
     @patch.object(Endpoint, "get")
     def test_endpoint_missing_verbs_and_stream_filters(
-        self, mock_get: MagicMock, mock_request: MagicMock
+        self,
+        mock_get: MagicMock,
+        mock_request: MagicMock,
     ) -> None:
         """Cover missing HTTP verbs and populated stream filters."""
         ep = Endpoint(
@@ -341,7 +365,8 @@ class TestEndpointMissingCoverage:
         ep.delete(domain="test.com")
 
         mock_get.return_value = MagicMock(
-            json=lambda: {"items": []}, raise_for_status=lambda: None
+            json=lambda: {"items": []},
+            raise_for_status=lambda: None,
         )
 
         results = list(ep.stream(filters={"limit": 10}))
@@ -379,7 +404,9 @@ class TestEndpointSerialization:
         payload_with_spaces = {"name": "test.com", "spam_action": "disabled"}
 
         with patch.object(
-            requests.Session, "request", return_value=MagicMock(status_code=200)
+            requests.Session,
+            "request",
+            return_value=MagicMock(status_code=200),
         ) as mock_req:
             ep.create(data=payload_with_spaces)
 
@@ -396,7 +423,9 @@ class TestEndpointSerialization:
         """
         url = {"base": "https://api.mailgun.net/v3/", "keys": ["messages"]}
         ep = Endpoint(
-            url=url, headers={"User-Agent": "mailgun-sdk"}, auth=("api", "key")
+            url=url,
+            headers={"User-Agent": "mailgun-sdk"},
+            auth=("api", "key"),
         )
 
         with patch("requests.Session.request") as mock_req:
@@ -423,7 +452,7 @@ class TestEndpointSerialization:
             "subject": "Testing STO",
             "text": "This is a test message.",
             "o:deliverytime-optimize-period": "24h",
-            "o:tag": ["newsletter", "python-sdk"],
+            "o:tag": ["async-integration-test", "httpx2-sdk"],
             "o:testmode": "yes",
             "v:custom-id": "USER-12345",
         }
@@ -441,7 +470,7 @@ class TestEndpointSerialization:
             assert actual_data is not None, "Data payload should not be None"
             assert "o:deliverytime-optimize-period" in actual_data
             assert actual_data["o:deliverytime-optimize-period"] == "24h"
-            assert actual_data["o:tag"] == ["newsletter", "python-sdk"]
+            assert actual_data["o:tag"] == ["async-integration-test", "httpx2-sdk"]
 
     def test_update_serializes_json(self) -> None:
         url = {"base": f"{BASE_URL_V4}/", "keys": ["domainlist"]}
@@ -461,11 +490,11 @@ class TestEndpointSerialization:
         with patch.object(requests.Session, "request") as mock_req:
             mock_req.return_value = MagicMock(status_code=200)
             ep.update(
-                data={"key": "value"}, headers={"Content-Type": "application/json"}
+                data={"key": "value"},
+                headers={"Content-Type": "application/json"},
             )
-            assert (
-                mock_req.call_args[1]["headers"]["Content-Type"] == "application/json"
-            )
+            assert mock_req.call_args[1]["headers"]["Content-Type"] == "application/json"
+
 
 class TestEndpointRetryAndStreamPointers:
     def test_reset_stream_pointers(self, tmp_path: Path) -> None:
@@ -504,7 +533,7 @@ class TestEndpointRetryAndStreamPointers:
         url = {"base": "https://api.mailgun.net/v3/", "keys": ["messages"]}
         policy = RetryPolicy(max_retries=1, base_delay=0.01)
 
-        mock_client = AsyncMock(spec=httpx.AsyncClient)
+        mock_client = AsyncMock(spec=httpx2.AsyncClient)
         ep = AsyncEndpoint(url=url, headers={}, auth=("api", "key"), client=mock_client)
         ep.retry_policy = policy
 
@@ -528,14 +557,17 @@ class TestEndpointRetryAndStreamPointers:
         resp_429.headers = {"Retry-After": "1"}
         resp_200 = MagicMock(status_code=200)
 
-        with patch.object(requests.Session, "request", side_effect=[resp_429, resp_200]):
-            with patch("time.sleep") as mock_sleep:
-                res = ep.create(domain="test.com", data={"to": "user@test.com"})
-                assert res.status_code == 200
-                mock_sleep.assert_called_with(1.0)
+        with (
+            patch.object(requests.Session, "request", side_effect=[resp_429, resp_200]),
+            patch("time.sleep") as mock_sleep,
+        ):
+            res = ep.create(domain="test.com", data={"to": "user@test.com"})
+            assert res.status_code == 200
+            mock_sleep.assert_called_with(1.0)
 
     def test_stream_pagination_type_casting_all_types(self) -> None:
         """Covers endpoints.py lines 795-806: cast int, tuple, set, and list."""
+
         class MockResp:
             def raise_for_status(self) -> None:
                 pass
@@ -543,10 +575,16 @@ class TestEndpointRetryAndStreamPointers:
             def json(self) -> dict:
                 return {
                     "items": [{"id": 1}],
-                    "paging": {"next": "https://api.mailgun.net/v3/events?page=2&tags=a&tags=b&limit=10"},
+                    "paging": {
+                        "next": "https://api.mailgun.net/v3/events?page=2&tags=a&tags=b&limit=10",
+                    },
                 }
 
-        ep = Endpoint(url={"base": "https://test", "keys": ["events"]}, headers={}, auth=("api", "key"))
+        ep = Endpoint(
+            url={"base": "https://test", "keys": ["events"]},
+            headers={},
+            auth=("api", "key"),
+        )
 
         responses = [
             MockResp(),

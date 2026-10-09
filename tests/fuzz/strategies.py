@@ -9,6 +9,7 @@ from typing import Any
 
 import hypothesis.strategies as st
 
+
 _EVIL_CONTROL_CHARS = [
     "\r\n",
     "\n",
@@ -36,6 +37,7 @@ _COMMON_DOMAINS = [
     "mail.custom-domain.co.uk",
     "xn--eckwd4c7c.xn--zckzah",
 ]
+
 
 @st.composite  # type: ignore[untyped-decorator]
 def evil_payloads(draw: st.DrawFn) -> str:
@@ -71,7 +73,7 @@ def nested_json_strategy(draw: st.DrawFn, max_depth: int = 2) -> Any:
                 st.integers(min_value=-10000, max_value=10000),
                 st.booleans(),
                 st.none(),
-            )
+            ),
         )
 
     return draw(
@@ -86,7 +88,7 @@ def nested_json_strategy(draw: st.DrawFn, max_depth: int = 2) -> Any:
             st.integers(min_value=-1000, max_value=1000),
             st.booleans(),
             st.none(),
-        )
+        ),
     )
 
 
@@ -126,8 +128,8 @@ def get_fuzz_payloads(draw: st.DrawFn) -> dict[str, Any]:
                     "Fri, 25 Oct 2026 23:10:10 -0000",
                     "2026-10-25T23:10:10Z",
                     draw(st.integers(min_value=0, max_value=2147483647)),
-                ]
-            )
+                ],
+            ),
         )
 
     return payload

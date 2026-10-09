@@ -9,6 +9,7 @@ from typing import Any
 import atheris
 import requests
 
+
 with atheris.instrument_imports():
     from mailgun import routes
     from mailgun.client import Client
@@ -33,12 +34,12 @@ def _generate_chaotic_file_payload(
                     ".env",
                     "payload.exe\x00.jpg",
                     "＼．．／＼．．／.txt",
-                ]
+                ],
             )
         )
         content = fdp.ConsumeBytes(64)
         mime_type = fdp.PickValueInList(
-            ["application/json", "text/plain", "image/png", fdp.ConsumeUnicodeNoSurrogates(16)]
+            ["application/json", "text/plain", "image/png", fdp.ConsumeUnicodeNoSurrogates(16)],
         )
         files.append(("attachment", (filename, content, mime_type)))
     return files

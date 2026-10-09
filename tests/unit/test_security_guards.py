@@ -26,11 +26,15 @@ class TestIdempotencyGuard:
         payload_1 = {"to": "user@test.com", "subject": "Hello", "o:tracking": "yes"}
         payload_2 = {"to": "user@test.com", "subject": "Hello", "o:tracking": "no"}
 
-        assert IdempotencyGuard.generate_key(domain, payload_1) == IdempotencyGuard.generate_key(domain, payload_2)
+        assert IdempotencyGuard.generate_key(domain, payload_1) == IdempotencyGuard.generate_key(
+            domain,
+            payload_2,
+        )
 
     def test_idempotency_chunked_stream(self) -> None:
         """Hits the hasattr(file_data, 'read') BytesIO chunking branch."""
         import io
+
         stream = io.BytesIO(b"Secure binary attachment data")
         key = IdempotencyGuard.generate_key("test.com", {}, files=[("report.pdf", stream)])
 
@@ -98,7 +102,10 @@ class TestSpamGuard:
     def test_spam_guard_parser_exception(self) -> None:
         """Hits the try/except block around parser.feed()."""
         with pytest.MonkeyPatch.context() as m:
-            m.setattr("mailgun.security._SpamGuardParser.feed", lambda self, data: (_ for _ in ()).throw(RuntimeError("Simulated Parsing Crash")))
+            m.setattr(
+                "mailgun.security._SpamGuardParser.feed",
+                lambda self, data: (_ for _ in ()).throw(RuntimeError("Simulated Parsing Crash")),
+            )
             report = SpamGuard.check_html("<html>Broken</html>")
             assert report["is_safe"] is False
             assert "Fatal HTML parsing error" in report["issues"][0]
@@ -123,4 +130,6 @@ class TestSpamGuard:
         html_event = "<html><body><img src='valid.png' alt='logo' onerror='alert(1)'></body></html>"
         report_event = SpamGuard.check_html(html_event)
         assert report_event["is_safe"] is False
-        assert any("Blocked inline event handler: onerror" in issue for issue in report_event["issues"])
+        assert any(
+            "Blocked inline event handler: onerror" in issue for issue in report_event["issues"]
+        )

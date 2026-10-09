@@ -29,9 +29,9 @@ class CoverageIntegrationTests(unittest.TestCase):
             # We care about SDK routing logic executing successfully,
             # not whether the Mailgun free tier accepts the request.
             return None
-        except Exception as e:
+        except Exception:
             # Re-raise actual SDK crashes (TypeError, KeyError, etc.)
-            raise e
+            raise
 
     def test_email_validation_handler_coverage(self) -> None:
         """Cover mailgun/handlers/email_validation_handler.py (0% -> 100%)."""
@@ -45,7 +45,12 @@ class CoverageIntegrationTests(unittest.TestCase):
         self._safe_execute(self.client.inbox.get, test_id="12345")
         self._safe_execute(self.client.inbox.get, test_id="12345", counters=True)
         self._safe_execute(self.client.inbox.get, test_id="12345", checks=True)
-        self._safe_execute(self.client.inbox.get, test_id="12345", checks=True, address="test@example.com")
+        self._safe_execute(
+            self.client.inbox.get,
+            test_id="12345",
+            checks=True,
+            address="test@example.com",
+        )
 
         with self.assertRaises(ApiError):
             self.client.inbox.get(test_id="12345", counters=False)
@@ -64,14 +69,14 @@ class CoverageIntegrationTests(unittest.TestCase):
             self.client.domains_webhooks.create,
             domain=self.domain,
             webhook_name="clicked",
-            data={"event_types": "clicked", "urls": ["http://test.com"]}
+            data={"event_types": "clicked", "urls": ["http://test.com"]},
         )
 
         self._safe_execute(
             self.client.domains_webhooks.delete,
             domain=self.domain,
             webhook_name="clicked",
-            filters={"url": "http://test.com"}
+            filters={"url": "http://test.com"},
         )
         self._safe_execute(self.client.domainlist.get)
         self.assertTrue(True)
@@ -87,6 +92,7 @@ class CoverageIntegrationTests(unittest.TestCase):
     def test_logger_and_filters_redaction(self) -> None:
         """Cover log sanitization logic in filters.py and logger.py."""
         from mailgun.logger import get_logger
+
         sdk_logger = get_logger("mailgun.test.redaction")
 
         # Construct dummy keys using low-entropy repetition ('a' * 32).
@@ -97,8 +103,8 @@ class CoverageIntegrationTests(unittest.TestCase):
 
         with self.assertLogs("mailgun.test.redaction", level="INFO") as cm:
             # Avoid the exact word "secret" to further bypass heuristic regexes
-            sdk_logger.info(f"Leaking data: {dummy_key} and {dummy_pubkey}")
-            sdk_logger.info("Dict auth payload", {"args": {"api_key": dummy_dict_key}})
+            sdk_logger.info("Leaking data: %s and %s", dummy_key, dummy_pubkey)
+            sdk_logger.info("Dict auth payload: %s", {"args": {"api_key": dummy_dict_key}})
 
         output = "".join(cm.output)
 
@@ -106,6 +112,7 @@ class CoverageIntegrationTests(unittest.TestCase):
         self.assertNotIn(dummy_pubkey, output)
         self.assertNotIn(dummy_dict_key, output)
         self.assertIn("[REDACTED]", output)
+
 
 class AsyncCoverageIntegrationTests(unittest.IsolatedAsyncioTestCase):
     """Async integration tests targeting missing coverage branches."""

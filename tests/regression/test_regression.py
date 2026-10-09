@@ -1,23 +1,22 @@
+import base64
 import logging
 import unittest
 from pathlib import Path
-import base64
 from typing import Any
 
+import httpx2
 import pytest
+import requests
+from pydantic import ValidationError
 
 from mailgun.builders import MailgunMessageBuilder
 from mailgun.client import AsyncClient, Client, Config
+from mailgun.ext.pydantic.models import SendMessageSchema
+from mailgun.filters import RedactingFilter
+from mailgun.handlers.email_validation_handler import handle_address_validate
+from mailgun.handlers.error_handler import ApiError
 from mailgun.logger import get_logger
 from mailgun.security import SecurityGuard
-from mailgun.filters import RedactingFilter
-from mailgun._httpx_compat import httpx as compat_httpx
-import requests
-from mailgun.handlers.email_validation_handler import handle_address_validate
-from pydantic import ValidationError
-from mailgun.ext.pydantic.models import SendMessageSchema
-from mailgun.handlers.error_handler import ApiError
-
 
 
 CORPUS_ROOT = Path("tests/fuzz/corpus")
@@ -32,7 +31,8 @@ def get_corpus_files() -> list[Path]:
 
 class TestConfigRegression:
     def test_api_url_emits_semantic_warning_on_version_suffix(
-        self, caplog: pytest.LogCaptureFixture
+        self,
+        caplog: pytest.LogCaptureFixture,
     ) -> None:
         with caplog.at_level(logging.WARNING):
             config = Config(api_url="https://api.eu.mailgun.net/v3/")
@@ -77,8 +77,7 @@ class TestConfigRouter:
         ],
     )
     def test_invalid_endpoint_key_raises_correct_keyerror(self, api_url: str) -> None:
-        """
-        Ensure that requesting a non-existent endpoint from the Config router
+        """Ensure that requesting a non-existent endpoint from the Config router
         raises a KeyError with the correctly formatted 'Invalid API endpoint' message.
         """
         config = Config(api_url=api_url)
@@ -98,8 +97,7 @@ class TestConfigRouter:
         ],
     )
     def test_empty_or_sanitized_endpoint_key_raises_keyerror(self, api_url: str) -> None:
-        """
-        Ensure that requesting a completely invalid/empty endpoint from the Config
+        """Ensure that requesting a completely invalid/empty endpoint from the Config
         router safely fails early with the 'Invalid endpoint key' message.
         """
         config = Config(api_url=api_url)
@@ -110,11 +108,12 @@ class TestConfigRouter:
 
         assert "Invalid endpoint key" in str(exc_info.value)
 
+
 class TestControlCharacters:
     @pytest.mark.asyncio
     async def test_async_endpoint_rejects_control_characters(self) -> None:
         """Ensure the asynchronous client intercepts control characters injected
-        via endpoint kwargs before they crash httpx.
+        via endpoint kwargs before they crash httpx2.
         """
         client = AsyncClient(auth=("api", "key"))
 
@@ -126,7 +125,7 @@ class TestControlCharacters:
 
     @pytest.mark.asyncio
     async def test_semantic_divergence_on_control_chars(self) -> None:
-        """Regression test for Semantic Divergence between Sync and Async clients
+        r"""Regression test for Semantic Divergence between Sync and Async clients
         caused by control characters in path segments (e.g., \x00, \x0b).
         Both must fail-closed natively with a ValueError, not a library-specific error.
         """
@@ -182,12 +181,14 @@ class TestLoggerRegression:
         # Using .warning() ensures we bypass default INFO-level filters
         # that might prevent the log record from being evaluated at all.
         with pytest.raises(
-            KeyError, match="Attempt to overwrite 'message' in LogRecord"
+            KeyError,
+            match="Attempt to overwrite 'message' in LogRecord",
         ):
             logger.warning("Test log", extra={"message": "malicious_override"})
 
         with pytest.raises(
-            KeyError, match="Attempt to overwrite 'levelname' in LogRecord"
+            KeyError,
+            match="Attempt to overwrite 'levelname' in LogRecord",
         ):
             logger.warning("Test log", extra={"levelname": "CRITICAL"})
 
@@ -205,7 +206,8 @@ class TestPathTraversal:
             # The SDK MUST raise its own internal ValueError before httpx crashes
             with pytest.raises(ValueError, match=r"Security Alert \(CWE-20\)"):
                 await client.domains_webhooks.get(
-                    domain="example.com", webhook_name=malicious_webhook
+                    domain="example.com",
+                    webhook_name=malicious_webhook,
                 )
 
     def test_domains_handler_path_traversal_prevention(self) -> None:
@@ -218,7 +220,8 @@ class TestPathTraversal:
         # The SDK should fail-closed and catch the control character before it hits the HTTP layer
         with pytest.raises(ValueError, match=r"Security Alert \(CWE-20\)"):
             client.domains_webhooks.get(
-                domain=malicious_payload, webhook_name=malicious_payload
+                domain=malicious_payload,
+                webhook_name=malicious_payload,
             )
 
     @pytest.mark.asyncio
@@ -245,7 +248,8 @@ class TestPathTraversal:
         malicious_domain = "QQstw;;;%;%\rli\n  W.#\t;;;"
 
         async with AsyncClient(
-            auth=("api", "key"), api_url="https://api.mailgun.net/v3"
+            auth=("api", "key"),
+            api_url="https://api.mailgun.net/v3",
         ) as client:
             # The SDK MUST intercept the control characters and fail-closed
             with pytest.raises(ValueError, match=r"Security Alert \(CWE-20\)"):
@@ -257,7 +261,8 @@ class TestPathTraversal:
 
             with pytest.raises(ValueError, match=r"Security Alert \(CWE-20\)"):
                 await client.templates.get(
-                    domain=malicious_domain, template_name="welcome-email"
+                    domain=malicious_domain,
+                    template_name="welcome-email",
                 )
 
     @pytest.mark.parametrize(
@@ -272,7 +277,8 @@ class TestPathTraversal:
         ],
     )
     def test_sanitize_path_segment_prevents_traversal(
-        self, malicious_input: str
+        self,
+        malicious_input: str,
     ) -> None:
         """Regression test for path traversal vulnerabilities.
         Ensures that encoded and raw traversal attempts are either
@@ -306,7 +312,7 @@ class TestPathTraversal:
 
 class TestBuilderSecurityRegression:
     def test_add_custom_header_rejects_control_characters(self) -> None:
-        """Regression test for CWE-20/CWE-113: Block Header Injection.
+        r"""Regression test for CWE-20/CWE-113: Block Header Injection.
         Validates the fuzzer-discovered payload containing the \\x08 Backspace char.
         """
         builder = MailgunMessageBuilder("test@domain.com")
@@ -333,7 +339,7 @@ class TestSecurityGuardRegression:
         Validates that passing a massive integer (exceeding IEEE 754 64-bit float limit)
         as a timestamp doesn't crash the application with an OverflowError.
         """
-        huge_timestamp = 10 ** 310  # 10^310 safely exceeds the max float size (~1.79e+308)
+        huge_timestamp = 10**310  # 10^310 safely exceeds the max float size (~1.79e+308)
 
         # The SDK should fail gracefully (catch OverflowError and raise ValueError,
         # or just return False) instead of crashing.
@@ -342,7 +348,7 @@ class TestSecurityGuardRegression:
                 signing_key="safe_key",
                 token="safe_token",
                 timestamp=huge_timestamp,
-                signature="safe_signature"
+                signature="safe_signature",
             )
             # If your SDK returns False on failure rather than raising
             assert result is False
@@ -355,12 +361,14 @@ class TestSecurityGuardRegression:
 
 class FaultyStringObject:
     """An object whose string representation explicitly crashes."""
+
     def __str__(self) -> str:
         raise AttributeError("Simulated stringification failure")
 
 
 class SecretContainer:
     """A helper class whose instances have a __dict__ containing secrets."""
+
     def __init__(self, key: str) -> None:
         self.key = key
 
@@ -435,7 +443,7 @@ class RegressionRedactionTests(unittest.TestCase):
             level=logging.INFO,
             pathname=__file__,
             lineno=20,
-            msg="%*s%%%%\"mem@bers\":",
+            msg='%*s%%%%"mem@bers":',
             args=(5, malicious_msg),
             exc_info=None,
         )
@@ -511,10 +519,12 @@ class TestRedactionFuzzCrash032af5:
             # the redaction filter path does not crash.
             return
 
+
 class TestuzzCrash:
     @pytest.mark.asyncio
     async def test_sync_async_parity_non_ascii_headers(
-        self, monkeypatch: pytest.MonkeyPatch
+        self,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Verify crash crash-066038255edaea23d35f02373148682cdad44d66 is handled safely."""
         status_code = 201
@@ -526,7 +536,10 @@ class TestuzzCrash:
 
         # Mock Requests
         def mock_send(
-            self: Any, request: requests.PreparedRequest, *args: Any, **kwargs: Any
+            self: Any,
+            request: requests.PreparedRequest,
+            *args: Any,
+            **kwargs: Any,
         ) -> requests.Response:
             resp = requests.Response()
             resp.status_code = status_code
@@ -540,15 +553,14 @@ class TestuzzCrash:
 
         # Mock HTTPX
         async def mock_handle(
-            self: Any, request: compat_httpx.Request
-        ) -> compat_httpx.Response:
+            self: Any,
+            request: httpx2.Request,
+        ) -> httpx2.Response:
             byte_headers = {
-                k.encode("latin-1"): (
-                    v.encode("latin-1", "replace") if isinstance(v, str) else v
-                )
+                k.encode("latin-1"): (v.encode("latin-1", "replace") if isinstance(v, str) else v)
                 for k, v in headers.items()
             }
-            return compat_httpx.Response(
+            return httpx2.Response(
                 status_code=status_code,
                 headers=byte_headers,
                 content=body,
@@ -556,7 +568,9 @@ class TestuzzCrash:
             )
 
         monkeypatch.setattr(
-            compat_httpx.AsyncHTTPTransport, "handle_async_request", mock_handle
+            httpx2.AsyncHTTPTransport,
+            "handle_async_request",
+            mock_handle,
         )
 
         sync_client = Client(auth=("api", "key-test"))
@@ -566,7 +580,6 @@ class TestuzzCrash:
         async_res = await async_client.ip_whitelist.delete()
 
         assert sync_res.status_code == async_res.status_code == 201
-
 
     def test_handle_address_validate_dict_keys_regression(self) -> None:
         """Verify handle_address_validate does not crash with KeyError: slice(1, None, None)."""
@@ -583,7 +596,6 @@ class TestuzzCrash:
             # Graceful rejection is acceptable; unhandled internal KeyError/crash is not
             pass
 
-
     def test_sanitize_headers_multivalue_list_type_drift(self) -> None:
         """Verify list-valued headers are coerced into strings without type drift."""
         headers = {
@@ -598,7 +610,6 @@ class TestuzzCrash:
         assert sanitized["X-Mailgun-Tag"] == "newsletter, weekly_digest"
         assert sanitized["Accept"] == "text/html, application/xhtml+xml"
 
-
     def test_send_message_schema_rejects_crlf_in_subject(self) -> None:
         """Ensure CRLF characters in subject are rejected (CWE-113)."""
         malicious_subject = "Test Subject\nBcc: evil@attacker.com"
@@ -611,7 +622,6 @@ class TestuzzCrash:
             )
         assert "CRLF injection detected in subject" in str(exc_info.value)
 
-
     def test_sanitize_headers_rejects_null_byte_in_list_value(self) -> None:
         """Ensure null bytes inside list-valued headers raise ValueError (CWE-113)."""
         headers = {"X-Custom": ["\x00"]}
@@ -623,18 +633,23 @@ class TestuzzCrash:
             SecurityGuard.sanitize_headers(headers_str)
 
     @pytest.mark.asyncio
-    async def test_async_endpoint_stream_handles_http_error_gracefully(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def test_async_endpoint_stream_handles_http_error_gracefully(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         """Ensure AsyncEndpoint.stream() wraps HTTP errors into ApiError rather than leaking HTTPStatusError."""
+
         async def mock_handle(
-            self: Any, request: compat_httpx.Request
-        ) -> compat_httpx.Response:
-            return compat_httpx.Response(
+            self: Any,
+            request: httpx2.Request,
+        ) -> httpx2.Response:
+            return httpx2.Response(
                 status_code=404,
                 content=b'{"message": "Not Found"}',
                 request=request,
             )
 
-        monkeypatch.setattr(compat_httpx.AsyncHTTPTransport, "handle_async_request", mock_handle)
+        monkeypatch.setattr(httpx2.AsyncHTTPTransport, "handle_async_request", mock_handle)
 
         client = AsyncClient(auth=("api", "test-key"))
         with pytest.raises(ApiError) as exc_info:
@@ -643,12 +658,15 @@ class TestuzzCrash:
 
         # Check the status code via code, response.status_code, or error string
         err = exc_info.value
-        status = getattr(err, "code", None) or getattr(getattr(err, "response", None), "status_code", None)
+        status = getattr(err, "code", None) or getattr(
+            getattr(err, "response", None),
+            "status_code",
+            None,
+        )
         if status is not None:
             assert status == 404
         else:
             assert "404" in str(err)
-
 
     def test_client_init_rejects_crlf_in_api_key(self) -> None:
         """Regression test for crash-a61263193b9bd80a8aa013dbff2bbc5f9549c014."""

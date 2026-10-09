@@ -35,13 +35,15 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 
 def pytest_collection_modifyitems(
-    config: pytest.Config, items: list[pytest.Item]
+    config: pytest.Config,
+    items: list[pytest.Item],
 ) -> None:
     if config.getoption("--run-skipped"):
         for item in items:
             for marker in list(item.iter_markers()):
-                if marker.name in ("skip", "skipif"):
+                if marker.name in {"skip", "skipif"}:
                     item.own_markers.remove(marker)
+
 
 @pytest.fixture(autouse=True)
 def bypass_retry_delays(monkeypatch: pytest.MonkeyPatch) -> None:

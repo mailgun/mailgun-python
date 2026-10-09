@@ -12,9 +12,7 @@ class TestLoggerInitialization:
         _ = get_logger("mailgun.test_idem")
         log2 = get_logger("mailgun.test_idem")
 
-        redacting_filters = [
-            f for f in log2.filters if isinstance(f, RedactingFilter)
-        ]
+        redacting_filters = [f for f in log2.filters if isinstance(f, RedactingFilter)]
         assert len(redacting_filters) == 1
 
     def test_get_logger_non_mailgun_namespace(self) -> None:
@@ -24,9 +22,7 @@ class TestLoggerInitialization:
         """
         logger = get_logger("external_namespace_app")
 
-        redacting_filters = [
-            f for f in logger.filters if isinstance(f, RedactingFilter)
-        ]
+        redacting_filters = [f for f in logger.filters if isinstance(f, RedactingFilter)]
         assert len(redacting_filters) == 1
 
         # We assert this didn't crash and correctly skipped the namespace block
@@ -65,9 +61,7 @@ class TestLoggerInitialization:
 
         try:
             get_logger("mailgun.test_bypass")
-            assert not any(
-                isinstance(h, logging.NullHandler) for h in root_logger.handlers
-            )
+            assert not any(isinstance(h, logging.NullHandler) for h in root_logger.handlers)
         finally:
             # Clean up to prevent state bleeding into downstream tests
             root_logger.handlers.clear()
@@ -141,6 +135,7 @@ class TestRedactingFilter:
 
     def test_redact_custom_object_dict_fallback(self) -> None:
         """Hits Line 99: hasattr(data, '__dict__') fallback."""
+
         class CustomObj:
             def __init__(self) -> None:
                 self.api_key = "key-supersecret"  # pragma: allowlist secret
@@ -148,7 +143,7 @@ class TestRedactingFilter:
         filtr = RedactingFilter()
         redacted = filtr._deep_redact(CustomObj())
 
-        assert redacted["api_key"] == "key-[REDACTED]"   # pragma: allowlist secret
+        assert redacted["api_key"] == "key-[REDACTED]"  # pragma: allowlist secret
 
     def test_redact_set(self) -> None:
         """Hits the isinstance(data, set) branch."""

@@ -12,6 +12,7 @@ from typing import Any
 
 import atheris
 
+
 with atheris.instrument_imports():
     from mailgun.security import SecurityGuard
 
@@ -89,10 +90,7 @@ def TestOneInput(data: bytes) -> None:
             val = fdp.ConsumeIntInRange(-100000, 100000)
         elif val_choice == 3:
             # Multi-value headers
-            val = [
-                fdp.ConsumeUnicodeNoSurrogates(24)
-                for _ in range(fdp.ConsumeIntInRange(1, 3))
-            ]
+            val = [fdp.ConsumeUnicodeNoSurrogates(24) for _ in range(fdp.ConsumeIntInRange(1, 3))]
         elif val_choice == 4:
             val = None
         elif val_choice == 5:
@@ -107,26 +105,26 @@ def TestOneInput(data: bytes) -> None:
 
         if not isinstance(sanitized, dict):
             raise RuntimeError(
-                f"CONTRACT VIOLATION: sanitize_headers returned {type(sanitized)}"
+                f"CONTRACT VIOLATION: sanitize_headers returned {type(sanitized)}",
             )
 
         # Invariant checks: sanitized headers must never leak raw CRLF or null bytes
         for k, v in sanitized.items():
             if not isinstance(k, str) or not isinstance(v, str):
                 raise RuntimeError(
-                    f"TYPE DRIFT: Sanitized header contains non-str: {type(k)}={type(v)}"
+                    f"TYPE DRIFT: Sanitized header contains non-str: {type(k)}={type(v)}",
                 )
             if "\r" in k or "\n" in k or "\x00" in k:
-                raise RuntimeError(f"INJECTION LEAK in header key: {repr(k)}")
+                raise RuntimeError(f"INJECTION LEAK in header key: {k!r}")
             if "\r" in v or "\n" in v or "\x00" in v:
-                raise RuntimeError(f"INJECTION LEAK in header value: {repr(v)}")
+                raise RuntimeError(f"INJECTION LEAK in header value: {v!r}")
 
     except (TypeError, ValueError, UnicodeEncodeError):
         # Expected security rejection for malformed headers or control characters
         pass
     except Exception as e:
         raise RuntimeError(
-            f"UNHANDLED CRASH in SecurityGuard.sanitize_headers: {e}"
+            f"UNHANDLED CRASH in SecurityGuard.sanitize_headers: {e}",
         ) from e
 
 
