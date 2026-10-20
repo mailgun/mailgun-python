@@ -1596,6 +1596,7 @@ class MailingListsTests(unittest.TestCase):
         self.assertIn("list", req.json())
 
 
+@pytest.mark.xdist_group(name="templates_sync")
 class TemplatesTests(unittest.TestCase):
     """Tests for Mailgun Templates API.
 
@@ -1612,8 +1613,9 @@ class TemplatesTests(unittest.TestCase):
         )
         self.client: Client = Client(auth=self.auth)
         self.domain: str = os.environ["DOMAIN"]
+        self.template_name: str = "template.name20_sync"
         self.post_template_data: dict[str, str] = {
-            "name": "template.name20",
+            "name": self.template_name,
             "description": "template description",
             "template": "{{fname}} {{lname}}",
             "engine": "handlebars",
@@ -1675,16 +1677,6 @@ class TemplatesTests(unittest.TestCase):
         )
         self.assertEqual(req.status_code, 200)
         self.assertIn("template", req.json())
-
-    @pytest.mark.order(9)
-    def test_delete_template(self) -> None:
-        self.client.templates.create(data=self.post_template_data, domain=self.domain)
-        req = self.client.templates.delete(
-            domain=self.domain,
-            template_name=self.post_template_data["name"],
-        )
-
-        self.assertEqual(req.status_code, 200)
 
     @pytest.mark.order(4)
     def test_post_version_template(self) -> None:
@@ -1748,12 +1740,19 @@ class TemplatesTests(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("template", req.json())
 
-    @pytest.mark.order(9)
-    def test_delete_version_template(self) -> None:
+    @pytest.mark.order(7)
+    def test_update_template_version_copy(self) -> None:
+        """Test to copy an existing version into a new version with the provided name: Happy Path with valid data."""
         self.client.templates.create(data=self.post_template_data, domain=self.domain)
 
-        self.post_template_version_data["tag"] = "v0"
-        self.post_template_version_data["active"] = "no"
+        with suppress(Exception):
+            self.client.templates.delete(
+                domain=self.domain,
+                template_name=self.post_template_data["name"],
+                versions=True,
+                tag="v3",
+            )
+
         self.client.templates.create(
             data=self.post_template_version_data,
             domain=self.domain,
@@ -1761,31 +1760,12 @@ class TemplatesTests(unittest.TestCase):
             versions=True,
         )
 
-        req = self.client.templates.delete(
-            domain=self.domain,
-            template_name=self.post_template_data["name"],
-            versions=True,
-            tag="v0",
-        )
-
-        self.client.templates.delete(
-            domain=self.domain,
-            template_name=self.post_template_data["name"],
-            versions=True,
-            tag=self.put_template_version,
-        )
-
-        self.assertEqual(req.status_code, 200)
-
-    @pytest.mark.order(7)
-    def test_update_template_version_copy(self) -> None:
-        """Test to copy an existing version into a new version with the provided name: Happy Path with valid data."""
         data = {"comment": "An updated version comment"}
 
         req = self.client.templates.put(
             domain=self.domain,
             filters=data,
-            template_name="template.name20",
+            template_name=self.post_template_data["name"],
             versions=True,
             tag="v11",
             copy=True,
@@ -1806,15 +1786,56 @@ class TemplatesTests(unittest.TestCase):
             "comment",
             "active",
             "id",
-            "headers",
         ]
 
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 200)
-        [self.assertIn(key, expected_keys) for key in req.json()]  # type: ignore[func-returns-value]
+        for key in expected_keys:
+            self.assertIn(key, req.json())
         self.assertIn("tag", req.json()["version"])
         self.assertIn("version has been copied", req.json()["message"])
-        [self.assertIn(key, expected_template_keys) for key in req.json()["template"]]  # type: ignore[func-returns-value]
+        for key in expected_template_keys:
+            self.assertIn(key, req.json()["template"])
+
+    @pytest.mark.order(8)
+    def test_delete_version_template(self) -> None:
+        self.client.templates.create(data=self.post_template_data, domain=self.domain)
+
+        self.post_template_version_data["tag"] = "v0"
+        self.post_template_version_data["active"] = "no"
+        self.client.templates.create(
+            data=self.post_template_version_data,
+            domain=self.domain,
+            template_name=self.post_template_data["name"],
+            versions=True,
+        )
+
+        req = self.client.templates.delete(
+            domain=self.domain,
+            template_name=self.post_template_data["name"],
+            versions=True,
+            tag="v0",
+        )
+
+        with suppress(Exception):
+            self.client.templates.delete(
+                domain=self.domain,
+                template_name=self.post_template_data["name"],
+                versions=True,
+                tag=self.put_template_version,
+            )
+
+        self.assertEqual(req.status_code, 200)
+
+    @pytest.mark.order(9)
+    def test_delete_template(self) -> None:
+        self.client.templates.create(data=self.post_template_data, domain=self.domain)
+        req = self.client.templates.delete(
+            domain=self.domain,
+            template_name=self.post_template_data["name"],
+        )
+
+        self.assertEqual(req.status_code, 200)
 
 
 @pytest.mark.skip(

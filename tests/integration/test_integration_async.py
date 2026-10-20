@@ -1342,6 +1342,7 @@ class AsyncMailingListsTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("list", req.json())
 
 
+@pytest.mark.xdist_group(name="templates_async")
 class AsyncTemplatesTests(unittest.IsolatedAsyncioTestCase):
     """Async tests for Mailgun Templates API using AsyncClient."""
 
@@ -1352,8 +1353,9 @@ class AsyncTemplatesTests(unittest.IsolatedAsyncioTestCase):
         )
         self.client: AsyncClient = AsyncClient(auth=self.auth)
         self.domain: str = os.environ["DOMAIN"]
+        self.template_name: str = "template.name20_async"
         self.post_template_data: dict[str, str] = {
-            "name": "template.name20",
+            "name": self.template_name,
             "description": "template description",
             "template": "{{fname}} {{lname}}",
             "engine": "handlebars",
@@ -1381,11 +1383,13 @@ class AsyncTemplatesTests(unittest.IsolatedAsyncioTestCase):
     async def asyncTearDown(self) -> None:
         await self.client.aclose()
 
+    @pytest.mark.order(1)
     async def test_create_template(self) -> None:
-        await self.client.templates.delete(
-            domain=self.domain,
-            template_name=self.post_template_data["name"],
-        )
+        with suppress(Exception):
+            await self.client.templates.delete(
+                domain=self.domain,
+                template_name=self.post_template_data["name"],
+            )
 
         req = await self.client.templates.create(
             data=self.post_template_data,
@@ -1394,6 +1398,7 @@ class AsyncTemplatesTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("template", req.json())
 
+    @pytest.mark.order(2)
     async def test_get_template(self) -> None:
         params = {"active": "yes"}
         await self.client.templates.create(data=self.post_template_data, domain=self.domain)
@@ -1406,6 +1411,7 @@ class AsyncTemplatesTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("template", req.json())
 
+    @pytest.mark.order(3)
     async def test_put_template(self) -> None:
         await self.client.templates.create(data=self.post_template_data, domain=self.domain)
         req = await self.client.templates.put(
@@ -1416,24 +1422,17 @@ class AsyncTemplatesTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("template", req.json())
 
-    async def test_delete_template(self) -> None:
-        await self.client.templates.create(data=self.post_template_data, domain=self.domain)
-        req = await self.client.templates.delete(
-            domain=self.domain,
-            template_name=self.post_template_data["name"],
-        )
-
-        self.assertEqual(req.status_code, 200)
-
+    @pytest.mark.order(4)
     async def test_post_version_template(self) -> None:
         await self.client.templates.create(data=self.post_template_data, domain=self.domain)
 
-        await self.client.templates.delete(
-            domain=self.domain,
-            template_name=self.post_template_data["name"],
-            versions=True,
-            tag=self.put_template_version,
-        )
+        with suppress(Exception):
+            await self.client.templates.delete(
+                domain=self.domain,
+                template_name=self.post_template_data["name"],
+                versions=True,
+                tag=self.put_template_version,
+            )
 
         req = await self.client.templates.create(
             data=self.post_template_version_data,
@@ -1444,6 +1443,7 @@ class AsyncTemplatesTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("template", req.json())
 
+    @pytest.mark.order(5)
     async def test_get_version_template(self) -> None:
         await self.client.templates.create(data=self.post_template_data, domain=self.domain)
 
@@ -1463,6 +1463,7 @@ class AsyncTemplatesTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("template", req.json())
 
+    @pytest.mark.order(6)
     async def test_put_version_template(self) -> None:
         await self.client.templates.create(data=self.post_template_data, domain=self.domain)
 
@@ -1484,37 +1485,18 @@ class AsyncTemplatesTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("template", req.json())
 
-    async def test_delete_version_template(self) -> None:
-        await self.client.templates.create(data=self.post_template_data, domain=self.domain)
-
-        self.post_template_version_data["tag"] = "v0"
-        self.post_template_version_data["active"] = "no"
-        await self.client.templates.create(
-            data=self.post_template_version_data,
-            domain=self.domain,
-            template_name=self.post_template_data["name"],
-            versions=True,
-        )
-
-        req = await self.client.templates.delete(
-            domain=self.domain,
-            template_name=self.post_template_data["name"],
-            versions=True,
-            tag="v0",
-        )
-
-        await self.client.templates.delete(
-            domain=self.domain,
-            template_name=self.post_template_data["name"],
-            versions=True,
-            tag=self.put_template_version,
-        )
-
-        self.assertEqual(req.status_code, 200)
-
+    @pytest.mark.order(7)
     async def test_update_template_version_copy(self) -> None:
         """Test to copy an existing version into a new version with the provided name: Happy Path with valid data."""
         await self.client.templates.create(data=self.post_template_data, domain=self.domain)
+
+        with suppress(Exception):
+            await self.client.templates.delete(
+                domain=self.domain,
+                template_name=self.post_template_data["name"],
+                versions=True,
+                tag="v3",
+            )
 
         await self.client.templates.create(
             data=self.post_template_version_data,
@@ -1528,7 +1510,7 @@ class AsyncTemplatesTests(unittest.IsolatedAsyncioTestCase):
         req = await self.client.templates.put(
             domain=self.domain,
             filters=data,
-            template_name="template.name20",
+            template_name=self.post_template_data["name"],
             versions=True,
             tag="v11",
             copy=True,
@@ -1549,15 +1531,56 @@ class AsyncTemplatesTests(unittest.IsolatedAsyncioTestCase):
             "comment",
             "active",
             "id",
-            "headers",
         ]
 
         self.assertIsInstance(req.json(), dict)
         self.assertEqual(req.status_code, 200)
-        [self.assertIn(key, expected_keys) for key in req.json()]  # type: ignore[func-returns-value]
+        for key in expected_keys:
+            self.assertIn(key, req.json())
         self.assertIn("tag", req.json()["version"])
         self.assertIn("version has been copied", req.json()["message"])
-        [self.assertIn(key, expected_template_keys) for key in req.json()["template"]]  # type: ignore[func-returns-value]
+        for key in expected_template_keys:
+            self.assertIn(key, req.json()["template"])
+
+    @pytest.mark.order(8)
+    async def test_delete_version_template(self) -> None:
+        await self.client.templates.create(data=self.post_template_data, domain=self.domain)
+
+        self.post_template_version_data["tag"] = "v0"
+        self.post_template_version_data["active"] = "no"
+        await self.client.templates.create(
+            data=self.post_template_version_data,
+            domain=self.domain,
+            template_name=self.post_template_data["name"],
+            versions=True,
+        )
+
+        req = await self.client.templates.delete(
+            domain=self.domain,
+            template_name=self.post_template_data["name"],
+            versions=True,
+            tag="v0",
+        )
+
+        with suppress(Exception):
+            await self.client.templates.delete(
+                domain=self.domain,
+                template_name=self.post_template_data["name"],
+                versions=True,
+                tag=self.put_template_version,
+            )
+
+        self.assertEqual(req.status_code, 200)
+
+    @pytest.mark.order(9)
+    async def test_delete_template(self) -> None:
+        await self.client.templates.create(data=self.post_template_data, domain=self.domain)
+        req = await self.client.templates.delete(
+            domain=self.domain,
+            template_name=self.post_template_data["name"],
+        )
+
+        self.assertEqual(req.status_code, 200)
 
 
 @pytest.mark.skip(
