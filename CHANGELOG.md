@@ -32,6 +32,7 @@ We [keep a changelog.](http://keepachangelog.com/)
 - PR #70: build(deps): Bump the minor-and-patch group with 2 updates.
 - PR #71: Replace httpx with httpx2.
 - PR #72: build(deps): Bump the minor-and-patch group with 2 updates.
+- PR #73: Release 1.10.0.
 
 ## [1.9.1] - 2026-09-21
 
