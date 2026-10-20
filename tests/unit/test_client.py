@@ -83,6 +83,7 @@ class TestClientClosure:
     def test_client_unclosed_resource_warning(self) -> None:
         """Verify that leaving a Client unclosed triggers a ResourceWarning upon deletion."""
         import gc
+
         client = Client(auth=("api", "key"))
         _ = client._session
         with pytest.warns(ResourceWarning, match="Unclosed Client detected"):
@@ -101,10 +102,12 @@ class TestClientClosure:
     def test_client_del_attribute_error(self) -> None:
         """Coverage: Silently catch AttributeError during GC deletion."""
         import gc
+
         client = Client(auth=("api", "key"))
         del client._session  # Force the attribute lookup/get_attribute to fail
         del client
         gc.collect()  # Trigger finalization via GC; must pass silently without crashing
+
 
 class TestClientPing:
     def test_sync_client_ping_success(self) -> None:
@@ -160,7 +163,10 @@ class TestClientInitialization:
     def test_sync_ping_network_failure(self) -> None:
         """Hits the except Exception branch inside ping()."""
         with pytest.MonkeyPatch.context() as m:
-            m.setattr("requests.Session.request", lambda *a, **k: (_ for _ in ()).throw(ConnectionError("Network Down")))
+            m.setattr(
+                "requests.Session.request",
+                lambda *a, **k: (_ for _ in ()).throw(ConnectionError("Network Down")),
+            )
             client = Client(auth=("api", "key"))
             assert client.ping() is False
 
@@ -181,7 +187,7 @@ class TestErrorHandler:
             # Force the underlying requests session to throw a ReadTimeout
             m.setattr(
                 "requests.Session.request",
-                lambda *args, **kwargs: (_ for _ in ()).throw(ReadTimeout("Timeout"))
+                lambda *args, **kwargs: (_ for _ in ()).throw(ReadTimeout("Timeout")),
             )
 
             client.domains.get(domain="test.com")
@@ -189,6 +195,7 @@ class TestErrorHandler:
     def test_deliverability_error_formatting(self) -> None:
         """Coverage: Ensure the custom SpamGuard exception formats output correctly."""
         from mailgun.handlers.error_handler import DeliverabilityError
+
         error = DeliverabilityError(score=45.0, issues=["Missing alt tags"])
 
         assert "Score: 45.0/100" in str(error)

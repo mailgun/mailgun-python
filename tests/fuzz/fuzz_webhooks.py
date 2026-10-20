@@ -16,6 +16,7 @@ from typing import Any
 
 import atheris
 
+
 with atheris.instrument_imports():
     from mailgun.security import SecurityGuard
 
@@ -32,7 +33,7 @@ _SIGNING_KEYS = [
 
 def _compute_valid_signature(key: str, timestamp: str, token: str) -> str:
     """Computes genuine HMAC-SHA256 signature for baseline positive verification."""
-    data = f"{timestamp}{token}".encode("utf-8")
+    data = f"{timestamp}{token}".encode()
     return hmac.new(key.encode("utf-8"), data, hashlib.sha256).hexdigest()
 
 
@@ -52,11 +53,7 @@ def TestOneInput(data: bytes) -> None:
         signing_key = fdp.ConsumeInt(50000)
 
     # 2. Token generation
-    token: Any = (
-        fdp.ConsumeUnicodeNoSurrogates(40)
-        if fdp.ConsumeBool()
-        else fdp.ConsumeBytes(32)
-    )
+    token: Any = fdp.ConsumeUnicodeNoSurrogates(40) if fdp.ConsumeBool() else fdp.ConsumeBytes(32)
 
     # 3. Timestamp Generation: Probing TTL boundaries (CWE-294)
     # Current time baseline: 15-minute (900s) default replay window
@@ -79,7 +76,7 @@ def TestOneInput(data: bytes) -> None:
     elif ts_mode == 3:
         # Extreme numbers (scientific notation, negative, overflow)
         timestamp = fdp.PickValueInList(
-            ["-1", "0", "1e12", "999999999999999999", "NaN", "Infinity", "inf"]
+            ["-1", "0", "1e12", "999999999999999999", "NaN", "Infinity", "inf"],
         )
     elif ts_mode == 4:
         # Raw chaotic string / non-numeric characters
@@ -101,11 +98,7 @@ def TestOneInput(data: bytes) -> None:
     ):
         # Genuine signature path to verify positive acceptance
         valid_sig = _compute_valid_signature(signing_key, timestamp, token)
-        if fdp.ConsumeBool():
-            # Upper-case variant to test case-insensitivity
-            signature = valid_sig.upper()
-        else:
-            signature = valid_sig
+        signature = valid_sig.upper() if fdp.ConsumeBool() else valid_sig
     elif sig_mode == 1:
         # Non-hex characters of 64 length
         signature = fdp.ConsumeUnicodeNoSurrogates(64)
@@ -140,7 +133,7 @@ def TestOneInput(data: bytes) -> None:
                     time_diff = abs(time.time() - parsed_ts)
                     if time_diff > 900:
                         raise RuntimeError(
-                            f"REPLAY VULNERABILITY (CWE-294): Webhook with delta {time_diff:.1f}s accepted!"
+                            f"REPLAY VULNERABILITY (CWE-294): Webhook with delta {time_diff:.1f}s accepted!",
                         )
             except (ValueError, TypeError, OverflowError):
                 # Fuzzed timestamp is intentionally non-numeric/out-of-range; skip replay-window invariant.

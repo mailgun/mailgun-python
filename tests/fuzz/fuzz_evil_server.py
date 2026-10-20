@@ -31,7 +31,11 @@ def TestOneInput(data: bytes) -> None:
     client = Client(auth=("api", "test-key"))
     original_send = requests.Session.send
 
-    def evil_send(self: requests.Session, request: requests.PreparedRequest, **kwargs: Any) -> requests.Response:
+    def evil_send(
+        self: requests.Session,
+        request: requests.PreparedRequest,
+        **kwargs: Any,
+    ) -> requests.Response:
         # Inject network-level transport faults
         if fdp.ConsumeBool():
             exceptions = [
@@ -47,7 +51,7 @@ def TestOneInput(data: bytes) -> None:
         status = fdp.PickValueInList(_STATUS_CODES)
         headers: dict[str, str] = {
             "content-type": fdp.PickValueInList(
-                ["application/json", "text/html", "application/octet-stream", "image/png"]
+                ["application/json", "text/html", "application/octet-stream", "image/png"],
             ),
             "content-length": str(fdp.ConsumeIntInRange(-1000, 20000)),
         }
@@ -55,15 +59,13 @@ def TestOneInput(data: bytes) -> None:
         # Hostile Retry-After injection
         if fdp.ConsumeBool():
             headers["Retry-After"] = (
-                fdp.ConsumeUnicodeNoSurrogates(16)
-                if fdp.ConsumeBool()
-                else str(fdp.ConsumeFloat())
+                fdp.ConsumeUnicodeNoSurrogates(16) if fdp.ConsumeBool() else str(fdp.ConsumeFloat())
             )
 
         # Redirect loop simulation
-        if status in (301, 302):
+        if status in {301, 302}:
             headers["Location"] = fdp.PickValueInList(
-                ["https://api.mailgun.net/v3/messages", "http://127.0.0.1:80", "/relative/loop"]
+                ["https://api.mailgun.net/v3/messages", "http://127.0.0.1:80", "/relative/loop"],
             )
 
         mock_response = requests.Response()
@@ -77,9 +79,13 @@ def TestOneInput(data: bytes) -> None:
 
     requests.Session.send = evil_send  # type: ignore[method-assign]
 
-    with Path(os.devnull).open("w") as devnull, contextlib.redirect_stdout(
-        devnull
-    ), contextlib.redirect_stderr(devnull):
+    with (
+        Path(os.devnull).open("w") as devnull,
+        contextlib.redirect_stdout(
+            devnull,
+        ),
+        contextlib.redirect_stderr(devnull),
+    ):
         try:
             target_method = fdp.PickValueInList(_HTTP_METHODS)
             client.messages.api_call(
@@ -98,7 +104,9 @@ def TestOneInput(data: bytes) -> None:
         ):
             pass
         except Exception as exc:
-            raise RuntimeError(f"Unhandled crash during evil server simulation: {type(exc).__name__}: {exc}") from exc
+            raise RuntimeError(
+                f"Unhandled crash during evil server simulation: {type(exc).__name__}: {exc}",
+            ) from exc
         finally:
             requests.Session.send = original_send  # type: ignore[method-assign]
             if hasattr(client, "close"):

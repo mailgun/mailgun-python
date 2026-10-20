@@ -14,6 +14,7 @@ from typing import Any
 
 import atheris
 
+
 with atheris.instrument_imports():
     from mailgun.client import Client
     from mailgun.handlers.error_handler import ApiError
@@ -37,8 +38,7 @@ def _generate_nested_json_tree(fdp: atheris.FuzzedDataProvider, depth: int = 0) 
         return None
     if choice == 4:
         return [
-            _generate_nested_json_tree(fdp, depth + 1)
-            for _ in range(fdp.ConsumeIntInRange(1, 3))
+            _generate_nested_json_tree(fdp, depth + 1) for _ in range(fdp.ConsumeIntInRange(1, 3))
         ]
     return {
         fdp.ConsumeUnicodeNoSurrogates(8): _generate_nested_json_tree(fdp, depth + 1)
@@ -61,8 +61,7 @@ def _generate_semantic_message(fdp: atheris.FuzzedDataProvider) -> dict[str, Any
     # Option parameters (o:tag, o:tracking, o:deliverytime)
     if fdp.ConsumeBool():
         payload["o:tag"] = [
-            fdp.ConsumeUnicodeNoSurrogates(12)
-            for _ in range(fdp.ConsumeIntInRange(1, 3))
+            fdp.ConsumeUnicodeNoSurrogates(12) for _ in range(fdp.ConsumeIntInRange(1, 3))
         ]
     if fdp.ConsumeBool():
         payload["o:tracking"] = fdp.PickValueInList([True, False, "yes", "no", None])
@@ -74,7 +73,7 @@ def _generate_semantic_message(fdp: atheris.FuzzedDataProvider) -> dict[str, Any
                 "2024-10-25T23:10:10Z",
                 fdp.ConsumeInt(10**10),
                 "invalid-time-format",
-            ]
+            ],
         )
 
     # Deep recipient-variables serialization
@@ -121,6 +120,7 @@ def TestOneInput(data: bytes) -> None:
             raise RuntimeError("CRITICAL: Infinite recursion during payload serialization")
         except Exception as e:
             raise RuntimeError(f"SEMANTIC CRASH: {type(e).__name__} - {e}") from e
+
 
 if __name__ == "__main__":
     atheris.instrument_all()

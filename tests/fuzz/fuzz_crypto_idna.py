@@ -7,6 +7,7 @@ from typing import Any
 
 import atheris
 
+
 with atheris.instrument_imports():
     from mailgun.security import SecretAuth, SecurityGuard
 
@@ -75,7 +76,9 @@ def TestOneInput(data: bytes) -> None:
     except ValueError:
         pass
     except Exception as e:
-        raise RuntimeError(f"UNHANDLED CRASH in Crypto/IDNA boundaries: {type(e).__name__} - {e}") from e
+        raise RuntimeError(
+            f"UNHANDLED CRASH in Crypto/IDNA boundaries: {type(e).__name__} - {e}",
+        ) from e
 
 
 if __name__ == "__main__":

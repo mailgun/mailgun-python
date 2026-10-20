@@ -6,6 +6,7 @@ import sys
 
 import atheris
 
+
 with atheris.instrument_imports():
     from mailgun import routes
     from mailgun.config import Config
@@ -33,7 +34,7 @@ def TestOneInput(data: bytes) -> None:
                 "https://user:pass@api.mailgun.net",  # pragma: allowlist secret
                 "ftp://api.mailgun.net",
                 "/v3/relative/path",
-            ]
+            ],
         )
     )
 

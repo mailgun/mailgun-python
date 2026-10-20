@@ -14,8 +14,10 @@ from unittest.mock import patch
 
 import atheris
 
+
 with atheris.instrument_imports():
-    from mailgun._httpx_compat import httpx as compat_httpx
+    import httpx2
+
     from mailgun.client import AsyncClient, Config
     from mailgun.config import RetryPolicy
     from mailgun.handlers.error_handler import ApiError
@@ -29,7 +31,7 @@ _FUZZ_LOOP = asyncio.new_event_loop()
 asyncio.set_event_loop(_FUZZ_LOOP)
 
 
-class ChaosAsyncTransport(compat_httpx.AsyncBaseTransport):
+class ChaosAsyncTransport(httpx2.AsyncBaseTransport):
     """Dynamic mock transport returning chaos responses based on request properties."""
 
     def __init__(self) -> None:
@@ -48,9 +50,10 @@ class ChaosAsyncTransport(compat_httpx.AsyncBaseTransport):
         self.headers = headers or [(b"content-type", b"application/json")]
 
     async def handle_async_request(
-        self, request: compat_httpx.Request
-    ) -> compat_httpx.Response:
-        return compat_httpx.Response(
+        self,
+        request: httpx2.Request,
+    ) -> httpx2.Response:
+        return httpx2.Response(
             status_code=self.status_code,
             content=self.response_body,
             headers=self.headers,
@@ -59,17 +62,19 @@ class ChaosAsyncTransport(compat_httpx.AsyncBaseTransport):
 
 
 _CHAOS_TRANSPORT = ChaosAsyncTransport()
-_ORIGINAL_INIT = compat_httpx.AsyncClient.__init__
+_ORIGINAL_INIT = httpx2.AsyncClient.__init__
 
 
 def _secure_init(
-    self: compat_httpx.AsyncClient, *args: Any, **kwargs: Any
+    self: httpx2.AsyncClient,
+    *args: Any,
+    **kwargs: Any,
 ) -> None:
     kwargs["transport"] = _CHAOS_TRANSPORT
     _ORIGINAL_INIT(self, *args, **kwargs)
 
 
-compat_httpx.AsyncClient.__init__ = _secure_init  # type: ignore[method-assign]
+httpx2.AsyncClient.__init__ = _secure_init  # type: ignore[method-assign]
 
 # Disable retries and backoff to guarantee sub-millisecond turnarounds
 _NO_RETRY_CONFIG = Config(
@@ -123,13 +128,12 @@ async def _execute_async_target(
         if hasattr(ep, "delete"):
             await ep.delete(domain=domain, tag="fuzz-tag")
 
-    elif action == "stream":
-        if hasattr(ep, "stream"):
-            count = 0
-            async for _ in ep.stream(domain=domain, filters={"limit": 5}):
-                count += 1
-                if count >= 2:
-                    break
+    elif action == "stream" and hasattr(ep, "stream"):
+        count = 0
+        async for _ in ep.stream(domain=domain, filters={"limit": 5}):
+            count += 1
+            if count >= 2:
+                break
 
 
 def TestOneInput(data: bytes) -> None:
@@ -192,22 +196,21 @@ def TestOneInput(data: bytes) -> None:
 
         except (
             ApiError,
-            compat_httpx.HTTPStatusError,
-            compat_httpx.RequestError,
+            httpx2.HTTPStatusError,
+            httpx2.RequestError,
             ValueError,
             TypeError,
             KeyError,
             AttributeError,
             StopIteration,
             TimeoutError,
-            asyncio.TimeoutError,
         ):
             pass
         except RecursionError:
             raise RuntimeError(f"RECURSION ERROR in endpoint {endpoint_name} on action {action}")
         except Exception as e:
             raise RuntimeError(
-                f"UNHANDLED ASYNC CRASH in endpoint {endpoint_name} ({action}): {type(e).__name__} - {e}"
+                f"UNHANDLED ASYNC CRASH in endpoint {endpoint_name} ({action}): {type(e).__name__} - {e}",
             ) from e
 
 

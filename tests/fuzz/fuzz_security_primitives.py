@@ -17,6 +17,7 @@ from typing import Any
 
 import atheris
 
+
 with atheris.instrument_imports():
     from mailgun.security import SecurityGuard
 
@@ -73,7 +74,7 @@ def TestOneInput(data: bytes) -> None:
 
             # Invariant: Output must never contain directory traversal sequences or null bytes
             if ".." in sanitized or "\x00" in sanitized or "/" in sanitized or "\\" in sanitized:
-                raise RuntimeError(f"PATH ESCAPE LEAK in sanitized segment: {repr(sanitized)}")
+                raise RuntimeError(f"PATH ESCAPE LEAK in sanitized segment: {sanitized!r}")
 
         elif target == 1:
             # Target 2: SSRF and Scheme/Host Validation (CWE-918)
@@ -102,9 +103,9 @@ def TestOneInput(data: bytes) -> None:
             if sanitized_headers is not None:
                 for k, v in sanitized_headers.items():
                     if "\r" in k or "\n" in k or "\x00" in k:
-                        raise RuntimeError(f"CRLF LEAK in header key: {repr(k)}")
+                        raise RuntimeError(f"CRLF LEAK in header key: {k!r}")
                     if "\r" in v or "\n" in v or "\x00" in v:
-                        raise RuntimeError(f"CRLF LEAK in header value: {repr(v)}")
+                        raise RuntimeError(f"CRLF LEAK in header value: {v!r}")
 
         elif target == 3:
             # Target 4: Timeout Bounds and Overflow Defense (CWE-400)
@@ -115,14 +116,20 @@ def TestOneInput(data: bytes) -> None:
             elif timeout_choice == 1:
                 timeout = (fdp.ConsumeFloat(), fdp.ConsumeFloat())
             elif timeout_choice == 2:
-                timeout = fdp.PickValueInList([float("inf"), float("-inf"), float("nan"), -1.0, 0.0])
+                timeout = fdp.PickValueInList(
+                    [float("inf"), float("-inf"), float("nan"), -1.0, 0.0],
+                )
             else:
                 timeout = fdp.ConsumeUnicodeNoSurrogates(16)
 
             sanitized_timeout = SecurityGuard.sanitize_timeout(timeout)
             # Invariant: Returned timeout must be positive and non-infinite
             if isinstance(sanitized_timeout, (int, float)):
-                if sanitized_timeout <= 0 or math.isnan(sanitized_timeout) or math.isinf(sanitized_timeout):
+                if (
+                    sanitized_timeout <= 0
+                    or math.isnan(sanitized_timeout)
+                    or math.isinf(sanitized_timeout)
+                ):
                     raise RuntimeError(f"INVALID TIMEOUT escaped: {sanitized_timeout}")
             elif isinstance(sanitized_timeout, tuple):
                 for t in sanitized_timeout:

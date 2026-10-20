@@ -13,6 +13,7 @@ from typing import Any
 
 import atheris
 
+
 with atheris.instrument_imports():
     from mailgun.security import SpamGuard
 
@@ -22,11 +23,11 @@ _BENIGN_MALFORMED_SNIPPETS = [
     '<a href="http://evil.com">Click here</a>',
     '<img src="cid:missing.png" alt="No image">',
     '<div style="display:none;font-size:0px;color:#ffffff;background-color:#ffffff">Hidden Spam</div>',
-    '<!-- ' * 50 + 'Unclosed Comment',
-    '<table' + ' border=1' * 200 + '><tr><td>Deep attr</td></tr></table>',
+    "<!-- " * 50 + "Unclosed Comment",
+    "<table" + " border=1" * 200 + "><tr><td>Deep attr</td></tr></table>",
     '<a href="javascript:void(0)">Spam</a>' * 50,
-    '<p>\u200b\u200c\u200dHidden zero-width tokens\ufeff</p>',
-    '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"' + '>' * 100,
+    "<p>\u200b\u200c\u200dHidden zero-width tokens\ufeff</p>",
+    '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"' + ">" * 100,
 ]
 
 _HOSTILE_EXECUTABLE_SNIPPETS = [
@@ -92,7 +93,9 @@ def TestOneInput(data: bytes) -> None:
 
         required_keys = {"score", "issues", "is_safe"}
         if not required_keys.issubset(report.keys()):
-            raise RuntimeError(f"SCHEMA DEFECT: Missing required keys in SpamReport: {set(report.keys())}")
+            raise RuntimeError(
+                f"SCHEMA DEFECT: Missing required keys in SpamReport: {set(report.keys())}",
+            )
 
         # Invariant 2: Score bounded and numeric
         score = report["score"]
@@ -104,11 +107,10 @@ def TestOneInput(data: bytes) -> None:
             raise RuntimeError(f"TYPE DRIFT: Issues must be a list, got {type(report['issues'])}")
 
         # Invariant 4: Standalone unmasked hostile executable snippets must be flagged unsafe
-        if mode == 1:
-            if report["is_safe"]:
-                raise RuntimeError(
-                    f"SECURITY BYPASS: Active executable snippet marked safe: {html_content!r}"
-                )
+        if mode == 1 and report["is_safe"]:
+            raise RuntimeError(
+                f"SECURITY BYPASS: Active executable snippet marked safe: {html_content!r}",
+            )
 
     except (TypeError, ValueError):
         # Expected rejection for oversized payloads exceeding MAX_HTML_SIZE_BYTES
@@ -116,7 +118,9 @@ def TestOneInput(data: bytes) -> None:
     except RecursionError:
         raise RuntimeError("RECURSION EXPLOSION in SpamGuard HTMLParser")
     except Exception as e:
-        raise RuntimeError(f"UNHANDLED CRASH in SpamGuard.check_html: {type(e).__name__} - {e}") from e
+        raise RuntimeError(
+            f"UNHANDLED CRASH in SpamGuard.check_html: {type(e).__name__} - {e}",
+        ) from e
 
 
 if __name__ == "__main__":

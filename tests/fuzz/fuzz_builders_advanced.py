@@ -21,7 +21,8 @@ logging.disable(logging.CRITICAL)
 
 
 def _test_cyclic_and_stream_pointer_invariants(
-    fdp: atheris.FuzzedDataProvider, builder: MailgunMessageBuilder
+    fdp: atheris.FuzzedDataProvider,
+    builder: MailgunMessageBuilder,
 ) -> None:
     # Explicitly annotate cyclic_dict as dict[str, Any] to allow self-referential structures
     cyclic_dict: dict[str, Any] = {"domain": "test.com", "to": ["a@b.com"]}
@@ -105,13 +106,12 @@ def TestOneInput(data: bytes) -> None:
                 nested_ast = _generate_nested_ast(fdp)
                 builder.add_custom_variable(var_key, nested_ast)
 
-
             elif op_code == 5:
                 # Attach in-memory BytesIO directly
                 raw_bytes = io.BytesIO(fdp.ConsumeBytes(128))
                 try:
                     getattr(builder, "add_attachment", lambda *a, **k: None)(
-                        ("payload.bin", raw_bytes, "application/octet-stream")
+                        ("payload.bin", raw_bytes, "application/octet-stream"),
                     )
                 except (AttributeError, TypeError, ValueError):
                     # Expected during fuzzing: optional API may be missing or reject malformed input.

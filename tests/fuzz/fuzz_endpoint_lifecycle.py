@@ -44,7 +44,7 @@ def _generate_fuzzed_id(fdp: atheris.FuzzedDataProvider) -> str:
     if choice == 2:
         # URL encoding and special characters
         return fdp.PickValueInList(
-            ["test@example.com", "tag:special", "id#123", "id?filter=1", "id%20space", ""]
+            ["test@example.com", "tag:special", "id#123", "id?filter=1", "id%20space", ""],
         )
     if choice == 3:
         # Sub-resource path representation
@@ -82,12 +82,18 @@ def TestOneInput(data: bytes) -> None:
                         # CREATE
                         new_id = _generate_fuzzed_id(fdp)
                         if hasattr(endpoint, "create"):
-                            endpoint.create(data={"id": new_id, "name": fdp.ConsumeUnicodeNoSurrogates(10)})
+                            endpoint.create(
+                                data={"id": new_id, "name": fdp.ConsumeUnicodeNoSurrogates(10)},
+                            )
                         active_ids.append(new_id)
 
                     elif op == 1:
                         # GET
-                        target_id = fdp.PickValueInList(active_ids) if (active_ids and fdp.ConsumeBool()) else _generate_fuzzed_id(fdp)
+                        target_id = (
+                            fdp.PickValueInList(active_ids)
+                            if (active_ids and fdp.ConsumeBool())
+                            else _generate_fuzzed_id(fdp)
+                        )
                         if hasattr(endpoint, "get"):
                             endpoint.get(domain=target_id)
 
@@ -104,7 +110,10 @@ def TestOneInput(data: bytes) -> None:
                         if hasattr(endpoint, "update"):
                             endpoint.update(
                                 domain=target_id,
-                                data={"fuzz_key": fdp.ConsumeUnicodeNoSurrogates(12), "val": fdp.ConsumeInt(1000)},
+                                data={
+                                    "fuzz_key": fdp.ConsumeUnicodeNoSurrogates(12),
+                                    "val": fdp.ConsumeInt(1000),
+                                },
                             )
 
                     elif op == 4 and active_ids:
@@ -125,7 +134,9 @@ def TestOneInput(data: bytes) -> None:
     ):
         pass
     except Exception as exc:
-        raise RuntimeError(f"Unexpected crash in endpoint lifecycle harness: {type(exc).__name__}: {exc}") from exc
+        raise RuntimeError(
+            f"Unexpected crash in endpoint lifecycle harness: {type(exc).__name__}: {exc}",
+        ) from exc
 
 
 if __name__ == "__main__":

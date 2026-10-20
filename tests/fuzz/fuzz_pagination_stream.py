@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, patch
 
 import atheris
 
+
 with atheris.instrument_imports():
     from mailgun.client import Endpoint
 
@@ -47,7 +48,7 @@ def TestOneInput(data: bytes) -> None:
         initial_filters["page"] = fdp.ConsumeUnicodeNoSurrogates(16)
     if fdp.ConsumeBool():
         initial_filters["event"] = fdp.PickValueInList(
-            ["delivered", "failed", "opened", "clicked", None]
+            ["delivered", "failed", "opened", "clicked", None],
         )
 
     if fdp.ConsumeBool():
@@ -72,9 +73,7 @@ def TestOneInput(data: bytes) -> None:
         {
             "items": [{"id": "event_2", "recipient": "user2@example.com"}],
             "paging": {
-                "next": (
-                    next_url if fdp.ConsumeBool() else None
-                ),  # 50% test cyclic cursor
+                "next": (next_url if fdp.ConsumeBool() else None),  # 50% test cyclic cursor
                 "previous": None,
             },
         },
@@ -105,9 +104,7 @@ def TestOneInput(data: bytes) -> None:
             stream_gen = ep.stream(filters=initial_filters)
 
             # Pull up to 3 pages to test iteration, type casting, and termination
-            iterations = 0
-            for _ in stream_gen:
-                iterations += 1
+            for iterations, _ in enumerate(stream_gen, start=1):
                 if iterations >= 3:
                     # Invariant: prevent endless loops on cyclic next URLs
                     break
@@ -117,7 +114,7 @@ def TestOneInput(data: bytes) -> None:
             pass
         except Exception as e:
             raise RuntimeError(
-                f"UNHANDLED CRASH in Endpoint.stream with filters {initial_filters} and url {repr(next_url)}: {e}"
+                f"UNHANDLED CRASH in Endpoint.stream with filters {initial_filters} and url {next_url!r}: {e}",
             ) from e
 
 

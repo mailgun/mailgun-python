@@ -13,7 +13,7 @@ class TestPydanticMessageSchema:
             to="user@example.com",
             from_="admin@example.com",
             subject="Secure Test",
-            text="Hello World"
+            text="Hello World",
         )
 
         # Pydantic v2 dump

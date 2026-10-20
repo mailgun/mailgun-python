@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 from typing import Any
 
+
 # Domain and API key configuration
 API_KEY = os.environ.get("APIKEY")
 DOMAIN = os.environ.get("DOMAIN", "sandbox-fuzz.mailgun.org")
@@ -121,21 +122,21 @@ _SYNTHETIC_SEEDS: dict[str, list[dict[str, Any]]] = {
                     "id": "A_EV_12345",
                     "timestamp": 1714000000.0,
                     "recipient": "user@example.com",
-                }
+                },
             ],
             "paging": {
                 "next": "https://api.mailgun.net/v3/events?page=eyJwIjoxfQ==&limit=10",
                 "previous": "https://api.mailgun.net/v3/events?page=eyJwIjowfQ==",
             },
-        }
+        },
     ],
     "webhooks_get": [
         {
             "webhook": {
                 "url": "https://example.com/webhook",
                 "urls": ["https://example.com/webhook"],
-            }
-        }
+            },
+        },
     ],
     "validate_get": [
         {
@@ -143,7 +144,7 @@ _SYNTHETIC_SEEDS: dict[str, list[dict[str, Any]]] = {
             "is_valid": True,
             "parts": {"domain": "example.com", "local_part": "test"},
             "risk": "low",
-        }
+        },
     ],
 }
 

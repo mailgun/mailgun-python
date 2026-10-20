@@ -10,10 +10,10 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx2
 import pytest
 import requests  # pyright: ignore[reportMissingModuleSource]
 
-from mailgun._httpx_compat import httpx as compat_httpx
 from mailgun.client import (
     AsyncClient,
     Client,
@@ -150,7 +150,7 @@ class TestSecurityGuardGeneral:
 
         # max_age_seconds <= 0 disables expiration check
         old_ts = 1000
-        msg = f"{old_ts}token".encode("utf-8")
+        msg = f"{old_ts}token".encode()
         sig = hmac.new(b"key", msg, hashlib.sha256).hexdigest()
         assert SecurityGuard.verify_webhook("key", "token", old_ts, sig, max_age_seconds=0) is True
 
@@ -194,12 +194,18 @@ class TestSecurityGuardGeneral:
             mock_path_cls.return_value.resolve.return_value = mock_target
 
             with pytest.raises(ValueError, match="Access to sensitive OS system directories"):
-                SecurityGuard.validate_attachment_path("/etc/sensitive_system_config.conf", safe_base_dir=None)  # pyright: ignore[reportArgumentType]
+                SecurityGuard.validate_attachment_path(
+                    "/etc/sensitive_system_config.conf",
+                    safe_base_dir=None,
+                )  # pyright: ignore[reportArgumentType]
 
     def test_verify_webhook_overflow_error(self) -> None:
         """Coverage: Massive timestamps triggering an OverflowError in the math blocks."""
         massive_ts = 10**310
-        with pytest.raises(ValueError, match="Invalid cryptographic payload or timestamp out of bounds"):
+        with pytest.raises(
+            ValueError,
+            match="Invalid cryptographic payload or timestamp out of bounds",
+        ):
             SecurityGuard.verify_webhook(b"key", "token", massive_ts, "sig")
 
     def test_analyze_html_image_with_alt_tag(self) -> None:
@@ -211,6 +217,7 @@ class TestSecurityGuardGeneral:
     def test_redacting_filter_deep_redact_types(self) -> None:
         """Coverage: Execute the deep redaction tree for all edge-case Python types."""
         from collections import namedtuple
+
         log_filter = RedactingFilter()
         LogData = namedtuple("LogData", ["key"])
 
@@ -236,6 +243,7 @@ class TestSecurityGuardGeneral:
         assert log_filter._deep_redact(["key-123"]) == ["key-[REDACTED]"]
         assert log_filter._deep_redact({"key-123"}) == {"key-[REDACTED]"}
 
+
 class TestSecurityGuardSSRFAndURL:
     """CWE-319, CWE-918, and URL validation logic."""
 
@@ -248,7 +256,9 @@ class TestSecurityGuardSSRFAndURL:
         assert SecurityGuard.sanitize_api_url("http://127.0.0.1:9000") == "http://127.0.0.1:9000"
 
     def test_https_is_always_allowed(self) -> None:
-        assert SecurityGuard.sanitize_api_url("https://api.mailgun.net") == "https://api.mailgun.net"
+        assert (
+            SecurityGuard.sanitize_api_url("https://api.mailgun.net") == "https://api.mailgun.net"
+        )
 
     def test_validate_mailgun_url_allowed(self) -> None:
         valid_urls = [
@@ -292,7 +302,10 @@ class TestSecurityGuardPathSegments:
         client = Client(auth=("api", "key"))
         with patch("requests.Session.request") as mock_request:
             with pytest.raises(ValueError, match="CWE-22"):
-                client.domains_webhooks.delete(domain="test.com", webhook_name="clicked/../../delete")
+                client.domains_webhooks.delete(
+                    domain="test.com",
+                    webhook_name="clicked/../../delete",
+                )
             mock_request.assert_not_called()
 
     def test_sanitize_path_segment_excessive_encoding(self) -> None:
@@ -333,10 +346,20 @@ class TestSecurityGuardResourceExhaustion:
         assert SecurityGuard.sanitize_timeout((10.0, 60.0)) == (10.0, 60.0)
         assert SecurityGuard.sanitize_timeout(5.0) == 5.0
 
-    @pytest.mark.parametrize("invalid_val", [
-        float("inf"), float("nan"), 0, -1.5, (5.0,), (5.0, 10.0, 15.0),
-        (float("nan"), 5.0), (5.0, float("inf")), (-2.0, 5.0),
-    ])
+    @pytest.mark.parametrize(
+        "invalid_val",
+        [
+            float("inf"),
+            float("nan"),
+            0,
+            -1.5,
+            (5.0,),
+            (5.0, 10.0, 15.0),
+            (float("nan"), 5.0),
+            (5.0, float("inf")),
+            (-2.0, 5.0),
+        ],
+    )
     def test_sanitize_timeout_invalid_values(self, invalid_val: Any) -> None:
         with pytest.raises(ValueError, match="Timeout must be"):
             SecurityGuard.sanitize_timeout(invalid_val)
@@ -387,27 +410,39 @@ class TestLogSanitization:
         fake_zone = "pubkey-safe_zone"
 
         record_str = logging.LogRecord(
-            name="mailgun.test", level=logging.INFO, pathname="client.py",
-            lineno=10, msg=f"Sending message with api key: {fake_private}",
-            args=(), exc_info=None
+            name="mailgun.test",
+            level=logging.INFO,
+            pathname="client.py",
+            lineno=10,
+            msg=f"Sending message with api key: {fake_private}",
+            args=(),
+            exc_info=None,
         )
         assert log_filter.filter(record_str) is True
         assert fake_private not in record_str.msg
         assert "key-[REDACTED]" in record_str.msg
 
         record_dict = logging.LogRecord(
-            name="mailgun.test", level=logging.INFO, pathname="client.py",
-            lineno=20, msg="Auth payload: %(secret)s",
-            args=({"secret": fake_public},), exc_info=None
+            name="mailgun.test",
+            level=logging.INFO,
+            pathname="client.py",
+            lineno=20,
+            msg="Auth payload: %(secret)s",
+            args=({"secret": fake_public},),
+            exc_info=None,
         )
         assert log_filter.filter(record_dict) is True
         if isinstance(record_dict.args, dict):
             assert record_dict.args["secret"] == "pubkey-[REDACTED]"  # pragma: allowlist secret
 
         record_tuple = logging.LogRecord(
-            name="mailgun.test", level=logging.WARNING, pathname="client.py",
-            lineno=30, msg="Failed to parse key: %s and %s",
-            args=(fake_live, fake_zone), exc_info=None
+            name="mailgun.test",
+            level=logging.WARNING,
+            pathname="client.py",
+            lineno=30,
+            msg="Failed to parse key: %s and %s",
+            args=(fake_live, fake_zone),
+            exc_info=None,
         )
         assert log_filter.filter(record_tuple) is True
         if isinstance(record_tuple.args, tuple):
@@ -432,11 +467,19 @@ class TestTransportSecurity:
         assert ssl_ctx.minimum_version == ssl.TLSVersion.TLSv1_2
 
     @patch("sys.audit")
-    def test_sync_client_emits_audit_hook(self, mock_audit: MagicMock, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_sync_client_emits_audit_hook(
+        self,
+        mock_audit: MagicMock,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         client = Client(auth=("api", "key"))
         monkeypatch.setattr(client._session, "get", MagicMock(return_value=requests.Response()))
         client.domains.get()
-        mock_audit.assert_called_with("mailgun.api.request", "GET", "https://api.mailgun.net/v3/domains")
+        mock_audit.assert_called_with(
+            "mailgun.api.request",
+            "GET",
+            "https://api.mailgun.net/v3/domains",
+        )
 
     @pytest.mark.asyncio
     @patch("sys.audit")
@@ -445,20 +488,24 @@ class TestTransportSecurity:
         client = AsyncClient(auth=("api", "key"))
 
         # Patch the transport directly
-        with patch("httpx.AsyncHTTPTransport") as mock_transport_class:
+        with patch("httpx2.AsyncHTTPTransport") as mock_transport_class:
             # Create a mock instance
             mock_transport_instance = AsyncMock()
             mock_transport_class.return_value = mock_transport_instance
 
             # Ensure handle_async_request is an AsyncMock that returns a valid response
             mock_transport_instance.handle_async_request = AsyncMock(
-                return_value=compat_httpx.Response(200)
+                return_value=httpx2.Response(200),
             )
 
             await client.domains.get()
 
             # Verify audit hook was called
-            mock_audit.assert_called_with("mailgun.api.request", "GET", "https://api.mailgun.net/v3/domains")
+            mock_audit.assert_called_with(
+                "mailgun.api.request",
+                "GET",
+                "https://api.mailgun.net/v3/domains",
+            )
             await client.aclose()
 
 
@@ -466,26 +513,37 @@ class TestExceptionSafety:
     """Tests for secure logging in error blocks."""
 
     @patch("mailgun.endpoints.logger.exception")
-    def test_sync_timeout_exception_logs_safely(self, mock_logger_exc: MagicMock, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_sync_timeout_exception_logs_safely(
+        self,
+        mock_logger_exc: MagicMock,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
         client = Client(auth=("api", "key"))
-        monkeypatch.setattr(client._session, "get", MagicMock(side_effect=requests.exceptions.Timeout("Read timed out")))
+        monkeypatch.setattr(
+            client._session,
+            "get",
+            MagicMock(side_effect=requests.exceptions.Timeout("Read timed out")),
+        )
         with pytest.raises(TimeoutError):
             client.domains.get()
         assert "https://api.mailgun.net/v3/domains" in mock_logger_exc.call_args[0][2]
 
     @pytest.mark.asyncio
     @patch("mailgun.endpoints.logger.critical")
-    async def test_async_connection_exception_logs_safely(self, mock_logger_crit: MagicMock) -> None:
+    async def test_async_connection_exception_logs_safely(
+        self,
+        mock_logger_crit: MagicMock,
+    ) -> None:
         """Verify that when an async network failure occurs, the logger uses safe_url_for_log."""
         client = AsyncClient(auth=("api", "key"))
 
-        with patch("mailgun.client.httpx.AsyncHTTPTransport") as mock_transport_class:
+        with patch("mailgun.client.httpx2.AsyncHTTPTransport") as mock_transport_class:
             mock_transport_instance = AsyncMock()
             mock_transport_class.return_value = mock_transport_instance
 
             # Set the side_effect on the async handler
             mock_transport_instance.handle_async_request = AsyncMock(
-                side_effect=compat_httpx.ConnectError("DNS failure")
+                side_effect=httpx2.ConnectError("DNS failure"),
             )
 
             with pytest.raises(ApiError, match="Network routing failed"):

@@ -22,9 +22,9 @@ import warnings
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Final, Self
 
+import httpx2
 import requests  # pyright: ignore[reportMissingModuleSource]
 
-from mailgun._httpx_compat import httpx
 from mailgun.config import Config
 from mailgun.endpoints import AsyncEndpoint, BaseEndpoint, Endpoint
 from mailgun.filters import RedactingFilter
@@ -282,7 +282,7 @@ class Client(BaseClient):
 
 
 class AsyncClient(BaseClient):
-    """Async client class using httpx."""
+    """Async client class using httpx2."""
 
     __slots__ = ("_client_kwargs", "_httpx_client")
 
@@ -301,7 +301,7 @@ class AsyncClient(BaseClient):
         """
         super().__init__(auth=auth, **kwargs)
         self._client_kwargs = kwargs.get("client_kwargs", {})
-        self._httpx_client: httpx.AsyncClient | None = None
+        self._httpx_client: httpx2.AsyncClient | None = None
 
     def __getattr__(self, name: str) -> Any:
         """Resolve and return the requested API endpoint instance.
@@ -341,14 +341,14 @@ class AsyncClient(BaseClient):
         return endpoint
 
     @property
-    def _client(self) -> httpx.AsyncClient:
-        """Provide lazy initialization for the underlying httpx.AsyncClient.
+    def _client(self) -> httpx2.AsyncClient:
+        """Provide lazy initialization for the underlying httpx2.AsyncClient.
 
         Returns:
-            The active httpx.AsyncClient instance.
+            The active httpx2.AsyncClient instance.
         """
         # Assign to a local variable so Pyright can properly narrow the type
-        current_client: httpx.AsyncClient | None = getattr(self, "_httpx_client", None)
+        current_client: httpx2.AsyncClient | None = getattr(self, "_httpx_client", None)
 
         if current_client is None or current_client.is_closed:
             # Enforce TLS 1.2+ for httpx (CWE-319)
@@ -358,20 +358,20 @@ class AsyncClient(BaseClient):
             # Check if the user already provided a custom transport (e.g. for mocking)
             kwargs = self._client_kwargs.copy()
             if "transport" not in kwargs:
-                limits = httpx.Limits(max_keepalive_connections=100, max_connections=100)
-                kwargs["transport"] = httpx.AsyncHTTPTransport(
+                limits = httpx2.Limits(max_keepalive_connections=100, max_connections=100)
+                kwargs["transport"] = httpx2.AsyncHTTPTransport(
                     retries=3,
                     limits=limits,
                     verify=ssl_context,
                 )
 
-            self._httpx_client = httpx.AsyncClient(**kwargs)
+            self._httpx_client = httpx2.AsyncClient(**kwargs)
             return self._httpx_client
 
         return current_client
 
     async def aclose(self) -> None:
-        """Close the underlying httpx.AsyncClient and purge memory."""
+        """Close the underlying httpx2.AsyncClient and purge memory."""
         if self._httpx_client:
             try:
                 # CWE-316: Clear async session

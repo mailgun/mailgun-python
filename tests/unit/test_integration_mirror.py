@@ -69,9 +69,9 @@ class DomainTests(unittest.TestCase):
         self.put_domain_data = {"spam_action": "disabled"}
         self.post_domain_creds = {
             "login": f"alice_bob@{self.domain}",
-            "password": "test_new_creds123", # pragma: allowlist secret
+            "password": "test_new_creds123",  # pragma: allowlist secret
         }
-        self.put_domain_creds = {"password": "test_new_creds"} # pragma: allowlist secret
+        self.put_domain_creds = {"password": "test_new_creds"}  # pragma: allowlist secret
         self.put_domain_connections_data = {"require_tls": "false", "skip_verification": "false"}
         self.put_domain_tracking_data = {"active": "yes", "skip_verification": "false"}
         self.put_domain_unsubscribe_data = {
@@ -88,7 +88,8 @@ class DomainTests(unittest.TestCase):
     def test_post_domain(self, m_post: MagicMock, m_delete: MagicMock) -> None:
         m_delete.return_value = mock_response(200, {"message": "ok"})
         m_post.return_value = mock_response(
-            200, {"message": "Domain DNS records have been created"}
+            200,
+            {"message": "Domain DNS records have been created"},
         )
         request = self.client.domains.create(data=self.post_domain_data)
         self.assertEqual(request.status_code, 200)
@@ -98,7 +99,8 @@ class DomainTests(unittest.TestCase):
     def test_post_domain_creds(self, m_post: MagicMock) -> None:
         m_post.return_value = mock_response(200, {"message": "Created"})
         request = self.client.domains_credentials.create(
-            domain=self.domain, data=self.post_domain_creds
+            domain=self.domain,
+            data=self.post_domain_creds,
         )
         self.assertEqual(request.status_code, 200)
         self.assertIn("message", request.json())
@@ -107,14 +109,18 @@ class DomainTests(unittest.TestCase):
     @patch("requests.Session.post")
     @patch("requests.Session.put")
     def test_update_simple_domain(
-        self, m_put: MagicMock, m_post: MagicMock, m_delete: MagicMock
+        self,
+        m_put: MagicMock,
+        m_post: MagicMock,
+        m_delete: MagicMock,
     ) -> None:
         m_delete.return_value = mock_response()
         m_post.return_value = mock_response(200, {"domain": {}})
         m_put.return_value = mock_response(200, {"message": "Domain has been updated"})
         self.client.domains.create(data=self.post_domain_data)
         request = self.client.domains.put(
-            data={"spam_action": "disabled"}, domain=self.post_domain_data["name"]
+            data={"spam_action": "disabled"},
+            domain=self.post_domain_data["name"],
         )
         self.assertEqual(request.status_code, 200)
         self.assertEqual(request.json()["message"], "Domain has been updated")
@@ -125,10 +131,13 @@ class DomainTests(unittest.TestCase):
         m_post.return_value = mock_response(200, {"message": "Created"})
         m_put.return_value = mock_response(200, {"message": "Updated"})
         self.client.domains_credentials.create(
-            domain=self.domain, data=self.post_domain_creds
+            domain=self.domain,
+            data=self.post_domain_creds,
         )
         request = self.client.domains_credentials.put(
-            domain=self.domain, data=self.put_domain_creds, login="alice_bob"
+            domain=self.domain,
+            data=self.put_domain_creds,
+            login="alice_bob",
         )
         self.assertEqual(request.status_code, 200)
         self.assertIn("message", request.json())
@@ -146,10 +155,12 @@ class DomainTests(unittest.TestCase):
             },
         )
         self.client.domains_credentials.create(
-            domain=self.domain, data=self.post_domain_creds
+            domain=self.domain,
+            data=self.post_domain_creds,
         )
         req = self.client.mailboxes.put(
-            domain=self.domain, login=f"alice_bob@{self.domain}"
+            domain=self.domain,
+            login=f"alice_bob@{self.domain}",
         )
         self.assertEqual(req.status_code, 200)
         self.assertIn("Password changed", req.json()["message"])
@@ -199,7 +210,8 @@ class DomainTests(unittest.TestCase):
     def test_put_domain_connections(self, m_put: MagicMock) -> None:
         m_put.return_value = mock_response(200, {"message": "Updated"})
         request = self.client.domains_connection.put(
-            domain=self.domain, data=self.put_domain_connections_data
+            domain=self.domain,
+            data=self.put_domain_connections_data,
         )
         self.assertEqual(request.status_code, 200)
         self.assertIn("message", request.json())
@@ -208,7 +220,8 @@ class DomainTests(unittest.TestCase):
     def test_put_domain_tracking_open(self, m_put: MagicMock) -> None:
         m_put.return_value = mock_response(200, {"message": "Updated"})
         request = self.client.domains_tracking_open.put(
-            domain=self.domain, data=self.put_domain_tracking_data
+            domain=self.domain,
+            data=self.put_domain_tracking_data,
         )
         self.assertEqual(request.status_code, 200)
         self.assertIn("message", request.json())
@@ -217,7 +230,8 @@ class DomainTests(unittest.TestCase):
     def test_put_domain_tracking_click(self, m_put: MagicMock) -> None:
         m_put.return_value = mock_response(200, {"message": "Updated"})
         request = self.client.domains_tracking_click.put(
-            domain=self.domain, data=self.put_domain_tracking_data
+            domain=self.domain,
+            data=self.put_domain_tracking_data,
         )
         self.assertEqual(request.status_code, 200)
         self.assertIn("message", request.json())
@@ -226,7 +240,8 @@ class DomainTests(unittest.TestCase):
     def test_put_domain_unsubscribe(self, m_put: MagicMock) -> None:
         m_put.return_value = mock_response(200, {"message": "Updated"})
         request = self.client.domains_tracking_unsubscribe.put(
-            domain=self.domain, data=self.put_domain_unsubscribe_data
+            domain=self.domain,
+            data=self.put_domain_unsubscribe_data,
         )
         self.assertEqual(request.status_code, 200)
         self.assertIn("message", request.json())
@@ -238,7 +253,8 @@ class DomainTests(unittest.TestCase):
         m_put.return_value = mock_response(200, {"message": "Updated"})
         self.client.domains.create(data=self.post_domain_data)
         request = self.client.domains_dkimauthority.put(
-            domain=self.test_domain, data=self.put_domain_dkim_authority_data
+            domain=self.test_domain,
+            data=self.put_domain_dkim_authority_data,
         )
         self.assertIn("message", request.json())
 
@@ -249,7 +265,8 @@ class DomainTests(unittest.TestCase):
         m_put.return_value = mock_response(200, {"message": "Updated"})
         self.client.domains.create(data=self.post_domain_data)
         request = self.client.domains_webprefix.put(
-            domain=self.test_domain, data=self.put_domain_webprefix_data
+            domain=self.test_domain,
+            data=self.put_domain_webprefix_data,
         )
         self.assertIn("message", request.json())
 
@@ -257,7 +274,8 @@ class DomainTests(unittest.TestCase):
     def test_put_dkim_selector(self, m_put: MagicMock) -> None:
         m_put.return_value = mock_response(200, {"message": "Updated"})
         request = self.client.domains_dkimselector.put(
-            domain=self.domain, data=self.put_dkim_selector_data
+            domain=self.domain,
+            data=self.put_dkim_selector_data,
         )
         self.assertIn("message", request.json())
 
@@ -271,7 +289,7 @@ class DomainTests(unittest.TestCase):
                         "signing_domain": "python.test.domain5",
                         "selector": "smtp",
                         "dns_record": {},
-                    }
+                    },
                 ],
                 "paging": {},
             },
@@ -301,29 +319,36 @@ class DomainTests(unittest.TestCase):
         m_post.return_value = mock_response()
         m_delete.return_value = mock_response()
         self.client.domains_credentials.create(
-            domain=self.domain, data=self.post_domain_creds
+            domain=self.domain,
+            data=self.post_domain_creds,
         )
         request = self.client.domains_credentials.delete(
-            domain=self.domain, login="alice_bob"
+            domain=self.domain,
+            login="alice_bob",
         )
         self.assertEqual(request.status_code, 200)
 
     @patch("requests.Session.delete")
     @patch("requests.Session.post")
     def test_delete_all_domain_credentials(
-        self, m_post: MagicMock, m_delete: MagicMock
+        self,
+        m_post: MagicMock,
+        m_delete: MagicMock,
     ) -> None:
         m_post.return_value = mock_response()
         m_delete.return_value = mock_response(
-            200, {"message": "All domain credentials have been deleted"}
+            200,
+            {"message": "All domain credentials have been deleted"},
         )
         self.client.domains_credentials.create(
-            domain=self.domain, data=self.post_domain_creds
+            domain=self.domain,
+            data=self.post_domain_creds,
         )
         request = self.client.domains_credentials.delete(domain=self.domain)
         self.assertEqual(request.status_code, 200)
         self.assertIn(
-            request.json()["message"], "All domain credentials have been deleted"
+            request.json()["message"],
+            "All domain credentials have been deleted",
         )
 
     @patch("requests.Session.delete")
@@ -331,12 +356,14 @@ class DomainTests(unittest.TestCase):
     def test_delete_domain(self, m_post: MagicMock, m_delete: MagicMock) -> None:
         m_post.return_value = mock_response()
         m_delete.return_value = mock_response(
-            200, {"message": "Domain will be deleted in the background"}
+            200,
+            {"message": "Domain will be deleted in the background"},
         )
         self.client.domains.create(data=self.post_domain_data)
         request = self.client.domains.delete(domain=self.test_domain)
         self.assertEqual(
-            request.json()["message"], "Domain will be deleted in the background"
+            request.json()["message"],
+            "Domain will be deleted in the background",
         )
         self.assertEqual(request.status_code, 200)
 
@@ -377,7 +404,8 @@ class IpTests(unittest.TestCase):
     def test_delete_ip(self, m_delete: MagicMock) -> None:
         m_delete.return_value = mock_response(200, {"message": "success"})
         request = self.client.domains_ips.delete(
-            domain=self.domain, ip=self.ip_data["ip"]
+            domain=self.domain,
+            ip=self.ip_data["ip"],
         )
         self.assertEqual("success", request.json()["message"])
         self.assertEqual(request.status_code, 200)
@@ -409,7 +437,9 @@ class IpPoolsTests(unittest.TestCase):
         m_patch.return_value = mock_response(200, {"message": "success"})
         self.client.ippools.create(domain=self.domain, data=self.data)
         req = self.client.ippools.patch(
-            domain=self.domain, data=self.patch_data, pool_id="pid123"
+            domain=self.domain,
+            data=self.patch_data,
+            pool_id="pid123",
         )
         self.assertEqual("success", req.json()["message"])
         self.assertEqual(req.status_code, 200)
@@ -418,7 +448,8 @@ class IpPoolsTests(unittest.TestCase):
     def test_link_domain_ippool(self, m_post: MagicMock) -> None:
         m_post.return_value = mock_response(200, {"message": "Linked"})
         req = self.client.domains_ips.create(
-            domain=self.domain, data={"pool_id": "pid123"}
+            domain=self.domain,
+            data={"pool_id": "pid123"},
         )
         self.assertIn("message", req.json())
 
@@ -429,7 +460,8 @@ class IpPoolsTests(unittest.TestCase):
         m_delete.return_value = mock_response(200, {"message": "started"})
         self.client.ippools.create(domain=self.domain, data=self.data)
         req_del = self.client.ippools.delete(
-            domain=self.domain, pool_id="pid123"
+            domain=self.domain,
+            pool_id="pid123",
         )
         self.assertEqual("started", req_del.json()["message"])
 
@@ -519,7 +551,8 @@ class TagsTests(unittest.TestCase):
     def test_delete_tags(self, m_delete: MagicMock) -> None:
         m_delete.return_value = mock_response(200, {"message": "Deleted"})
         req = self.client.tags.delete(
-            domain=self.domain, tag_name=self.tag_name
+            domain=self.domain,
+            tag_name=self.tag_name,
         )
         self.assertEqual(req.status_code, 200)
         self.assertIn("message", req.json())
@@ -567,7 +600,8 @@ class BouncesTests(unittest.TestCase):
         m_get.return_value = mock_response(200, {"address": self.bounces_data["address"]})
         self.client.bounces.create(data=self.bounces_data, domain=self.domain)
         req = self.client.bounces.get(
-            domain=self.domain, bounce_address=self.bounces_data["address"]
+            domain=self.domain,
+            bounce_address=self.bounces_data["address"],
         )
         self.assertEqual(req.status_code, 200)
         self.assertIn("address", req.json())
@@ -592,7 +626,8 @@ class BouncesTests(unittest.TestCase):
         m_delete.return_value = mock_response(200, {"message": "Deleted"})
         self.client.bounces.create(data=self.bounces_data, domain=self.domain)
         req = self.client.bounces.delete(
-            domain=self.domain, bounce_address=self.bounces_data["address"]
+            domain=self.domain,
+            bounce_address=self.bounces_data["address"],
         )
         self.assertEqual(req.status_code, 200)
         self.assertIn("message", req.json())
@@ -633,7 +668,8 @@ class UnsubscribesTests(unittest.TestCase):
     def test_unsub_get_single(self, m_get: MagicMock) -> None:
         m_get.return_value = mock_response(200, {"address": self.unsub_data["address"]})
         req = self.client.unsubscribes.get(
-            domain=self.domain, unsubscribe_address=self.unsub_data["address"]
+            domain=self.domain,
+            unsubscribe_address=self.unsub_data["address"],
         )
         self.assertEqual(req.status_code, 200)
         self.assertIn("address", req.json())
@@ -655,7 +691,8 @@ class UnsubscribesTests(unittest.TestCase):
     def test_unsub_delete(self, m_delete: MagicMock) -> None:
         m_delete.return_value = mock_response(200, {"message": "Deleted"})
         req = self.client.unsubscribes.delete(
-            domain=self.domain, unsubscribe_address=self.unsub_data["address"]
+            domain=self.domain,
+            unsubscribe_address=self.unsub_data["address"],
         )
         self.assertEqual(req.status_code, 200)
         self.assertIn("message", req.json())
@@ -706,7 +743,8 @@ class ComplaintsTests(unittest.TestCase):
         m_get.return_value = mock_response(200, {"address": self.compl_data["address"]})
         self.client.complaints.create(data=self.compl_data, domain=self.domain)
         req = self.client.complaints.get(
-            domain=self.domain, complaint_address=self.compl_data["address"]
+            domain=self.domain,
+            complaint_address=self.compl_data["address"],
         )
         self.assertEqual(req.status_code, 200)
         self.assertIn("address", req.json())
@@ -730,7 +768,8 @@ class ComplaintsTests(unittest.TestCase):
         m_post.return_value = mock_response()
         m_delete.return_value = mock_response(200, {"message": "Deleted"})
         req = self.client.complaints.delete(
-            domain=self.domain, unsubscribe_address=self.compl_data["address"]
+            domain=self.domain,
+            unsubscribe_address=self.compl_data["address"],
         )
         self.assertEqual(req.status_code, 200)
         self.assertIn("message", req.json())
@@ -769,7 +808,8 @@ class WhiteListTests(unittest.TestCase):
     def test_whitel_delete_simple(self, m_delete: MagicMock) -> None:
         m_delete.return_value = mock_response(200, {"message": "Deleted"})
         req = self.client.whitelists.delete(
-            domain=self.domain, whitelist_address=self.whitel_data["address"]
+            domain=self.domain,
+            whitelist_address=self.whitel_data["address"],
         )
         self.assertEqual(req.status_code, 200)
         self.assertIn("message", req.json())
@@ -795,7 +835,10 @@ class RoutesTests(unittest.TestCase):
     @patch("requests.Session.delete")
     @patch("requests.Session.get")
     def test_routes_create(
-        self, m_get: MagicMock, m_delete: MagicMock, m_post: MagicMock
+        self,
+        m_get: MagicMock,
+        m_delete: MagicMock,
+        m_post: MagicMock,
     ) -> None:
         m_get.return_value = mock_response(200, {"items": [{"id": "rid"}]})
         m_delete.return_value = mock_response()
@@ -804,7 +847,8 @@ class RoutesTests(unittest.TestCase):
         req1 = self.client.routes.get(domain=self.domain, filters=params)
         if req1.json().get("items"):
             self.client.routes.delete(
-                domain=self.domain, route_id=req1.json()["items"][0]["id"]
+                domain=self.domain,
+                route_id=req1.json()["items"][0]["id"],
             )
         req = self.client.routes.create(domain=self.domain, data=self.routes_data)
         self.assertEqual(req.status_code, 200)
@@ -823,10 +867,12 @@ class RoutesTests(unittest.TestCase):
         m_post.return_value = mock_response(200, {"route": {"id": "rid123"}})
         m_get.return_value = mock_response(200, {"route": {"id": "rid123"}})
         req_post = self.client.routes.create(
-            domain=self.domain, data=self.routes_data
+            domain=self.domain,
+            data=self.routes_data,
         )
         req = self.client.routes.get(
-            domain=self.domain, route_id=req_post.json()["route"]["id"]
+            domain=self.domain,
+            route_id=req_post.json()["route"]["id"],
         )
         self.assertEqual(req.status_code, 200)
         self.assertIn("route", req.json())
@@ -837,7 +883,8 @@ class RoutesTests(unittest.TestCase):
         m_post.return_value = mock_response(200, {"route": {"id": "rid123"}})
         m_put.return_value = mock_response(200, {"message": "Updated"})
         req_post = self.client.routes.create(
-            domain=self.domain, data=self.routes_data
+            domain=self.domain,
+            data=self.routes_data,
         )
         req = self.client.routes.put(
             domain=self.domain,
@@ -853,10 +900,12 @@ class RoutesTests(unittest.TestCase):
         m_post.return_value = mock_response(200, {"route": {"id": "rid123"}})
         m_delete.return_value = mock_response(200, {"message": "Deleted"})
         req_post = self.client.routes.create(
-            domain=self.domain, data=self.routes_data
+            domain=self.domain,
+            data=self.routes_data,
         )
         req = self.client.routes.delete(
-            domain=self.domain, route_id=req_post.json()["route"]["id"]
+            domain=self.domain,
+            route_id=req_post.json()["route"]["id"],
         )
         self.assertEqual(req.status_code, 200)
         self.assertIn("message", req.json())
@@ -873,7 +922,7 @@ class RoutesTests(unittest.TestCase):
                     "expression": "",
                     "id": "r1",
                     "priority": 0,
-                }
+                },
             },
         )
         query = {"address": self.sender}
@@ -881,7 +930,12 @@ class RoutesTests(unittest.TestCase):
         self.assertEqual(req.status_code, 200)
         self.assertIn("route", req.json())
         expected_keys = [
-            "actions", "created_at", "description", "expression", "id", "priority"
+            "actions",
+            "created_at",
+            "description",
+            "expression",
+            "id",
+            "priority",
         ]
         for key in expected_keys:
             self.assertIn(key, req.json()["route"])
@@ -902,7 +956,8 @@ class WebhooksTests(unittest.TestCase):
         m_post.return_value = mock_response(200, {"message": "Created"})
         m_delete.return_value = mock_response()
         req = self.client.domains_webhooks.create(
-            domain=self.domain, data=self.webhooks_data
+            domain=self.domain,
+            data=self.webhooks_data,
         )
         self.assertEqual(req.status_code, 200)
         self.assertIn("message", req.json())
@@ -924,10 +979,12 @@ class WebhooksTests(unittest.TestCase):
         m_delete.return_value = mock_response(200)
 
         self.client.domains_webhooks.create(
-            domain=self.domain, data=self.webhooks_data
+            domain=self.domain,
+            data=self.webhooks_data,
         )
         req = self.client.domains_webhooks_clicked.put(
-            domain=self.domain, data=self.webhooks_data_put
+            domain=self.domain,
+            data=self.webhooks_data_put,
         )
         self.assertEqual(req.status_code, 200)
         self.assertIn("message", req.json())
@@ -936,13 +993,19 @@ class WebhooksTests(unittest.TestCase):
     @patch("requests.Session.delete")
     @patch("requests.Session.get")
     @patch("requests.Session.post")
-    def test_webhook_get_simple(self, m_post: MagicMock, m_get: MagicMock, m_delete: MagicMock) -> None:
+    def test_webhook_get_simple(
+        self,
+        m_post: MagicMock,
+        m_get: MagicMock,
+        m_delete: MagicMock,
+    ) -> None:
         m_post.return_value = mock_response()
         m_get.return_value = mock_response(200, {"webhook": {}})
         m_delete.return_value = mock_response(200)
 
         self.client.domains_webhooks.create(
-            domain=self.domain, data=self.webhooks_data
+            domain=self.domain,
+            data=self.webhooks_data,
         )
         req = self.client.domains_webhooks_clicked.get(domain=self.domain)
         self.assertEqual(req.status_code, 200)
@@ -955,7 +1018,8 @@ class WebhooksTests(unittest.TestCase):
         m_post.return_value = mock_response()
         m_delete.return_value = mock_response(200, {"message": "Deleted"})
         self.client.domains_webhooks.create(
-            domain=self.domain, data=self.webhooks_data
+            domain=self.domain,
+            data=self.webhooks_data,
         )
         req = self.client.domains_webhooks_clicked.delete(domain=self.domain)
         self.assertEqual(req.status_code, 200)
@@ -1004,7 +1068,8 @@ class MailingListsTests(unittest.TestCase):
     def test_maillist_lists_get(self, m_get: MagicMock) -> None:
         m_get.return_value = mock_response(200, {"list": {}})
         req = self.client.lists.get(
-            domain=self.domain, address=self.maillist_address
+            domain=self.domain,
+            address=self.maillist_address,
         )
         self.assertEqual(req.status_code, 200)
         self.assertIn("list", req.json())
@@ -1013,7 +1078,8 @@ class MailingListsTests(unittest.TestCase):
     def test_maillist_lists_create(self, m_post: MagicMock) -> None:
         m_post.return_value = mock_response(200, {"list": {}})
         req = self.client.lists.create(
-            domain=self.domain, data=self.mailing_lists_data
+            domain=self.domain,
+            data=self.mailing_lists_data,
         )
         self.assertEqual(req.status_code, 200)
         self.assertIn("list", req.json())
@@ -1035,13 +1101,16 @@ class MailingListsTests(unittest.TestCase):
     @patch("requests.Session.delete")
     @patch("requests.Session.post")
     def test_maillists_lists_delete(
-        self, m_post: MagicMock, m_delete: MagicMock
+        self,
+        m_post: MagicMock,
+        m_delete: MagicMock,
     ) -> None:
         m_post.return_value = mock_response()
         m_delete.return_value = mock_response()
         self.client.lists.create(domain=self.domain, data=self.mailing_lists_data)
         req = self.client.lists.delete(
-            domain=self.domain, address=f"python_sdk@{self.domain}"
+            domain=self.domain,
+            address=f"python_sdk@{self.domain}",
         )
         self.assertEqual(req.status_code, 200)
         self.client.lists.create(domain=self.domain, data=self.mailing_lists_data)
@@ -1050,7 +1119,8 @@ class MailingListsTests(unittest.TestCase):
     def test_maillists_lists_members_pages_get(self, m_get: MagicMock) -> None:
         m_get.return_value = mock_response(200, {"items": []})
         req = self.client.lists_members_pages.get(
-            domain=self.domain, address=self.maillist_address
+            domain=self.domain,
+            address=self.maillist_address,
         )
         self.assertEqual(req.status_code, 200)
         self.assertIn("items", req.json())
@@ -1058,7 +1128,9 @@ class MailingListsTests(unittest.TestCase):
     @patch("requests.Session.post")
     @patch("requests.Session.delete")
     def test_maillists_lists_members_create(
-        self, m_delete: MagicMock, m_post: MagicMock
+        self,
+        m_delete: MagicMock,
+        m_post: MagicMock,
     ) -> None:
         m_delete.return_value = mock_response()
         m_post.return_value = mock_response(200, {"member": {}})
@@ -1074,7 +1146,8 @@ class MailingListsTests(unittest.TestCase):
     def test_maillists_lists_members_get(self, m_get: MagicMock) -> None:
         m_get.return_value = mock_response(200, {"items": []})
         req = self.client.lists_members.get(
-            domain=self.domain, address=self.maillist_address
+            domain=self.domain,
+            address=self.maillist_address,
         )
         self.assertEqual(req.status_code, 200)
         self.assertIn("items", req.json())
@@ -1082,7 +1155,9 @@ class MailingListsTests(unittest.TestCase):
     @patch("requests.Session.put")
     @patch("requests.Session.post")
     def test_maillists_lists_members_update(
-        self, m_post: MagicMock, m_put: MagicMock
+        self,
+        m_post: MagicMock,
+        m_put: MagicMock,
     ) -> None:
         m_post.return_value = mock_response()
         m_put.return_value = mock_response(200, {"member": {}})
@@ -1103,7 +1178,9 @@ class MailingListsTests(unittest.TestCase):
     @patch("requests.Session.delete")
     @patch("requests.Session.post")
     def test_maillists_lists_members_delete(
-        self, m_post: MagicMock, m_delete: MagicMock
+        self,
+        m_post: MagicMock,
+        m_delete: MagicMock,
     ) -> None:
         m_post.return_value = mock_response()
         m_delete.return_value = mock_response()
@@ -1169,7 +1246,8 @@ class TemplatesTests(unittest.TestCase):
             template_name=self.post_template_data["name"],
         )
         req = self.client.templates.create(
-            data=self.post_template_data, domain=self.domain
+            data=self.post_template_data,
+            domain=self.domain,
         )
         self.assertEqual(req.status_code, 200)
         self.assertIn("template", req.json())
@@ -1194,7 +1272,8 @@ class TemplatesTests(unittest.TestCase):
         m_post.return_value = mock_response()
         m_put.return_value = mock_response(200, {"template": {}})
         self.client.templates.create(
-            data=self.post_template_data, domain=self.domain
+            data=self.post_template_data,
+            domain=self.domain,
         )
         req = self.client.templates.put(
             domain=self.domain,
@@ -1210,7 +1289,8 @@ class TemplatesTests(unittest.TestCase):
         m_post.return_value = mock_response()
         m_delete.return_value = mock_response()
         self.client.templates.create(
-            data=self.post_template_data, domain=self.domain
+            data=self.post_template_data,
+            domain=self.domain,
         )
         req = self.client.templates.delete(
             domain=self.domain,
@@ -1261,12 +1341,15 @@ class TemplatesTests(unittest.TestCase):
     @patch("requests.Session.delete")
     @patch("requests.Session.post")
     def test_delete_version_template(
-        self, m_post: MagicMock, m_delete: MagicMock
+        self,
+        m_post: MagicMock,
+        m_delete: MagicMock,
     ) -> None:
         m_post.return_value = mock_response()
         m_delete.return_value = mock_response()
         self.client.templates.create(
-            data=self.post_template_data, domain=self.domain
+            data=self.post_template_data,
+            domain=self.domain,
         )
         req = self.client.templates.delete(
             domain=self.domain,
@@ -1319,7 +1402,7 @@ class MetricsTest(unittest.TestCase):
         now = datetime.now()
         now_formatted = now.strftime("%a, %d %b %Y %H:%M:%S +0000")
         yesterday_formatted = (now - timedelta(days=1)).strftime(
-            "%a, %d %b %Y %H:%M:%S +0000"
+            "%a, %d %b %Y %H:%M:%S +0000",
         )
         self.account_metrics_data = {
             "start": yesterday_formatted,
@@ -1334,8 +1417,8 @@ class MetricsTest(unittest.TestCase):
                         "attribute": "domain",
                         "comparator": "=",
                         "values": [{"label": self.domain, "value": self.domain}],
-                    }
-                ]
+                    },
+                ],
             },
             "include_subaccounts": True,
             "include_aggregates": True,
@@ -1380,20 +1463,23 @@ class MetricsTest(unittest.TestCase):
 
     @patch("requests.Session.post")
     def test_post_query_get_account_metrics_invalid_data(
-        self, m_post: MagicMock
+        self,
+        m_post: MagicMock,
     ) -> None:
         m_post.return_value = mock_response(
-            400, {"message": "'resolution' attribute is invalid"}
+            400,
+            {"message": "'resolution' attribute is invalid"},
         )
         req = self.client.analytics_metrics.create(
-            data=self.invalid_account_metrics_data
+            data=self.invalid_account_metrics_data,
         )
         self.assertEqual(req.status_code, 400)
         self.assertIn("'resolution' attribute is invalid", req.json()["message"])
 
     @patch("requests.Session.post")
     def test_post_query_get_account_metrics_invalid_url(
-        self, m_post: MagicMock
+        self,
+        m_post: MagicMock,
     ) -> None:
         m_post.return_value = mock_response(404, {})
         req = self.client.analytics_metric.create(data=self.account_metrics_data)
@@ -1415,30 +1501,33 @@ class MetricsTest(unittest.TestCase):
             },
         )
         req = self.client.analytics_usage_metrics.create(
-            data=self.account_usage_metrics_data
+            data=self.account_usage_metrics_data,
         )
         self.assertEqual(req.status_code, 200)
         self.assertIn("email_validation_count", req.json()["items"][0]["metrics"])
 
     @patch("requests.Session.post")
     def test_post_query_get_account_usage_metrics_invalid_data(
-        self, m_post: MagicMock
+        self,
+        m_post: MagicMock,
     ) -> None:
         m_post.return_value = mock_response(
-            400, {"message": "'resolution' attribute is invalid"}
+            400,
+            {"message": "'resolution' attribute is invalid"},
         )
         req = self.client.analytics_usage_metrics.create(
-            data=self.invalid_account_usage_metrics_data
+            data=self.invalid_account_usage_metrics_data,
         )
         self.assertEqual(req.status_code, 400)
 
     @patch("requests.Session.post")
     def test_post_query_get_account_usage_metrics_invalid_url(
-        self, m_post: MagicMock
+        self,
+        m_post: MagicMock,
     ) -> None:
         m_post.return_value = mock_response(404, {})
         req = self.client.analytics_usage_metric.create(
-            data=self.invalid_account_usage_metrics_data
+            data=self.invalid_account_usage_metrics_data,
         )
         self.assertEqual(req.status_code, 404)
 
@@ -1452,7 +1541,7 @@ class LogsTests(unittest.TestCase):
         now = datetime.now()
         now_formatted = now.strftime("%a, %d %b %Y %H:%M:%S +0000")
         yesterday_formatted = (now - timedelta(days=1)).strftime(
-            "%a, %d %b %Y %H:%M:%S +0000"
+            "%a, %d %b %Y %H:%M:%S +0000",
         )
         self.account_logs_data = {
             "start": yesterday_formatted,
@@ -1463,8 +1552,8 @@ class LogsTests(unittest.TestCase):
                         "attribute": "domain",
                         "comparator": "=",
                         "values": [{"label": self.domain, "value": self.domain}],
-                    }
-                ]
+                    },
+                ],
             },
             "include_subaccounts": True,
             "pagination": {"sort": "timestamp:asc", "limit": 50},
@@ -1478,8 +1567,8 @@ class LogsTests(unittest.TestCase):
                         "attribute": "test",
                         "comparator": "=",
                         "values": [{"label": "", "value": ""}],
-                    }
-                ]
+                    },
+                ],
             },
             "include_subaccounts": True,
             "pagination": {"sort": "timestamp:asc", "limit": 0},
@@ -1504,14 +1593,15 @@ class LogsTests(unittest.TestCase):
 
     @patch("requests.Session.post")
     def test_post_query_get_account_logs_invalid_data(
-        self, m_post: MagicMock
+        self,
+        m_post: MagicMock,
     ) -> None:
         m_post.return_value = mock_response(
             400,
             {"message": "'test' is not a valid filter predicate attribute"},
         )
         req = self.client.analytics_logs.create(
-            data=self.invalid_account_logs_data
+            data=self.invalid_account_logs_data,
         )
         self.assertEqual(req.status_code, 400)
         self.assertIn(
@@ -1521,7 +1611,8 @@ class LogsTests(unittest.TestCase):
 
     @patch("requests.Session.post")
     def test_post_query_get_account_logs_invalid_url(
-        self, m_post: MagicMock
+        self,
+        m_post: MagicMock,
     ) -> None:
         m_post.return_value = mock_response(404, {})
         req = self.client.analytics_log.create(data=self.account_logs_data)
@@ -1563,7 +1654,8 @@ class TagsNewTests(unittest.TestCase):
 
     @patch("requests.Session.post")
     def test_post_query_get_account_tags_with_incorrect_url(
-        self, m_post: MagicMock
+        self,
+        m_post: MagicMock,
     ) -> None:
         """Invalid URL (analytics_tag singular) returns 404."""
         m_post.return_value = mock_response(404, {"error": "Not found"})
@@ -1618,7 +1710,8 @@ class BounceClassificationTests(unittest.TestCase):
     @patch("requests.Session.post")
     def test_post_list_statistic_with_old_dates(self, m_post: MagicMock) -> None:
         m_post.return_value = mock_response(
-            400, {"message": "is out of permitted log retention"}
+            400,
+            {"message": "is out of permitted log retention"},
         )
         data = {
             "dimensions": ["classification_id"],
@@ -1673,7 +1766,7 @@ class UsersTests(unittest.TestCase):
                         "tfa_active": False,
                         "tfa_created_at": "",
                         "tfa_enabled": False,
-                    }
+                    },
                 ],
             },
         )
@@ -1788,7 +1881,8 @@ class KeysTests(unittest.TestCase):
     @patch("requests.Session.get")
     def test_get_keys_without_filtering_data(self, m_get: MagicMock) -> None:
         m_get.return_value = mock_response(
-            200, {"items": [{"id": "k1", "description": "test"}]}
+            200,
+            {"items": [{"id": "k1", "description": "test"}]},
         )
         req = self.client.keys.get()
         self.assertEqual(req.status_code, 200)
@@ -1808,7 +1902,7 @@ class KeysTests(unittest.TestCase):
                     "created_at": "",
                     "updated_at": "",
                     "expires_at": "",
-                    "secret": "secret", # pragma: allowlist secret
+                    "secret": "secret",  # pragma: allowlist secret
                     "is_disabled": False,
                     "domain_name": "python.test.domain5",
                     "requestor": self.mailgun_email,

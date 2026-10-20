@@ -13,6 +13,7 @@ import urllib.parse
 
 import atheris
 
+
 with atheris.instrument_imports():
     from mailgun.security import SecurityGuard
 
@@ -83,10 +84,10 @@ def TestOneInput(data: bytes) -> None:
 
                 if "ascending" in params:
                     for a_val in params["ascending"]:
-                        _ = a_val.lower() in ("true", "1", "yes")
+                        _ = a_val.lower() in {"true", "1", "yes"}
 
                 # SSRF guard on pagination host
-                if parsed.scheme in ("http", "https") and parsed.netloc:
+                if parsed.scheme in {"http", "https"} and parsed.netloc:
                     try:
                         SecurityGuard.validate_mailgun_url(target_url)
                     except (ValueError, TypeError):
@@ -102,7 +103,9 @@ def TestOneInput(data: bytes) -> None:
         query_str = fdp.ConsumeUnicodeNoSurrogates(200)
         try:
             parsed_qs = urllib.parse.parse_qs(
-                query_str, keep_blank_values=True, max_num_fields=30
+                query_str,
+                keep_blank_values=True,
+                max_num_fields=30,
             )
             for k, vals in parsed_qs.items():
                 if "\x00" in k or any("\x00" in v for v in vals):
@@ -111,7 +114,6 @@ def TestOneInput(data: bytes) -> None:
             # Expected for malformed fuzz inputs; continue fuzzing other paths.
             pass
 
-
     else:
         # URL construction with mutated cursor tokens
         cursor_token = fdp.ConsumeUnicodeNoSurrogates(128)
@@ -119,7 +121,7 @@ def TestOneInput(data: bytes) -> None:
         constructed_url = f"{base}?page={urllib.parse.quote(cursor_token)}"
         try:
             split_url = urllib.parse.urlsplit(constructed_url)
-            if split_url.scheme not in ("http", "https"):
+            if split_url.scheme not in {"http", "https"}:
                 raise RuntimeError("Scheme corruption occurred during cursor interpolation")
         except (ValueError, UnicodeDecodeError):
             # Expected for malformed fuzz inputs; continue fuzzing other paths.

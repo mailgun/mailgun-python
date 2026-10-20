@@ -23,12 +23,14 @@ class TestDeprecatedRegexes:
         regexes = routes.get_deprecated_regexes()
 
         with pytest.raises(
-            TypeError, match="'mappingproxy' object does not support item assignment"
+            TypeError,
+            match="'mappingproxy' object does not support item assignment",
         ):
-            regexes[re.compile("new")] = "hacked"  # type: ignore[index]
+            regexes[re.compile(r"new")] = "hacked"  # type: ignore[index]
 
         with pytest.raises(
-            AttributeError, match="'mappingproxy' object has no attribute 'clear'"
+            AttributeError,
+            match="'mappingproxy' object has no attribute 'clear'",
         ):
             regexes.clear()  # type: ignore[attr-defined]
 
@@ -128,7 +130,7 @@ class TestRoutingEngine(unittest.TestCase):
         mock_request.return_value = MagicMock(status_code=200)
 
         all_endpoints = set(routes.EXACT_ROUTES.keys()) | set(
-            routes.PREFIX_ROUTES.keys()
+            routes.PREFIX_ROUTES.keys(),
         )
 
         failed_resolutions = []
@@ -155,7 +157,7 @@ class TestRoutingEngine(unittest.TestCase):
                         target_url = mock_request.call_args[1].get("url")
 
                     self.assertTrue(
-                        str(target_url).startswith("https://api.mailgun.net/")
+                        str(target_url).startswith("https://api.mailgun.net/"),
                     )
                     successful_urls.append(f"{endpoint_name} -> {target_url}")
 
@@ -171,5 +173,5 @@ class TestRoutingEngine(unittest.TestCase):
 
         if successful_urls:
             print(
-                f"\n[ROUTING ENGINE] Successfully validated {len(successful_urls)} routes."
+                f"\n[ROUTING ENGINE] Successfully validated {len(successful_urls)} routes.",
             )

@@ -10,11 +10,11 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Final
 from urllib.parse import parse_qs, urlparse
 
+import httpx2
 import requests  # pyright: ignore[reportMissingModuleSource]
 from requests.models import Response  # pyright: ignore[reportMissingModuleSource]
 
 from mailgun import routes
-from mailgun._httpx_compat import httpx
 from mailgun.config import RetryPolicy
 from mailgun.handlers.error_handler import ApiError, MailgunTimeoutError
 from mailgun.logger import get_logger
@@ -276,12 +276,12 @@ class BaseEndpoint:
             MailgunTimeoutError: If the request times out.
             ApiError: If network routing fails or the API request fails.
         """
-        if isinstance(e, (requests.Timeout, httpx.TimeoutException)):
+        if isinstance(e, (requests.Timeout, httpx2.TimeoutException)):
             msg = f"Request timed out for {method.upper()} {target_url}"
             raise MailgunTimeoutError(msg) from e
         if isinstance(e, ApiError):
             raise e
-        if isinstance(e, (requests.ConnectionError, httpx.ConnectError, httpx.NetworkError)):
+        if isinstance(e, (requests.ConnectionError, httpx2.ConnectError, httpx2.NetworkError)):
             msg = f"Network routing failed for {method.upper()} {target_url}: {e}"
             raise ApiError(msg) from e
         msg = f"API request failed for {method.upper()} {target_url}: {e}"
@@ -343,7 +343,7 @@ class BaseEndpoint:
             req_headers.update(custom_headers)
 
         # CWE-400 / Crash Prevention: Enforce string keys and values to
-        # prevent HTTP protocol serialization crashes in requests/httpx.
+        # prevent HTTP protocol serialization crashes in requests/httpx2.
         return {str(k): str(v) for k, v in req_headers.items()}
 
     def _prepare_request(
@@ -564,6 +564,18 @@ class Endpoint(BaseEndpoint):
                 break
 
             except requests.RequestException as e:
+                # Client-side configuration and validation errors are unrecoverable; do not retry
+                if isinstance(
+                    e,
+                    (
+                        requests.exceptions.InvalidURL,
+                        requests.exceptions.InvalidHeader,
+                        requests.exceptions.InvalidSchema,
+                        requests.exceptions.MissingSchema,
+                    ),
+                ):
+                    self._handle_api_error(e, safe_method, target_url)
+
                 if attempt < max_attempts - 1:
                     delay = policy.calculate_delay(attempt)
 
@@ -791,9 +803,13 @@ class Endpoint(BaseEndpoint):
 
         Yields:
             Individual records from the paginated API response.
+
+        Raises:
+            ApiError: If the server returns a 4xx or 5xx status code or a network error occurs.
         """
         initial_filters = dict(filters) if filters else {}
         current_filters = initial_filters.copy()
+        prev_url: str | None = None
 
         while True:
             # Pass a copy of the dictionary so the mock (and the underlying request layer)
@@ -801,7 +817,10 @@ class Endpoint(BaseEndpoint):
             response = self.get(filters=current_filters.copy(), domain=domain, **kwargs)
 
             if hasattr(response, "raise_for_status"):
-                response.raise_for_status()
+                try:
+                    response.raise_for_status()
+                except requests.HTTPError as exc:
+                    raise ApiError(exc.response) from exc
 
             data = response.json()
             if not isinstance(data, dict):
@@ -812,14 +831,10 @@ class Endpoint(BaseEndpoint):
             yield from items
 
             paging_dict = data.get("paging") or {}
-            # Check for the next page cursor
             next_url = paging_dict.get("next")
-            if not next_url or not items:
+            if not next_url or not items or next_url == prev_url:
                 break
-
-            # Stop if there's no next URL or the current page was empty
-            if not next_url or not items:
-                break
+            prev_url = next_url
 
             # Mailgun returns a full URL. Parse it to extract just the new pagination parameters
             # (like 'page' or 'url') so the next self.get() call works correctly.
@@ -841,7 +856,7 @@ class Endpoint(BaseEndpoint):
 
 
 class AsyncEndpoint(BaseEndpoint):
-    """Generate async requests and return responses using httpx."""
+    """Generate async requests and return responses using httpx2."""
 
     __slots__ = ("_client",)
 
@@ -850,7 +865,7 @@ class AsyncEndpoint(BaseEndpoint):
         url: dict[str, Any],
         headers: dict[str, str],
         auth: tuple[str, str] | None,
-        client: httpx.AsyncClient | None = None,
+        client: httpx2.AsyncClient | None = None,
         timeout: TimeoutType = 60,
         *,
         dry_run: bool = False,
@@ -861,12 +876,12 @@ class AsyncEndpoint(BaseEndpoint):
             url: URL dictionary with pairs {"base": "keys"}.
             headers: Headers dictionary.
             auth: httpx auth tuple or None.
-            client: Optional httpx.AsyncClient instance to reuse.
+            client: Optional httpx2.AsyncClient instance to reuse.
             timeout: Base request timeout.
             dry_run: Execution sandbox flag.
         """
         super().__init__(url, headers, auth, timeout=timeout, dry_run=dry_run)
-        self._client = client or httpx.AsyncClient()
+        self._client = client or httpx2.AsyncClient()
 
     async def api_call(  # noqa: PLR0912, PLR0914, PLR0915
         self,
@@ -913,15 +928,15 @@ class AsyncEndpoint(BaseEndpoint):
                 safe_method.upper(),
                 safe_url_for_log,
             )
-            mock_request = httpx.Request(safe_method.upper(), target_url)
-            return httpx.Response(
+            mock_request = httpx2.Request(safe_method.upper(), target_url)
+            return httpx2.Response(
                 HTTPStatus.OK,
                 request=mock_request,
                 content=b'{"message": "Dry run successful - request intercepted", "id": "<dry-run-mock-id>"}',
             )
 
         if isinstance(safe_timeout, tuple) and len(safe_timeout) == 2:  # noqa: PLR2004
-            safe_timeout = httpx.Timeout(safe_timeout[1], connect=safe_timeout[0])
+            safe_timeout = httpx2.Timeout(safe_timeout[1], connect=safe_timeout[0])
 
         request_kwargs: dict[str, Any] = {
             "method": safe_method.upper(),
@@ -998,7 +1013,11 @@ class AsyncEndpoint(BaseEndpoint):
 
                 break
 
-            except httpx.RequestError as e:
+            except httpx2.RequestError as e:
+                # Protocol and decoding violations are non-transient; do not retry
+                if isinstance(e, (httpx2.UnsupportedProtocol, httpx2.DecodingError)):
+                    self._handle_api_error(e, safe_method, target_url)
+
                 if attempt < max_attempts - 1:
                     delay = policy.calculate_delay(attempt)
 
@@ -1017,14 +1036,14 @@ class AsyncEndpoint(BaseEndpoint):
 
                     continue
 
-                if isinstance(e, httpx.TimeoutException):
+                if isinstance(e, httpx2.TimeoutException):
                     logger.exception(
                         "Request timed out for %s %s",
                         safe_method.upper(),
                         safe_url_for_log,
                     )
 
-                elif isinstance(e, (httpx.ConnectError, httpx.NetworkError)):
+                elif isinstance(e, (httpx2.ConnectError, httpx2.NetworkError)):
                     logger.critical(
                         "Network routing failed for %s %s: %s",
                         safe_method.upper(),
@@ -1234,6 +1253,7 @@ class AsyncEndpoint(BaseEndpoint):
         """
         initial_filters = dict(filters) if filters else {}
         current_filters = initial_filters.copy()
+        prev_url: str | None = None
 
         while True:
             response = await self.get(filters=current_filters.copy(), domain=domain, **kwargs)
@@ -1242,7 +1262,7 @@ class AsyncEndpoint(BaseEndpoint):
             if hasattr(response, "raise_for_status"):
                 try:
                     response.raise_for_status()
-                except httpx.HTTPStatusError as exc:
+                except httpx2.HTTPStatusError as exc:
                     raise ApiError(exc.response) from exc
 
             data = response.json()
@@ -1256,8 +1276,9 @@ class AsyncEndpoint(BaseEndpoint):
 
             paging_dict = data.get("paging") or {}
             next_url = paging_dict.get("next")
-            if not next_url or not items:
+            if not next_url or not items or next_url == prev_url:
                 break
+            prev_url = next_url
 
             # Mailgun returns a full URL. Parse it to extract just the new pagination parameters
             # (like 'page' or 'url') so the next self.get() call works correctly.

@@ -108,7 +108,10 @@ class TestDefaultHandler:
 
     def test_handle_default_loop_and_empty_keys(self) -> None:
         url = {"base": "https://api.mailgun.net/v3/", "keys": []}
-        assert handle_default(url, domain="test.com", _method="GET") == "https://api.mailgun.net/v3/test.com"
+        assert (
+            handle_default(url, domain="test.com", _method="GET")
+            == "https://api.mailgun.net/v3/test.com"
+        )
 
 
 class TestDomainsHandler:
@@ -151,35 +154,50 @@ class TestDomainsHandler:
     def test_domain_webhooks_v4_delete_bulk(self) -> None:
         url = {"base": f"{BASE_URL_V3}/domains/", "keys": ["webhooks"]}
         result = handle_webhooks(
-            url, TEST_DOMAIN, "delete", filters={"url": "https://hook.com"}
+            url,
+            TEST_DOMAIN,
+            "delete",
+            filters={"url": "https://hook.com"},
         )
         assert result == f"{BASE_URL_V4}/domains/{TEST_DOMAIN}/webhooks"
 
     def test_domain_webhooks_v4_dynamic_upgrade_on_delete(self) -> None:
         url = {"base": "https://api.mailgun.net/v3/domains/", "keys": ["webhooks"]}
         result = handle_webhooks(
-            url, "example.com", "DELETE", filters={"url": "https://webhook.site/123"}
+            url,
+            "example.com",
+            "DELETE",
+            filters={"url": "https://webhook.site/123"},
         )
         assert result == "https://api.mailgun.net/v4/domains/example.com/webhooks"
 
     def test_domain_webhooks_v4_dynamic_upgrade_on_put(self) -> None:
         url = {"base": "https://api.mailgun.net/v3/domains/", "keys": ["webhooks"]}
         result = handle_webhooks(
-            url, "example.com", "PUT", data={"event_types": ["delivered", "opened"]}
+            url,
+            "example.com",
+            "PUT",
+            data={"event_types": ["delivered", "opened"]},
         )
         assert result == "https://api.mailgun.net/v4/domains/example.com/webhooks"
 
     def test_domain_webhooks_v4_post_multi(self) -> None:
         url = {"base": f"{BASE_URL_V3}/domains/", "keys": ["webhooks"]}
         result = handle_webhooks(
-            url, TEST_DOMAIN, "post", data={"event_types": "clicked,opened"}
+            url,
+            TEST_DOMAIN,
+            "post",
+            data={"event_types": "clicked,opened"},
         )
         assert result == f"{BASE_URL_V4}/domains/{TEST_DOMAIN}/webhooks"
 
     def test_domain_webhooks_v4_put_multi(self) -> None:
         url = {"base": "https://api.mailgun.net/v4/", "keys": ["webhooks"]}
         result = handle_webhooks(
-            url, "example.com", "PUT", data={"event_types": "clicked,opened"}
+            url,
+            "example.com",
+            "PUT",
+            data={"event_types": "clicked,opened"},
         )
         assert result == "https://api.mailgun.net/v4/example.com/webhooks"
 
@@ -191,7 +209,10 @@ class TestDomainsHandler:
     def test_handle_domains_credentials_edge_cases(self) -> None:
         url = {"base": "https://api.mailgun.net/v3/", "keys": ["credentials"]}
         res = handle_mailboxes_credentials(
-            url, domain="test.com", _method="GET", login="user@test.com"
+            url,
+            domain="test.com",
+            _method="GET",
+            login="user@test.com",
         )
         assert res == "https://api.mailgun.net/v3/test.com/credentials/user%40test.com"
 
@@ -280,7 +301,12 @@ class TestInboxPlacementHandler:
     def test_with_test_id_and_checks_true_with_address(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["inbox", "tests"]}
         result = handle_inbox(
-            url, None, None, test_id=TEST_123, checks=True, address=TEST_EMAIL
+            url,
+            None,
+            None,
+            test_id=TEST_123,
+            checks=True,
+            address=TEST_EMAIL,
         )
         assert result == "https://api.mailgun.net/v3/inbox/tests/test-123/checks/user%40example.com"
 
@@ -351,7 +377,11 @@ class TestMailingListsHandler:
     def test_lists_member_address(self) -> None:
         url = {"base": f"{BASE_URL_V3}/", "keys": ["lists", "members"]}
         result = handle_lists(
-            url, None, None, address="dev@test", member_address="usr@test"
+            url,
+            None,
+            None,
+            address="dev@test",
+            member_address="usr@test",
         )
         assert result == f"{BASE_URL_V3}/lists/dev%40test/members/usr%40test"
 
@@ -496,7 +526,11 @@ class TestTemplatesHandler:
     def test_template_versions(self) -> None:
         url = {"base": f"{BASE_URL_V4}/", "keys": ["templates"]}
         result = handle_templates(
-            url, TEST_DOMAIN, None, template_name="promo", versions=True
+            url,
+            TEST_DOMAIN,
+            None,
+            template_name="promo",
+            versions=True,
         )
         assert result == f"{BASE_URL_V3}/{TEST_DOMAIN}/templates/promo/versions"
 

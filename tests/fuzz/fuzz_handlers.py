@@ -13,6 +13,7 @@ from typing import Any
 
 import atheris
 
+
 with atheris.instrument_imports():
     from mailgun.handlers.bounce_classification_handler import (
         handle_bounce_classification,
@@ -148,10 +149,7 @@ def _generate_chaotic_value(fdp: atheris.FuzzedDataProvider, depth: int = 0) -> 
     if choice == 4:
         return None
     if choice == 5:
-        return [
-            _generate_chaotic_value(fdp, depth + 1)
-            for _ in range(fdp.ConsumeIntInRange(0, 4))
-        ]
+        return [_generate_chaotic_value(fdp, depth + 1) for _ in range(fdp.ConsumeIntInRange(0, 4))]
     if choice == 6:
         return {
             fdp.ConsumeUnicodeNoSurrogates(12): _generate_chaotic_value(fdp, depth + 1)
@@ -245,8 +243,7 @@ def TestOneInput(data: bytes) -> None:
 
         if key == "event_types":
             kwargs[key] = [
-                fdp.ConsumeUnicodeNoSurrogates(8)
-                for _ in range(fdp.ConsumeIntInRange(1, 4))
+                fdp.ConsumeUnicodeNoSurrogates(8) for _ in range(fdp.ConsumeIntInRange(1, 4))
             ]
         elif key == "filters" and fdp.ConsumeBool():
             kwargs[key] = {
@@ -266,7 +263,7 @@ def TestOneInput(data: bytes) -> None:
         if not isinstance(result, str):
             handler_name = getattr(handler, "__name__", type(handler).__name__)
             raise RuntimeError(
-                f"CONTRACT VIOLATION: Handler {handler_name} returned non-string: {type(result)}"
+                f"CONTRACT VIOLATION: Handler {handler_name} returned non-string: {type(result)}",
             )
     except (ApiError, TypeError, ValueError):
         # Expected rejections for malformed URLs, missing keys, or unsupported methods
@@ -274,7 +271,7 @@ def TestOneInput(data: bytes) -> None:
     except Exception as e:
         handler_name = getattr(handler, "__name__", type(handler).__name__)
         raise RuntimeError(
-            f"UNHANDLED CRASH in {handler_name} with kwargs {list(kwargs.keys())}: {e}"
+            f"UNHANDLED CRASH in {handler_name} with kwargs {list(kwargs.keys())}: {e}",
         ) from e
 
 

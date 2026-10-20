@@ -15,6 +15,7 @@ from unittest.mock import MagicMock, patch
 import atheris
 import requests
 
+
 with atheris.instrument_imports():
     from mailgun.client import Client, Config
     from mailgun.config import RetryPolicy
@@ -66,6 +67,7 @@ class ChaosMockAdapter(requests.adapters.HTTPAdapter):
 # 1. Enforce a global fallback socket timeout to immediately fail any unmocked socket calls
 socket.setdefaulttimeout(1.0)
 
+
 # 2. Patch Session.send globally so client.ping() cannot escape to live networks
 def TestOneInput(data: bytes) -> None:
     if len(data) < 20:
@@ -82,8 +84,10 @@ def TestOneInput(data: bytes) -> None:
     )
 
     # Patch time.sleep and requests.Session.send to intercept all network traffic
-    with patch("time.sleep", return_value=None), \
-         patch.object(requests.Session, "send", side_effect=adapter.send):
+    with (
+        patch("time.sleep", return_value=None),
+        patch.object(requests.Session, "send", side_effect=adapter.send),
+    ):
         try:
             client = Client(auth=("api", auth_key), config=config)
             assert client._session is not None
@@ -160,9 +164,13 @@ def TestOneInput(data: bytes) -> None:
                     elif op_code == 4:
                         raw_bytes = fdp.ConsumeBytes(fdp.ConsumeIntInRange(1, 1024))
                         mem_stream = io.BytesIO(raw_bytes)
-                        files = [("attachment", ("file.bin", mem_stream, "application/octet-stream"))]
+                        files = [
+                            ("attachment", ("file.bin", mem_stream, "application/octet-stream")),
+                        ]
                         IdempotencyGuard.generate_key("test.com", {"to": "test@test.com"}, files)
-                        assert mem_stream.tell() == 0, "Stream pointer corrupted during hash generation"
+                        assert mem_stream.tell() == 0, (
+                            "Stream pointer corrupted during hash generation"
+                        )
 
                     # Action 5: Deep Pagination Shock
                     elif op_code == 5:
@@ -182,11 +190,13 @@ def TestOneInput(data: bytes) -> None:
                             m.status_code = 200
                             has_next = (call_count < 2) and fdp.ConsumeBool()
                             m.json.return_value = {
-                                "items": [{"id": fdp.ConsumeInt(1000)}] if fdp.ConsumeBool() else [],
+                                "items": [{"id": fdp.ConsumeInt(1000)}]
+                                if fdp.ConsumeBool()
+                                else [],
                                 "paging": {
                                     "next": "https://api.mailgun.net/v3/events?page=next"
                                     if has_next
-                                    else None
+                                    else None,
                                 },
                             }
                             return m

@@ -44,8 +44,7 @@ classifiers = [
 
 dynamic = [ "version" ]
 dependencies = [
-    "httpx2 >=2.7.0",     # The new primary async engine
-    "httpx >=0.24.0",     # Kept as a fallback/safety net
+    "httpx2 >=2.7.0",
     "requests>=2.33.0",
 ]
 
@@ -178,6 +177,7 @@ docstring-code-format = true
 select = [ "ALL" ]
 ignore = [
     # --- Formatter Conflicts ---
+    "missing-trailing-comma",                    # COM812: Recommended by Ruff when using ruff format
     "single-line-implicit-string-concatenation", # Implicit string concatenation (Conflicts with ruff-format)
     "incorrect-blank-line-before-class",   # one-blank-line-before-class (conflicts with D211)
     "multi-line-summary-second-line",   # multi-line-summary-second-line (conflicts with D212)
@@ -189,7 +189,9 @@ ignore = [
     "line-too-long",   # Line too long (Let the formatter handle wrapping)
 
     # --- Docstring ---
-    "undocumented-param", "undocumented-public-module", "undocumented-public-package",
+    "undocumented-param",
+    "undocumented-public-module",
+    "undocumented-public-package",
 
     # --- Keep existing TODO ignores ---
     "complex-structure",
@@ -204,9 +206,107 @@ dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 external = [ "DOC", "PLR" ]
 preview = true
 
+# Test suite rules relaxation
 [tool.ruff.lint.per-file-ignores]
-"__init__.py" = [ "module-import-not-at-top-of-file" ]
+"__init__.py" = ["module-import-not-at-top-of-file"]
 "mailgun/endpoints.py" = ["import-outside-top-level"]
+
+# Test suite relaxations
+"tests/**" = [
+    # Core test assertions & naming
+    "assert",
+    "magic-value-comparison",
+    "invalid-function-name",
+    "non-lowercase-variable-in-function",
+    "shebang-not-executable",
+    "commented-out-code",
+    "implicit-namespace-package",
+    "class-as-data-structure",
+    "collections-named-tuple",
+
+    # Docstring relaxations in tests
+    "missing-blank-line-after-summary",
+    "undocumented-public-module",
+    "undocumented-public-package",
+    "undocumented-public-class",
+    "undocumented-public-method",
+    "undocumented-public-function",
+    "undocumented-public-init",
+    "undocumented-public-nested-class",
+    "undocumented-magic-method",
+    "docstring-missing-returns",
+    "docstring-missing-yields",
+    "docstring-missing-exception",
+    "missing-terminal-punctuation",
+
+    # Test execution & white-box state inspections
+    "private-member-access",
+    "import-private-name",
+    "import-outside-top-level",
+    "set-attr-with-constant",
+    "builtin-argument-shadowing",
+    "unused-function-argument",
+    "unused-method-argument",
+    "unused-lambda-argument",
+    "unused-loop-control-variable",
+    "unused-unpacked-variable",
+    "unused-async",
+    "manual-list-comprehension",
+    "if-exp-instead-of-or-operator",
+    "no-self-use",
+
+    # String & float equality test assertions
+    "compare-to-empty-string",
+    "float-equality-comparison",
+    "boolean-positional-value-in-call",
+    "boolean-type-hint-positional-argument",
+    "boolean-default-value-positional-argument",
+
+    # Pytest & Unittest specifics
+    "pytest-unittest-assertion",
+    "pytest-unittest-raises-assertion",
+    "pytest-fixture-param-without-value",
+    "pytest-raises-too-broad",
+    "pytest-warns-too-broad",
+    "pytest-warns-with-multiple-statements",
+    "pytest-raises-with-multiple-statements",
+
+    # Security & Logging test vectors
+    "hardcoded-password-string",
+    "hardcoded-password-func-arg",
+    "ambiguous-unicode-character-string",
+    "static-join-to-f-string",
+    "suspicious-subprocess-import",
+    "subprocess-without-shell-equals-true",
+    "start-process-with-partial-path",
+    "root-logger-call",
+    "logging-extra-attr-clash",
+
+    # Complexity & Flow in fuzzing harnesses
+    "too-many-branches",
+    "too-many-statements",
+    "too-many-locals",
+    "too-many-nested-blocks",
+    "too-many-public-methods",
+    "f-string-in-exception",
+    "raise-within-try",
+    "type-check-without-type-error",
+    "raise-without-from-inside-except",
+    "error-suffix-on-exception-name",
+    "print",
+    "blind-except",
+    "try-except-pass",
+    "suppressible-exception",
+    "blocking-open-call-in-async-function",
+    "blocking-sleep-in-async-function",
+    "unspecified-encoding",
+    "call-datetime-now-without-tzinfo",
+    "typing-only-first-party-import",
+    "typing-only-standard-library-import",
+    "missing-todo-author",
+    "missing-todo-link",
+    "line-contains-todo",
+]
 
 [tool.ruff.lint.pylint]
 max-args = 9           # Default is 5. SDK endpoints need more (auth, data, headers, files, etc.)

@@ -11,24 +11,28 @@ class TestEnterpriseAuditHooks:
 
     @patch("sys.audit")
     def test_audit_hook_emits_on_control_characters(
-        self, mock_audit: MagicMock
+        self,
+        mock_audit: MagicMock,
     ) -> None:
         """Ensure control characters (CWE-20) trigger an audit event before crashing."""
         bad_input = "payload\x00hidden"
 
         with pytest.raises(ValueError, match="Security Alert \\(CWE-20\\)"):
             SecurityGuard.validate_no_control_characters(
-                bad_input, context="PayloadField"
+                bad_input,
+                context="PayloadField",
             )
 
         # Verify the SecOps team receives the context of the attack
         mock_audit.assert_called_once_with(
-            "mailgun.security.control_characters", "PayloadField"
+            "mailgun.security.control_characters",
+            "PayloadField",
         )
 
     @patch("sys.audit")
     def test_audit_hook_emits_on_crlf_header_injection(
-        self, mock_audit: MagicMock
+        self,
+        mock_audit: MagicMock,
     ) -> None:
         """Ensure CRLF injections (CWE-113) trigger an audit event before crashing."""
         bad_headers = {"X-Custom": "value\nInjected-Header: bad"}
@@ -38,7 +42,8 @@ class TestEnterpriseAuditHooks:
 
         # Verify the exact telemetry event was broadcasted to the runtime
         mock_audit.assert_called_once_with(
-            "mailgun.security.header_injection", "X-Custom"
+            "mailgun.security.header_injection",
+            "X-Custom",
         )
 
     @patch("sys.audit")
@@ -51,12 +56,14 @@ class TestEnterpriseAuditHooks:
 
         # Verify the exact malicious URL is sent to the audit log
         mock_audit.assert_called_once_with(
-            "mailgun.security.ssrf_attempt", untrusted_url
+            "mailgun.security.ssrf_attempt",
+            untrusted_url,
         )
 
     @patch("sys.addaudithook")
     def test_enable_security_audit_registers_hook(
-        self, mock_addaudithook: MagicMock
+        self,
+        mock_addaudithook: MagicMock,
     ) -> None:
         """Ensure the opt-in security audit method successfully binds to the OS runtime."""
         # Call the opt-in method

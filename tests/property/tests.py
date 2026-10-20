@@ -7,17 +7,20 @@ import hmac
 import io
 import logging
 import string
+import tempfile
 import time
+from pathlib import Path
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 from urllib.parse import urlparse
 
+import pytest
+import requests  # pyright: ignore[reportMissingModuleSource]
 from hypothesis import HealthCheck, assume, given, settings  # type: ignore[import-untyped]
 from hypothesis import strategies as st  # type: ignore[import-untyped]
 from hypothesis.stateful import RuleBasedStateMachine, initialize, rule
-import pytest
-import requests  # pyright: ignore[reportMissingModuleSource]
 
+from mailgun.builders import ChunkedStreamer, MailgunMessageBuilder
 from mailgun.client import Client, Endpoint
 from mailgun.config import Config, _get_cached_route_data
 from mailgun.filters import RedactingFilter
@@ -28,13 +31,7 @@ from mailgun.handlers.ips_handler import handle_ips
 from mailgun.handlers.mailinglists_handler import handle_lists
 from mailgun.handlers.tags_handler import handle_tags
 from mailgun.handlers.templates_handler import handle_templates
-from mailgun.security import IdempotencyGuard, SecurityGuard, _PATH_CONTROL_CHAR_RE
-
-import tempfile
-from pathlib import Path
-from unittest.mock import MagicMock
-
-from mailgun.builders import ChunkedStreamer, MailgunMessageBuilder
+from mailgun.security import _PATH_CONTROL_CHAR_RE, IdempotencyGuard, SecurityGuard
 
 
 # ------------------------------------------------------------------------------
@@ -104,7 +101,7 @@ class TestHandlerProperties:
             keys=st.text(),
             values=st.one_of(st.integers(), st.text(), st.booleans()),
             max_size=10,
-        )
+        ),
     )  # type: ignore[untyped-decorator]
     def test_inbox_handler_defensive_errors(self, kwargs: dict[str, Any]) -> None:
         """INVARIANT: Handlers must process arbitrary keyword arguments defensively."""
@@ -121,7 +118,10 @@ class TestHandlerProperties:
         method=st.sampled_from(["GET", "POST", "PUT", "DELETE"]),
     )  # type: ignore[untyped-decorator]
     def test_mailinglists_handler_invariants(
-        self, domain: str, address: str, method: str
+        self,
+        domain: str,
+        address: str,
+        method: str,
     ) -> None:
         """INVARIANT: mailinglists_handler must gracefully construct URL paths.
 
@@ -139,7 +139,9 @@ class TestHandlerProperties:
         dirty_ip=st.text(alphabet=string.printable),
     )  # type: ignore[untyped-decorator]
     def test_property_ips_handler_robustness(
-        self, dirty_domain: str, dirty_ip: str
+        self,
+        dirty_domain: str,
+        dirty_ip: str,
     ) -> None:
         """INVARIANT: The IPs handler must process printable strings without unhandled exceptions."""
         url = {"base": "https://api.mailgun.net/v3", "keys": ["ips"]}
@@ -212,7 +214,7 @@ class TestSecurityGuardProperties:
             alphabet=st.characters(blacklist_categories=("Cs",), blacklist_characters=["\t"]),  # type: ignore[arg-type]
             min_size=1,
             max_size=255,
-        )
+        ),
     )  # type: ignore[untyped-decorator]
     def test_property_header_injection_prevention(self, dirty_input: str) -> None:
         """INVARIANT: Any string containing ASCII control characters must raise ValueError (CWE-113/117)."""
@@ -333,7 +335,8 @@ def test_redacting_filter_args_preservation(args: list[Any], msg: str) -> None:
     template_str=st.sampled_from(["User count: %d, Target: %s", "Item: %s, Price: %s"]),
 )  # type: ignore[untyped-decorator]
 def test_redacting_filter_tuple_args_string_formatting(
-    secret_token: str, template_str: str
+    secret_token: str,
+    template_str: str,
 ) -> None:
     """INVARIANT: RedactingFilter must not crash Python's standard logging string formatter."""
     filter_ = RedactingFilter()
@@ -381,18 +384,26 @@ def test_sanitize_path_traversal_fuzz(segment: str) -> None:
     time_delta=st.integers(min_value=-3600, max_value=3600),
 )  # type: ignore[untyped-decorator]
 def test_verify_webhook_replay_ttl_invariant(
-    token: str, signing_key: str, time_delta: int
+    token: str,
+    signing_key: str,
+    time_delta: int,
 ) -> None:
     """INVARIANT: verify_webhook must reject timestamps outside max_age_seconds window."""
     now = int(time.time())
     ts = now + time_delta
-    msg = f"{ts}{token}".encode("utf-8")
+    msg = f"{ts}{token}".encode()
     sig = hmac.new(
-        key=signing_key.encode("utf-8"), msg=msg, digestmod=hashlib.sha256
+        key=signing_key.encode("utf-8"),
+        msg=msg,
+        digestmod=hashlib.sha256,
     ).hexdigest()
 
     is_valid = SecurityGuard.verify_webhook(
-        signing_key, token, ts, sig, max_age_seconds=900
+        signing_key,
+        token,
+        ts,
+        sig,
+        max_age_seconds=900,
     )
 
     if abs(time_delta) > 900:
@@ -416,7 +427,9 @@ class ClientLifecycleMachine(RuleBasedStateMachine):
         self.client: Client | None = None
         self.is_connected: bool = True
 
-    @initialize(api_key=st.text(alphabet=string.ascii_letters + string.digits, min_size=5, max_size=20))  # type: ignore[untyped-decorator]
+    @initialize(
+        api_key=st.text(alphabet=string.ascii_letters + string.digits, min_size=5, max_size=20),
+    )  # type: ignore[untyped-decorator]
     def init_client(self, api_key: str) -> None:
         """Initialize client instance with generated credentials."""
         try:
@@ -551,7 +564,9 @@ class MailgunStateSequenceMachine(RuleBasedStateMachine):
         key1 = IdempotencyGuard.generate_key("example.com", {"to": "user@example.com"}, files)
         assert isinstance(key1, str)
         assert len(key1) == 64
-        assert streamer.tell() == 0, "Streamer pointer was not reset to 0 after idempotency calculation"
+        assert streamer.tell() == 0, (
+            "Streamer pointer was not reset to 0 after idempotency calculation"
+        )
 
         chunk = streamer.read(1024)
         assert chunk == b"A" * 1024
@@ -603,5 +618,6 @@ class MailgunStateSequenceMachine(RuleBasedStateMachine):
             mock_cred = "mock-client-credential"
             self.client = Client(auth=("api", mock_cred))
             self.is_closed = False
+
 
 TestMailgunStateMachine = MailgunStateSequenceMachine.TestCase

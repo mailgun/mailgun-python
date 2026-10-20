@@ -12,6 +12,7 @@ from typing import Any
 
 import atheris
 
+
 with atheris.instrument_imports():
     from pydantic import ValidationError
 
@@ -25,7 +26,7 @@ _MALICIOUS_RECIPIENTS = [
     "evil\r\nBcc: victim@target.com",
     "user@localhost",
     "test@[127.0.0.1]",
-    "\"Recipient with quotes\" <recipient@example.com>",
+    '"Recipient with quotes" <recipient@example.com>',
     "user+tag@domain.co.uk",
     "a" * 255 + "@long.domain.com",
     "user@" + "sub." * 50 + "com",
@@ -44,8 +45,7 @@ def _generate_fuzzed_recipient(fdp: atheris.FuzzedDataProvider) -> Any:
         return fdp.ConsumeUnicodeNoSurrogates(64)
     if choice == 2:
         return [
-            fdp.PickValueInList(_MALICIOUS_RECIPIENTS)
-            for _ in range(fdp.ConsumeIntInRange(1, 4))
+            fdp.PickValueInList(_MALICIOUS_RECIPIENTS) for _ in range(fdp.ConsumeIntInRange(1, 4))
         ]
     if choice == 3:
         return fdp.ConsumeInt(10000)
@@ -64,15 +64,9 @@ def TestOneInput(data: bytes) -> None:
         if fdp.ConsumeBool()
         else fdp.ConsumeUnicodeNoSurrogates(48)
     )
-    subject_val = (
-        fdp.ConsumeUnicodeNoSurrogates(64) if fdp.ConsumeBool() else None
-    )
-    text_val = (
-        fdp.ConsumeUnicodeNoSurrogates(128) if fdp.ConsumeBool() else None
-    )
-    html_val = (
-        fdp.ConsumeUnicodeNoSurrogates(128) if fdp.ConsumeBool() else None
-    )
+    subject_val = fdp.ConsumeUnicodeNoSurrogates(64) if fdp.ConsumeBool() else None
+    text_val = fdp.ConsumeUnicodeNoSurrogates(128) if fdp.ConsumeBool() else None
+    html_val = fdp.ConsumeUnicodeNoSurrogates(128) if fdp.ConsumeBool() else None
 
     # Custom parameter mutations (testing h:, v:, o: prefix handling & CRLF rejection)
     custom_params: dict[str, Any] = {}
@@ -117,7 +111,7 @@ def TestOneInput(data: bytes) -> None:
         for field in ("from_", "subject"):
             field_val = dumped.get(field)
             if isinstance(field_val, str) and ("\r" in field_val or "\n" in field_val):
-                raise RuntimeError(f"CRLF injection leak in model field {field}: {repr(field_val)}")
+                raise RuntimeError(f"CRLF injection leak in model field {field}: {field_val!r}")
 
     except (ValidationError, ValueError, TypeError):
         # Expected defensive rejections from Pydantic validators

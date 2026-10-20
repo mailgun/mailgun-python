@@ -246,7 +246,7 @@ class TestMailgunTemplateBuilder:
                 [
                     {"account_id": "123", "name": "new-template"},
                     {"account_id": "456", "name": "other-template", "domain": "test.com"},
-                ]
+                ],
             )
             .build()
         )

@@ -7,10 +7,10 @@ from typing import Any
 
 import atheris
 
-with atheris.instrument_imports():
-    import requests
 
-    from mailgun._httpx_compat import httpx as compat_httpx
+with atheris.instrument_imports():
+    import httpx2
+    import requests
 
 logging.disable(logging.CRITICAL)
 
@@ -48,7 +48,7 @@ def TestOneInput(data: bytes) -> None:
             payload[key] = fdp.ConsumeBool()
 
     sync_req = requests.Request("POST", "https://api.mailgun.net/v3/fuzz", data=payload)
-    async_req = compat_httpx.Request("POST", "https://api.mailgun.net/v3/fuzz", data=payload)
+    async_req = httpx2.Request("POST", "https://api.mailgun.net/v3/fuzz", data=payload)
 
     sync_exc: Exception | None = None
     async_exc: Exception | None = None
@@ -74,7 +74,7 @@ def TestOneInput(data: bytes) -> None:
         raise RuntimeError(
             f"DIFFERENTIAL DIVERGENCE: Sync resolved to '{sync_category}' ({type(sync_exc).__name__}), "
             f"but Async resolved to '{async_category}' ({type(async_exc).__name__}). "
-            f"Payload: {payload!r}"
+            f"Payload: {payload!r}",
         )
 
 
