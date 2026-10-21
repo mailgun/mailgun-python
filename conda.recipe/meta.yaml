@@ -29,7 +29,6 @@ requirements:
   run:
     - python
     - httpx2 >=2.7.0
-    - httpx >=0.24
     - requests >=2.33.0
 
 test:
