@@ -4,7 +4,7 @@ We [keep a changelog.](http://keepachangelog.com/)
 
 ## [Unreleased]
 
-## [1.10.0] - 2026-10-20
+## [1.10.0] - 2026-10-21
 
 ### Changed
 
