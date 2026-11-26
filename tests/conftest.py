@@ -1,9 +1,26 @@
 import asyncio
+import importlib.util
+import inspect
 import time
 from unittest.mock import AsyncMock
 from urllib.parse import urlparse
 
 import pytest
+
+
+if importlib.util.find_spec("pytest_asyncio") is None:
+
+    def pytest_configure(config: pytest.Config) -> None:
+        config.addinivalue_line("markers", "asyncio: mark test as asynchronous.")
+
+    @pytest.hookimpl(tryfirst=True)
+    def pytest_pyfunc_call(pyfuncitem: pytest.Function) -> bool | None:
+        if inspect.iscoroutinefunction(pyfuncitem.obj):
+            funcargs = pyfuncitem.funcargs
+            testargs = {arg: funcargs[arg] for arg in pyfuncitem._fixtureinfo.argnames}
+            asyncio.run(pyfuncitem.obj(**testargs))
+            return True
+        return None
 
 
 BASE_URL_V1: str = "https://api.mailgun.net/v1"

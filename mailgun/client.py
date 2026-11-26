@@ -140,6 +140,11 @@ class BaseClient:
         """
         return sorted(set(super().__dir__()) | self.config.available_endpoints)
 
+    @staticmethod
+    def _is_healthy_response(response: Any) -> bool:
+        """Return True when a readiness probe response has HTTP 200 OK status."""
+        return bool(hasattr(response, "status_code") and response.status_code == HTTPStatus.OK)
+
 
 # ==============================================================================
 # 2. SYNCHRONOUS IMPLEMENTATION
@@ -280,10 +285,7 @@ class Client(BaseClient):
             response = self.domains.get(filters={"limit": 1})
         except Exception:  # ruff: ignore[blind-except] - Explicitly failing closed on readiness probe
             return False
-        else:
-            if hasattr(response, "status_code"):
-                return bool(response.status_code == HTTPStatus.OK)
-            return False
+        return self._is_healthy_response(response)
 
 
 # ==============================================================================
@@ -458,7 +460,4 @@ class AsyncClient(BaseClient):
             response = await self.domains.get(filters={"limit": 1})
         except Exception:  # ruff: ignore[blind-except] - Explicitly failing closed on readiness probe
             return False
-        else:
-            if hasattr(response, "status_code"):
-                return bool(response.status_code == HTTPStatus.OK)
-            return False
+        return self._is_healthy_response(response)

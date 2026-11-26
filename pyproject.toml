@@ -121,6 +121,9 @@ urls."Source" = "https://github.com/mailgun/mailgun-python"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+filterwarnings = [
+  "ignore:Unknown config option. asyncio:pytest.PytestConfigWarning",
+]
 
 [tool.setuptools]
 py-modules = [ "mailgun._version" ]
@@ -224,7 +227,7 @@ preview = true
 
 # Test suite rules relaxation
 [tool.ruff.lint.per-file-ignores]
-"__init__.py" = ["module-import-not-at-top-of-file"]
+"__init__.py" = ["module-import-not-at-top-of-file", "non-empty-init-module"]
 "mailgun/endpoints.py" = ["import-outside-top-level"]
 
 # Test suite relaxations

@@ -245,7 +245,9 @@ def post_dkim_keys_sync(api_key: str, domain_name: str, secret_key_filename: str
 
     secret_key_path = Path(secret_key_filename)
     subprocess.run(
-        ["openssl", "genrsa", "-traditional", "-out", secret_key_filename, "--", "2048"], check=True
+        ["openssl", "genrsa", "-traditional", "-out", secret_key_filename, "--", "2048"],
+        check=True,
+        timeout=30,
     )
 
     files = [

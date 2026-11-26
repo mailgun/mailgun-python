@@ -3,6 +3,9 @@ import re
 from typing import Any, Final
 
 
+_filter_logger = logging.getLogger(__name__)
+
+
 class RedactingFilter(logging.Filter):
     """Centralized Log Sanitization Filter (CWE-316, CWE-117).
 
@@ -121,8 +124,8 @@ class RedactingFilter(logging.Filter):
             if hasattr(data, "_fields"):  # Safely unpack NamedTuples
                 try:
                     return type(data)(*(self._deep_redact(item, depth + 1) for item in data))
-                except Exception:  # ruff: ignore[blind-except, try-except-pass]
-                    pass
+                except (TypeError, ValueError):
+                    return tuple(self._deep_redact(item, depth + 1) for item in data)
             return tuple(self._deep_redact(item, depth + 1) for item in data)
         except Exception:  # ruff: ignore[blind-except]
             return data
@@ -139,21 +142,15 @@ class RedactingFilter(logging.Filter):
         """
         try:
             if hasattr(data, "model_dump") and callable(data.model_dump):
-                try:
-                    return self._deep_redact(data.model_dump(), depth + 1)
-                except Exception:  # ruff: ignore[blind-except, try-except-pass]
-                    pass
-        except Exception:  # ruff: ignore[blind-except, try-except-pass]
-            pass
+                return self._deep_redact(data.model_dump(), depth + 1)
+        except (AttributeError, TypeError, ValueError, RuntimeError):
+            _filter_logger.debug("RedactingFilter: model_dump() failed during log sanitization.")
 
         try:
             if hasattr(data, "__dict__"):
-                try:
-                    return self._deep_redact(vars(data), depth + 1)
-                except Exception:  # ruff: ignore[blind-except, try-except-pass]
-                    pass
-        except Exception:  # ruff: ignore[blind-except, try-except-pass]
-            pass
+                return self._deep_redact(vars(data), depth + 1)
+        except (AttributeError, TypeError, ValueError, RuntimeError):
+            _filter_logger.debug("RedactingFilter: vars() failed during log sanitization.")
 
         try:
             str_val = str(data)
@@ -191,8 +188,8 @@ class RedactingFilter(logging.Filter):
                 return self._redact_tuple(data, depth)
 
             return self._redact_object(data, depth)
-        except Exception:  # ruff: ignore[blind-except, try-except-pass]
-            pass
+        except (TypeError, ValueError, AttributeError, RuntimeError):
+            _filter_logger.debug("RedactingFilter: fallback to unredacted data.")
 
         return data
 
@@ -226,8 +223,8 @@ class RedactingFilter(logging.Filter):
             extra_keys = [k for k in list(record.__dict__.keys()) if k not in self._STANDARD_ATTRS]
             for attr_name in extra_keys:
                 record.__dict__[attr_name] = self._deep_redact(record.__dict__[attr_name], 0)
-        except Exception:  # ruff: ignore[blind-except, try-except-pass]
+        except (TypeError, ValueError, AttributeError, KeyError, RuntimeError):
             # Never let logging filters crash application execution
-            pass
+            return True
 
         return True

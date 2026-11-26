@@ -60,7 +60,7 @@ class SecureHTTPAdapter(HTTPAdapter):
         """Initialize the pool manager with a secure TLS context."""
         kwargs["ssl_context"] = self._get_secure_ssl_context()
         # HTTPAdapter lacks strict static types for this internal method.
-        super().init_poolmanager(*args, **kwargs)
+        super().init_poolmanager(*args, **kwargs)  # type: ignore[no-untyped-call]
 
     def proxy_manager_for(self, proxy: str, **proxy_kwargs: Any) -> Any:
         """Ensure proxy connections also strictly enforce TLS 1.2+.
@@ -69,7 +69,7 @@ class SecureHTTPAdapter(HTTPAdapter):
             Any: The proxy manager instance.
         """
         proxy_kwargs["ssl_context"] = self._get_secure_ssl_context()
-        return super().proxy_manager_for(proxy, **proxy_kwargs)
+        return super().proxy_manager_for(proxy, **proxy_kwargs)  # type: ignore[no-untyped-call]
 
 
 class SecretAuth(tuple):  # type: ignore[type-arg]
@@ -864,13 +864,65 @@ class IdempotencyGuard:
         return data
 
     @staticmethod
-    def generate_key(domain: str, payload: dict[str, Any], files: list[Any] | None = None) -> str:
+    def _hash_readable_stream(file_obj: Any) -> str:
+        """Compute a SHA-256 hex digest for a seekable/readable stream without mutating its cursor.
+
+        Returns:
+            str: SHA-256 hex digest of the stream contents.
+        """
+        current_pos = (
+            file_obj.tell() if hasattr(file_obj, "tell") and callable(file_obj.tell) else 0
+        )
+        if hasattr(file_obj, "seek") and callable(file_obj.seek):
+            file_obj.seek(0)
+
+        file_hash = hashlib.sha256()
+        while chunk := file_obj.read(65536):
+            file_hash.update(chunk if isinstance(chunk, bytes) else str(chunk).encode("utf-8"))
+
+        if hasattr(file_obj, "seek") and callable(file_obj.seek):
+            file_obj.seek(current_pos)
+        return file_hash.hexdigest()
+
+    @classmethod
+    def _fingerprint_file_item(cls, f_item: Any) -> str:
+        """Compute a deterministic fingerprint string for a single attachment entry.
+
+        Returns:
+            str: Deterministic ``<field>_<sha256>`` fingerprint.
+        """
+        if isinstance(f_item, (tuple, list)) and len(f_item) > 1 and f_item[1] is not None:
+            field_name = str(f_item[0])
+            file_data = f_item[1]
+        else:
+            field_name = "attachment"
+            file_data = f_item
+
+        file_obj = (
+            file_data[1]
+            if isinstance(file_data, (tuple, list)) and len(file_data) > 1
+            else file_data
+        )
+        if isinstance(file_obj, (bytes, bytearray)):
+            sig = hashlib.sha256(file_obj).hexdigest()
+        elif hasattr(file_obj, "read") and callable(file_obj.read):
+            sig = cls._hash_readable_stream(file_obj)
+        else:
+            sig = hashlib.sha256(str(file_obj).encode("utf-8")).hexdigest()
+        return f"{field_name}_{sig}"
+
+    @classmethod
+    def generate_key(
+        cls,
+        domain: str,
+        payload: dict[str, Any],
+        files: list[Any] | None = None,
+    ) -> str:
         """Generates a unique, collision-resistant SHA-256 fingerprint of the message payload.
 
         Returns:
             SHA-256 fingerprint hex digest.
         """
-        # Filtering only core fields
         fingerprint_data: dict[str, Any] = {
             "domain": domain,
             "to": payload.get("to"),
@@ -882,51 +934,9 @@ class IdempotencyGuard:
             "html": payload.get("html"),
             "v_variables": {k: v for k, v in payload.items() if str(k).startswith("v:")},
         }
-
-        # Include attachment signatures to prevent false-positive deduplication
         if files:
-            file_signatures: list[str] = []
-            for f_item in files:
-                if isinstance(f_item, (tuple, list)) and len(f_item) > 1 and f_item[1] is not None:
-                    field_name = str(f_item[0])
-                    file_data = f_item[1]
-                else:
-                    field_name = "attachment"
-                    file_data = f_item
+            fingerprint_data["files"] = [cls._fingerprint_file_item(item) for item in files]
 
-                # Unwrap nested tuple attachments: ("filename.pdf", stream/bytes, ...)
-                if isinstance(file_data, (tuple, list)) and len(file_data) > 1:
-                    file_obj = file_data[1]
-                else:
-                    file_obj = file_data
-
-                if isinstance(file_obj, (bytes, bytearray)):
-                    sig = hashlib.sha256(file_obj).hexdigest()
-                elif hasattr(file_obj, "read") and callable(file_obj.read):
-                    current_pos = (
-                        file_obj.tell()
-                        if hasattr(file_obj, "tell") and callable(file_obj.tell)
-                        else 0
-                    )
-                    if hasattr(file_obj, "seek") and callable(file_obj.seek):
-                        file_obj.seek(0)
-
-                    file_hash = hashlib.sha256()
-                    while chunk := file_obj.read(65536):
-                        file_hash.update(
-                            chunk if isinstance(chunk, bytes) else str(chunk).encode("utf-8"),
-                        )
-
-                    if hasattr(file_obj, "seek") and callable(file_obj.seek):
-                        file_obj.seek(current_pos)
-                    sig = file_hash.hexdigest()
-                else:
-                    sig = hashlib.sha256(str(file_obj).encode("utf-8")).hexdigest()
-
-                file_signatures.append(f"{field_name}_{sig}")
-            fingerprint_data["files"] = file_signatures
-
-        # Pass fingerprint_data through _deep_sanitize before JSON serialization
-        safe_data = IdempotencyGuard._deep_sanitize(fingerprint_data)
+        safe_data = cls._deep_sanitize(fingerprint_data)
         serialized = json.dumps(safe_data, sort_keys=True, default=str)
         return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
