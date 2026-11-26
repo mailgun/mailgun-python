@@ -22,6 +22,13 @@ if TYPE_CHECKING:
         RouteNotFoundError,
         UploadError,
     )
+    from mailgun.testing import MockEndpoint, MockMailgunClient, MockResponse
+    from mailgun.webhooks import (
+        WebhookVerificationError,
+        parse_webhook_event,
+        verify_webhook_payload,
+        verify_webhook_signature,
+    )
 
     __version__: str
 
@@ -34,8 +41,15 @@ _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "MailgunMessageBuilder": ("mailgun.builders", "MailgunMessageBuilder"),
     "MailgunTemplateBuilder": ("mailgun.builders", "MailgunTemplateBuilder"),
     "MailgunTimeoutError": ("mailgun.handlers.error_handler", "MailgunTimeoutError"),
+    "MockEndpoint": ("mailgun.testing", "MockEndpoint"),
+    "MockMailgunClient": ("mailgun.testing", "MockMailgunClient"),
+    "MockResponse": ("mailgun.testing", "MockResponse"),
     "RouteNotFoundError": ("mailgun.handlers.error_handler", "RouteNotFoundError"),
     "UploadError": ("mailgun.handlers.error_handler", "UploadError"),
+    "WebhookVerificationError": ("mailgun.webhooks", "WebhookVerificationError"),
+    "parse_webhook_event": ("mailgun.webhooks", "parse_webhook_event"),
+    "verify_webhook_payload": ("mailgun.webhooks", "verify_webhook_payload"),
+    "verify_webhook_signature": ("mailgun.webhooks", "verify_webhook_signature"),
 }
 
 # Defines the root public API of the Mailgun SDK
@@ -47,9 +61,16 @@ __all__ = [
     "MailgunMessageBuilder",
     "MailgunTemplateBuilder",
     "MailgunTimeoutError",
+    "MockEndpoint",
+    "MockMailgunClient",
+    "MockResponse",
     "RouteNotFoundError",
     "UploadError",
+    "WebhookVerificationError",
     "__version__",
+    "parse_webhook_event",
+    "verify_webhook_payload",
+    "verify_webhook_signature",
 ]
 
 _SUBMODULE_LOADERS: dict[str, Callable[[], Any]] = {
@@ -67,7 +88,9 @@ _SUBMODULE_LOADERS: dict[str, Callable[[], Any]] = {
     "mailgun.logger": lambda: importlib.import_module("mailgun.logger"),
     "mailgun.routes": lambda: importlib.import_module("mailgun.routes"),
     "mailgun.security": lambda: importlib.import_module("mailgun.security"),
+    "mailgun.testing": lambda: importlib.import_module("mailgun.testing"),
     "mailgun.types": lambda: importlib.import_module("mailgun.types"),
+    "mailgun.webhooks": lambda: importlib.import_module("mailgun.webhooks"),
 }
 
 _LAZY_SUBMODULES: frozenset[str] = frozenset(
@@ -81,7 +104,9 @@ _LAZY_SUBMODULES: frozenset[str] = frozenset(
         "logger",
         "routes",
         "security",
+        "testing",
         "types",
+        "webhooks",
     },
 )
 
