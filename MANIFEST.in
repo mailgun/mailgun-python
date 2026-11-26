@@ -11,6 +11,8 @@ include MANIFEST.in
 
 # Include package data
 recursive-include mailgun *.py
+recursive-include mailgun *.pyi
+recursive-include mailgun *.typed
 recursive-include mailgun *.csv
 recursive-include mailgun *.mime
 recursive-include mailgun *.txt
