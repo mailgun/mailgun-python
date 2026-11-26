@@ -11,6 +11,7 @@ from mailgun.builders import MailgunMessageBuilder, MailgunTemplateBuilder
 from mailgun.client import AsyncClient, Client
 from mailgun.handlers.error_handler import (
     ApiError,
+    DeliverabilityError,
     MailgunTimeoutError,
     RouteNotFoundError,
     UploadError,
@@ -22,6 +23,7 @@ __all__ = [
     "ApiError",
     "AsyncClient",
     "Client",
+    "DeliverabilityError",
     "MailgunMessageBuilder",
     "MailgunTemplateBuilder",
     "MailgunTimeoutError",

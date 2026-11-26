@@ -10,7 +10,6 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Final
 from urllib.parse import parse_qs, urlparse
 
-import httpx2
 import requests  # pyright: ignore[reportMissingModuleSource]
 from requests.models import Response  # pyright: ignore[reportMissingModuleSource]
 
@@ -21,8 +20,19 @@ from mailgun.logger import get_logger
 from mailgun.security import SecurityGuard
 
 
+httpx2: Any
+try:
+    import httpx2 as _httpx2_runtime
+
+    httpx2 = _httpx2_runtime
+except ImportError:  # pragma: no cover
+    httpx2 = None
+
+
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Mapping
+
+    import httpx2 as _httpx2_mod
 
     from mailgun.types import APIResponseType, AsyncAPIResponseType, TimeoutType
 
@@ -135,7 +145,13 @@ def _load_handler(endpoint_key: str) -> Callable[..., str]:  # noqa: PLR0911, PL
         from mailgun.handlers.templates_handler import handle_templates
 
         return handle_templates
-    if endpoint_key == "addressvalidate":
+    if endpoint_key in {
+        "address",
+        "addressvalidate",
+        "address_bulk",
+        "address_preview",
+        "address_validate",
+    }:
         from mailgun.handlers import email_validation_handler as evh
 
         return evh.handle_address_validate
@@ -276,12 +292,22 @@ class BaseEndpoint:
             MailgunTimeoutError: If the request times out.
             ApiError: If network routing fails or the API request fails.
         """
-        if isinstance(e, (requests.Timeout, httpx2.TimeoutException)):
+        timeout_errors: tuple[type[BaseException], ...] = (
+            (requests.Timeout, httpx2.TimeoutException)
+            if httpx2 is not None
+            else (requests.Timeout,)
+        )
+        network_errors: tuple[type[BaseException], ...] = (
+            (requests.ConnectionError, httpx2.ConnectError, httpx2.NetworkError)
+            if httpx2 is not None
+            else (requests.ConnectionError,)
+        )
+        if isinstance(e, timeout_errors):
             msg = f"Request timed out for {method.upper()} {target_url}"
             raise MailgunTimeoutError(msg) from e
         if isinstance(e, ApiError):
             raise e
-        if isinstance(e, (requests.ConnectionError, httpx2.ConnectError, httpx2.NetworkError)):
+        if isinstance(e, network_errors):
             msg = f"Network routing failed for {method.upper()} {target_url}: {e}"
             raise ApiError(msg) from e
         msg = f"API request failed for {method.upper()} {target_url}: {e}"
@@ -865,7 +891,7 @@ class AsyncEndpoint(BaseEndpoint):
         url: dict[str, Any],
         headers: dict[str, str],
         auth: tuple[str, str] | None,
-        client: httpx2.AsyncClient | None = None,
+        client: _httpx2_mod.AsyncClient | None = None,
         timeout: TimeoutType = 60,
         *,
         dry_run: bool = False,
@@ -879,7 +905,13 @@ class AsyncEndpoint(BaseEndpoint):
             client: Optional httpx2.AsyncClient instance to reuse.
             timeout: Base request timeout.
             dry_run: Execution sandbox flag.
+
+        Raises:
+            ImportError: If the optional ``httpx2`` dependency is not installed.
         """
+        if httpx2 is None:
+            msg = "AsyncEndpoint requires the 'async' extra. Install it with: pip install 'mailgun[async]'"
+            raise ImportError(msg)
         super().__init__(url, headers, auth, timeout=timeout, dry_run=dry_run)
         self._client = client or httpx2.AsyncClient()
 

@@ -49,32 +49,27 @@ def _get_cached_route_data(clean_key: str) -> dict[str, Any]:
         return {"version": version, "keys": tuple(route_keys)}
 
     route_parts = clean_key.split("_")
-
-    # Explicitly check for exact matches in PREFIX_ROUTES before splitting
-    if clean_key in routes.PREFIX_ROUTES:
-        version, suffix, key_override = routes.PREFIX_ROUTES[clean_key]
-        return {
-            "version": version,
-            "suffix": suffix,
-            "keys": (key_override or clean_key,),
-        }
+    if any(not part for part in route_parts):
+        available = sorted(list(routes.EXACT_ROUTES.keys()) + list(routes.PREFIX_ROUTES.keys()))
+        error_msg = f"Invalid API endpoint requested: {clean_key}. Available endpoints: {', '.join(available)}"
+        raise KeyError(error_msg)
 
     # Intercept domain endpoints BEFORE the prefix router swallows them!
     # This ensures Config._resolve_domains_route is triggered to apply DOMAIN_ALIASES.
     if route_parts[0] == "domains":
         return {"type": "domain", "parts": tuple(route_parts)}
 
-    # Fallback to prefix matching
-    if route_parts[0] in routes.PREFIX_ROUTES:
-        version, suffix, key_override = routes.PREFIX_ROUTES[route_parts[0]]
-        keys = list(route_parts)
-        if key_override:
-            keys[0] = key_override
-        return {
-            "version": version,
-            "suffix": suffix,
-            "keys": tuple(keys),
-        }
+    # Longest-prefix matching across underscore-delimited route segments
+    for idx in range(len(route_parts), 0, -1):
+        prefix = "_".join(route_parts[:idx])
+        if prefix in routes.PREFIX_ROUTES:
+            version, suffix, key_override = routes.PREFIX_ROUTES[prefix]
+            first_key = key_override or prefix
+            return {
+                "version": version,
+                "suffix": suffix,
+                "keys": (first_key, *route_parts[idx:]),
+            }
 
     # Explicitly reject typo'd endpoints and provide available options for DX
     available = sorted(list(routes.EXACT_ROUTES.keys()) + list(routes.PREFIX_ROUTES.keys()))
@@ -162,6 +157,7 @@ class Config:
         routes.DOMAIN_ENDPOINTS,
     )
     _V1_ENDPOINTS: Final[frozenset[str]] = frozenset(routes.DOMAIN_ENDPOINTS["v1"])
+    _V2_ENDPOINTS: Final[frozenset[str]] = frozenset(routes.DOMAIN_ENDPOINTS.get("v2", []))
     _V3_ENDPOINTS: Final[frozenset[str]] = frozenset(routes.DOMAIN_ENDPOINTS["v3"])
     _V4_ENDPOINTS: Final[frozenset[str]] = frozenset(routes.DOMAIN_ENDPOINTS.get("v4", []))
 
@@ -292,6 +288,9 @@ class Config:
                 if part in self._V1_ENDPOINTS:
                     version = APIVersion.V1
                     break
+                if part in self._V2_ENDPOINTS:
+                    version = APIVersion.V2
+                    break
                 if part in self._V4_ENDPOINTS:
                     version = APIVersion.V4
                     break
@@ -318,7 +317,11 @@ class Config:
         route_data = _get_cached_route_data(clean_key)
 
         # HTTP header mapping based on endpoint naming conventions
-        requires_json_headers = "analytics" in clean_key or "bounceclassification" in clean_key
+        requires_json_headers = (
+            "analytics" in clean_key
+            or "bounceclassification" in clean_key
+            or "bounce_classification" in clean_key
+        )
 
         # Prepare headers
         headers_map = self._HEADERS_JSON if requires_json_headers else self._HEADERS_BASE
