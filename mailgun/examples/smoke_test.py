@@ -137,6 +137,7 @@ def test_post_dkim_keys_sync(api_key: str, domain: str) -> Any:
         subprocess.run(
             ["openssl", "genrsa", "-traditional", "-out", secret_key_filename, "--", "2048"],
             check=True,
+            timeout=30,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )

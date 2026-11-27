@@ -4,6 +4,28 @@ We [keep a changelog.](http://keepachangelog.com/)
 
 ## [Unreleased]
 
+## [1.11.0] - Unreleased
+
+### Added
+
+- **Offline Testing Kit (`mailgun.testing`):** Added `MockMailgunClient`, `MockEndpoint`, and `MockResponse` supporting both synchronous (`Client`) and asynchronous (`AsyncClient`) call patterns, request recording (`sent_requests`), queued/routed responses, and `stream()` pagination without monkeypatching HTTP internals.
+- **Webhook Verification Facade (`mailgun.webhooks`):** Added `WebhookVerificationError`, `verify_webhook_signature()`, `verify_webhook_payload()`, and `parse_webhook_event()` layered cleanly over `SecurityGuard.verify_webhook()`.
+- **PEP 484 Type Stubs & Drift Gate (`scripts/check_stubs.py`):** Added deterministic AST-based `.pyi` stub generation and `--check` verification (`mailgun/client.pyi`, `mailgun/endpoints.pyi`) with typed route properties on `Client` and `AsyncClient`.
+- **Optional `[async]` Extra & Compatibility Shim:** Added `optional-dependencies.async` and `optional-dependencies.all` in `pyproject.toml`, restored `mailgun/_httpx_compat.py` (`HAS_HTTPX2`), and exported `DeliverabilityError` in `mailgun.__all__` and `mailgun.handlers.error_handler.__all__`.
+- **Multi-Arch CI & Migration Guide:** Added `ubuntu-24.04-arm` (`aarch64`) to `.github/workflows/commit_checks.yaml`, added `MIGRATION.md`, and unblocked Conda packaging by removing `httpx2` from mandatory runtime dependencies in `conda.recipe/meta.yaml` and `environment.yaml`.
+
+### Changed
+
+- **PEP 562 Lazy Top-Level Exports (`mailgun/__init__.py`):** Deferred loading of `requests`, `httpx2`, `mailgun.client`, `mailgun.endpoints`, and `mailgun.builders` until attribute access, reducing `import mailgun` cold-start overhead.
+- **Declarative Handler Dispatch & Complexity Reduction:** Replaced `_load_handler`'s branching chain with `_HANDLER_REGISTRY` in `mailgun/endpoints.py`, consolidated shared retry/logging/pagination helpers on `BaseEndpoint` and `BaseClient`, and decomposed `IdempotencyGuard.generate_key()` in `mailgun/security.py`.
+- **Packaging & Release Gating:** Upgraded PyPI classifier to `Development Status :: 5 - Production/Stable`, configured `[tool.pytest.ini_options]` (`asyncio_mode = "auto"`), and enabled `env.IS_STABLE == 'true'` in `.github/workflows/publish.yml` so pre-releases publish only to TestPyPI.
+
+### Fixed
+
+- **Optional `httpx2` Transport:** Sync `Client` now works with `requests` alone; `AsyncClient` / `AsyncEndpoint` raise an actionable `ImportError` recommending `pip install "mailgun[async]"` only when instantiated without `httpx2`.
+- **Routing & Handler Fixes:** Fixed `_get_cached_route_data` longest-prefix matching for multi-word underscore routes (`preview_v2_*`, `reputationanalytics_v2_*`, `ip_pools_*`, `dynamic_pools_*`, `ip_warmups_*`, `ip_whitelist_*`, `maverick_score_*`), `bounce_classification` JSON `Content-Type` headers, `address` validation dispatch through `handle_address_validate`, `domains` `v2` (`x509`) resolution, and `handle_ips` / `handle_ippools` URL segment ordering.
+- **Security & Example Hygiene:** Replaced silent `except Exception: pass` blocks in `mailgun/filters.py` and added explicit `timeout=30` bounds to `openssl` subprocess calls in `mailgun/examples/`.
+
 ## [1.10.0] - 2026-10-21
 
 ### Changed

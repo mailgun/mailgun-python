@@ -145,21 +145,29 @@ To build the `mailgun` package from the sources you need `setuptools` (as a buil
 
 ### Runtime dependencies
 
-At runtime the package requires `requests >=2.33.0`. For async support, it requires `httpx2 >=2.7.0`.
+At runtime the package requires `requests >=2.33.0`. For async support (`AsyncClient` / `AsyncEndpoint`), install the optional `[async]` extra (`httpx2 >=2.7.0`).
 
 ### Test dependencies
 
-For running test you need `pytest >=9.0.3`, `pytest-asyncio`, and `responses` at least. Make sure to provide the environment variables from [Authentication](#authentication).
+For running tests you need `pytest >=9.0.3`, `pytest-asyncio`, and `responses` at least. Make sure to provide the environment variables from [Authentication](#authentication).
 
 ## Installation
 
 ### pip install
 
-Use the below command to install the Mailgun SDK for Python:
+Use the below command to install the Mailgun SDK for Python (synchronous `Client`):
 
 ```bash
 pip install mailgun
 ```
+
+To enable `AsyncClient` (`httpx2` HTTP/2 transport):
+
+```bash
+pip install "mailgun[async]"
+```
+
+For offline unit testing and webhook verification helpers, import `MockMailgunClient` (`mailgun.testing`) and `verify_webhook_payload` / `parse_webhook_event` (`mailgun.webhooks`) directly from `mailgun` (loaded lazily via PEP 562). See [MIGRATION.md](MIGRATION.md) for `v1.10.x` -> `v1.11.0` details.
 
 #### git clone & pip install locally
 

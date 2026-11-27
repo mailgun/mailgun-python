@@ -35,7 +35,10 @@ def handle_address_validate(
     else:
         keys = []
 
-    final_keys = build_path_from_keys(keys[1:] if len(keys) > 1 else [])
+    if keys and keys[0] == "address":
+        final_keys = build_path_from_keys(keys)
+    else:
+        final_keys = build_path_from_keys(keys[1:] if len(keys) > 1 else [])
     base_url = str(url.get("base", "")).rstrip("/")
 
     if "list_name" in kwargs:

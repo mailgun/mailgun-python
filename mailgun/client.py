@@ -22,7 +22,6 @@ import warnings
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Final, Self
 
-import httpx2
 import requests  # pyright: ignore[reportMissingModuleSource]
 
 from mailgun.config import Config
@@ -31,8 +30,19 @@ from mailgun.filters import RedactingFilter
 from mailgun.security import SecretAuth, SecureHTTPAdapter, SecurityGuard
 
 
+httpx2: Any
+try:
+    import httpx2 as _httpx2_runtime
+
+    httpx2 = _httpx2_runtime
+except ImportError:  # pragma: no cover
+    httpx2 = None
+
+
 if TYPE_CHECKING:
     import types
+
+    import httpx2 as _httpx2_mod
 
 # ==============================================================================
 # 1. PUBLIC API & GLOBALS
@@ -129,6 +139,11 @@ class BaseClient:
             A list of available attributes including dynamic endpoints.
         """
         return sorted(set(super().__dir__()) | self.config.available_endpoints)
+
+    @staticmethod
+    def _is_healthy_response(response: Any) -> bool:
+        """Return True when a readiness probe response has HTTP 200 OK status."""
+        return bool(hasattr(response, "status_code") and response.status_code == HTTPStatus.OK)
 
 
 # ==============================================================================
@@ -270,10 +285,7 @@ class Client(BaseClient):
             response = self.domains.get(filters={"limit": 1})
         except Exception:  # ruff: ignore[blind-except] - Explicitly failing closed on readiness probe
             return False
-        else:
-            if hasattr(response, "status_code"):
-                return bool(response.status_code == HTTPStatus.OK)
-            return False
+        return self._is_healthy_response(response)
 
 
 # ==============================================================================
@@ -298,10 +310,16 @@ class AsyncClient(BaseClient):
         Args:
             auth: A tuple containing the API user and API key.
             **kwargs: Additional configuration parameters.
+
+        Raises:
+            ImportError: If the optional ``httpx2`` dependency is not installed.
         """
+        if httpx2 is None:
+            msg = "AsyncClient requires the 'async' extra. Install it with: pip install 'mailgun[async]'"
+            raise ImportError(msg)
         super().__init__(auth=auth, **kwargs)
         self._client_kwargs = kwargs.get("client_kwargs", {})
-        self._httpx_client: httpx2.AsyncClient | None = None
+        self._httpx_client: _httpx2_mod.AsyncClient | None = None
 
     def __getattr__(self, name: str) -> Any:
         """Resolve and return the requested API endpoint instance.
@@ -341,16 +359,22 @@ class AsyncClient(BaseClient):
         return endpoint
 
     @property
-    def _client(self) -> httpx2.AsyncClient:
+    def _client(self) -> _httpx2_mod.AsyncClient:
         """Provide lazy initialization for the underlying httpx2.AsyncClient.
 
         Returns:
             The active httpx2.AsyncClient instance.
+
+        Raises:
+            ImportError: If the optional ``httpx2`` dependency is not installed.
         """
         # Assign to a local variable so Pyright can properly narrow the type
-        current_client: httpx2.AsyncClient | None = getattr(self, "_httpx_client", None)
+        current_client: _httpx2_mod.AsyncClient | None = getattr(self, "_httpx_client", None)
 
         if current_client is None or current_client.is_closed:
+            if httpx2 is None:
+                msg = "AsyncClient requires the 'async' extra. Install it with: pip install 'mailgun[async]'"
+                raise ImportError(msg)
             # Enforce TLS 1.2+ for httpx (CWE-319)
             ssl_context = ssl.create_default_context()
             ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
@@ -365,8 +389,9 @@ class AsyncClient(BaseClient):
                     verify=ssl_context,
                 )
 
-            self._httpx_client = httpx2.AsyncClient(**kwargs)
-            return self._httpx_client
+            created_client: _httpx2_mod.AsyncClient = httpx2.AsyncClient(**kwargs)
+            self._httpx_client = created_client
+            return created_client
 
         return current_client
 
@@ -435,7 +460,4 @@ class AsyncClient(BaseClient):
             response = await self.domains.get(filters={"limit": 1})
         except Exception:  # ruff: ignore[blind-except] - Explicitly failing closed on readiness probe
             return False
-        else:
-            if hasattr(response, "status_code"):
-                return bool(response.status_code == HTTPStatus.OK)
-            return False
+        return self._is_healthy_response(response)

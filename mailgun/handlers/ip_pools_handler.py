@@ -28,20 +28,30 @@ def handle_ippools(
     Returns:
         The final URL for the IP pools endpoint.
     """
-    final_keys = build_path_from_keys(url.get("keys", []))
-    base_url = str(url["base"]).rstrip("/") + final_keys
+    url_keys = list(url.get("keys", []))
+    base_prefix = str(url["base"]).rstrip("/")
 
-    if "pool_id" not in kwargs:
-        return base_url
-
-    safe_pool = SecurityGuard.sanitize_path_segment(kwargs["pool_id"])
-    pool_url = f"{base_url}/{safe_pool}"
-
-    if "ips.json" in final_keys:
+    if "ips.json" in url_keys or len(url_keys) <= 1 or url_keys[0] != "ip_pools":
+        final_keys = build_path_from_keys(url_keys)
+        base_url = base_prefix + final_keys
+        if "pool_id" not in kwargs:
+            return base_url
+        safe_pool = SecurityGuard.sanitize_path_segment(kwargs["pool_id"])
+        pool_url = f"{base_url}/{safe_pool}"
+        if "ips.json" in final_keys:
+            return pool_url
+        if "ip" in kwargs:
+            safe_ip = SecurityGuard.sanitize_path_segment(kwargs["ip"])
+            return f"{pool_url}/ips/{safe_ip}"
         return pool_url
 
+    root_url = base_prefix + build_path_from_keys(url_keys[:1])
+    sub_keys = build_path_from_keys(url_keys[1:])
+    if "pool_id" not in kwargs:
+        return f"{root_url}{sub_keys}"
+    safe_pool = SecurityGuard.sanitize_path_segment(kwargs["pool_id"])
+    pool_url = f"{root_url}/{safe_pool}{sub_keys}"
     if "ip" in kwargs:
         safe_ip = SecurityGuard.sanitize_path_segment(kwargs["ip"])
-        return f"{pool_url}/ips/{safe_ip}"
-
+        return f"{pool_url}/{safe_ip}"
     return pool_url

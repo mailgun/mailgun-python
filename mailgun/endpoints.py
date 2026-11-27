@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import importlib
 import json
 import sys
 import time
@@ -10,7 +11,6 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Final
 from urllib.parse import parse_qs, urlparse
 
-import httpx2
 import requests  # pyright: ignore[reportMissingModuleSource]
 from requests.models import Response  # pyright: ignore[reportMissingModuleSource]
 
@@ -21,8 +21,19 @@ from mailgun.logger import get_logger
 from mailgun.security import SecurityGuard
 
 
+httpx2: Any
+try:
+    import httpx2 as _httpx2_runtime
+
+    httpx2 = _httpx2_runtime
+except ImportError:  # pragma: no cover
+    httpx2 = None
+
+
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Mapping
+
+    import httpx2 as _httpx2_mod
 
     from mailgun.types import APIResponseType, AsyncAPIResponseType, TimeoutType
 
@@ -52,118 +63,55 @@ def build_path_from_keys(keys: Iterable[str]) -> str:
     )
 
 
-@lru_cache(maxsize=32)
-def _load_handler(endpoint_key: str) -> Callable[..., str]:  # noqa: PLR0911, PLR0912
-    """Lazy load the API URL handler for a specific endpoint using SAST-safe literal imports.
+_HANDLER_REGISTRY: Final[dict[str, tuple[str, str]]] = {
+    "domains": ("mailgun.handlers.domains_handler", "handle_domains"),
+    "dkim_authority": ("mailgun.handlers.domains_handler", "handle_domains"),
+    "dkim_selector": ("mailgun.handlers.domains_handler", "handle_domains"),
+    "web_prefix": ("mailgun.handlers.domains_handler", "handle_domains"),
+    "domainlist": ("mailgun.handlers.domains_handler", "handle_domainlist"),
+    "dkim": ("mailgun.handlers.domains_handler", "handle_dkimkeys"),
+    "sending_queues": ("mailgun.handlers.domains_handler", "handle_sending_queues"),
+    "mailboxes": ("mailgun.handlers.domains_handler", "handle_mailboxes_credentials"),
+    "webhooks": ("mailgun.handlers.domains_handler", "handle_webhooks"),
+    "bounces": ("mailgun.handlers.suppressions_handler", "handle_bounces"),
+    "unsubscribes": ("mailgun.handlers.suppressions_handler", "handle_unsubscribes"),
+    "whitelists": ("mailgun.handlers.suppressions_handler", "handle_whitelists"),
+    "complaints": ("mailgun.handlers.suppressions_handler", "handle_complaints"),
+    "resendmessage": ("mailgun.handlers.messages_handler", "handle_resend_message"),
+    "ips": ("mailgun.handlers.ips_handler", "handle_ips"),
+    "ip_pools": ("mailgun.handlers.ip_pools_handler", "handle_ippools"),
+    "tags": ("mailgun.handlers.tags_handler", "handle_tags"),
+    "routes": ("mailgun.handlers.routes_handler", "handle_routes"),
+    "lists": ("mailgun.handlers.mailinglists_handler", "handle_lists"),
+    "templates": ("mailgun.handlers.templates_handler", "handle_templates"),
+    "address": ("mailgun.handlers.email_validation_handler", "handle_address_validate"),
+    "addressvalidate": ("mailgun.handlers.email_validation_handler", "handle_address_validate"),
+    "address_bulk": ("mailgun.handlers.email_validation_handler", "handle_address_validate"),
+    "address_preview": ("mailgun.handlers.email_validation_handler", "handle_address_validate"),
+    "address_validate": ("mailgun.handlers.email_validation_handler", "handle_address_validate"),
+    "inbox": ("mailgun.handlers.inbox_placement_handler", "handle_inbox"),
+    "analytics": ("mailgun.handlers.metrics_handler", "handle_metrics"),
+    "bounce-classification": (
+        "mailgun.handlers.bounce_classification_handler",
+        "handle_bounce_classification",
+    ),
+    "users": ("mailgun.handlers.users_handler", "handle_users"),
+    "keys": ("mailgun.handlers.keys_handler", "handle_keys"),
+}
 
-    This maintains zero-I/O startup performance. The lru_cache ensures this branching logic
-    is executed exactly once per route type.
+
+@lru_cache(maxsize=32)
+def _load_handler(endpoint_key: str) -> Callable[..., str]:
+    """Lazy load the API URL handler for a specific endpoint via declarative dispatch.
 
     Returns:
         Callable: The specific handler function for the requested endpoint.
     """
-    # Group 1: Domains Handler (Most common aliases grouped for speed)
-    if endpoint_key in {"domains", "dkim_authority", "dkim_selector", "web_prefix"}:
-        from mailgun.handlers.domains_handler import handle_domains
-
-        return handle_domains
-    if endpoint_key == "domainlist":
-        from mailgun.handlers.domains_handler import handle_domainlist
-
-        return handle_domainlist
-    if endpoint_key == "dkim":
-        from mailgun.handlers.domains_handler import handle_dkimkeys
-
-        return handle_dkimkeys
-    if endpoint_key == "sending_queues":
-        from mailgun.handlers.domains_handler import handle_sending_queues
-
-        return handle_sending_queues
-    if endpoint_key == "mailboxes":
-        from mailgun.handlers.domains_handler import handle_mailboxes_credentials
-
-        return handle_mailboxes_credentials
-    if endpoint_key == "webhooks":
-        from mailgun.handlers.domains_handler import handle_webhooks
-
-        return handle_webhooks
-
-    # Group 2: Suppressions
-    if endpoint_key == "bounces":
-        from mailgun.handlers.suppressions_handler import handle_bounces
-
-        return handle_bounces
-    if endpoint_key == "unsubscribes":
-        from mailgun.handlers.suppressions_handler import handle_unsubscribes
-
-        return handle_unsubscribes
-    if endpoint_key == "whitelists":
-        from mailgun.handlers.suppressions_handler import handle_whitelists
-
-        return handle_whitelists
-    if endpoint_key == "complaints":
-        from mailgun.handlers.suppressions_handler import handle_complaints
-
-        return handle_complaints
-
-    # Group 3: Specific Services
-    if endpoint_key == "resendmessage":
-        from mailgun.handlers.messages_handler import handle_resend_message
-
-        return handle_resend_message
-    if endpoint_key == "ips":
-        from mailgun.handlers.ips_handler import handle_ips
-
-        return handle_ips
-    if endpoint_key == "ip_pools":
-        from mailgun.handlers.ip_pools_handler import handle_ippools
-
-        return handle_ippools
-    if endpoint_key == "tags":
-        from mailgun.handlers.tags_handler import handle_tags
-
-        return handle_tags
-    if endpoint_key == "routes":
-        from mailgun.handlers.routes_handler import handle_routes
-
-        return handle_routes
-    if endpoint_key == "lists":
-        from mailgun.handlers.mailinglists_handler import handle_lists
-
-        return handle_lists
-    if endpoint_key == "templates":
-        from mailgun.handlers.templates_handler import handle_templates
-
-        return handle_templates
-    if endpoint_key == "addressvalidate":
-        from mailgun.handlers import email_validation_handler as evh
-
-        return evh.handle_address_validate
-    if endpoint_key == "inbox":
-        from mailgun.handlers.inbox_placement_handler import handle_inbox
-
-        return handle_inbox
-    if endpoint_key == "analytics":
-        from mailgun.handlers.metrics_handler import handle_metrics
-
-        return handle_metrics
-    if endpoint_key == "bounce-classification":
-        from mailgun.handlers import bounce_classification_handler as bch
-
-        return bch.handle_bounce_classification
-    if endpoint_key == "users":
-        from mailgun.handlers.users_handler import handle_users
-
-        return handle_users
-    if endpoint_key == "keys":
-        from mailgun.handlers.keys_handler import handle_keys
-
-        return handle_keys
-
-    # Group 4: Fallback for "messages", "messages.mime", "events", and unknown routes
-    from mailgun.handlers.default_handler import handle_default
-
-    return handle_default
+    module_name, attr_name = _HANDLER_REGISTRY.get(
+        endpoint_key,
+        ("mailgun.handlers.default_handler", "handle_default"),
+    )
+    return getattr(importlib.import_module(module_name), attr_name)
 
 
 class BaseEndpoint:
@@ -276,12 +224,22 @@ class BaseEndpoint:
             MailgunTimeoutError: If the request times out.
             ApiError: If network routing fails or the API request fails.
         """
-        if isinstance(e, (requests.Timeout, httpx2.TimeoutException)):
+        timeout_errors: tuple[type[BaseException], ...] = (
+            (requests.Timeout, httpx2.TimeoutException)
+            if httpx2 is not None
+            else (requests.Timeout,)
+        )
+        network_errors: tuple[type[BaseException], ...] = (
+            (requests.ConnectionError, httpx2.ConnectError, httpx2.NetworkError)
+            if httpx2 is not None
+            else (requests.ConnectionError,)
+        )
+        if isinstance(e, timeout_errors):
             msg = f"Request timed out for {method.upper()} {target_url}"
             raise MailgunTimeoutError(msg) from e
         if isinstance(e, ApiError):
             raise e
-        if isinstance(e, (requests.ConnectionError, httpx2.ConnectError, httpx2.NetworkError)):
+        if isinstance(e, network_errors):
             msg = f"Network routing failed for {method.upper()} {target_url}: {e}"
             raise ApiError(msg) from e
         msg = f"API request failed for {method.upper()} {target_url}: {e}"
@@ -417,6 +375,60 @@ class BaseEndpoint:
             return set(raw_values)
         return parsed_str
 
+    @staticmethod
+    def _compute_retry_delay(
+        policy: RetryPolicy,
+        status_code: int,
+        response: Any,
+        attempt: int,
+    ) -> float:
+        """Compute retry delay respecting Retry-After on HTTP 429 responses.
+
+        Returns:
+            float: Delay duration in seconds before the next retry attempt.
+        """
+        delay = policy.calculate_delay(attempt)
+        if status_code == HTTPStatus.TOO_MANY_REQUESTS and policy.respect_retry_after:
+            headers = getattr(response, "headers", None)
+            retry_after = headers.get("Retry-After") if headers is not None else None
+            if retry_after and str(retry_after).isdigit():
+                delay = min(float(retry_after), policy.max_delay)
+        return delay
+
+    @staticmethod
+    def _log_response_status(
+        status_code: Any,
+        safe_method: str,
+        safe_url_for_log: str,
+        *,
+        is_async: bool = False,
+    ) -> None:
+        """Emit structured debug/error logs for completed API responses."""
+        if isinstance(status_code, int) and status_code >= _HTTP_ERROR_THRESHOLD:
+            msg = "API Async Error %s | %s %s" if is_async else "API Error %s | %s %s"
+            logger.error(msg, status_code, safe_method.upper(), safe_url_for_log)
+        else:
+            msg = "API Async Success %s | %s %s" if is_async else "API Success %s | %s %s"
+            logger.debug(msg, status_code, safe_method.upper(), safe_url_for_log)
+
+    @classmethod
+    def _advance_pagination_filters(
+        cls,
+        next_url: str,
+        initial_filters: dict[str, Any],
+        current_filters: dict[str, Any],
+    ) -> None:
+        """Update pagination query filters in-place from Mailgun's ``paging.next`` URL."""
+        query_params = parse_qs(urlparse(next_url).query)
+        for k, v in query_params.items():
+            if not v:
+                continue
+            orig_ref = initial_filters.get(k, current_filters.get(k))
+            if orig_ref is not None:
+                current_filters[k] = cls._cast_query_param(orig_ref, v)
+            else:
+                current_filters[k] = v[0] if len(v) == 1 else v
+
 
 class Endpoint(BaseEndpoint):
     """Generate synchronous requests and return responses."""
@@ -528,11 +540,7 @@ class Endpoint(BaseEndpoint):
                 is_transient_error = status_code in {429, 500, 502, 503, 504}
 
                 if is_transient_error and attempt < max_attempts - 1:
-                    delay = policy.calculate_delay(attempt)
-                    if status_code == HTTPStatus.TOO_MANY_REQUESTS and policy.respect_retry_after:
-                        retry_after = response.headers.get("Retry-After")
-                        if retry_after and retry_after.isdigit():
-                            delay = min(float(retry_after), policy.max_delay)
+                    delay = self._compute_retry_delay(policy, status_code, response, attempt)
 
                     logger.warning(
                         "API Transient Error %s | Retrying in %.2fs (Attempt %d/%d) | URL: %s",
@@ -546,21 +554,9 @@ class Endpoint(BaseEndpoint):
                     time.sleep(delay)
                     continue
 
-                is_error = isinstance(status_code, int) and status_code >= _HTTP_ERROR_THRESHOLD
-                if is_error:
-                    logger.error(
-                        "API Error %s | %s %s",
-                        status_code,
-                        safe_method.upper(),
-                        safe_url_for_log,
-                    )
-                else:
-                    logger.debug(
-                        "API Success %s | %s %s",
-                        status_code,
-                        safe_method.upper(),
-                        safe_url_for_log,
-                    )
+                self._log_response_status(
+                    status_code, safe_method, safe_url_for_log, is_async=False
+                )
                 break
 
             except requests.RequestException as e:
@@ -838,16 +834,7 @@ class Endpoint(BaseEndpoint):
 
             # Mailgun returns a full URL. Parse it to extract just the new pagination parameters
             # (like 'page' or 'url') so the next self.get() call works correctly.
-            query_params = parse_qs(urlparse(next_url).query)
-            for k, v in query_params.items():
-                if not v:
-                    continue
-
-                orig_ref = initial_filters.get(k, current_filters.get(k))
-                if orig_ref is not None:
-                    current_filters[k] = self._cast_query_param(orig_ref, v)
-                else:
-                    current_filters[k] = v[0] if len(v) == 1 else v
+            self._advance_pagination_filters(next_url, initial_filters, current_filters)
 
 
 # ==============================================================================
@@ -865,7 +852,7 @@ class AsyncEndpoint(BaseEndpoint):
         url: dict[str, Any],
         headers: dict[str, str],
         auth: tuple[str, str] | None,
-        client: httpx2.AsyncClient | None = None,
+        client: _httpx2_mod.AsyncClient | None = None,
         timeout: TimeoutType = 60,
         *,
         dry_run: bool = False,
@@ -879,7 +866,13 @@ class AsyncEndpoint(BaseEndpoint):
             client: Optional httpx2.AsyncClient instance to reuse.
             timeout: Base request timeout.
             dry_run: Execution sandbox flag.
+
+        Raises:
+            ImportError: If the optional ``httpx2`` dependency is not installed.
         """
+        if httpx2 is None:
+            msg = "AsyncEndpoint requires the 'async' extra. Install it with: pip install 'mailgun[async]'"
+            raise ImportError(msg)
         super().__init__(url, headers, auth, timeout=timeout, dry_run=dry_run)
         self._client = client or httpx2.AsyncClient()
 
@@ -976,12 +969,7 @@ class AsyncEndpoint(BaseEndpoint):
                 is_transient_error = status_code in {429, 500, 502, 503, 504}
 
                 if is_transient_error and attempt < max_attempts - 1:
-                    delay = policy.calculate_delay(attempt)
-
-                    if status_code == HTTPStatus.TOO_MANY_REQUESTS and policy.respect_retry_after:
-                        retry_after = response.headers.get("Retry-After")
-                        if retry_after and retry_after.isdigit():
-                            delay = min(float(retry_after), policy.max_delay)
+                    delay = self._compute_retry_delay(policy, status_code, response, attempt)
 
                     logger.warning(
                         "API Async Transient Error %s | Retrying in %.2fs (Attempt %d/%d) | URL: %s",
@@ -995,21 +983,7 @@ class AsyncEndpoint(BaseEndpoint):
                     await asyncio.sleep(delay)
                     continue
 
-                is_error = isinstance(status_code, int) and status_code >= _HTTP_ERROR_THRESHOLD
-                if is_error:
-                    logger.error(
-                        "API Async Error %s | %s %s",
-                        status_code,
-                        safe_method.upper(),
-                        safe_url_for_log,
-                    )
-                else:
-                    logger.debug(
-                        "API Async Success %s | %s %s",
-                        status_code,
-                        safe_method.upper(),
-                        safe_url_for_log,
-                    )
+                self._log_response_status(status_code, safe_method, safe_url_for_log, is_async=True)
 
                 break
 
@@ -1282,13 +1256,4 @@ class AsyncEndpoint(BaseEndpoint):
 
             # Mailgun returns a full URL. Parse it to extract just the new pagination parameters
             # (like 'page' or 'url') so the next self.get() call works correctly.
-            query_params = parse_qs(urlparse(next_url).query)
-            for k, v in query_params.items():
-                if not v:
-                    continue
-
-                orig_ref = initial_filters.get(k, current_filters.get(k))
-                if orig_ref is not None:
-                    current_filters[k] = self._cast_query_param(orig_ref, v)
-                else:
-                    current_filters[k] = v[0] if len(v) == 1 else v
+            self._advance_pagination_filters(next_url, initial_filters, current_filters)

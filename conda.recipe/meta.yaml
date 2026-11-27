@@ -28,7 +28,6 @@ requirements:
     {% endfor %}
   run:
     - python
-    - httpx2 >=2.7.0
     - requests >=2.33.0
 
 test:
@@ -38,6 +37,8 @@ test:
     - mailgun.examples
     - mailgun.ext
     - mailgun.ext.pydantic
+    - mailgun.testing
+    - mailgun.webhooks
   source_files:
     - tests/
   requires:

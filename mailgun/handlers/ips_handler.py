@@ -28,9 +28,13 @@ def handle_ips(
     Returns:
         The final URL for the IPs endpoint.
     """
-    final_keys = build_path_from_keys(url.get("keys", []))
-    base_url = str(url["base"]).rstrip("/") + final_keys
+    url_keys = list(url.get("keys", []))
+    base_prefix = str(url["base"]).rstrip("/")
     if "ip" in kwargs:
         safe_ip = SecurityGuard.sanitize_path_segment(kwargs["ip"])
-        return f"{base_url}/{safe_ip}"
-    return base_url
+        if len(url_keys) > 1 and url_keys[0] == "ips":
+            root_url = base_prefix + build_path_from_keys(url_keys[:1])
+            sub_keys = build_path_from_keys(url_keys[1:])
+            return f"{root_url}/{safe_ip}{sub_keys}"
+        return f"{base_prefix}{build_path_from_keys(url_keys)}/{safe_ip}"
+    return f"{base_prefix}{build_path_from_keys(url_keys)}"

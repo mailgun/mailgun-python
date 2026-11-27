@@ -12,6 +12,7 @@ from __future__ import annotations
 
 __all__ = [
     "ApiError",
+    "DeliverabilityError",
     "MailgunTimeoutError",
     "RouteNotFoundError",
     "UploadError",
@@ -43,6 +44,7 @@ class DeliverabilityError(ApiError):
     """Raised when SpamGuard detects critical structural flaws in the HTML payload that would severely penalize domain reputation or trigger spam filters."""
 
     def __init__(self, score: float, issues: list[str]) -> None:
+        """Initialize a DeliverabilityError with score and issue details."""
         self.score = score
         self.issues = issues
 

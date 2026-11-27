@@ -27,7 +27,7 @@ authors = [
 requires-python = ">=3.11"
 
 classifiers = [
-  "Development Status :: 3 - Alpha",
+  "Development Status :: 5 - Production/Stable",
   "Environment :: Console",
   "Intended Audience :: Developers",
   "Natural Language :: English",
@@ -44,8 +44,17 @@ classifiers = [
 
 dynamic = [ "version" ]
 dependencies = [
-    "httpx2 >=2.7.0",
     "requests>=2.33.0",
+]
+
+optional-dependencies.async = [
+  "httpx2 >=2.7.0",
+]
+
+optional-dependencies.all = [
+  "httpx2 >=2.7.0",
+  "pydantic >=2.13.4",
+  "fastapi>=0.100.0",
 ]
 
 optional-dependencies.pydantic = [
@@ -67,6 +76,7 @@ optional-dependencies.docs = [
 ]
 optional-dependencies.linting = [
   "bandit",
+  "httpx2 >=2.7.0",
   "pre-commit",
   "ruff",
   "mypy",
@@ -85,6 +95,7 @@ optional-dependencies.spelling = [ "typos" ]
 optional-dependencies.tests = [
   "codecov>=2.0.16",
   "coverage>=4.5.4",
+  "httpx2 >=2.7.0",
     "hypothesis",
   # For a Private key PEM file generated in PKCS1 format.
   "openssl",
@@ -105,6 +116,14 @@ urls."Documentation" = "https://documentation.mailgun.com"
 urls."Homepage" = "https://www.mailgun.com"
 urls."Issue Tracker" = "https://github.com/mailgun/mailgun-python/issues"
 urls."Repository" = "https://github.com/mailgun/mailgun-python"
+urls."Source" = "https://github.com/mailgun/mailgun-python"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = [
+  "ignore:Unknown config option. asyncio:pytest.PytestConfigWarning",
+]
 
 [tool.setuptools]
 py-modules = [ "mailgun._version" ]
@@ -208,7 +227,7 @@ preview = true
 
 # Test suite rules relaxation
 [tool.ruff.lint.per-file-ignores]
-"__init__.py" = ["module-import-not-at-top-of-file"]
+"__init__.py" = ["module-import-not-at-top-of-file", "non-empty-init-module"]
 "mailgun/endpoints.py" = ["import-outside-top-level"]
 
 # Test suite relaxations

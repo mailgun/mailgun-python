@@ -183,6 +183,7 @@ _DEPRECATED_ROUTES_PATTERNS: Final[dict[str, str]] = {
     r"^/v3/domains/[^/]+/limits/tag": "The domain tag limits API is deprecated.",
     r"^/v3/lists/[^/]+/validate": "The v3 Bulk Validation API is deprecated. Migrate to the v4 Bulk Validations Service.",
     r"^/v3/address/(validate|parse|private)": "The v3 Address Validation/Parsing APIs are deprecated. Migrate to the v4 Validations Service.",
+    r"^/v4/address/parse": "The v4 address parse endpoint is not part of the Mailgun v4 Validation API. Migrate to /v4/address/validate.",
 }
 
 
